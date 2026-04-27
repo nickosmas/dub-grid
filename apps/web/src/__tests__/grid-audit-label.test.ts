@@ -9,10 +9,10 @@ function makeShiftMap(
   return {
     [key]: {
       label: "D",
-      shiftCodeIds: [1],
+      assignmentIds: [1],
       isDraft: true,
       draftKind: "modified",
-      publishedShiftCodeIds: [1],
+      publishedAssignmentDefinitionIds: [1],
       publishedLabel: "D",
       ...overrides,
     },
@@ -63,5 +63,22 @@ describe("resolveGridAuditLabel", () => {
         currentUserId: "user-1",
       }),
     ).toBe("J. Example");
+  });
+
+  it("falls back to the publisher when publish history has no updatedBy", () => {
+    expect(
+      resolveGridAuditLabel({
+        cellKey: "emp-1_2024-01-15",
+        shifts: {},
+        publishChangesMap: new Map([
+          [
+            "emp-1_2024-01-15",
+            { updatedBy: null, publishedBy: "user-3" },
+          ],
+        ]),
+        auditNames: new Map([["user-3", "Morgan Example"]]),
+        currentUserId: "user-1",
+      }),
+    ).toBe("M. Example");
   });
 });

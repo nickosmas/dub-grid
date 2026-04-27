@@ -5,7 +5,7 @@
 
 import type {
   ShiftMap,
-  ShiftCode,
+  AssignmentDefinition,
   Employee,
   FocusArea,
   RecurringShift,
@@ -28,7 +28,7 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export function computeEmployeeHoursHistory(
   empId: string,
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
   weekCount: number,
   otThreshold: number = 40,
   categoryById?: Map<number, ShiftCategory>,
@@ -56,17 +56,17 @@ export function computeEmployeeHoursHistory(
 
     for (const dateKey of weekDateKeys) {
       const entry = shifts[`${empId}_${dateKey}`];
-      if (!entry || entry.isDelete || entry.shiftCodeIds.length === 0) continue;
+      if (!entry || entry.isDelete || entry.assignmentIds.length === 0) continue;
 
       const hours = computeShiftDurationHours(
-        entry.shiftCodeIds,
-        shiftCodeById,
+        entry.assignmentIds,
+        assignmentById,
         entry.customStartTime,
         entry.customEndTime,
         categoryById,
       );
       totalHours += hours;
-      if (entry.shiftCodeIds.length > 0) {
+      if (entry.assignmentIds.length > 0) {
         shiftCount++;
       }
     }
@@ -87,22 +87,22 @@ export function computeEmployeeHoursHistory(
   return results;
 }
 
-// ─── Shift Code Distribution ────────────────────────────
+// ─── Assignment Distribution ────────────────────────────
 
 export function computeShiftDistribution(
   empId: string,
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
 ): ShiftDistributionEntry[] {
   const counts = new Map<number, number>();
   let total = 0;
 
   for (const [key, entry] of Object.entries(shifts)) {
     if (!key.startsWith(`${empId}_`)) continue;
-    if (entry.isDelete || entry.shiftCodeIds.length === 0) continue;
+    if (entry.isDelete || entry.assignmentIds.length === 0) continue;
 
-    for (const codeId of entry.shiftCodeIds) {
-      const sc = shiftCodeById.get(codeId);
+    for (const codeId of entry.assignmentIds) {
+      const sc = assignmentById.get(codeId);
       if (sc) {
         counts.set(codeId, (counts.get(codeId) ?? 0) + 1);
         total++;
@@ -113,9 +113,9 @@ export function computeShiftDistribution(
 
   return Array.from(counts.entries())
     .map(([codeId, count]) => {
-      const sc = shiftCodeById.get(codeId);
+      const sc = assignmentById.get(codeId);
       return {
-        shiftCodeId: codeId,
+        assignmentId: codeId,
         label: sc?.label ?? "?",
         name: sc?.name ?? "Unknown",
         count,
@@ -137,7 +137,7 @@ export function computeDayPattern(
 
   for (const [key, entry] of Object.entries(shifts)) {
     if (!key.startsWith(`${empId}_`)) continue;
-    if (entry.isDelete || entry.shiftCodeIds.length === 0) continue;
+    if (entry.isDelete || entry.assignmentIds.length === 0) continue;
 
     const dateKey = key.substring(key.indexOf("_") + 1);
     const date = new Date(dateKey + "T00:00:00");
@@ -159,7 +159,7 @@ export function computeDayPattern(
 export function computeFocusAreaDistribution(
   empId: string,
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
   focusAreas: FocusArea[],
 ): FocusAreaDistributionEntry[] {
   const faCounts = new Map<number, number>();
@@ -167,10 +167,10 @@ export function computeFocusAreaDistribution(
 
   for (const [key, entry] of Object.entries(shifts)) {
     if (!key.startsWith(`${empId}_`)) continue;
-    if (entry.isDelete || entry.shiftCodeIds.length === 0) continue;
+    if (entry.isDelete || entry.assignmentIds.length === 0) continue;
 
-    for (const codeId of entry.shiftCodeIds) {
-      const sc = shiftCodeById.get(codeId);
+    for (const codeId of entry.assignmentIds) {
+      const sc = assignmentById.get(codeId);
       if (sc && sc.focusAreaId != null) {
         faCounts.set(sc.focusAreaId, (faCounts.get(sc.focusAreaId) ?? 0) + 1);
         total++;
@@ -221,7 +221,7 @@ export function computeOvertimeSummary(
 export function generateEmployeeCSV(
   employee: Employee,
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
   focusAreas: FocusArea[],
   certifications: { id: number; name: string }[],
   orgRoles: { id: number; name: string }[],
@@ -263,7 +263,7 @@ export function generateEmployeeCSV(
 
   // ── Shift History section
   lines.push("SHIFT HISTORY");
-  lines.push("Date,Shift Code,Start Time,End Time,Status");
+  lines.push("Date,Assignment,Start Time,End Time,Status");
   const empShifts = Object.entries(shifts)
     .filter(([key]) => key.startsWith(`${employee.id}_`))
     .sort(([a], [b]) => {
@@ -278,9 +278,9 @@ export function generateEmployeeCSV(
     const isAbsence = entry.absenceTypeId != null;
     const label = isAbsence
       ? entry.label
-      : entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.label ?? "?").join("/");
-    const startTime = isAbsence ? "" : (entry.customStartTime ?? entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.defaultStartTime).find(Boolean) ?? "");
-    const endTime = isAbsence ? "" : (entry.customEndTime ?? entry.shiftCodeIds.map(id => shiftCodeById.get(id)?.defaultEndTime).find(Boolean) ?? "");
+      : entry.assignmentIds.map(id => assignmentById.get(id)?.label ?? "?").join("/");
+    const startTime = isAbsence ? "" : (entry.customStartTime ?? entry.assignmentIds.map(id => assignmentById.get(id)?.defaultStartTime).find(Boolean) ?? "");
+    const endTime = isAbsence ? "" : (entry.customEndTime ?? entry.assignmentIds.map(id => assignmentById.get(id)?.defaultEndTime).find(Boolean) ?? "");
     const status = entry.isDraft ? "Draft" : "Published";
     lines.push(
       `${dateKey},${esc(label)},${startTime},${endTime},${status}`,
@@ -290,7 +290,7 @@ export function generateEmployeeCSV(
 
   // ── Recurring Shifts section
   lines.push("RECURRING SHIFTS");
-  lines.push("Day,Shift Code,Effective From,Effective Until");
+  lines.push("Day,Assignment,Effective From,Effective Until");
   for (const rs of recurringShifts) {
     lines.push(
       `${DAY_LABELS[rs.dayOfWeek]},${esc(rs.shiftLabel)},${rs.effectiveFrom},${rs.effectiveUntil ?? "Ongoing"}`,

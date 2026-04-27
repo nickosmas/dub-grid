@@ -4,7 +4,19 @@ import { useState } from "react";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
 import { supabase } from "@/lib/supabase";
-import { AbsenceType, EditModalState, Employee, FocusArea, NamedItem, ShiftCode } from "@/types";
+import {
+  AbsenceType,
+  DraftKind,
+  EditModalState,
+  Employee,
+  FocusArea,
+  JobDefinition,
+  NamedItem,
+  ScheduleCellInput,
+  ShiftCategory,
+  AssignmentDefinition,
+  ShiftDisplayMode,
+} from "@/types";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -14,45 +26,105 @@ const modal: EditModalState = {
   date: new Date(2024, 0, 15), // Jan 15, 2024
   empFocusAreaIds: [1, 2],
   empCertificationId: null,
+  empRoleIds: [],
 };
 
-const northShift: ShiftCode = {
+const northCategory: ShiftCategory = {
+  id: 11,
+  orgId: "org-1",
+  name: "Day Shift",
+  abbr: "D",
+  sortOrder: 0,
+  focusAreaId: 1,
+};
+
+const southCategory: ShiftCategory = {
+  id: 12,
+  orgId: "org-1",
+  name: "Evening Shift",
+  abbr: "E",
+  sortOrder: 1,
+  focusAreaId: 2,
+};
+
+const northShift: AssignmentDefinition = {
   id: 1,
   orgId: "org-1",
   label: "D",
-  name: "Day",
+  name: "Day Shift",
   color: "#DBEAFE",
   border: "#93C5FD",
   text: "#1E40AF",
   sortOrder: 1,
+  categoryId: 11,
+  shiftId: 11,
+  jobId: 102,
   focusAreaId: 1,
 };
 
-const southShift: ShiftCode = {
+const southShift: AssignmentDefinition = {
   id: 2,
   orgId: "org-1",
   label: "E",
-  name: "Eve",
+  name: "Evening Shift",
   color: "#FEF3C7",
   border: "#FCD34D",
   text: "#92400E",
   sortOrder: 2,
+  categoryId: 12,
+  shiftId: 12,
+  jobId: 102,
   focusAreaId: 2,
 };
 
-const generalShift: ShiftCode = {
+const generalShift: AssignmentDefinition = {
   id: 3,
   orgId: "org-1",
   label: "X",
-  name: "Off",
+  name: "Cross Wing",
   color: "#F1F5F9",
   border: "#CBD5E1",
   text:"#475569",
   sortOrder: 3,
+  jobId: 101,
   isGeneral: true,
 };
 
-const shiftCodes = [northShift, southShift, generalShift];
+const shiftCategories = [northCategory, southCategory];
+const assignments = [northShift, southShift, generalShift];
+
+const jobs: JobDefinition[] = [
+  {
+    id: 101,
+    orgId: "org-1",
+    name: "Cross Wing",
+    abbr: "X",
+    showOnGrid: true,
+    assignmentMode: "shiftless",
+    eligibleRoleIds: [],
+    requiredCertificationIds: [],
+    color: "#F1F5F9",
+    border: "#CBD5E1",
+    text: "#475569",
+    sortOrder: 0,
+    systemKey: null,
+  },
+  {
+    id: 102,
+    orgId: "org-1",
+    name: "Supervisor",
+    abbr: "SUPV",
+    showOnGrid: true,
+    assignmentMode: "with_shift",
+    eligibleRoleIds: [],
+    requiredCertificationIds: [],
+    color: "#DBEAFE",
+    border: "#93C5FD",
+    text: "#1E40AF",
+    sortOrder: 1,
+    systemKey: null,
+  },
+];
 
 const absenceTypes: AbsenceType[] = [
   {
@@ -123,12 +195,21 @@ const employees: Employee[] = [
 function renderPanel(
   overrides: {
     currentShift?: string | null;
-    currentShiftCodeIds?: number[];
+    currentAssignmentIds?: number[];
+    currentAbsenceTypeId?: number | null;
+    customStartTime?: string | null;
+    customEndTime?: string | null;
+    draftKind?: DraftKind;
+    publishedAssignmentIds?: number[];
+    publishedAbsenceTypeId?: number | null;
+    publishedCustomStartTime?: string | null;
+    publishedCustomEndTime?: string | null;
     onSelect?: ReturnType<typeof vi.fn>;
     onClose?: ReturnType<typeof vi.fn>;
     modalOverride?: EditModalState;
-    shiftCodesOverride?: ShiftCode[];
+    assignmentsOverride?: AssignmentDefinition[];
     certificationsOverride?: NamedItem[];
+    shiftDisplayMode?: ShiftDisplayMode;
     auditInfo?: {
       createdByName: string | null;
       updatedByName: string | null;
@@ -143,12 +224,23 @@ function renderPanel(
     <ShiftEditPanel
       modal={overrides.modalOverride ?? modal}
       currentShift={overrides.currentShift ?? null}
-      currentShiftCodeIds={overrides.currentShiftCodeIds ?? []}
-      shiftCodes={overrides.shiftCodesOverride ?? shiftCodes}
+      currentAssignmentIds={overrides.currentAssignmentIds ?? []}
+      currentAbsenceTypeId={overrides.currentAbsenceTypeId ?? null}
+      assignments={overrides.assignmentsOverride ?? assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
+      customStartTime={overrides.customStartTime ?? null}
+      customEndTime={overrides.customEndTime ?? null}
+      draftKind={overrides.draftKind ?? null}
+      publishedAssignmentIds={overrides.publishedAssignmentIds ?? []}
+      publishedAbsenceTypeId={overrides.publishedAbsenceTypeId ?? null}
+      publishedCustomStartTime={overrides.publishedCustomStartTime ?? null}
+      publishedCustomEndTime={overrides.publishedCustomEndTime ?? null}
       onSelect={onSelect}
       onClose={onClose}
       focusAreas={focusAreas}
       certifications={overrides.certificationsOverride ?? certifications}
+      shiftDisplayMode={overrides.shiftDisplayMode ?? "code"}
       auditInfo={overrides.auditInfo}
     />,
   );
@@ -172,8 +264,10 @@ function renderRequestPanel(
     <ShiftEditPanel
       modal={overrides.modalOverride ?? modal}
       currentShift="D"
-      currentShiftCodeIds={[1]}
-      shiftCodes={shiftCodes}
+      currentAssignmentIds={[1]}
+      assignments={assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
       onSelect={vi.fn()}
       onClose={vi.fn()}
       focusAreas={focusAreas}
@@ -195,6 +289,80 @@ function renderRequestPanel(
   return { ...result, onMakeAvailable, onCallOff, onSubmitSwap };
 }
 
+function derivePanelSelection(
+  input: ScheduleCellInput | null,
+  shiftDisplayMode: ShiftDisplayMode = "code",
+): {
+  currentShift: string | null;
+  currentAssignmentIds: number[];
+  currentAbsenceTypeId: number | null;
+} {
+  if (!input || input.kind === "deleted") {
+    return {
+      currentShift: null,
+      currentAssignmentIds: [],
+      currentAbsenceTypeId: null,
+    };
+  }
+
+  if (input.kind === "absence") {
+    const absenceType =
+      absenceTypes.find((candidate) => candidate.id === input.absenceTypeId) ??
+      null;
+    return {
+      currentShift: absenceType?.label ?? null,
+      currentAssignmentIds: [],
+      currentAbsenceTypeId: input.absenceTypeId ?? null,
+    };
+  }
+
+  const orderedSegments = [...input.segments].sort(
+    (left, right) => left.position - right.position,
+  );
+  const currentAssignmentIds = orderedSegments
+    .map(
+      (segment) =>
+        assignments.find(
+          (assignment) =>
+            (assignment.shiftId ?? assignment.categoryId ?? null) ===
+              (segment.shiftId ?? null) && assignment.jobId === segment.jobId,
+        )?.id ?? null,
+    )
+    .filter((id): id is number => id != null);
+  const currentShift = orderedSegments
+    .map((segment) => {
+      const assignment =
+        assignments.find(
+          (candidate) =>
+            (candidate.shiftId ?? candidate.categoryId ?? null) ===
+              (segment.shiftId ?? null) && candidate.jobId === segment.jobId,
+        ) ?? null;
+      const job = jobs.find((candidate) => candidate.id === segment.jobId) ?? null;
+
+      if (!assignment) {
+        return shiftDisplayMode === "name"
+          ? (job?.name ?? "?")
+          : (job?.abbr ?? "?");
+      }
+
+      const primaryLabel =
+        shiftDisplayMode === "name" ? assignment.name : assignment.label;
+      const secondaryLabel =
+        shiftDisplayMode === "name" ? (job?.name ?? null) : (job?.abbr ?? null);
+
+      return secondaryLabel
+        ? `${primaryLabel} · ${secondaryLabel}`
+        : primaryLabel;
+    })
+    .join("/");
+
+  return {
+    currentShift,
+    currentAssignmentIds,
+    currentAbsenceTypeId: null,
+  };
+}
+
 function createSupabaseBuilder() {
   const builder = {
     select: vi.fn(),
@@ -212,21 +380,24 @@ function createSupabaseBuilder() {
 
 function RepeatFlowPanel() {
   const [currentShift, setCurrentShift] = useState<string | null>("D");
-  const [currentShiftCodeIds, setCurrentShiftCodeIds] = useState<number[]>([1]);
+  const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([1]);
 
   return (
     <ShiftEditPanel
       modal={modal}
       currentShift={currentShift}
-      currentShiftCodeIds={currentShiftCodeIds}
-      shiftCodes={shiftCodes}
+      currentAssignmentIds={currentAssignmentIds}
+      assignments={assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
       focusAreas={focusAreas}
       certifications={certifications}
       allowShiftEdits
       empId={modal.empId}
-      onSelect={(label, shiftCodeIds) => {
-        setCurrentShift(label === "OFF" ? null : label);
-        setCurrentShiftCodeIds(shiftCodeIds);
+      onSelect={(input) => {
+        const next = derivePanelSelection(input);
+        setCurrentShift(next.currentShift);
+        setCurrentAssignmentIds(next.currentAssignmentIds);
       }}
       onClose={vi.fn()}
       onRepeatConfirm={vi.fn()}
@@ -242,18 +413,51 @@ function RepeatAbsenceFlowPanel() {
     <ShiftEditPanel
       modal={modal}
       currentShift={currentShift}
-      currentShiftCodeIds={[]}
+      currentAssignmentIds={[]}
       currentAbsenceTypeId={currentAbsenceTypeId}
-      shiftCodes={shiftCodes}
+      assignments={assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
       absenceTypes={absenceTypes}
       focusAreas={focusAreas}
       certifications={certifications}
       allowShiftEdits
       empId={modal.empId}
-      onSelect={() => {}}
-      onAbsenceSelect={(absenceType) => {
-        setCurrentShift(absenceType.label);
-        setCurrentAbsenceTypeId(absenceType.id);
+      onSelect={(input) => {
+        if (input?.kind !== "absence" || input.absenceTypeId == null) return;
+        const absenceType = absenceTypes.find((type) => type.id === input.absenceTypeId);
+        setCurrentShift(absenceType?.label ?? null);
+        setCurrentAbsenceTypeId(input.absenceTypeId);
+      }}
+      onClose={vi.fn()}
+      onRepeatConfirm={vi.fn()}
+    />
+  );
+}
+
+function RepeatNameFlowPanel() {
+  const [currentShift, setCurrentShift] = useState<string | null>(
+    "Day Shift · Supervisor",
+  );
+  const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([1]);
+
+  return (
+    <ShiftEditPanel
+      modal={modal}
+      currentShift={currentShift}
+      currentAssignmentIds={currentAssignmentIds}
+      assignments={assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
+      focusAreas={focusAreas}
+      certifications={certifications}
+      allowShiftEdits
+      empId={modal.empId}
+      shiftDisplayMode="name"
+      onSelect={(input) => {
+        const next = derivePanelSelection(input, "name");
+        setCurrentShift(next.currentShift);
+        setCurrentAssignmentIds(next.currentAssignmentIds);
       }}
       onClose={vi.fn()}
       onRepeatConfirm={vi.fn()}
@@ -269,20 +473,23 @@ function ConfirmDraftHarness({
   isStale?: boolean;
 }) {
   const [currentShift, setCurrentShift] = useState<string | null>(null);
-  const [currentShiftCodeIds, setCurrentShiftCodeIds] = useState<number[]>([]);
+  const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([]);
 
   return (
     <ShiftEditPanel
       modal={modal}
       currentShift={currentShift}
-      currentShiftCodeIds={currentShiftCodeIds}
-      shiftCodes={shiftCodes}
+      currentAssignmentIds={currentAssignmentIds}
+      assignments={assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
       focusAreas={focusAreas}
       certifications={certifications}
       allowShiftEdits
-      onSelect={(label, shiftCodeIds) => {
-        setCurrentShift(label === "OFF" ? null : label);
-        setCurrentShiftCodeIds(shiftCodeIds);
+      onSelect={(input) => {
+        const next = derivePanelSelection(input);
+        setCurrentShift(next.currentShift);
+        setCurrentAssignmentIds(next.currentAssignmentIds);
       }}
       onClose={vi.fn()}
       onConfirmDraft={onConfirmDraft}
@@ -299,8 +506,10 @@ function CustomTimeHarness() {
     <ShiftEditPanel
       modal={modal}
       currentShift="D"
-      currentShiftCodeIds={[1]}
-      shiftCodes={shiftCodes}
+      currentAssignmentIds={[1]}
+      assignments={assignments}
+      shiftCategories={shiftCategories}
+      jobs={jobs}
       focusAreas={focusAreas}
       certifications={certifications}
       allowShiftEdits
@@ -356,7 +565,7 @@ describe("ShiftEditPanel", () => {
     it("keeps real names in the audit footer instead of showing Me", () => {
       renderPanel({
         currentShift: "D",
-        currentShiftCodeIds: [1],
+        currentAssignmentIds: [1],
         auditInfo: {
           createdByName: "Alex Admin",
           updatedByName: "Riley RN",
@@ -421,11 +630,27 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Shift buttons", () => {
-    it("clicking a shift button calls onSelect with the shift's label", () => {
+    it("clicking a shift button calls onSelect with canonical schedule state", () => {
       const { onSelect } = renderPanel();
       fireEvent.click(screen.getByText("D"));
-      // Component calls onSelect(label, shiftCodeIds, seriesScope | undefined)
-      expect(onSelect).toHaveBeenCalledWith("D", [1], undefined);
+      expect(onSelect).toHaveBeenCalledWith(
+        {
+          kind: "worked",
+          segments: [
+            {
+              shiftId: 11,
+              jobId: 102,
+              position: 0,
+            },
+          ],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        undefined,
+      );
     });
 
     it("active shift button has the shift's color as background style", () => {
@@ -441,6 +666,79 @@ describe("ShiftEditPanel", () => {
     });
   });
 
+  describe("Diff badges", () => {
+    it("keeps an added second shift marked as new without flagging the published shift", () => {
+      const { container } = renderPanel({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        draftKind: "modified",
+        publishedAssignmentIds: [1],
+      });
+
+      const badges = Array.from(
+        container.querySelectorAll("[data-shift-diff-badge]"),
+      ) as HTMLElement[];
+
+      expect(
+        container.querySelector('[data-shift-diff-index="0"]'),
+      ).toBeNull();
+      expect(badges).toHaveLength(0);
+    });
+
+    it("shows independent time and new badges when editing the published shift and adding a second shift", () => {
+      const { container } = renderPanel({
+        currentShift: "D/E",
+        currentAssignmentIds: [1, 2],
+        customStartTime: "08:00|16:00",
+        customEndTime: "16:00|23:00",
+        draftKind: "modified",
+        publishedAssignmentIds: [1],
+        publishedCustomStartTime: "07:00",
+        publishedCustomEndTime: "15:00",
+      });
+
+      expect(
+        container.querySelector('[data-shift-diff-index="0"]')?.textContent,
+      ).toBe("Time");
+      expect(
+        (
+          container.querySelector('[data-shift-diff-index="0"]') as HTMLElement
+        )?.style.background,
+      ).toBe("var(--color-warning)");
+      expect(
+        container.querySelector('[data-shift-diff-index="1"]'),
+      ).toBeNull();
+    });
+
+    it("keeps a brand-new shift with custom time border-only", () => {
+      const { container } = renderPanel({
+        currentShift: "E",
+        currentAssignmentIds: [2],
+        customStartTime: "16:00",
+        customEndTime: "23:00",
+        draftKind: "new",
+      });
+
+      expect(
+        container.querySelector('[data-shift-diff-badge="new"]'),
+      ).toBeNull();
+    });
+
+    it("shows the previous label when a published single shift is replaced", () => {
+      const { container } = renderPanel({
+        currentShift: "E",
+        currentAssignmentIds: [2],
+        draftKind: "modified",
+        publishedAssignmentIds: [1],
+      });
+
+      expect(
+        container.querySelector('[data-shift-diff-badge="modified"]')
+          ?.textContent,
+      ).toBe("Was D · SUPV");
+    });
+  });
+
   describe("General section", () => {
     it("general shifts appear in a 'General' section", () => {
       renderPanel();
@@ -450,7 +748,23 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Qualification filtering", () => {
-    const restrictedShift: ShiftCode = {
+    const restrictedJob: JobDefinition = {
+      id: 102,
+      orgId: "org-1",
+      name: "JL Coverage",
+      abbr: "JL",
+      showOnGrid: true,
+      assignmentMode: "with_shift",
+      eligibleRoleIds: [],
+      requiredCertificationIds: [1],
+      color: "#EDE9FE",
+      border: "#A78BFA",
+      text: "#6D28D9",
+      sortOrder: 2,
+      systemKey: null,
+    };
+
+    const restrictedShift: AssignmentDefinition = {
       id: 4,
       orgId: "org-1",
       label: "JL",
@@ -459,6 +773,9 @@ describe("ShiftEditPanel", () => {
       border: "#A78BFA",
       text: "#6D28D9",
       sortOrder: 4,
+      categoryId: 11,
+      shiftId: 11,
+      jobId: 102,
       focusAreaId: 1,
       requiredCertificationIds: [1],
     };
@@ -469,7 +786,9 @@ describe("ShiftEditPanel", () => {
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftCodes={[restrictedShift, generalShift]}
+          assignments={[restrictedShift, generalShift]}
+          shiftCategories={shiftCategories}
+          jobs={[...jobs, restrictedJob]}
           focusAreas={focusAreas}
           certifications={certifications}
           onSelect={vi.fn()}
@@ -486,7 +805,9 @@ describe("ShiftEditPanel", () => {
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftCodes={[restrictedShift, generalShift]}
+          assignments={[restrictedShift, generalShift]}
+          shiftCategories={shiftCategories}
+          jobs={[...jobs, restrictedJob]}
           focusAreas={focusAreas}
           certifications={certifications}
           onSelect={vi.fn()}
@@ -504,7 +825,9 @@ describe("ShiftEditPanel", () => {
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftCodes={[northShift, generalShift]}
+          assignments={[northShift, generalShift]}
+          shiftCategories={shiftCategories}
+          jobs={jobs}
           focusAreas={focusAreas}
           certifications={certifications}
           onSelect={vi.fn()}
@@ -522,7 +845,9 @@ describe("ShiftEditPanel", () => {
         <ShiftEditPanel
           modal={modalWithDesig}
           currentShift={null}
-          shiftCodes={[restrictedShift]}
+          assignments={[restrictedShift]}
+          shiftCategories={shiftCategories}
+          jobs={[...jobs, restrictedJob]}
           certifications={certifications}
           onSelect={vi.fn()}
           onClose={vi.fn()}
@@ -534,6 +859,20 @@ describe("ShiftEditPanel", () => {
   });
 
   describe("Repeat mode", () => {
+    it("renders the current shift preview with split grid labels in name mode", () => {
+      renderPanel({
+        currentShift: "Day Shift · Supervisor",
+        currentAssignmentIds: [1],
+        shiftDisplayMode: "name",
+      });
+
+      expect(screen.getByText(/^Day Shift$/)).toBeInTheDocument();
+      expect(screen.getByText(/^Supervisor$/)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/^Day Shift · Supervisor$/),
+      ).not.toBeInTheDocument();
+    });
+
     it("shows repeat mode only before local edits and keeps the sticky footer hidden while backing out", async () => {
       const user = userEvent.setup();
 
@@ -600,6 +939,25 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByText("Repeating Off Day")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Create Repeating Off Day" }),
+      ).toBeInTheDocument();
+    });
+
+    it("renders the repeat preview badge with split grid labels in name mode", async () => {
+      const user = userEvent.setup();
+
+      render(<RepeatNameFlowPanel />);
+
+      await user.click(
+        screen.getByRole("button", { name: "Make this a repeating shift" }),
+      );
+
+      const preview = document.querySelector(
+        '[data-repeat-shift-preview="true"]',
+      ) as HTMLElement | null;
+
+      expect(preview).not.toBeNull();
+      expect(
+        within(preview!).getByText(/^Day Shift · Supervisor$/),
       ).toBeInTheDocument();
     });
   });

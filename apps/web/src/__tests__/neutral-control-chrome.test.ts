@@ -24,7 +24,7 @@ const settingsPage = readFileSync(resolveWebSource("components/settings/Settings
 const gridmasterPortal = readFileSync(resolveWebSource("components/gridmaster/GridmasterPortal.tsx"), "utf-8");
 const staffView = readFileSync(resolveWebSource("components/StaffView.tsx"), "utf-8");
 const membersSection = readFileSync(resolveWebSource("components/staff/MembersSection.tsx"), "utf-8");
-const shiftCodes = readFileSync(resolveWebSource("components/settings/ShiftCodes.tsx"), "utf-8");
+const jobsSettings = readFileSync(resolveWebSource("components/settings/Jobs.tsx"), "utf-8");
 const toolbar = readFileSync(resolveWebSource("components/Toolbar.tsx"), "utf-8");
 const dashboardHeader = readFileSync(resolveWebSource("components/dashboard/DashboardHeader.tsx"), "utf-8");
 const printOptionsModal = readFileSync(resolveWebSource("components/PrintOptionsModal.tsx"), "utf-8");
@@ -167,10 +167,10 @@ describe("shared chrome theming", () => {
   });
 
   it("keeps audited primary buttons and selectors on theme blue", () => {
-    expect(shiftCodes).toContain(
+    expect(jobsSettings).toContain(
       'className="dg-btn dg-btn-primary dg-btn-sm"',
     );
-    expect(shiftCodes).toContain('className="dg-btn dg-btn-secondary dg-btn-sm"');
+    expect(jobsSettings).toContain('className="dg-btn dg-btn-secondary dg-btn-sm"');
     expect(toolbar).toContain('background: toolsOpen ? "var(--color-brand-bg)" : undefined');
     expect(toolbar).toContain('color: toolsOpen ? "var(--color-brand)" : undefined');
     expect(globalsCss).toMatch(
@@ -180,8 +180,6 @@ describe("shared chrome theming", () => {
 
   it("limits neutral control tokens to structural row and drag chrome", () => {
     const allowedFiles = [
-      "apps/web/src/components/settings/DepartmentsSettings.tsx",
-      "apps/web/src/components/settings/StringListSettings.tsx",
       "apps/web/src/components/staff/MembersSection.tsx",
       "apps/web/src/components/staff/StaffContextBar.tsx",
       "apps/web/src/components/staff/StaffTableRow.tsx",

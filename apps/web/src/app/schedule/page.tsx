@@ -4,10 +4,15 @@ import * as Sentry from "@/lib/sentry";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Toolbar from "@/components/Toolbar";
-import ScheduleGrid from "@/components/ScheduleGrid";
+import ScheduleGrid, {
+  buildScheduleGridModel,
+  type ScheduleGridHandlers,
+  type ScheduleGridInteractionState,
+} from "@/components/ScheduleGrid";
 import MonthView from "@/components/MonthView";
 import PrintLegend from "@/components/PrintLegend";
 import type { PrintConfig } from "@/components/PrintOptionsModal";
+import ChangeLegend from "@/components/ChangeLegend";
 import DraftBanner from "@/components/DraftBanner";
 import DraftReviewSummary from "@/components/DraftReviewSummary";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
@@ -46,10 +51,8 @@ import {
 } from "@/lib/utils";
 import {
   filterAndSortEmployees,
-  isEmployeeQualified,
-  getDisqualificationReasons,
   hasVisibleGridShiftEntry,
-  buildShiftCodeIdsByFocusArea,
+  buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
   buildPublishedDateSet,
   computeCoverageGaps,
   filterPublishedDates,
@@ -59,6 +62,18 @@ import {
   checkSameDayOverlaps,
 } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
+import {
+  formatShiftAssignmentDisqualificationMessage,
+  getAssignmentDefinitionDisqualificationReasons as getAssignmentDisqualificationReasons,
+  isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
+} from "@/lib/assignable-shifts";
+import { createShiftJobCompatibilityMaps } from "@/lib/shift-job-segments";
+import {
+  buildScheduleCellEntryFromInput,
+  deriveAssignmentDefinitionIdsFromScheduleCellInput as deriveAssignmentIdsFromScheduleCellInput,
+  resolveScheduleCellSnapshotFromInput,
+  scheduleCellSnapshotToInput,
+} from "@/lib/schedule-cells";
 import {
   fetchShifts,
   fetchScheduleNotes,
@@ -93,7 +108,10 @@ import {
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
-import { resolveScheduleSpan } from "@/lib/schedule-view";
+import {
+  getScheduleStartForSpan,
+  resolveScheduleSpan,
+} from "@/lib/schedule-view";
 import { supabase } from "@/lib/supabase";
 import {
   usePermissions,
@@ -108,18 +126,6 @@ import PresenceAvatars from "@/components/PresenceAvatars";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import { toast } from "sonner";
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  TouchSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import type { DragStartEvent, DragEndEvent } from "@dnd-kit/core";
-import type { ShiftDragData } from "@/components/DraggableShift";
-import type { CellDropData } from "@/components/DroppableCell";
 import ShiftContextMenu from "@/components/ShiftContextMenu";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
@@ -131,7 +137,9 @@ import {
   SubNavItem,
 } from "@/components/MobileSubNavContext";
 import { mergeDraftChangedBroadcastPayload } from "./_lib/draft-broadcast";
-import { shouldShowScheduleEditorNames } from "./_lib/editor-visibility";
+import {
+  shouldRenderScheduleAuthorNames,
+} from "./_lib/editor-visibility";
 import {
   cloneDraftNotes,
   cloneShiftEntry,
@@ -146,14 +154,14 @@ import {
   IMPORT_PREVIOUS_BATCH_SIZE,
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
-  type ScheduleEntryPayload,
   type ScheduleOperation,
 } from "./_lib/operations";
 import {
   Employee,
   EditModalState,
+  GridCellId,
   ShiftMap,
-  ShiftCode,
+  AssignmentDefinition,
   AbsenceType,
   RecurringShift,
   SeriesFrequency,
@@ -162,7 +170,13 @@ import {
   PublishChange,
   PublishHistoryEntry,
   GridOpenShift,
+  ScheduleCellInput,
 } from "@/types";
+
+type ContextMenuState = {
+  anchorEl: HTMLElement;
+  cellId: GridCellId;
+};
 
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
@@ -183,18 +197,18 @@ function SchedulerContent() {
   const {
     org,
     focusAreas,
-    shiftCodes,
-    allShiftCodes,
+    assignments: assignments,
+    allAssignmentDefinitions: allAssignmentDefinitions,
     shiftCategories,
+    jobs,
     indicatorTypes,
     certifications,
     orgRoles,
-    shiftCodeMap,
+    assignmentLabelMap: assignmentLabelMap,
     absenceTypes,
     allAbsenceTypes,
     absenceTypeMap,
     coverageRequirements,
-    coverageRuleConfigs,
     departments,
     loading: orgLoading,
     loadError,
@@ -204,8 +218,19 @@ function SchedulerContent() {
   const { employees, loading: empLoading } = useEmployees(
     orgId ?? org?.id ?? null,
   );
+  const segmentCompatibility = useMemo(
+    () =>
+      createShiftJobCompatibilityMaps({
+        assignments: assignments,
+        shiftCategories,
+        jobs,
+        shiftDisplayMode: org?.shiftDisplayMode ?? "code",
+      }),
+    [jobs, org?.shiftDisplayMode, shiftCategories, assignments],
+  );
 
   const [today, setToday] = useState(() => new Date());
+  const payPeriodStartDate = org?.payPeriodStartDate ?? null;
 
   // Refresh `today` if the app stays open past midnight
   useEffect(() => {
@@ -264,6 +289,16 @@ function SchedulerContent() {
     preferredSpan,
     shouldAutoUseOneWeek,
   );
+  useEffect(() => {
+    if (preferredSpan !== 2) return;
+    setWeekStart((prev) =>
+      getScheduleStartForSpan({
+        date: prev,
+        span: 2,
+        payPeriodStartDate,
+      }),
+    );
+  }, [payPeriodStartDate, preferredSpan]);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
   // My Schedule mode: for regular users, default to showing only their own shifts
@@ -342,13 +377,13 @@ function SchedulerContent() {
 
   const [coverageGapSelection, setCoverageGapSelection] = useState<{
     openShift: GridOpenShift;
-    qualifiedShiftCodes: ShiftCode[];
-    selectedShiftCodeId: number;
+    qualifiedAssignmentDefinitions: AssignmentDefinition[];
+    selectedAssignmentDefinitionId: number;
   } | null>(null);
 
   const shiftRequests = useShiftRequests(
     orgId ?? org?.id ?? null,
-    shiftCodeMap,
+    assignmentLabelMap,
     currentEmpId,
     canApproveShiftRequests,
   );
@@ -362,12 +397,12 @@ function SchedulerContent() {
   >([]);
   useEffect(() => {
     const effectiveOrgId = orgId ?? org?.id;
-    if (!effectiveOrgId || !shiftCodeMap.size) return;
+    if (!effectiveOrgId || !assignmentLabelMap.size) return;
     fetchCalloffOpenShifts(
       effectiveOrgId,
       shiftFetchStart,
       shiftFetchEnd,
-      shiftCodeMap,
+      assignmentLabelMap,
     )
       .then(setCalloffOpenShifts)
       .catch((err) => {
@@ -378,7 +413,7 @@ function SchedulerContent() {
         toast.error("Failed to load available shift opportunities");
         setCalloffOpenShifts([]);
       });
-  }, [orgId, org?.id, shiftFetchStart, shiftFetchEnd, shiftCodeMap]);
+  }, [orgId, org?.id, shiftFetchStart, shiftFetchEnd, assignmentLabelMap]);
 
   const draftBreakdown = useMemo(
     () => computeDraftBreakdown(shifts, notes),
@@ -458,7 +493,11 @@ function SchedulerContent() {
           Sentry.captureException(err, {
             extra: { context: "schedule.publish_summary", orgId: org.id },
           });
-          toast.error("Failed to load the latest publish summary");
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Failed to load the latest publish summary",
+          );
         }
       })
       .finally(() => {
@@ -507,7 +546,11 @@ function SchedulerContent() {
           Sentry.captureException(err, {
             extra: { context: "schedule.discard_summary", orgId: org.id },
           });
-          toast.error("Failed to load the latest discard summary");
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Failed to load the latest discard summary",
+          );
         }
       })
       .finally(() => {
@@ -715,32 +758,11 @@ function SchedulerContent() {
     [buildEditSessionFingerprint, collectCellNotesSnapshot],
   );
 
-  // ── Drag & Drop state ──────────────────────────────────────────────────────
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 250, tolerance: 5 },
-    }),
-    useSensor(KeyboardSensor),
-  );
-  const [activeDrag, setActiveDrag] = useState<ShiftDragData | null>(null);
-
   // ── Clipboard state (copy-paste shifts) ───────────────────────────────────
-  const [clipboard, setClipboard] = useState<ScheduleEntryPayload | null>(null);
-  const activeDragModeRef = useRef<"move" | "copy">("move");
-  const hoveredCellRef = useRef<{
-    empId: string;
-    date: Date;
-    focusAreaName: string;
-  } | null>(null);
+  const [clipboard, setClipboard] = useState<ScheduleCellInput | null>(null);
 
   // ── Context menu state ────────────────────────────────────────────────────
-  const [contextMenu, setContextMenu] = useState<{
-    anchorEl: HTMLElement;
-    empId: string;
-    date: Date;
-    focusAreaName: string;
-  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [pendingClearShift, setPendingClearShift] = useState<{
     empId: string;
     date: Date;
@@ -751,7 +773,7 @@ function SchedulerContent() {
     empId: string;
     date: Date;
     existingLabel: string;
-    pasteEntry: ScheduleEntryPayload;
+    pasteEntry: ScheduleCellInput;
   } | null>(null);
   const [pendingClaimShift, setPendingClaimShift] =
     useState<GridOpenShift | null>(null);
@@ -779,8 +801,8 @@ function SchedulerContent() {
   canEditNotesRef.current = canEditNotes;
   // Stable refs for map objects — avoids recreating callbacks when maps get new
   // references (which happens on every React Query revalidation).
-  const shiftCodeMapRef = useRef(shiftCodeMap);
-  shiftCodeMapRef.current = shiftCodeMap;
+  const assignmentLabelMapRef = useRef(assignmentLabelMap);
+  assignmentLabelMapRef.current = assignmentLabelMap;
   const absenceTypeMapRef = useRef(absenceTypeMap);
   absenceTypeMapRef.current = absenceTypeMap;
 
@@ -791,10 +813,11 @@ function SchedulerContent() {
       fetchShifts(
         org.id,
         canEditShiftsRef.current,
-        shiftCodeMapRef.current,
+        assignmentLabelMapRef.current,
         absenceTypeMapRef.current,
         shiftFetchStart,
         shiftFetchEnd,
+        segmentCompatibility,
       ),
       fetchScheduleNotes(org.id, shiftFetchStart, shiftFetchEnd),
     ]);
@@ -868,17 +891,18 @@ function SchedulerContent() {
             fetchShifts(
               orgId,
               canEditShifts,
-              shiftCodeMap,
+              assignmentLabelMap,
               absenceTypeMap,
               shiftFetchStart,
               shiftFetchEnd,
+              segmentCompatibility,
             ),
             fetchScheduleNotes(orgId, shiftFetchStart, shiftFetchEnd),
             canViewRecurringShifts
               ? fetchRecurringShifts(
                   orgId,
                   undefined,
-                  shiftCodeMap,
+                  assignmentLabelMap,
                   false,
                   absenceTypeMap,
                 )
@@ -1009,14 +1033,15 @@ function SchedulerContent() {
     canEditShifts,
     sendReliableBroadcast,
   );
-  const canShowEditorNames = shouldShowScheduleEditorNames(
+  const canRenderAuthorNames = shouldRenderScheduleAuthorNames({
+    showAudit,
     onlineUsers,
-    authUser?.id ?? currentUser?.id ?? null,
-  );
+    currentUserId: authUser?.id ?? currentUser?.id ?? null,
+  });
 
   // Resolve audit metadata (created/updated by names) when the edit panel opens.
   useEffect(() => {
-    if (!editPanel || !canShowEditorNames) {
+    if (!editPanel || !canRenderAuthorNames) {
       setAuditInfo(null);
       return;
     }
@@ -1049,13 +1074,13 @@ function SchedulerContent() {
     return () => {
       cancelled = true;
     };
-  }, [canShowEditorNames, editPanel, shifts, resolveUserName]);
+  }, [canRenderAuthorNames, editPanel, shifts, resolveUserName]);
 
   // Batch-fetch profile names for shift creators (audit mode) and publishers (publish tooltips).
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
   const needsAuditNames =
     publishHistory.length > 0 ||
-    (canShowEditorNames &&
+    (canRenderAuthorNames &&
       (showAudit ||
         Object.values(shifts).some(
           (entry) => entry.isDraft && (!!entry.updatedBy || !!entry.createdBy),
@@ -1470,10 +1495,11 @@ function SchedulerContent() {
         const draftShifts = await fetchShifts(
           org.id,
           true,
-          shiftCodeMapRef.current,
+          assignmentLabelMapRef.current,
           absenceTypeMapRef.current,
           shiftFetchStart,
           shiftFetchEnd,
+          segmentCompatibility,
         );
         setShifts(draftShifts);
       } catch (err) {
@@ -1590,16 +1616,93 @@ function SchedulerContent() {
   // ── Shift helpers ────────────────────────────────────────────────────────────
 
   const buildEntryPayload = useCallback(
-    (entry: ShiftMap[string]): ScheduleEntryPayload => ({
-      label: entry.label,
-      shiftCodeIds: [...entry.shiftCodeIds],
-      absenceTypeId: entry.absenceTypeId ?? null,
-      customStartTime:
-        entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
-      customEndTime:
-        entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
-    }),
+    (entry: ShiftMap[string]): ScheduleCellInput =>
+      scheduleCellSnapshotToInput(
+        entry.effective ?? entry.draft ?? entry.published,
+      ) ?? {
+        kind:
+          entry.isDelete
+            ? "deleted"
+            : entry.absenceTypeId != null
+              ? "absence"
+              : "worked",
+        segments: (entry.segments ?? []).map((segment, index) => ({
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: segment.position ?? index,
+        })),
+        absenceTypeId: entry.absenceTypeId ?? null,
+        customStartTime:
+          entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
+        customEndTime:
+          entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
+        seriesId: entry.seriesId ?? null,
+        fromRecurring: entry.fromRecurring ?? false,
+      },
     [],
+  );
+
+  const getInputAssignmentDefinitionIds = useCallback(
+    (input: ScheduleCellInput): number[] =>
+      deriveAssignmentIdsFromScheduleCellInput(input, segmentCompatibility),
+    [segmentCompatibility],
+  );
+
+  const resolveInputSnapshot = useCallback(
+    (input: ScheduleCellInput) =>
+      resolveScheduleCellSnapshotFromInput(input, {
+        segmentCompatibility,
+        absenceTypeMap,
+      }),
+    [absenceTypeMap, segmentCompatibility],
+  );
+
+  const getInputLabel = useCallback(
+    (input: ScheduleCellInput): string => {
+      const snapshot = resolveInputSnapshot(input);
+      if (snapshot.label) return snapshot.label;
+      if (input.kind === "absence") {
+        return absenceTypeMap.get(input.absenceTypeId ?? -1) ?? "?";
+      }
+      return "shift";
+    },
+    [absenceTypeMap, resolveInputSnapshot],
+  );
+
+  const getPublishedSnapshot = useCallback(
+    (entry: ShiftMap[string] | null | undefined) => {
+      if (!entry) return null;
+      if (entry.published !== undefined) {
+        return entry.published ?? null;
+      }
+      if (
+        (entry.publishedAssignmentDefinitionIds?.length ?? 0) === 0 &&
+        entry.publishedAbsenceTypeId == null
+      ) {
+        return null;
+      }
+      return resolveScheduleCellSnapshotFromInput(
+        {
+          kind:
+            entry.publishedAbsenceTypeId != null ? "absence" : "worked",
+          segments: (entry.publishedSegments ?? []).map((segment, index) => ({
+            shiftId: segment.shiftId,
+            jobId: segment.jobId,
+            position: segment.position ?? index,
+          })),
+          absenceTypeId: entry.publishedAbsenceTypeId ?? null,
+          customStartTime: entry.publishedCustomStartTime ?? null,
+          customEndTime: entry.publishedCustomEndTime ?? null,
+          seriesId: entry.seriesId ?? null,
+          fromRecurring: entry.fromRecurring ?? false,
+        },
+        {
+          segmentCompatibility,
+          absenceTypeMap,
+        },
+      );
+    },
+    [absenceTypeMap, segmentCompatibility],
   );
 
   const shiftForKey = useCallback(
@@ -1609,18 +1712,18 @@ function SchedulerContent() {
       if (entry.isDelete) return null;
       if (entry.absenceTypeId != null)
         return absenceTypeMap.get(entry.absenceTypeId) ?? "?";
-      if (entry.shiftCodeIds.length > 0)
-        return entry.shiftCodeIds
-          .map((id) => shiftCodeMap.get(id) ?? "?")
+      if (entry.assignmentIds.length > 0)
+        return entry.assignmentIds
+          .map((id) => assignmentLabelMap.get(id) ?? "?")
           .join("/");
       return entry.label ?? null;
     },
-    [shifts, shiftCodeMap, absenceTypeMap],
+    [shifts, assignmentLabelMap, absenceTypeMap],
   );
 
-  const shiftCodeIdsForKey = useCallback(
+  const assignmentIdsForKey = useCallback(
     (empId: string, date: Date): number[] =>
-      shifts[`${empId}_${formatDateKey(date)}`]?.shiftCodeIds ?? [],
+      shifts[`${empId}_${formatDateKey(date)}`]?.assignmentIds ?? [],
     [shifts],
   );
 
@@ -1635,7 +1738,7 @@ function SchedulerContent() {
     return shifts[editSessionCellKey] ?? null;
   }, [editSessionCellKey, editSessionDraft, shifts]);
   const panelCurrentShift = panelShiftEntry ? panelShiftEntry.label : null;
-  const panelCurrentShiftCodeIds = panelShiftEntry?.shiftCodeIds ?? [];
+  const panelCurrentAssignmentIds = panelShiftEntry?.assignmentIds ?? [];
   const panelCurrentAbsenceTypeId =
     editSessionDraft?.cellKey === editSessionCellKey
       ? panelShiftEntry?.absenceTypeId ?? null
@@ -1661,7 +1764,16 @@ function SchedulerContent() {
     (empId: string, date: Date): number | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return null;
-      return entry.absenceTypeId ?? entry.publishedAbsenceTypeId ?? null;
+      return entry.absenceTypeId ?? null;
+    },
+    [shifts],
+  );
+
+  const publishedAbsenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) return null;
+      return entry.publishedAbsenceTypeId ?? null;
     },
     [shifts],
   );
@@ -1676,18 +1788,18 @@ function SchedulerContent() {
   const getShiftTimeRanges = useCallback(
     (empId: string, date: Date): { start: string; end: string }[] => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
-      if (!entry || entry.shiftCodeIds.length === 0) return [];
+      if (!entry || entry.assignmentIds.length === 0) return [];
       const startParts = entry.customStartTime?.split("|") ?? [];
       const endParts = entry.customEndTime?.split("|") ?? [];
       const ranges: { start: string; end: string }[] = [];
-      for (let i = 0; i < entry.shiftCodeIds.length; i++) {
+      for (let i = 0; i < entry.assignmentIds.length; i++) {
         const customStart = startParts[i] || null;
         const customEnd = endParts[i] || null;
         if (customStart && customEnd) {
           ranges.push({ start: customStart, end: customEnd });
           continue;
         }
-        const sc = shiftCodes.find((c) => c.id === entry.shiftCodeIds[i]);
+        const sc = assignments.find((c) => c.id === entry.assignmentIds[i]);
         if (sc?.defaultStartTime && sc?.defaultEndTime) {
           ranges.push({ start: sc.defaultStartTime, end: sc.defaultEndTime });
           continue;
@@ -1701,12 +1813,12 @@ function SchedulerContent() {
       }
       return ranges;
     },
-    [shifts, shiftCodes, shiftCategories],
+    [shifts, assignments, shiftCategories],
   );
 
   const getOpenShiftTimeRanges = useCallback(
     (
-      shiftCodeIds: number[],
+      assignmentIds: number[],
       customStartTime: string | null,
       customEndTime: string | null,
     ): { start: string; end: string }[] => {
@@ -1716,19 +1828,19 @@ function SchedulerContent() {
         return ranges;
       }
 
-      for (const shiftCodeId of shiftCodeIds) {
-        const shiftCode =
-          shiftCodes.find((item) => item.id === shiftCodeId) ??
-          allShiftCodes.find((item) => item.id === shiftCodeId);
-        if (shiftCode?.defaultStartTime && shiftCode.defaultEndTime) {
+      for (const assignmentId of assignmentIds) {
+        const assignment =
+          assignments.find((item) => item.id === assignmentId) ??
+          allAssignmentDefinitions.find((item) => item.id === assignmentId);
+        if (assignment?.defaultStartTime && assignment.defaultEndTime) {
           ranges.push({
-            start: shiftCode.defaultStartTime,
-            end: shiftCode.defaultEndTime,
+            start: assignment.defaultStartTime,
+            end: assignment.defaultEndTime,
           });
           continue;
         }
-        if (shiftCode?.categoryId != null) {
-          const category = shiftCategories.find((item) => item.id === shiftCode.categoryId);
+        if (assignment?.categoryId != null) {
+          const category = shiftCategories.find((item) => item.id === assignment.categoryId);
           if (category?.startTime && category.endTime) {
             ranges.push({ start: category.startTime, end: category.endTime });
           }
@@ -1737,12 +1849,53 @@ function SchedulerContent() {
 
       return ranges;
     },
-    [shiftCodes, allShiftCodes, shiftCategories],
+    [assignments, allAssignmentDefinitions, shiftCategories],
+  );
+
+  const buildOpenShiftInput = useCallback(
+    (args: {
+      segments?: ScheduleCellInput["segments"];
+      shiftIds?: Array<number | null>;
+      jobIds?: number[];
+      customStartTime: string | null;
+      customEndTime: string | null;
+    }): ScheduleCellInput | null => {
+      const explicitSegments = args.segments ?? [];
+      const explicitShiftIds = args.shiftIds ?? [];
+      const explicitJobIds = args.jobIds ?? [];
+      const segments =
+        explicitSegments.length > 0
+          ? explicitSegments.map((segment, index) => ({
+              shiftId: segment.shiftId ?? null,
+              jobId: segment.jobId,
+              position: index,
+            }))
+          : explicitJobIds.map((jobId, index) => ({
+              shiftId: explicitShiftIds[index] ?? null,
+              jobId,
+              position: index,
+            }));
+
+      if (segments.length === 0) {
+        return null;
+      }
+
+      return {
+        kind: "worked",
+        segments,
+        absenceTypeId: null,
+        customStartTime: args.customStartTime,
+        customEndTime: args.customEndTime,
+        seriesId: null,
+        fromRecurring: false,
+      };
+    },
+    [],
   );
 
   const hasOpenShiftConflict = useCallback(
     (
-      shiftCodeIds: number[],
+      assignmentIds: number[],
       date: Date,
       customStartTime: string | null,
       customEndTime: string | null,
@@ -1751,7 +1904,7 @@ function SchedulerContent() {
       const myRanges = getShiftTimeRanges(currentEmpId, date);
       if (myRanges.length === 0) return false;
       const openShiftRanges = getOpenShiftTimeRanges(
-        shiftCodeIds,
+        assignmentIds,
         customStartTime,
         customEndTime,
       );
@@ -1761,15 +1914,15 @@ function SchedulerContent() {
   );
 
   // ── Coverage gaps ──────────────────────────────────────────────────────────
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, ShiftCode>();
-    for (const sc of shiftCodes) map.set(sc.id, sc);
-    // Include archived codes from allShiftCodes for shift lookup
-    for (const sc of allShiftCodes) {
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const sc of assignments) map.set(sc.id, sc);
+    // Include archived codes from allAssignmentDefinitions for shift lookup
+    for (const sc of allAssignmentDefinitions) {
       if (!map.has(sc.id)) map.set(sc.id, sc);
     }
     return map;
-  }, [shiftCodes, allShiftCodes]);
+  }, [assignments, allAssignmentDefinitions]);
 
   // ── Cross-date overlap warnings for the open edit panel ─────────────────
   const overnightOverlapWarnings = useMemo((): string[] => {
@@ -1780,7 +1933,7 @@ function SchedulerContent() {
       editSessionDraft?.cellKey === `${empId}_${formatDateKey(date)}`
         ? editSessionDraft.draftShift
         : shifts[`${empId}_${formatDateKey(date)}`];
-    if (!entry || (entry.shiftCodeIds.length === 0 && !entry.absenceTypeId))
+    if (!entry || (entry.assignmentIds.length === 0 && !entry.absenceTypeId))
       return [];
 
     // Resolve effective start/end: custom times → shift code defaults → category defaults
@@ -1793,7 +1946,7 @@ function SchedulerContent() {
       const e = customEnd?.split("|")[0];
       if (s && e) return { start: s, end: e };
       const code =
-        codeIds[0] != null ? shiftCodeById.get(codeIds[0]) : undefined;
+        codeIds[0] != null ? assignmentById.get(codeIds[0]) : undefined;
       if (code?.defaultStartTime && code?.defaultEndTime) {
         return { start: code.defaultStartTime, end: code.defaultEndTime };
       }
@@ -1810,7 +1963,7 @@ function SchedulerContent() {
     const currentTimes = resolveEffective(
       entry.customStartTime,
       entry.customEndTime,
-      entry.shiftCodeIds,
+      entry.assignmentIds,
     );
     if (!currentTimes) return [];
 
@@ -1818,11 +1971,11 @@ function SchedulerContent() {
     const prevDate = addDays(date, -1);
     const prevEntry = shifts[`${empId}_${formatDateKey(prevDate)}`];
     const prevTimes =
-      prevEntry && prevEntry.shiftCodeIds.length > 0
+      prevEntry && prevEntry.assignmentIds.length > 0
         ? resolveEffective(
             prevEntry.customStartTime,
             prevEntry.customEndTime,
-            prevEntry.shiftCodeIds,
+            prevEntry.assignmentIds,
           )
         : null;
 
@@ -1830,11 +1983,11 @@ function SchedulerContent() {
     const nextDate = addDays(date, 1);
     const nextEntry = shifts[`${empId}_${formatDateKey(nextDate)}`];
     const nextTimes =
-      nextEntry && nextEntry.shiftCodeIds.length > 0
+      nextEntry && nextEntry.assignmentIds.length > 0
         ? resolveEffective(
             nextEntry.customStartTime,
             nextEntry.customEndTime,
-            nextEntry.shiftCodeIds,
+            nextEntry.assignmentIds,
           )
         : null;
 
@@ -1844,13 +1997,13 @@ function SchedulerContent() {
     });
 
     // Same-day overlap check for multi-code cells
-    if (entry.shiftCodeIds.length >= 2) {
+    if (entry.assignmentIds.length >= 2) {
       const pillRanges: { start: string; end: string }[] = [];
       const pillLabels: string[] = [];
       const startParts = entry.customStartTime?.split("|") ?? [];
       const endParts = entry.customEndTime?.split("|") ?? [];
-      for (let i = 0; i < entry.shiftCodeIds.length; i++) {
-        const code = shiftCodeById.get(entry.shiftCodeIds[i]);
+      for (let i = 0; i < entry.assignmentIds.length; i++) {
+        const code = assignmentById.get(entry.assignmentIds[i]);
         const cat =
           code?.categoryId != null
             ? shiftCategories.find((c) => c.id === code.categoryId)
@@ -1860,7 +2013,7 @@ function SchedulerContent() {
         if (s && e) {
           pillRanges.push({ start: s, end: e });
           pillLabels.push(
-            shiftCodeMap.get(entry.shiftCodeIds[i]) ?? code?.label ?? "?",
+            assignmentLabelMap.get(entry.assignmentIds[i]) ?? code?.label ?? "?",
           );
         }
       }
@@ -1872,9 +2025,9 @@ function SchedulerContent() {
     editPanel,
     editSessionDraft,
     shifts,
-    shiftCodeById,
+    assignmentById,
     shiftCategories,
-    shiftCodeMap,
+    assignmentLabelMap,
   ]);
 
   const employeesByFocusArea = useMemo(() => {
@@ -1888,9 +2041,9 @@ function SchedulerContent() {
     return next;
   }, [employees, focusAreas]);
 
-  const shiftCodeIdsByFocusArea = useMemo(
-    () => buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes),
-    [focusAreas, shiftCodes],
+  const assignmentIdsByFocusArea = useMemo(
+    () => buildAssignmentIdsByFocusArea(focusAreas, assignments),
+    [focusAreas, assignments],
   );
 
   const allCoverageGaps = useMemo(() => {
@@ -1899,28 +2052,26 @@ function SchedulerContent() {
     return computeCoverageGaps(
       focusAreas,
       shiftCategories,
-      shiftCodes,
+      assignments,
       coverageRequirements,
-      coverageRuleConfigs,
       dates,
       employeesByFocusArea,
-      shiftCodeIdsForKey,
-      shiftCodeById,
-      shiftCodeIdsByFocusArea,
-      shiftCodeMap,
+      assignmentIdsForKey,
+      assignmentById,
+      assignmentIdsByFocusArea,
+      assignmentLabelMap,
     );
   }, [
     coverageRequirements,
-    coverageRuleConfigs,
     focusAreas,
     shiftCategories,
-    shiftCodes,
+    assignments,
     dates,
     employeesByFocusArea,
-    shiftCodeIdsForKey,
-    shiftCodeById,
-    shiftCodeIdsByFocusArea,
-    shiftCodeMap,
+    assignmentIdsForKey,
+    assignmentById,
+    assignmentIdsByFocusArea,
+    assignmentLabelMap,
   ]);
 
   const visibleCoverageGaps = useMemo(() => {
@@ -1935,53 +2086,51 @@ function SchedulerContent() {
     return computeCoverageGaps(
       focusAreas,
       shiftCategories,
-      shiftCodes,
+      assignments,
       coverageRequirements,
-      coverageRuleConfigs,
       publishedVisibleDates,
       employeesByFocusArea,
-      shiftCodeIdsForKey,
-      shiftCodeById,
-      shiftCodeIdsByFocusArea,
-      shiftCodeMap,
+      assignmentIdsForKey,
+      assignmentById,
+      assignmentIdsByFocusArea,
+      assignmentLabelMap,
     );
   }, [
     coverageRequirements,
-    coverageRuleConfigs,
     focusAreas,
     shiftCategories,
-    shiftCodes,
+    assignments,
     publishedVisibleDates,
     employeesByFocusArea,
-    shiftCodeIdsForKey,
-    shiftCodeById,
-    shiftCodeIdsByFocusArea,
-    shiftCodeMap,
+    assignmentIdsForKey,
+    assignmentById,
+    assignmentIdsByFocusArea,
+    assignmentLabelMap,
   ]);
 
   // ── Merge calloff open shifts + coverage-gap open shifts ──
   const openShifts = useMemo<GridOpenShift[]>(() => {
     const gapShifts: GridOpenShift[] = visibleCoverageGaps
       .map((gap) => {
-        const sc = shiftCodeById.get(gap.preferredOpenShiftCodeId);
+        const sc = assignmentById.get(gap.preferredOpenAssignmentDefinitionId);
         return {
-          id: `gap_${gap.focusAreaId}_${gap.requirementShiftCodeId}_${formatDateKey(gap.date)}`,
+          id: `gap_${gap.focusAreaId}_${gap.requirementAssignmentDefinitionId}_${formatDateKey(gap.date)}`,
           source: "coverage_gap" as const,
           date: formatDateKey(gap.date),
           focusAreaId: gap.focusAreaId,
-          requirementShiftCodeId: gap.requirementShiftCodeId,
-          shiftCodeIds: [gap.preferredOpenShiftCodeId],
-          eligibleShiftCodeIds: gap.eligibleShiftCodeIds,
-          preferredOpenShiftCodeId: gap.preferredOpenShiftCodeId,
+          requirementAssignmentDefinitionId: gap.requirementAssignmentDefinitionId,
+          assignmentIds: [gap.preferredOpenAssignmentDefinitionId],
+          eligibleAssignmentDefinitionIds: gap.eligibleAssignmentDefinitionIds,
+          preferredOpenAssignmentDefinitionId: gap.preferredOpenAssignmentDefinitionId,
           ruleLabel: gap.ruleLabel,
-          shiftCodeLabel: gap.shiftCodeLabel,
+          assignmentLabel: gap.assignmentLabel,
           customStartTime: sc?.defaultStartTime ?? null,
           customEndTime: sc?.defaultEndTime ?? null,
           needed: gap.status.required - gap.status.actual,
         };
       });
     return [...calloffOpenShifts, ...gapShifts];
-  }, [calloffOpenShifts, visibleCoverageGaps, shiftCodeById]);
+  }, [calloffOpenShifts, visibleCoverageGaps, assignmentById]);
 
   const draftKindForKey = useCallback(
     (empId: string, date: Date): DraftKind => {
@@ -1998,18 +2147,18 @@ function SchedulerContent() {
       if (!entry) return null;
       if (entry.publishedAbsenceTypeId != null)
         return absenceTypeMap.get(entry.publishedAbsenceTypeId) ?? "?";
-      if (entry.publishedShiftCodeIds.length > 0)
-        return entry.publishedShiftCodeIds
-          .map((id) => shiftCodeMap.get(id) ?? "?")
+      if (entry.publishedAssignmentDefinitionIds.length > 0)
+        return entry.publishedAssignmentDefinitionIds
+          .map((id) => assignmentLabelMap.get(id) ?? "?")
           .join("/");
       return null;
     },
-    [shifts, shiftCodeMap, absenceTypeMap],
+    [shifts, assignmentLabelMap, absenceTypeMap],
   );
 
-  const publishedShiftCodeIdsForKey = useCallback(
+  const publishedAssignmentIdsForKey = useCallback(
     (empId: string, date: Date): number[] =>
-      shifts[`${empId}_${formatDateKey(date)}`]?.publishedShiftCodeIds ?? [],
+      shifts[`${empId}_${formatDateKey(date)}`]?.publishedAssignmentDefinitionIds ?? [],
     [shifts],
   );
 
@@ -2053,9 +2202,40 @@ function SchedulerContent() {
       perPill?: { start: string; end: string }[];
     } | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
-      if (!entry?.customStartTime && !entry?.customEndTime) return null;
+      if (!entry) return null;
       const rawStart = entry.customStartTime ?? "";
       const rawEnd = entry.customEndTime ?? "";
+      const startParts = rawStart.split("|");
+      const endParts = rawEnd.split("|");
+      const start = startParts[0] || "";
+      const end = endParts[0] || "";
+      const maxLen = Math.max(startParts.length, endParts.length);
+      const perPill =
+        maxLen > 1
+          ? Array.from({ length: maxLen }, (_, i) => ({
+              start: startParts[i] || "",
+              end: endParts[i] || "",
+            }))
+          : undefined;
+      if (!start && !end && !perPill) return null;
+      return { start, end, perPill };
+    },
+    [shifts],
+  );
+
+  const getPublishedCustomShiftTimes = useCallback(
+    (
+      empId: string,
+      date: Date,
+    ): {
+      start: string;
+      end: string;
+      perPill?: { start: string; end: string }[];
+    } | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) return null;
+      const rawStart = entry.publishedCustomStartTime ?? "";
+      const rawEnd = entry.publishedCustomEndTime ?? "";
       const startParts = rawStart.split("|");
       const endParts = rawEnd.split("|");
       const start = startParts[0] || "";
@@ -2093,7 +2273,7 @@ function SchedulerContent() {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return null;
       return {
-        publishedShiftCodeIds: entry.publishedShiftCodeIds ?? [],
+        publishedAssignmentDefinitionIds: entry.publishedAssignmentDefinitionIds ?? [],
         publishedCustomStartTime: entry.publishedCustomStartTime ?? null,
         publishedCustomEndTime: entry.publishedCustomEndTime ?? null,
       };
@@ -2109,7 +2289,7 @@ function SchedulerContent() {
       if (dateStr < todayStr) return true;
       if (dateStr > todayStr) return false;
       const publishedShift = getPublishedRequestShift(empId, date);
-      if (!publishedShift || publishedShift.publishedShiftCodeIds.length === 0)
+      if (!publishedShift || publishedShift.publishedAssignmentDefinitionIds.length === 0)
         return true;
       // Resolve earliest start time from custom times or shift code defaults
       let earliest: string | null = null;
@@ -2120,8 +2300,8 @@ function SchedulerContent() {
         }
       }
       if (!earliest) {
-        for (const codeId of publishedShift.publishedShiftCodeIds) {
-          const sc = shiftCodes.find((c) => c.id === codeId);
+        for (const codeId of publishedShift.publishedAssignmentDefinitionIds) {
+          const sc = assignments.find((c) => c.id === codeId);
           if (
             sc?.defaultStartTime &&
             (!earliest || sc.defaultStartTime < earliest)
@@ -2135,21 +2315,21 @@ function SchedulerContent() {
       const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       return nowTime >= earliest;
     },
-    [getPublishedRequestShift, shiftCodes, today],
+    [getPublishedRequestShift, assignments, today],
   );
 
   /** True if the published shift has at least one categorized, non-off-day shift code. */
   const isPublishedRequestableShift = useCallback(
     (empId: string, date: Date): boolean => {
       const publishedShift = getPublishedRequestShift(empId, date);
-      if (!publishedShift || publishedShift.publishedShiftCodeIds.length === 0)
+      if (!publishedShift || publishedShift.publishedAssignmentDefinitionIds.length === 0)
         return false;
-      return publishedShift.publishedShiftCodeIds.some((codeId) => {
-        const sc = shiftCodes.find((c) => c.id === codeId);
+      return publishedShift.publishedAssignmentDefinitionIds.some((codeId) => {
+        const sc = assignments.find((c) => c.id === codeId);
         return sc != null && sc.categoryId != null;
       });
     },
-    [getPublishedRequestShift, shiftCodes],
+    [getPublishedRequestShift, assignments],
   );
 
   const canCreateOwnShiftRequest = useCallback(
@@ -2232,10 +2412,11 @@ function SchedulerContent() {
     const freshShifts = await fetchShifts(
       orgId,
       canEditShifts,
-      shiftCodeMapRef.current,
+      assignmentLabelMapRef.current,
       absenceTypeMapRef.current,
       shiftFetchStart,
       shiftFetchEnd,
+      segmentCompatibility,
     );
     setShifts(freshShifts);
   }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd]);
@@ -2311,8 +2492,8 @@ function SchedulerContent() {
 
   /** Compare current shift values against published state to determine correct draftKind. */
   function computeDraftKind(entry: {
-    shiftCodeIds: number[];
-    publishedShiftCodeIds?: number[];
+    assignmentIds: number[];
+    publishedAssignmentDefinitionIds?: number[];
     absenceTypeId?: number | null;
     publishedAbsenceTypeId?: number | null;
     customStartTime?: string | null;
@@ -2320,18 +2501,18 @@ function SchedulerContent() {
     publishedCustomStartTime?: string | null;
     publishedCustomEndTime?: string | null;
   }): DraftKind {
-    const pubCodes = entry.publishedShiftCodeIds ?? [];
+    const pubCodes = entry.publishedAssignmentDefinitionIds ?? [];
     const hasPub = pubCodes.length > 0 || entry.publishedAbsenceTypeId != null;
 
     if (!hasPub) {
-      return entry.shiftCodeIds.length > 0 || entry.absenceTypeId != null
+      return entry.assignmentIds.length > 0 || entry.absenceTypeId != null
         ? "new"
         : null;
     }
 
     const codesMatch =
-      entry.shiftCodeIds.length === pubCodes.length &&
-      entry.shiftCodeIds.every((id, i) => id === pubCodes[i]);
+      entry.assignmentIds.length === pubCodes.length &&
+      entry.assignmentIds.every((id, i) => id === pubCodes[i]);
     const absMatch =
       (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null);
     const startMatch =
@@ -2342,7 +2523,7 @@ function SchedulerContent() {
 
     if (codesMatch && absMatch && startMatch && endMatch) return null;
 
-    return entry.shiftCodeIds.length === 0 && entry.absenceTypeId == null
+    return entry.assignmentIds.length === 0 && entry.absenceTypeId == null
       ? "deleted"
       : "modified";
   }
@@ -2351,7 +2532,7 @@ function SchedulerContent() {
     (
       empId: string,
       date: Date,
-      entry: ScheduleEntryPayload | null,
+      entry: ScheduleCellInput | null,
     ) => {
       const orgId = org?.id;
       if (!orgId) {
@@ -2366,39 +2547,49 @@ function SchedulerContent() {
       const existingVersion = existing?.version;
       const isDelete =
         !entry ||
-        entry.label === "OFF" ||
-        (entry.shiftCodeIds.length === 0 && entry.absenceTypeId == null);
+        entry.kind === "deleted" ||
+        (entry.kind === "worked" &&
+          entry.segments.length === 0 &&
+          entry.absenceTypeId == null);
 
       if (isDelete) {
         const ex = shiftsRef.current[key];
-        // Nothing to delete — cell is already empty (no shift codes AND no absence type)
+        // Nothing to delete — cell is already empty (no worked assignment AND no absence type)
         const hasContent =
           ex &&
-          (ex.shiftCodeIds.length > 0 ||
-            ex.publishedShiftCodeIds?.length ||
+          (ex.assignmentIds.length > 0 ||
+            ex.publishedAssignmentDefinitionIds?.length ||
             ex.absenceTypeId != null ||
             ex.publishedAbsenceTypeId != null);
         if (!hasContent) return;
 
         if (
-          ex.publishedShiftCodeIds?.length ||
+          ex.publishedAssignmentDefinitionIds?.length ||
           ex.publishedAbsenceTypeId != null
         ) {
           // Published shift/absence being deleted → mark as draft-deleted
-          const deleteValue = {
-            label: "OFF",
-            shiftCodeIds: [] as number[],
-            isDraft: true,
+          const deleteValue = buildScheduleCellEntryFromInput({
+            input: {
+              kind: "deleted",
+              segments: [],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: ex.seriesId ?? null,
+              fromRecurring: ex.fromRecurring ?? false,
+            },
+            published: getPublishedSnapshot(ex),
+            segmentCompatibility,
+            absenceTypeMap,
+            draftKind: "deleted",
             isDelete: true,
-            draftKind: "deleted" as const,
-            absenceTypeId: null,
-            publishedShiftCodeIds: ex.publishedShiftCodeIds,
-            publishedAbsenceTypeId: ex.publishedAbsenceTypeId,
-            publishedLabel: ex.publishedLabel ?? "",
             version: existingVersion != null ? existingVersion + 1 : undefined,
             createdBy: ex.createdBy ?? null,
             updatedBy: currentUserRef.current?.id ?? null,
-          };
+            createdAt: ex.createdAt ?? null,
+            updatedAt: ex.updatedAt ?? null,
+          });
+          if (!deleteValue) return;
           setShifts((prev) => ({ ...prev, [key]: deleteValue }));
           void enqueueShiftWrite(key, async () => {
             try {
@@ -2435,59 +2626,86 @@ function SchedulerContent() {
           broadcastDraftChanged({ shifts: { [key]: null } });
         }
       } else {
+        const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
         // Filter out any stale/archived shift code IDs
-        const validCodeIds = entry.shiftCodeIds.filter((id) =>
-          shiftCodeMapRef.current.has(id),
+        const validCodeIds = derivedCodeIds.filter((id) =>
+          assignmentLabelMapRef.current.has(id),
         );
-        if (entry.absenceTypeId == null && validCodeIds.length === 0) {
-          toast.error("Selected shift code is no longer available");
+        if (
+          entry.kind === "worked" &&
+          (derivedCodeIds.length === 0 ||
+            derivedCodeIds.length !== entry.segments.length)
+        ) {
+          toast.error("That assignment is no longer available.");
           return;
         }
-        if (validCodeIds.length < entry.shiftCodeIds.length) {
-          toast.warning("Some shift codes were removed (no longer available)");
+        if (validCodeIds.length < derivedCodeIds.length) {
+          toast.warning("Removed assignments that are no longer available.");
+          return;
         }
         if (
+          entry.kind === "absence" &&
           entry.absenceTypeId != null &&
           !absenceTypeMapRef.current.has(entry.absenceTypeId)
         ) {
-          toast.error("Selected absence type is no longer available");
+          toast.error("That absence type is no longer available.");
           return;
         }
         const ex = shiftsRef.current[key];
-        const upsertValue: ShiftMap[string] = {
-          ...ex,
-          label: entry.label,
-          shiftCodeIds: entry.absenceTypeId != null ? [] : validCodeIds,
-          absenceTypeId: entry.absenceTypeId ?? null,
-          isDelete: false,
-          publishedShiftCodeIds: ex?.publishedShiftCodeIds ?? [],
-          publishedLabel: ex?.publishedLabel ?? "",
-          customStartTime:
-            entry.absenceTypeId != null ? null : entry.customStartTime,
-          customEndTime:
-            entry.absenceTypeId != null ? null : entry.customEndTime,
-          isDraft: true,
+        const normalizedEntry: ScheduleCellInput =
+          entry.kind === "worked"
+            ? {
+                ...entry,
+                customStartTime: entry.customStartTime ?? null,
+                customEndTime: entry.customEndTime ?? null,
+              }
+            : entry.kind === "absence"
+              ? {
+                  ...entry,
+                  segments: [],
+                  customStartTime: null,
+                  customEndTime: null,
+                }
+              : entry;
+        const provisional = buildScheduleCellEntryFromInput({
+          input: normalizedEntry,
+          published: getPublishedSnapshot(ex),
+          segmentCompatibility,
+          absenceTypeMap,
           draftKind: null,
-          // Optimistically bump version to match the DB write so subsequent
-          // edits use the correct expectedVersion for the optimistic lock.
           version: existingVersion != null ? existingVersion + 1 : undefined,
+          createdBy: ex?.createdBy ?? null,
           updatedBy: currentUserRef.current?.id ?? null,
-        };
-        const dk = computeDraftKind(upsertValue);
-        upsertValue.isDraft = dk !== null;
-        upsertValue.draftKind = dk;
+          createdAt: ex?.createdAt ?? null,
+          updatedAt: ex?.updatedAt ?? null,
+        });
+        if (!provisional) {
+          toast.error("That assignment could not be resolved.");
+          return;
+        }
+        const dk = computeDraftKind(provisional);
+        const upsertValue = buildScheduleCellEntryFromInput({
+          input: normalizedEntry,
+          published: getPublishedSnapshot(ex),
+          segmentCompatibility,
+          absenceTypeMap,
+          draftKind: dk,
+          version: existingVersion != null ? existingVersion + 1 : undefined,
+          createdBy: ex?.createdBy ?? null,
+          updatedBy: currentUserRef.current?.id ?? null,
+          createdAt: ex?.createdAt ?? null,
+          updatedAt: ex?.updatedAt ?? null,
+        });
+        if (!upsertValue) return;
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
         void enqueueShiftWrite(key, async () => {
           try {
             await upsertShift(
               empId,
               dateKey,
-              entry.absenceTypeId != null ? [] : validCodeIds,
+              normalizedEntry,
               orgId,
-              entry.absenceTypeId != null ? null : entry.customStartTime,
-              entry.absenceTypeId != null ? null : entry.customEndTime,
               existingVersion,
-              entry.absenceTypeId ?? null,
             );
           } catch (err) {
             if (err instanceof OptimisticLockError) {
@@ -2506,31 +2724,35 @@ function SchedulerContent() {
       org?.id,
       broadcastDraftChanged,
       enqueueShiftWrite,
+      getInputAssignmentDefinitionIds,
+      getPublishedSnapshot,
       handleShiftWriteConflict,
+      segmentCompatibility,
+      absenceTypeMap,
     ],
   );
 
   const getShiftStyle = useCallback(
-    (type: string, focusAreaName?: string): ShiftCode => {
+    (type: string, focusAreaName?: string): AssignmentDefinition => {
       const fa = focusAreaName
         ? focusAreas.find((w) => w.name === focusAreaName)
         : null;
-      const matchesType = (t: ShiftCode) => t.label === type || t.name === type;
+      const matchesType = (t: AssignmentDefinition) => t.label === type || t.name === type;
 
       // 1. Code associated with this focus area → use the code's own colors
       if (fa) {
-        const specific = shiftCodes.find(
+        const specific = assignments.find(
           (t) => matchesType(t) && t.focusAreaId === fa.id,
         );
         if (specific) return specific;
       }
       // 2. Global code (no focus area associations)
-      const general = shiftCodes.find(
+      const general = assignments.find(
         (t) => matchesType(t) && t.focusAreaId == null,
       );
       if (general) return general;
       // 3. Cross-area code — belongs to another focus area; use its own colors.
-      const crossArea = shiftCodes.find((t) => matchesType(t));
+      const crossArea = assignments.find((t) => matchesType(t));
       if (crossArea) return crossArea;
       // 4. Fallback
       return {
@@ -2542,9 +2764,9 @@ function SchedulerContent() {
         border: "var(--color-border)",
         text: "var(--color-text-muted)",
         sortOrder: 999,
-      } satisfies ShiftCode;
+      } satisfies AssignmentDefinition;
     },
-    [shiftCodes, focusAreas],
+    [assignments, focusAreas],
   );
 
   // ── Event handlers ───────────────────────────────────────────────────────────
@@ -2579,6 +2801,7 @@ function SchedulerContent() {
         date,
         empFocusAreaIds: emp.focusAreaIds,
         empCertificationId: emp.certificationId,
+        empRoleIds: emp.roleIds,
         activeFocusAreaId: activeFaId,
       });
     },
@@ -2593,125 +2816,121 @@ function SchedulerContent() {
     ],
   );
 
-  const handleShiftSelect = useCallback(
-    (label: string, shiftCodeIds: number[]) => {
-      updateEditSessionDraft((prev) => {
-        const currentShift = prev.draftShift;
+  const buildDraftShiftFromInput = useCallback(
+    (
+      currentShift: ShiftMap[string] | null,
+      input: ScheduleCellInput | null,
+    ): ShiftMap[string] | null => {
+      const published = getPublishedSnapshot(currentShift);
+      const hasPublishedContent =
+        (currentShift?.publishedAssignmentDefinitionIds.length ?? 0) > 0 ||
+        currentShift?.publishedAbsenceTypeId != null;
 
-        if (label === "OFF" || shiftCodeIds.length === 0) {
-          const hasContent =
-            currentShift &&
-            (currentShift.shiftCodeIds.length > 0 ||
-              currentShift.publishedShiftCodeIds.length > 0 ||
-              currentShift.absenceTypeId != null ||
-              currentShift.publishedAbsenceTypeId != null);
-
-          if (!hasContent) {
-            return {
-              draftShift: currentShift,
-              draftNotes: prev.draftNotes,
-            };
-          }
-
-          if (
-            currentShift?.publishedShiftCodeIds.length ||
-            currentShift?.publishedAbsenceTypeId != null
-          ) {
-            return {
-              draftShift: {
-                ...currentShift,
-                label: "OFF",
-                shiftCodeIds: [],
-                absenceTypeId: null,
-                isDraft: true,
-                isDelete: true,
-                draftKind: "deleted",
-                customStartTime: null,
-                customEndTime: null,
-              },
-              draftNotes: prev.draftNotes,
-            };
-          }
-
-          return {
-            draftShift: null,
-            draftNotes: prev.draftNotes,
-          };
+      if (!input || input.kind === "deleted") {
+        if (!currentShift) return null;
+        if (!hasPublishedContent) {
+          return null;
         }
-
-        const validCodeIds = shiftCodeIds.filter((id) =>
-          shiftCodeMapRef.current.has(id),
-        );
-        if (validCodeIds.length === 0) {
-          toast.error("Selected shift code is no longer available");
-          return {
-            draftShift: currentShift,
-            draftNotes: prev.draftNotes,
-          };
-        }
-        if (validCodeIds.length < shiftCodeIds.length) {
-          toast.warning("Some shift codes were removed (no longer available)");
-        }
-
-        const nextShift: ShiftMap[string] = {
-          ...(currentShift ?? {
-            publishedShiftCodeIds: [],
-            publishedLabel: "",
-            isDraft: false,
-            draftKind: null,
-          }),
-          label,
-          shiftCodeIds: validCodeIds,
-          absenceTypeId: null,
-          isDelete: false,
-        };
-        const draftKind = computeDraftKind(nextShift);
-
-        return {
-          draftShift: {
-            ...nextShift,
-            isDraft: draftKind !== null,
-            draftKind,
+        return buildScheduleCellEntryFromInput({
+          input: {
+            kind: "deleted",
+            segments: [],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: currentShift.seriesId ?? null,
+            fromRecurring: currentShift.fromRecurring ?? false,
           },
-          draftNotes: prev.draftNotes,
-        };
+          published,
+          segmentCompatibility,
+          absenceTypeMap,
+          draftKind: "deleted",
+          isDelete: true,
+          version: currentShift.version,
+          createdBy: currentShift.createdBy ?? null,
+          updatedBy: currentUserRef.current?.id ?? null,
+          createdAt: currentShift.createdAt ?? null,
+          updatedAt: currentShift.updatedAt ?? null,
+        });
+      }
+
+      if (input.kind === "worked") {
+        const derivedCodeIds = getInputAssignmentDefinitionIds(input);
+        if (
+          derivedCodeIds.length === 0 ||
+          derivedCodeIds.length !== input.segments.length
+        ) {
+          toast.error("That assignment is no longer available.");
+          return currentShift;
+        }
+
+        const validCodeIds = derivedCodeIds.filter((id) =>
+          assignmentLabelMapRef.current.has(id),
+        );
+        if (validCodeIds.length < derivedCodeIds.length) {
+          toast.warning("Removed assignments that are no longer available.");
+          return currentShift;
+        }
+      }
+
+      if (
+        input.kind === "absence" &&
+        input.absenceTypeId != null &&
+        !absenceTypeMapRef.current.has(input.absenceTypeId)
+      ) {
+        toast.error("That absence type is no longer available.");
+        return currentShift;
+      }
+
+      const provisional = buildScheduleCellEntryFromInput({
+        input,
+        published,
+        segmentCompatibility,
+        absenceTypeMap,
+        draftKind: null,
+        isDelete: false,
+        version: currentShift?.version,
+        createdBy: currentShift?.createdBy ?? null,
+        updatedBy: currentUserRef.current?.id ?? null,
+        createdAt: currentShift?.createdAt ?? null,
+        updatedAt: currentShift?.updatedAt ?? null,
+      });
+      if (!provisional) {
+        toast.error("That assignment could not be resolved.");
+        return currentShift;
+      }
+
+      const draftKind = computeDraftKind(provisional);
+      return buildScheduleCellEntryFromInput({
+        input,
+        published,
+        segmentCompatibility,
+        absenceTypeMap,
+        draftKind,
+        isDelete: false,
+        version: currentShift?.version,
+        createdBy: currentShift?.createdBy ?? null,
+        updatedBy: currentUserRef.current?.id ?? null,
+        createdAt: currentShift?.createdAt ?? null,
+        updatedAt: currentShift?.updatedAt ?? null,
       });
     },
     [
-      updateEditSessionDraft,
+      absenceTypeMap,
+      getInputAssignmentDefinitionIds,
+      getPublishedSnapshot,
+      segmentCompatibility,
     ],
   );
 
-  const handleAbsenceSelect = useCallback(
-    (absenceType: AbsenceType) => {
-      updateEditSessionDraft((prev) => {
-        const currentShift = prev.draftShift;
-        const updated: ShiftMap[string] = {
-          ...(currentShift ?? {
-            publishedShiftCodeIds: [],
-            publishedLabel: "",
-            isDraft: false,
-            draftKind: null,
-          }),
-          label: absenceTypeMap.get(absenceType.id) ?? absenceType.label,
-          shiftCodeIds: [],
-          absenceTypeId: absenceType.id,
-          customStartTime: null,
-          customEndTime: null,
-          isDelete: false,
-        };
-        const draftKind = computeDraftKind(updated);
-        return {
-          draftShift: {
-            ...updated,
-            isDraft: draftKind !== null,
-            draftKind,
-          },
-          draftNotes: prev.draftNotes,
-        };
-      });
+  const handleShiftSelect = useCallback(
+    (input: ScheduleCellInput | null) => {
+      updateEditSessionDraft((prev) => ({
+        draftShift: buildDraftShiftFromInput(prev.draftShift, input),
+        draftNotes: prev.draftNotes,
+      }));
     },
-    [absenceTypeMap, updateEditSessionDraft],
+    [buildDraftShiftFromInput, updateEditSessionDraft],
   );
 
   const handleConfirmEditPanel = useCallback(
@@ -2733,7 +2952,7 @@ function SchedulerContent() {
       const shiftIsDeleted = (shift: ShiftMap[string] | null) =>
         !shift ||
         shift.isDelete ||
-        (shift.shiftCodeIds.length === 0 && shift.absenceTypeId == null);
+        (shift.assignmentIds.length === 0 && shift.absenceTypeId == null);
       const shiftIdentityMatches = (
         left: ShiftMap[string] | null,
         right: ShiftMap[string] | null,
@@ -2742,7 +2961,7 @@ function SchedulerContent() {
         const rightDeleted = shiftIsDeleted(right);
         if (leftDeleted || rightDeleted) return leftDeleted === rightDeleted;
         return (
-          idsMatch(left!.shiftCodeIds, right!.shiftCodeIds) &&
+          idsMatch(left!.assignmentIds, right!.assignmentIds) &&
           (left!.absenceTypeId ?? null) === (right!.absenceTypeId ?? null)
         );
       };
@@ -2790,19 +3009,19 @@ function SchedulerContent() {
           } else if (session.draftShift) {
             await updateSeriesAllShifts(
               workingBaseShift.seriesId,
-              session.draftShift.shiftCodeIds[0] ?? null,
+              buildEntryPayload(session.draftShift),
               orgId,
-              session.draftShift.absenceTypeId ?? null,
             );
           }
 
           const freshShifts = await fetchShifts(
             orgId,
             canEditShiftsRef.current,
-            shiftCodeMapRef.current,
+            assignmentLabelMapRef.current,
             absenceTypeMapRef.current,
             shiftFetchStart,
             shiftFetchEnd,
+            segmentCompatibility,
           );
           setShifts(freshShifts);
           shiftsRef.current = freshShifts;
@@ -2835,12 +3054,9 @@ function SchedulerContent() {
             await upsertShift(
               panel.empId,
               formatDateKey(panel.date),
-              session.draftShift.shiftCodeIds,
+              buildEntryPayload(session.draftShift),
               orgId,
-              session.draftShift.customStartTime ?? null,
-              session.draftShift.customEndTime ?? null,
               expectedVersion,
-              session.draftShift.absenceTypeId ?? null,
             );
           }
         } else if (remainingTimeChanged && session.draftShift && workingShift) {
@@ -2951,10 +3167,11 @@ function SchedulerContent() {
       const shiftData = await fetchShifts(
         org.id,
         canEditShifts,
-        shiftCodeMapRef.current,
+        assignmentLabelMapRef.current,
         absenceTypeMapRef.current,
         shiftFetchStart,
         shiftFetchEnd,
+        segmentCompatibility,
       );
       setShifts(shiftData);
       const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
@@ -3012,11 +3229,19 @@ function SchedulerContent() {
           : null;
       const currentLabel = draftEntry?.label ?? shiftForKey(editPanel.empId, editPanel.date);
       if (!currentLabel || currentLabel === "OFF") return;
-      const codeIds = draftEntry?.shiftCodeIds ?? shiftCodeIdsForKey(editPanel.empId, editPanel.date);
       const absenceTypeId =
         draftEntry?.absenceTypeId ??
         absenceTypeIdForKey(editPanel.empId, editPanel.date);
-      if (!codeIds.length && absenceTypeId == null) return;
+      const seriesInputSource =
+        draftEntry ??
+        shiftsRef.current[cellKey] ??
+        null;
+      const seriesInput = seriesInputSource
+        ? buildEntryPayload(seriesInputSource)
+        : null;
+      if (!seriesInput || (seriesInput.kind === "worked" && seriesInput.segments.length === 0)) {
+        return;
+      }
       setIsCreatingRepeatSeries(true);
       startScheduleOperation({
         kind: "repeat_series",
@@ -3045,12 +3270,9 @@ function SchedulerContent() {
           await upsertShift(
             editPanel.empId,
             formatDateKey(editPanel.date),
-            pendingEntry.shiftCodeIds,
+            buildEntryPayload(pendingEntry),
             org.id,
-            pendingEntry.customStartTime ?? null,
-            pendingEntry.customEndTime ?? null,
             persistedEntry?.version,
-            pendingEntry.absenceTypeId ?? null,
           );
         }
 
@@ -3064,14 +3286,13 @@ function SchedulerContent() {
         await createShiftSeries(
           editPanel.empId,
           org.id,
-          codeIds[0] ?? null,
+          seriesInput,
           currentLabel,
           frequency,
           daysOfWeek,
           startDate,
           endDate,
           maxOccurrences,
-          absenceTypeId ?? null,
           {
             onProgress: (progress) => {
               updateScheduleOperation("repeat_series", {
@@ -3088,10 +3309,11 @@ function SchedulerContent() {
         const shiftData = await fetchShifts(
           org.id,
           canEditShifts,
-          shiftCodeMapRef.current,
+          assignmentLabelMapRef.current,
           absenceTypeMapRef.current,
           shiftFetchStart,
           shiftFetchEnd,
+          segmentCompatibility,
         );
         setShifts(shiftData);
         // Broadcast new/changed shifts to other editors
@@ -3127,7 +3349,7 @@ function SchedulerContent() {
       org,
       canEditShifts,
       shiftForKey,
-      shiftCodeIdsForKey,
+      assignmentIdsForKey,
       absenceTypeIdForKey,
       startScheduleOperation,
       updateScheduleOperation,
@@ -3146,82 +3368,96 @@ function SchedulerContent() {
     () => new Map(focusAreas.map((fa) => [fa.id, fa.name])),
     [focusAreas],
   );
+  const handleGridCellActivate = useCallback<
+    ScheduleGridHandlers["onActivateCell"]
+  >(
+    ({ emp, date, cellId }) => {
+      handleCellClick(
+        emp,
+        date,
+        focusAreaNameMap.get(cellId.sectionId),
+      );
+    },
+    [handleCellClick, focusAreaNameMap],
+  );
   const certificationNameMap = useMemo(
     () => new Map(certifications.map((c) => [c.id, c.name])),
     [certifications],
   );
+  const roleNameMap = useMemo(
+    () => new Map(orgRoles.map((role) => [role.id, role.name])),
+    [orgRoles],
+  );
 
   /** Returns null if qualified, or an error message string if not. */
   const checkQualification = useCallback(
-    (empId: string, shiftCodeIds: number[]): string | null => {
+    (empId: string, assignmentIds: number[]): string | null => {
       const emp = employees.find((e) => e.id === empId);
       if (!emp) return null; // shouldn't happen, but don't block
 
-      for (const codeId of shiftCodeIds) {
-        const code = shiftCodes.find((sc) => sc.id === codeId);
+      for (const codeId of assignmentIds) {
+        const code = assignments.find((sc) => sc.id === codeId);
         if (!code) continue;
-        if (!isEmployeeQualified(emp, code)) {
-          const reasons = getDisqualificationReasons(
-            emp,
-            code,
-            focusAreaNameMap,
-            certificationNameMap,
-          );
+        if (
+          !isEmployeeQualifiedForAssignment(emp, {
+            assignment: code,
+            shiftCategories,
+            jobs,
+            orgRoles,
+          })
+        ) {
+          const reasons = getAssignmentDisqualificationReasons(emp, {
+            assignment: code,
+            shiftCategories,
+            jobs,
+            focusAreaNames: focusAreaNameMap,
+            roleNames: roleNameMap,
+            certificationNames: certificationNameMap,
+            orgRoles,
+          });
           const displayLabel =
-            shiftCodeMapRef.current.get(codeId) ?? code.label;
-          return `${getEmployeeDisplayName(emp)} cannot be assigned ${displayLabel}: ${reasons.join(", ")}`;
+            assignmentLabelMapRef.current.get(codeId) ?? code.label;
+          return formatShiftAssignmentDisqualificationMessage({
+            employeeName: getEmployeeDisplayName(emp),
+            assignmentLabel: displayLabel,
+            reasons,
+          });
         }
       }
       return null;
     },
-    [employees, shiftCodes, focusAreaNameMap, certificationNameMap],
+    [
+      certificationNameMap,
+      employees,
+      focusAreaNameMap,
+      jobs,
+      roleNameMap,
+      orgRoles,
+      shiftCategories,
+      assignments,
+    ],
   );
 
-  // ── Drag & Drop handlers ──────────────────────────────────────────────────
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    const data = event.active.data.current as ShiftDragData | undefined;
-    if (data) {
-      const activatorEvent = event.activatorEvent;
-      const wantsCopy =
-        (activatorEvent instanceof MouseEvent ||
-          activatorEvent instanceof KeyboardEvent) &&
-        activatorEvent.shiftKey;
-      setActiveDrag(data);
-      activeDragModeRef.current = wantsCopy ? "copy" : "move";
-      document.documentElement.dataset.dragging = "true";
-    }
-  }, []);
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      setActiveDrag(null);
-      const dragMode = activeDragModeRef.current;
-      activeDragModeRef.current = "move";
-      delete document.documentElement.dataset.dragging;
-      const { active, over } = event;
-      if (!over) return;
-
-      const dragData = active.data.current as ShiftDragData | undefined;
-      const dropData = over.data.current as CellDropData | undefined;
-      if (!dragData || !dropData) return;
-
-      // No-op if dropped on same cell
-      const sourceKey = `${dragData.empId}_${dragData.dateKey}`;
-      const targetKey = `${dropData.empId}_${dropData.dateKey}`;
+  // ── Grid-owned drag/drop handler ─────────────────────────────────────────
+  const handleMoveGridEntry = useCallback<
+    NonNullable<ScheduleGridHandlers["onMoveEntry"]>
+  >(
+    ({ sourceCellId, targetCellId, payload, mode }) => {
+      const sourceKey = `${sourceCellId.empId}_${sourceCellId.dateKey}`;
+      const targetKey = `${targetCellId.empId}_${targetCellId.dateKey}`;
       if (sourceKey === targetKey) return;
 
-      // Check target lock
       const targetLock = getCellLock(targetKey);
       if (targetLock) {
         toast.info(`Cell is being edited by ${targetLock.userName}`);
         return;
       }
 
-      // Check if target employee qualifies for the shift
-      if (dragData.shiftCodeIds.length > 0) {
+      const payloadAssignmentDefinitionIds = getInputAssignmentDefinitionIds(payload);
+      if (payloadAssignmentDefinitionIds.length > 0) {
         const disqualified = checkQualification(
-          dropData.empId,
-          dragData.shiftCodeIds,
+          targetCellId.empId,
+          payloadAssignmentDefinitionIds,
         );
         if (disqualified) {
           toast.error(disqualified);
@@ -3230,65 +3466,81 @@ function SchedulerContent() {
       }
 
       const sourceEntry = shifts[sourceKey];
-      const targetPublishedShiftCodeIds =
-        shifts[targetKey]?.publishedShiftCodeIds ?? [];
+      const targetPublishedAssignmentDefinitionIds =
+        shifts[targetKey]?.publishedAssignmentDefinitionIds ?? [];
       const targetPublishedAbsenceTypeId =
         shifts[targetKey]?.publishedAbsenceTypeId ?? null;
       const targetPublishedLabel = shifts[targetKey]?.publishedLabel ?? "";
       const targetHasPublished =
-        targetPublishedShiftCodeIds.length > 0 ||
+        targetPublishedAssignmentDefinitionIds.length > 0 ||
         targetPublishedAbsenceTypeId != null;
       const targetDraftKind: DraftKind = targetHasPublished
         ? "modified"
         : "new";
-      const movedEntry: ShiftMap[string] = {
-        ...(shifts[targetKey] ?? {}),
-        label: dragData.label,
-        shiftCodeIds: dragData.absenceTypeId != null ? [] : dragData.shiftCodeIds,
-        absenceTypeId: dragData.absenceTypeId ?? null,
-        isDraft: true,
-        isDelete: false,
+      const movedEntry = buildScheduleCellEntryFromInput({
+        input: {
+          ...payload,
+          customStartTime:
+            payload.kind === "worked"
+              ? (sourceEntry?.customStartTime ?? payload.customStartTime ?? null)
+              : null,
+          customEndTime:
+            payload.kind === "worked"
+              ? (sourceEntry?.customEndTime ?? payload.customEndTime ?? null)
+              : null,
+        },
+        published: getPublishedSnapshot(shifts[targetKey]),
+        segmentCompatibility,
+        absenceTypeMap,
         draftKind: targetDraftKind,
-        publishedShiftCodeIds: targetPublishedShiftCodeIds,
-        publishedAbsenceTypeId: targetPublishedAbsenceTypeId,
-        publishedLabel: targetPublishedLabel,
-        customStartTime:
-          dragData.absenceTypeId != null
-            ? null
-            : (sourceEntry?.customStartTime ?? dragData.customStartTime ?? null),
-        customEndTime:
-          dragData.absenceTypeId != null
-            ? null
-            : (sourceEntry?.customEndTime ?? dragData.customEndTime ?? null),
+        version:
+          shifts[targetKey]?.version != null
+            ? shifts[targetKey]!.version + 1
+            : undefined,
+        createdBy: shifts[targetKey]?.createdBy ?? null,
         updatedBy: currentUserRef.current?.id ?? null,
-      };
+        createdAt: shifts[targetKey]?.createdAt ?? null,
+        updatedAt: shifts[targetKey]?.updatedAt ?? null,
+      });
+      if (!movedEntry) {
+        toast.error("That assignment could not be moved.");
+        return;
+      }
       const sourceReplacement =
-        dragMode === "move"
-          ? sourceEntry?.publishedShiftCodeIds?.length ||
+        mode === "move"
+          ? sourceEntry?.publishedAssignmentDefinitionIds?.length ||
             sourceEntry?.publishedAbsenceTypeId != null
-            ? {
-                label: "OFF",
-                shiftCodeIds: [],
-                absenceTypeId: null,
-                isDraft: true,
+            ? buildScheduleCellEntryFromInput({
+                input: {
+                  kind: "deleted",
+                  segments: [],
+                  absenceTypeId: null,
+                  customStartTime: null,
+                  customEndTime: null,
+                  seriesId: sourceEntry?.seriesId ?? null,
+                  fromRecurring: sourceEntry?.fromRecurring ?? false,
+                },
+                published: getPublishedSnapshot(sourceEntry),
+                segmentCompatibility,
+                absenceTypeMap,
+                draftKind: "deleted",
                 isDelete: true,
-                draftKind: "deleted" as DraftKind,
-                publishedShiftCodeIds: sourceEntry?.publishedShiftCodeIds ?? [],
-                publishedAbsenceTypeId:
-                  sourceEntry?.publishedAbsenceTypeId ?? null,
-                publishedLabel: sourceEntry?.publishedLabel ?? "",
-                customStartTime: null,
-                customEndTime: null,
+                version:
+                  sourceEntry?.version != null
+                    ? sourceEntry.version + 1
+                    : undefined,
+                createdBy: sourceEntry?.createdBy ?? null,
                 updatedBy: currentUserRef.current?.id ?? null,
-              }
+                createdAt: sourceEntry?.createdAt ?? null,
+                updatedAt: sourceEntry?.updatedAt ?? null,
+              })
             : null
           : undefined;
 
-      // Optimistic UI update
       setShifts((prev) => {
         const next = { ...prev };
         next[targetKey] = movedEntry;
-        if (dragMode === "move") {
+        if (mode === "move") {
           if (sourceReplacement) {
             next[sourceKey] = sourceReplacement;
           } else {
@@ -3301,7 +3553,7 @@ function SchedulerContent() {
       broadcastDraftChanged({
         shifts: {
           [targetKey]: movedEntry,
-          ...(dragMode === "move"
+          ...(mode === "move"
             ? {
                 [sourceKey]: sourceReplacement,
               }
@@ -3316,18 +3568,17 @@ function SchedulerContent() {
         .then(() =>
           moveShift(
             org!.id,
-            dragData.empId,
-            dragData.dateKey,
-            dropData.empId,
-            dropData.dateKey,
-            dragData.shiftCodeIds,
-            dragData.absenceTypeId ?? null,
-            dragMode,
+            sourceCellId.empId,
+            sourceCellId.dateKey,
+            targetCellId.empId,
+            targetCellId.dateKey,
+            payload,
+            mode,
             sourceEntry?.version,
           ),
         )
         .then(() => {
-          toast.success(dragMode === "copy" ? "Entry copied" : "Entry moved");
+          toast.success(mode === "copy" ? "Entry copied" : "Entry moved");
         })
         .catch(async (err) => {
           if (err instanceof OptimisticLockError) {
@@ -3336,9 +3587,7 @@ function SchedulerContent() {
             );
           } else {
             toast.error(
-              dragMode === "copy"
-                ? "Failed to copy entry"
-                : "Failed to move entry",
+              mode === "copy" ? "Failed to copy entry" : "Failed to move entry",
             );
             Sentry.captureException(err);
           }
@@ -3349,9 +3598,13 @@ function SchedulerContent() {
       shifts,
       org,
       getCellLock,
+      getInputAssignmentDefinitionIds,
+      getPublishedSnapshot,
       checkQualification,
       broadcastDraftChanged,
       refetchScheduleData,
+      segmentCompatibility,
+      absenceTypeMap,
     ],
   );
 
@@ -3363,7 +3616,7 @@ function SchedulerContent() {
       if (
         !shift ||
         shift.isDelete ||
-        (shift.shiftCodeIds.length === 0 && shift.absenceTypeId == null)
+        (shift.assignmentIds.length === 0 && shift.absenceTypeId == null)
       ) {
         return;
       }
@@ -3384,8 +3637,9 @@ function SchedulerContent() {
       }
 
       // Check if target employee qualifies for the pasted shift
-      if (clipboard.shiftCodeIds.length > 0) {
-        const disqualified = checkQualification(empId, clipboard.shiftCodeIds);
+      const clipboardAssignmentDefinitionIds = getInputAssignmentDefinitionIds(clipboard);
+      if (clipboardAssignmentDefinitionIds.length > 0) {
+        const disqualified = checkQualification(empId, clipboardAssignmentDefinitionIds);
         if (disqualified) {
           toast.error(disqualified);
           return;
@@ -3396,7 +3650,7 @@ function SchedulerContent() {
       const existing = shifts[cellKey];
       if (
         existing &&
-        (existing.shiftCodeIds.length > 0 || existing.absenceTypeId != null) &&
+        (existing.assignmentIds.length > 0 || existing.absenceTypeId != null) &&
         !existing.isDelete
       ) {
         setPendingPasteOver({
@@ -3411,7 +3665,14 @@ function SchedulerContent() {
       setShift(empId, date, clipboard);
       toast.success("Entry pasted");
     },
-    [clipboard, setShift, getCellLock, checkQualification, shifts],
+    [
+      clipboard,
+      setShift,
+      getCellLock,
+      getInputAssignmentDefinitionIds,
+      checkQualification,
+      shifts,
+    ],
   );
 
   const handleClearShift = useCallback(
@@ -3430,58 +3691,65 @@ function SchedulerContent() {
     [getCellLock, employees, shiftForKey],
   );
 
+  const getDateFromCellId = useCallback(
+    (cellId: GridCellId) => new Date(`${cellId.dateKey}T00:00:00`),
+    [],
+  );
+
+  const handleCopyGridCell = useCallback(
+    (cellId: GridCellId) => {
+      handleCopyShift(cellId.empId, getDateFromCellId(cellId));
+    },
+    [getDateFromCellId, handleCopyShift],
+  );
+
+  const handlePasteGridCell = useCallback(
+    (cellId: GridCellId) => {
+      handlePasteShift(cellId.empId, getDateFromCellId(cellId));
+    },
+    [getDateFromCellId, handlePasteShift],
+  );
+
   // Context menu handlers
-  const handleCellContextMenu = useCallback(
-    (
-      e: React.MouseEvent | React.KeyboardEvent,
-      empId: string,
-      date: Date,
-      focusAreaName: string,
-    ) => {
-      e.preventDefault();
+  const handleGridCellContextMenu = useCallback<
+    NonNullable<ScheduleGridHandlers["onOpenCellMenu"]>
+  >(
+    ({ event, anchorEl, cellId, date }) => {
+      event.preventDefault();
+      const cellKey = `${cellId.empId}_${formatDateKey(date)}`;
+      const shiftEntry = shifts[cellKey];
+      const hasShift = !!(
+        shiftEntry &&
+        (shiftEntry.assignmentIds.length > 0 ||
+          shiftEntry.absenceTypeId != null) &&
+        !shiftEntry.isDelete
+      );
+      const canRequestBase =
+        !shiftEntry?.absenceTypeId &&
+        canCreateOwnShiftRequest(cellId.empId, date);
+      const hasActiveRequest = hasActiveRequestForShift(cellId.empId, date);
+      const canRequest = canRequestBase && !hasActiveRequest;
+      const hasEditActions = canEditShifts && (hasShift || !!clipboard);
+      const hasRequestActions = canRequest && !hasActiveRequest;
+
+      if (!hasEditActions && !hasRequestActions) {
+        setContextMenu(null);
+        return;
+      }
+
       setContextMenu({
-        anchorEl: e.currentTarget as HTMLElement,
-        empId,
-        date,
-        focusAreaName,
+        anchorEl,
+        cellId,
       });
     },
-    [],
+    [
+      canCreateOwnShiftRequest,
+      canEditShifts,
+      clipboard,
+      hasActiveRequestForShift,
+      shifts,
+    ],
   );
-
-  const handleCellHover = useCallback(
-    (empId: string, date: Date, focusAreaName: string) => {
-      hoveredCellRef.current = { empId, date, focusAreaName };
-    },
-    [],
-  );
-
-  // Keyboard shortcuts for copy-paste (Cmd/Ctrl+C and Cmd/Ctrl+V)
-  useEffect(() => {
-    if (!canEditShifts) return;
-
-    function handleKeyDown(e: KeyboardEvent) {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod) return;
-
-      const hovered = hoveredCellRef.current;
-      if (!hovered) return;
-
-      if (e.key === "c") {
-        // Don't intercept if user has text selected
-        const sel = window.getSelection();
-        if (sel && sel.toString().length > 0) return;
-        e.preventDefault();
-        handleCopyShift(hovered.empId, hovered.date);
-      } else if (e.key === "v") {
-        e.preventDefault();
-        handlePasteShift(hovered.empId, hovered.date);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [canEditShifts, handleCopyShift, handlePasteShift]);
 
   // Compute the auto-fill date range (reused by preview + apply)
   const getAutoFillRange = useCallback((): {
@@ -3513,7 +3781,7 @@ function SchedulerContent() {
     const freshRecurringShifts = await fetchRecurringShifts(
       org.id,
       undefined,
-      shiftCodeMapRef.current,
+      assignmentLabelMapRef.current,
       false,
       absenceTypeMapRef.current,
     );
@@ -3540,18 +3808,24 @@ function SchedulerContent() {
           const until = rs.effectiveUntil;
           return from <= dateKey && (!until || until >= dateKey);
         });
-        // Verify shift code or absence type is still active (not archived)
+        // Verify the canonical recurring state still references active schedule definitions.
         if (match) {
-          if (
-            match.shiftCodeId != null &&
-            shiftCodes.some((sc) => sc.id === match.shiftCodeId)
-          )
+          if (match.input.kind === "worked") {
+            const activeShiftIds = new Set(shiftCategories.map((shift) => shift.id));
+            const activeJobIds = new Set(jobs.map((job) => job.id));
+            const isActive = match.input.segments.every(
+              (segment) =>
+                activeJobIds.has(segment.jobId) &&
+                (segment.shiftId == null || activeShiftIds.has(segment.shiftId)),
+            );
+            if (isActive) count++;
+          } else if (
+            match.input.kind === "absence" &&
+            match.input.absenceTypeId != null &&
+            absenceTypes.some((at) => at.id === match.input.absenceTypeId)
+          ) {
             count++;
-          else if (
-            match.absenceTypeId != null &&
-            absenceTypes.some((at) => at.id === match.absenceTypeId)
-          )
-            count++;
+          }
         }
       }
     }
@@ -3564,7 +3838,7 @@ function SchedulerContent() {
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     setAutoFillPreview({ count, dateRange });
     setShowAutoFillConfirm(true);
-  }, [org, getAutoFillRange, shiftCodes, absenceTypes, shifts]);
+  }, [org, getAutoFillRange, absenceTypes, shifts, shiftCategories, jobs]);
 
   // Actually apply recurring schedules (called after confirmation)
   const handleApplyRecurring = useCallback(async () => {
@@ -3666,7 +3940,7 @@ function SchedulerContent() {
         const sourceShift = shifts[sourceKey];
         if (
           sourceShift &&
-          (sourceShift.shiftCodeIds.length > 0 ||
+          (sourceShift.assignmentIds.length > 0 ||
             sourceShift.absenceTypeId != null) &&
           !sourceShift.isDelete &&
           !shifts[targetKey]
@@ -3730,16 +4004,16 @@ function SchedulerContent() {
 
           if (
             sourceShift &&
-            (sourceShift.shiftCodeIds.length > 0 ||
+            (sourceShift.assignmentIds.length > 0 ||
               sourceShift.absenceTypeId != null) &&
             !sourceShift.isDelete &&
             !shifts[targetKey]
           ) {
-            // BUG 1.11: Check qualification for shift codes (ignore absence types)
-            if (sourceShift.shiftCodeIds.length > 0) {
+            // BUG 1.11: Check qualification for worked assignments (ignore absence types)
+            if (sourceShift.assignmentIds.length > 0) {
               const disqualifyReason = checkQualification(
                 emp.id,
-                sourceShift.shiftCodeIds,
+                sourceShift.assignmentIds,
               );
               if (disqualifyReason) {
                 disqualifiedShifts.push({
@@ -3754,11 +4028,11 @@ function SchedulerContent() {
             // Build optimistic state entry
             shiftUpdates[targetKey] = {
               label: sourceShift.label,
-              shiftCodeIds: sourceShift.shiftCodeIds,
+              assignmentIds: sourceShift.assignmentIds,
               absenceTypeId: sourceShift.absenceTypeId,
               isDraft: true,
               draftKind: "new",
-              publishedShiftCodeIds: [],
+              publishedAssignmentDefinitionIds: [],
               publishedLabel: "",
               updatedBy: currentUserRef.current?.id ?? null,
             };
@@ -3768,12 +4042,9 @@ function SchedulerContent() {
               upsertShift(
                 emp.id,
                 targetDateKey,
-                sourceShift.shiftCodeIds,
+                buildEntryPayload(sourceShift),
                 org.id,
-                sourceShift.customStartTime,
-                sourceShift.customEndTime,
                 undefined,
-                sourceShift.absenceTypeId,
               )
             );
           }
@@ -3933,17 +4204,35 @@ function SchedulerContent() {
   }, [spanWeeks, isMobile]);
 
   const handleToday = useCallback(
-    () => setWeekStart(getWeekStart(today)),
-    [today],
+    () => {
+      if (spanWeeks === "month") {
+        setWeekStart(new Date(today.getFullYear(), today.getMonth(), 1));
+        return;
+      }
+
+      setWeekStart(
+        getScheduleStartForSpan({
+          date: today,
+          span: preferredSpan === 2 ? 2 : spanWeeks,
+          payPeriodStartDate,
+        }),
+      );
+    },
+    [payPeriodStartDate, preferredSpan, spanWeeks, today],
   );
 
   const handleSpanChange = useCallback((next: 1 | 2 | "month") => {
     if (next !== "month") {
-      // Snap weekStart to Sunday when leaving month view
-      setWeekStart((prev) => getWeekStart(prev));
+      setWeekStart((prev) =>
+        getScheduleStartForSpan({
+          date: prev,
+          span: next,
+          payPeriodStartDate,
+        }),
+      );
     }
     setPreferredSpan(next);
-  }, []);
+  }, [payPeriodStartDate]);
 
   const handlePublish = useCallback(async () => {
     if (!org) return;
@@ -4104,6 +4393,256 @@ function SchedulerContent() {
     ],
   );
 
+  const handleClaimOpenShift = useMemo<
+    ScheduleGridHandlers["onClaimOpenShift"]
+  >(
+    () =>
+      currentEmpId
+        ? (openShift: GridOpenShift) => {
+            const dateObj = new Date(openShift.date + "T00:00:00");
+            if (openShift.source === "coverage_gap" && currentEmployee) {
+              const eligibleAssignmentDefinitions = (
+                openShift.eligibleAssignmentDefinitionIds?.length
+                  ? openShift.eligibleAssignmentDefinitionIds
+                  : openShift.assignmentIds
+              )
+                .map((codeId) => assignmentById.get(codeId))
+                .filter((assignment): assignment is AssignmentDefinition => !!assignment)
+                .filter((assignment) =>
+                  isEmployeeQualifiedForAssignment(
+                    {
+                      certificationId: currentEmployee.certificationId,
+                      focusAreaIds: currentEmployee.focusAreaIds,
+                      roleIds: currentEmployee.roleIds,
+                    },
+                    {
+                      assignment,
+                      shiftCategories,
+                      jobs,
+                      orgRoles,
+                    },
+                  ),
+                );
+
+              if (eligibleAssignmentDefinitions.length === 0) {
+                toast.error(
+                  "You aren't qualified to cover this gap.",
+                );
+                return;
+              }
+
+              if (eligibleAssignmentDefinitions.length === 1) {
+                const selectedAssignmentDefinition = eligibleAssignmentDefinitions[0];
+                const selectedRange = getOpenShiftTimeRanges(
+                  [selectedAssignmentDefinition.id],
+                  null,
+                  null,
+                )[0];
+                if (
+                  hasOpenShiftConflict(
+                    [selectedAssignmentDefinition.id],
+                    dateObj,
+                    selectedRange?.start ?? null,
+                    selectedRange?.end ?? null,
+                  )
+                ) {
+                  toast.error("You already have a shift during that time.");
+                  return;
+                }
+                setPendingClaimShift({
+                  ...openShift,
+                  assignmentIds: [selectedAssignmentDefinition.id],
+                  customStartTime: selectedRange?.start ?? null,
+                  customEndTime: selectedRange?.end ?? null,
+                });
+                return;
+              }
+
+              const preferredAssignmentDefinition =
+                eligibleAssignmentDefinitions.find(
+                  (assignment) =>
+                    assignment.id === openShift.preferredOpenAssignmentDefinitionId,
+                ) ?? eligibleAssignmentDefinitions[0];
+
+              setCoverageGapSelection({
+                openShift,
+                qualifiedAssignmentDefinitions: eligibleAssignmentDefinitions,
+                selectedAssignmentDefinitionId: preferredAssignmentDefinition.id,
+              });
+              return;
+            }
+
+            if (
+              hasOpenShiftConflict(
+                openShift.assignmentIds,
+                dateObj,
+                openShift.customStartTime,
+                openShift.customEndTime,
+              )
+            ) {
+              toast.error("You already have a shift during that time.");
+              return;
+            }
+
+            setPendingClaimShift(openShift);
+          }
+        : undefined,
+    [
+      currentEmpId,
+      currentEmployee,
+      getOpenShiftTimeRanges,
+      hasOpenShiftConflict,
+      jobs,
+      orgRoles,
+      shiftCategories,
+      assignmentById,
+    ],
+  );
+
+  const scheduleGridModel = useMemo(
+    () =>
+      buildScheduleGridModel({
+        filteredEmployees,
+        allEmployees: employees,
+        week1,
+        week2,
+        spanWeeks: spanWeeks === "month" ? 1 : spanWeeks,
+        today,
+        focusAreas,
+        departments,
+        assignments,
+        historicalAssignments: allAssignmentDefinitions,
+        shiftCategories,
+        jobs,
+        indicatorTypes,
+        certifications,
+        orgRoles,
+        coverageRequirements,
+        absenceTypeMap: absenceTypeObjectMap,
+        recentlyPublishedKeys,
+        cellLocks: lockedCells,
+        resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
+        openShifts,
+        activeFocusArea,
+        highlightEmpIds,
+        isCellInteractive: canEditShifts || canEditNotes || !!currentEmpId,
+        canDragShifts: canEditShifts,
+        shiftDisplayMode: org?.shiftDisplayMode ?? "code",
+        showDiffOverlay,
+        showPublishDiffOverlay: showPublishDiff,
+        showAudit,
+        accessors: {
+          shiftForKey,
+          assignmentIdsForKey,
+          getShiftStyle,
+          activeIndicatorIdsForKey,
+          getCustomShiftTimes,
+          getPublishedCustomShiftTimes,
+          draftKindForKey,
+          publishedLabelForKey,
+          publishedAssignmentIdsForKey,
+          publishedAbsenceTypeIdForKey,
+          hasTimeChangesForKey,
+          publishDiffForKey: publishDiffKindForKey,
+          createdByNameForKey:
+            canRenderAuthorNames ? createdByNameForKey : undefined,
+          absenceTypeIdForKey,
+        },
+      }),
+    [
+      filteredEmployees,
+      employees,
+      week1,
+      week2,
+      spanWeeks,
+      today,
+      focusAreas,
+      departments,
+      assignments,
+      allAssignmentDefinitions,
+      shiftCategories,
+      jobs,
+      indicatorTypes,
+      certifications,
+      orgRoles,
+      coverageRequirements,
+      absenceTypeObjectMap,
+      recentlyPublishedKeys,
+      lockedCells,
+      auditNames,
+      openShifts,
+      activeFocusArea,
+      highlightEmpIds,
+      canEditShifts,
+      canEditNotes,
+      currentEmpId,
+      org?.shiftDisplayMode,
+      showDiffOverlay,
+      showPublishDiff,
+      showAudit,
+      shiftForKey,
+      assignmentIdsForKey,
+      getShiftStyle,
+      activeIndicatorIdsForKey,
+      getCustomShiftTimes,
+      getPublishedCustomShiftTimes,
+      draftKindForKey,
+      publishedLabelForKey,
+      publishedAssignmentIdsForKey,
+      publishedAbsenceTypeIdForKey,
+      hasTimeChangesForKey,
+      publishDiffKindForKey,
+      canRenderAuthorNames,
+      createdByNameForKey,
+      absenceTypeIdForKey,
+    ],
+  );
+
+  const scheduleGridInteractionState = useMemo<ScheduleGridInteractionState>(() => {
+    const editPanelSectionId =
+      editPanel?.activeFocusAreaId ?? editPanel?.empFocusAreaIds[0] ?? null;
+    const activeCellId =
+      contextMenu?.cellId ??
+      (editPanel && editPanelSectionId != null
+        ? {
+            empId: editPanel.empId,
+            dateKey: formatDateKey(editPanel.date),
+            sectionId: editPanelSectionId,
+          }
+        : null);
+
+    return {
+      activeCellId,
+      contextMenuCellId: contextMenu?.cellId ?? null,
+      hasClipboard: !!clipboard,
+    };
+  }, [contextMenu, editPanel, clipboard]);
+
+  const scheduleGridHandlers = useMemo<ScheduleGridHandlers>(
+    () => ({
+      onActivateCell: handleGridCellActivate,
+      onOpenCellMenu: handleGridCellContextMenu,
+      onMoveEntry: handleMoveGridEntry,
+      onCopyCell: canEditShifts ? handleCopyGridCell : undefined,
+      onPasteCell: canEditShifts ? handlePasteGridCell : undefined,
+      onClearCell: canEditShifts
+        ? (cellId) => handleClearShift(cellId.empId, getDateFromCellId(cellId))
+        : undefined,
+      onClaimOpenShift: handleClaimOpenShift,
+    }),
+    [
+      handleGridCellActivate,
+      handleGridCellContextMenu,
+      handleMoveGridEntry,
+      canEditShifts,
+      handleCopyGridCell,
+      handlePasteGridCell,
+      handleClearShift,
+      getDateFromCellId,
+      handleClaimOpenShift,
+    ],
+  );
+
   // ── Loading / error states ───────────────────────────────────────────────────
 
   const isLoading = orgLoading || empLoading || scheduleLoading;
@@ -4247,8 +4786,6 @@ function SchedulerContent() {
     );
   }
 
-  // ── Main UI ──────────────────────────────────────────────────────────────────
-
   return (
     <div
       style={{
@@ -4338,6 +4875,7 @@ function SchedulerContent() {
                         ? ` across ${publishHistory.length} publishes`
                         : ""}
                     </span>
+                    {!isMobile && showPublishDiff && <ChangeLegend />}
                     <div className="dg-draft-banner-actions">
                       {isMobile ? (
                         <span
@@ -4478,12 +5016,12 @@ function SchedulerContent() {
                 allEmployees={employees}
                 dates={dates.slice(0, 7)}
                 shiftForKey={shiftForKey}
-                shiftCodeIdsForKey={shiftCodeIdsForKey}
+                assignmentIdsForKey={assignmentIdsForKey}
                 getShiftStyle={getShiftStyle}
                 handleCellClick={handleCellClick}
                 today={today}
                 focusAreas={focusAreas}
-                shiftCodes={shiftCodes}
+                assignments={assignments}
                 shiftCategories={shiftCategories}
                 indicatorTypes={indicatorTypes}
                 certifications={certifications}
@@ -4503,203 +5041,41 @@ function SchedulerContent() {
             {/* Desktop/Tablet Grid */}
             {spanWeeks !== "month" && !isMobile && (
               <div data-tour="schedule-grid">
-                <DndContext
-                  sensors={sensors}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                >
-                  <ScheduleGrid
-                    filteredEmployees={filteredEmployees}
-                    allEmployees={employees}
-                    week1={week1}
-                    week2={week2}
-                    spanWeeks={spanWeeks}
-                    shiftForKey={shiftForKey}
-                    shiftCodeIdsForKey={shiftCodeIdsForKey}
-                    getShiftStyle={getShiftStyle}
-                    handleCellClick={handleCellClick}
-                    today={today}
-                    highlightEmpIds={highlightEmpIds}
-                    focusAreas={focusAreas}
-                    departments={departments}
-                    shiftCodes={shiftCodes}
-                    shiftCategories={shiftCategories}
-                    indicatorTypes={indicatorTypes}
-                    certifications={certifications}
-                    orgRoles={orgRoles}
-                    isCellInteractive={
-                      canEditShifts || canEditNotes || !!currentEmpId
-                    }
-                    canDragShifts={canEditShifts}
-                    activeIndicatorIdsForKey={activeIndicatorIdsForKey}
-                    activeFocusArea={activeFocusArea}
-                    getCustomShiftTimes={getCustomShiftTimes}
-                    draftKindForKey={draftKindForKey}
-                    showDiffOverlay={showDiffOverlay}
-                    publishedLabelForKey={publishedLabelForKey}
-                    publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
-                    hasTimeChangesForKey={hasTimeChangesForKey}
-                    publishDiffForKey={publishDiffKindForKey}
-                    recentlyPublishedKeys={recentlyPublishedKeys}
-                    cellLocks={lockedCells}
-                    showAudit={showAudit && canShowEditorNames}
-                    createdByNameForKey={
-                      canShowEditorNames ? createdByNameForKey : undefined
-                    }
-                    onCellHover={handleCellHover}
-                    onCellContextMenu={handleCellContextMenu}
-                    coverageRequirements={coverageRequirements}
-                    absenceTypeMap={absenceTypeObjectMap}
-                    absenceTypeIdForKey={absenceTypeIdForKey}
-                    shiftDisplayMode={org?.shiftDisplayMode}
-                    resolvePublisherName={(userId: string) =>
-                      auditNames.get(userId) ?? null
-                    }
-                    selectedCellKey={editSessionCellKey}
-                    openShifts={openShifts}
-                    onClaimOpenShift={
-                      currentEmpId
-                        ? (openShift) => {
-                            const dateObj = new Date(
-                              openShift.date + "T00:00:00",
-                            );
-                            if (
-                              openShift.source === "coverage_gap" &&
-                              currentEmployee
-                            ) {
-                              const eligibleShiftCodes = (
-                                openShift.eligibleShiftCodeIds?.length
-                                  ? openShift.eligibleShiftCodeIds
-                                  : openShift.shiftCodeIds
-                              )
-                                .map((codeId) => shiftCodeById.get(codeId))
-                                .filter((shiftCode): shiftCode is ShiftCode => !!shiftCode)
-                                .filter((shiftCode) =>
-                                  isEmployeeQualified(
-                                    {
-                                      certificationId: currentEmployee.certificationId,
-                                      focusAreaIds: currentEmployee.focusAreaIds,
-                                    },
-                                    shiftCode,
-                                  ),
-                                );
-
-                              if (eligibleShiftCodes.length === 0) {
-                                toast.error(
-                                  "You are not qualified for any shift code that can cover this gap",
-                                );
-                                return;
-                              }
-
-                              if (eligibleShiftCodes.length === 1) {
-                                const selectedShiftCode = eligibleShiftCodes[0];
-                                const selectedRange = getOpenShiftTimeRanges(
-                                  [selectedShiftCode.id],
-                                  null,
-                                  null,
-                                )[0];
-                                if (
-                                  hasOpenShiftConflict(
-                                    [selectedShiftCode.id],
-                                    dateObj,
-                                    selectedRange?.start ?? null,
-                                    selectedRange?.end ?? null,
-                                  )
-                                ) {
-                                  toast.error(
-                                    "You already have a shift at the same time",
-                                  );
-                                  return;
-                                }
-                                setPendingClaimShift({
-                                  ...openShift,
-                                  shiftCodeIds: [selectedShiftCode.id],
-                                  customStartTime: selectedRange?.start ?? null,
-                                  customEndTime: selectedRange?.end ?? null,
-                                });
-                                return;
-                              }
-
-                              const preferredShiftCode =
-                                eligibleShiftCodes.find(
-                                  (shiftCode) =>
-                                    shiftCode.id ===
-                                    openShift.preferredOpenShiftCodeId,
-                                ) ?? eligibleShiftCodes[0];
-
-                              setCoverageGapSelection({
-                                openShift,
-                                qualifiedShiftCodes: eligibleShiftCodes,
-                                selectedShiftCodeId: preferredShiftCode.id,
-                              });
-                              return;
-                            }
-
-                            if (
-                              hasOpenShiftConflict(
-                                openShift.shiftCodeIds,
-                                dateObj,
-                                openShift.customStartTime,
-                                openShift.customEndTime,
-                              )
-                            ) {
-                              toast.error(
-                                "You already have a shift at the same time",
-                              );
-                              return;
-                            }
-                            setPendingClaimShift(openShift);
-                          }
-                        : undefined
-                    }
-                  />
-                  <DragOverlay dropAnimation={null}>
-                    {activeDrag && (
-                      <div
-                        style={{
-                          background: activeDrag.pillColor,
-                          color: activeDrag.pillText,
-                          border: `1px solid ${activeDrag.pillText}20`,
-                          borderRadius: 8,
-                          padding: "6px 16px",
-                          fontSize: "var(--dg-fs-title)",
-                          fontWeight: 800,
-                          boxShadow: "var(--shadow-drag)",
-                          cursor: "grabbing",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {activeDrag.label}
-                      </div>
-                    )}
-                  </DragOverlay>
-                </DndContext>
+                <ScheduleGrid
+                  model={scheduleGridModel}
+                  interactionState={scheduleGridInteractionState}
+                  handlers={scheduleGridHandlers}
+                />
               </div>
             )}
 
             {/* Context menu for copy/paste/requests */}
             {(() => {
               if (!contextMenu) return null;
-              const cmKey = `${contextMenu.empId}_${formatDateKey(contextMenu.date)}`;
+              const contextMenuDate = getDateFromCellId(contextMenu.cellId);
+              const cmKey = `${contextMenu.cellId.empId}_${contextMenu.cellId.dateKey}`;
               const cmShiftEntry = shifts[cmKey];
               const cmHasEntry = !!(
                 cmShiftEntry &&
-                (cmShiftEntry.shiftCodeIds.length > 0 ||
+                (cmShiftEntry.assignmentIds.length > 0 ||
                   cmShiftEntry.absenceTypeId != null) &&
                 !cmShiftEntry.isDelete
               );
               const cmCanRequestBase =
                 !cmShiftEntry?.absenceTypeId &&
                 canCreateOwnShiftRequest(
-                  contextMenu.empId,
-                  contextMenu.date,
+                  contextMenu.cellId.empId,
+                  contextMenuDate,
                 );
               const cmCanRequest =
                 cmCanRequestBase &&
-                !hasActiveRequestForShift(contextMenu.empId, contextMenu.date);
+                !hasActiveRequestForShift(
+                  contextMenu.cellId.empId,
+                  contextMenuDate,
+                );
               const cmHasActiveRequest = hasActiveRequestForShift(
-                contextMenu.empId,
-                contextMenu.date,
+                contextMenu.cellId.empId,
+                contextMenuDate,
               );
               // Only show the menu when at least one action is usable
               const hasEditActions =
@@ -4714,21 +5090,20 @@ function SchedulerContent() {
                   canEdit={canEditShifts}
                   canRequest={cmCanRequest}
                   hasActiveRequest={cmHasActiveRequest}
-                  onCopy={() =>
-                    handleCopyShift(contextMenu.empId, contextMenu.date)
-                  }
-                  onPaste={() =>
-                    handlePasteShift(contextMenu.empId, contextMenu.date)
-                  }
+                  onCopy={() => handleCopyGridCell(contextMenu.cellId)}
+                  onPaste={() => handlePasteGridCell(contextMenu.cellId)}
                   onClear={() =>
-                    handleClearShift(contextMenu.empId, contextMenu.date)
+                    handleClearShift(
+                      contextMenu.cellId.empId,
+                      contextMenuDate,
+                    )
                   }
                   onNeedCoverage={() => {
                     const emp = employees.find(
-                      (e) => e.id === contextMenu.empId,
+                      (e) => e.id === contextMenu.cellId.empId,
                     );
                     if (!emp) return;
-                    const cellKey = `${emp.id}_${formatDateKey(contextMenu.date)}`;
+                    const cellKey = `${emp.id}_${contextMenu.cellId.dateKey}`;
                     const activity = getCellActivity(cellKey);
                     const lock = getCellLock(cellKey);
                     if (lock) {
@@ -4742,36 +5117,30 @@ function SchedulerContent() {
                       return;
                     }
                     lockCell(cellKey);
-                    const activeFaId =
-                      focusAreas.find(
-                        (fa) => fa.name === contextMenu.focusAreaName,
-                      )?.id ?? null;
                     startEditSession({
                       empId: emp.id,
                       empName: getEmployeeDisplayName(emp),
-                      date: contextMenu.date,
+                      date: contextMenuDate,
                       empFocusAreaIds: emp.focusAreaIds,
                       empCertificationId: emp.certificationId,
-                      activeFocusAreaId: activeFaId,
+                      empRoleIds: emp.roleIds,
+                      activeFocusAreaId: contextMenu.cellId.sectionId,
                       requestMode: "coverage",
                     });
                   }}
                   onProposeSwap={() => {
                     const emp = employees.find(
-                      (e) => e.id === contextMenu.empId,
+                      (e) => e.id === contextMenu.cellId.empId,
                     );
                     if (!emp) return;
-                    const activeFaId =
-                      focusAreas.find(
-                        (fa) => fa.name === contextMenu.focusAreaName,
-                      )?.id ?? null;
                     startEditSession({
                       empId: emp.id,
                       empName: getEmployeeDisplayName(emp),
-                      date: contextMenu.date,
+                      date: contextMenuDate,
                       empFocusAreaIds: emp.focusAreaIds,
                       empCertificationId: emp.certificationId,
-                      activeFocusAreaId: activeFaId,
+                      empRoleIds: emp.roleIds,
+                      activeFocusAreaId: contextMenu.cellId.sectionId,
                       requestMode: "swap",
                     });
                   }}
@@ -4802,15 +5171,15 @@ function SchedulerContent() {
             {/* Confirm dialog for claiming / volunteering for an open shift */}
             {coverageGapSelection && currentEmpId && (
               <Modal
-                title="Choose Shift Code"
+                title="Choose Assignment"
                 onClose={() => setCoverageGapSelection(null)}
                 style={{ maxWidth: 420 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                    <strong>{coverageGapSelection.openShift.ruleLabel ?? coverageGapSelection.openShift.shiftCodeLabel}</strong> on{" "}
-                    <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more than one exact shift code.
-                    Choose which code you want to volunteer for.
+                    <strong>{coverageGapSelection.openShift.ruleLabel ?? coverageGapSelection.openShift.assignmentLabel}</strong> on{" "}
+                    <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more than one exact assignment option.
+                    Choose which option you want to volunteer for.
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -4818,17 +5187,19 @@ function SchedulerContent() {
                       Shift code
                     </span>
                     <CustomSelect
-                      value={String(coverageGapSelection.selectedShiftCodeId)}
-                      options={coverageGapSelection.qualifiedShiftCodes.map((shiftCode) => ({
-                        value: String(shiftCode.id),
-                        label: org?.shiftDisplayMode === "name"
-                          ? (shiftCode.name || shiftCode.label)
-                          : shiftCode.label,
+                      value={String(coverageGapSelection.selectedAssignmentDefinitionId)}
+                      options={coverageGapSelection.qualifiedAssignmentDefinitions.map((assignment) => ({
+                        value: String(assignment.id),
+                        label:
+                          assignmentLabelMap.get(assignment.id) ??
+                          (org?.shiftDisplayMode === "name"
+                            ? (assignment.name || assignment.label)
+                            : assignment.label),
                       }))}
                       onChange={(value) =>
                         setCoverageGapSelection((current) =>
                           current
-                            ? { ...current, selectedShiftCodeId: Number(value) }
+                            ? { ...current, selectedAssignmentDefinitionId: Number(value) }
                             : current,
                         )
                       }
@@ -4849,38 +5220,49 @@ function SchedulerContent() {
                       type="button"
                       className="dg-btn dg-btn-primary"
                       onClick={() => {
-                        const selectedShiftCode = coverageGapSelection.qualifiedShiftCodes.find(
-                          (shiftCode) =>
-                            shiftCode.id === coverageGapSelection.selectedShiftCodeId,
+                        const selectedAssignmentDefinition = coverageGapSelection.qualifiedAssignmentDefinitions.find(
+                          (assignment) =>
+                            assignment.id === coverageGapSelection.selectedAssignmentDefinitionId,
                         );
-                        if (!selectedShiftCode) return;
+                        if (!selectedAssignmentDefinition) return;
                         const dateObj = new Date(
                           coverageGapSelection.openShift.date + "T00:00:00",
                         );
                         const selectedRange = getOpenShiftTimeRanges(
-                          [selectedShiftCode.id],
+                          [selectedAssignmentDefinition.id],
                           null,
                           null,
                         )[0];
                         if (
                           hasOpenShiftConflict(
-                            [selectedShiftCode.id],
+                            [selectedAssignmentDefinition.id],
                             dateObj,
                             selectedRange?.start ?? null,
                             selectedRange?.end ?? null,
                           )
                         ) {
-                          toast.error("You already have a shift at the same time");
+                          toast.error("You already have a shift during that time.");
+                          return;
+                        }
+                        const volunteerInput = buildOpenShiftInput({
+                          shiftIds: [
+                            selectedAssignmentDefinition.shiftId ?? selectedAssignmentDefinition.categoryId ?? null,
+                          ],
+                          jobIds:
+                            selectedAssignmentDefinition.jobId != null ? [selectedAssignmentDefinition.jobId] : [],
+                          customStartTime: selectedRange?.start ?? null,
+                          customEndTime: selectedRange?.end ?? null,
+                        });
+                        if (!volunteerInput) {
+                          toast.error("That assignment is no longer available.");
                           return;
                         }
                         setCoverageGapSelection(null);
                         shiftRequests.volunteer(
                           currentEmpId,
                           coverageGapSelection.openShift.date,
-                          [selectedShiftCode.id],
+                          volunteerInput,
                           coverageGapSelection.openShift.focusAreaId,
-                          selectedRange?.start ?? null,
-                          selectedRange?.end ?? null,
                         );
                       }}
                     >
@@ -4899,7 +5281,7 @@ function SchedulerContent() {
                 }
                 message={
                   <>
-                    <strong>{pendingClaimShift.shiftCodeLabel}</strong> on{" "}
+                    <strong>{pendingClaimShift.assignmentLabel}</strong> on{" "}
                     <strong>{pendingClaimShift.date}</strong>
                     {pendingClaimShift.calledOffBy && (
                       <> (called off by {pendingClaimShift.calledOffBy})</>
@@ -4918,13 +5300,27 @@ function SchedulerContent() {
                   if (os.source === "calloff" && os.requestId) {
                     shiftRequests.claim(os.requestId, currentEmpId);
                   } else if (os.source === "coverage_gap") {
+                    const volunteerInput = buildOpenShiftInput({
+                      segments:
+                        os.segments?.map((segment, index) => ({
+                          shiftId: segment.shiftId ?? null,
+                          jobId: segment.jobId,
+                          position: index,
+                        })) ?? [],
+                      shiftIds: os.shiftIds,
+                      jobIds: os.jobIds,
+                      customStartTime: os.customStartTime,
+                      customEndTime: os.customEndTime,
+                    });
+                    if (!volunteerInput) {
+                      toast.error("That assignment is no longer available.");
+                      return;
+                    }
                     shiftRequests.volunteer(
                       currentEmpId,
                       os.date,
-                      os.shiftCodeIds,
+                      volunteerInput,
                       os.focusAreaId,
-                      os.customStartTime,
-                      os.customEndTime,
                     );
                   }
                 }}
@@ -4936,7 +5332,7 @@ function SchedulerContent() {
             {pendingPasteOver && (
               <ConfirmDialog
                 title="Replace Entry?"
-                message={`Replace "${pendingPasteOver.existingLabel}" with "${pendingPasteOver.pasteEntry.label}"?`}
+                message={`Replace "${pendingPasteOver.existingLabel}" with "${getInputLabel(pendingPasteOver.pasteEntry)}"?`}
                 confirmLabel="Replace"
                 variant="warning"
                 onConfirm={() => {
@@ -4957,12 +5353,12 @@ function SchedulerContent() {
                 monthStart={monthStart}
                 filteredEmployees={filteredEmployees}
                 shiftForKey={shiftForKey}
-                shiftCodeIdsForKey={shiftCodeIdsForKey}
+                assignmentIdsForKey={assignmentIdsForKey}
                 isAbsenceForKey={isAbsenceForKey}
                 getShiftStyle={getShiftStyle}
                 today={today}
                 focusAreas={focusAreas}
-                shiftCodes={shiftCodes}
+                assignments={assignments}
                 shiftCategories={shiftCategories}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
@@ -4976,11 +5372,14 @@ function SchedulerContent() {
               key={`${editSessionCellKey ?? "panel"}_${editSessionDraft?.baseVersion ?? "new"}_${editPanel.requestMode ?? "edit"}`}
               modal={editPanel}
               currentShift={panelCurrentShift}
-              currentShiftCodeIds={panelCurrentShiftCodeIds}
-              shiftCodes={shiftCodes}
+              currentAssignmentIds={panelCurrentAssignmentIds}
+              currentSegments={panelShiftEntry?.segments ?? []}
+              assignments={assignments}
               shiftCategories={shiftCategories}
+              jobs={jobs}
               focusAreas={focusAreas}
               certifications={certifications}
+              orgRoles={orgRoles}
               indicatorTypes={indicatorTypes}
               onSelect={handleShiftSelect}
               onConfirmDraft={handleConfirmEditPanel}
@@ -4995,6 +5394,7 @@ function SchedulerContent() {
                   ?.seriesId ??
                 null
               }
+              fromRecurring={panelShiftEntry?.fromRecurring ?? false}
               onRepeatConfirm={
                 canEditShifts && canManageShiftSeries
                   ? handleRepeatConfirm
@@ -5007,16 +5407,34 @@ function SchedulerContent() {
               onCustomTimeChange={
                 canEditShifts ? handleCustomTimeChange : undefined
               }
-              publishedShiftCodeIds={
-                panelShiftEntry?.publishedShiftCodeIds ??
+              publishedAssignmentIds={
+                panelShiftEntry?.publishedAssignmentDefinitionIds ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
-                  ?.publishedShiftCodeIds ??
+                  ?.publishedAssignmentDefinitionIds ??
                 []
+              }
+              publishedAbsenceTypeId={
+                panelShiftEntry?.publishedAbsenceTypeId ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.publishedAbsenceTypeId ??
+                null
+              }
+              publishedCustomStartTime={
+                panelShiftEntry?.publishedCustomStartTime ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.publishedCustomStartTime ??
+                null
+              }
+              publishedCustomEndTime={
+                panelShiftEntry?.publishedCustomEndTime ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
+                  ?.publishedCustomEndTime ??
+                null
               }
               draftKind={panelDraftKind}
               isStale={editSessionDraft?.isStale ?? false}
               auditInfo={
-                canEditShifts && canShowEditorNames ? auditInfo : undefined
+                canEditShifts && canRenderAuthorNames ? auditInfo : undefined
               }
               overlapWarnings={overnightOverlapWarnings}
               enforceConflicts={org?.enforceConflictPrevention ?? false}
@@ -5073,7 +5491,6 @@ function SchedulerContent() {
               shiftDisplayMode={org?.shiftDisplayMode}
               absenceTypes={absenceTypes}
               currentAbsenceTypeId={panelCurrentAbsenceTypeId}
-              onAbsenceSelect={canEditShifts ? handleAbsenceSelect : undefined}
             />
           )}
 
@@ -5096,8 +5513,8 @@ function SchedulerContent() {
                     end: req.requesterCustomEndTime,
                   });
                 } else {
-                  for (const codeId of req.requesterShiftCodeIds) {
-                    const sc = shiftCodes.find((c) => c.id === codeId);
+                  for (const codeId of req.requesterAssignmentDefinitionIds) {
+                    const sc = assignments.find((c) => c.id === codeId);
                     if (sc?.defaultStartTime && sc?.defaultEndTime) {
                       pickupRanges.push({
                         start: sc.defaultStartTime,
@@ -5157,7 +5574,7 @@ function SchedulerContent() {
           )}
 
           <PrintLegend
-            shiftCodes={shiftCodes}
+            assignments={assignments}
             shiftDisplayMode={org?.shiftDisplayMode}
           />
 
@@ -5182,12 +5599,13 @@ function SchedulerContent() {
               employees={employees}
               allEmployees={employees}
               focusAreas={focusAreas}
-              shiftCodes={shiftCodes}
+              assignments={assignments}
               shiftCategories={shiftCategories}
+              jobs={jobs}
               certifications={certifications}
               orgRoles={orgRoles}
               shiftForKey={shiftForKey}
-              shiftCodeIdsForKey={shiftCodeIdsForKey}
+              assignmentIdsForKey={assignmentIdsForKey}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}
               onClose={() => setActivePrintConfig(null)}
@@ -5354,12 +5772,13 @@ function SchedulerContent() {
               onSelectEntry={(entry) => {
                 // Navigate grid to the publish's date range
                 const publishStart = new Date(entry.startDate + "T00:00:00");
-                setWeekStart(getWeekStart(publishStart));
+                setWeekStart(publishStart);
                 setPublishHistory([entry]);
                 setShowPublishDiff(true);
                 setShowPublishHistory(false);
               }}
-              shiftCodeMap={shiftCodeMap}
+              assignments={assignments}
+              assignmentLabelMap={assignmentLabelMap}
               employees={employees}
               absenceTypeMap={absenceTypeMap}
             />

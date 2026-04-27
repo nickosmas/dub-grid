@@ -1,5 +1,5 @@
 import { formatDateKey } from "@/lib/dashboard-stats";
-import type { ShiftMap, ShiftCode, Employee, AbsenceType } from "@/types";
+import type { ShiftMap, AssignmentDefinition, Employee, AbsenceType } from "@/types";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -8,7 +8,7 @@ interface MyScheduleCardProps {
   employee: Employee | undefined;
   periodDates: Date[];
   shifts: ShiftMap;
-  shiftCodeById: Map<number, ShiftCode>;
+  assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeById: Map<number, AbsenceType>;
 }
 
@@ -17,7 +17,7 @@ export default function MyScheduleCard({
   employee,
   periodDates,
   shifts,
-  shiftCodeById,
+  assignmentById,
   absenceTypeById,
 }: MyScheduleCardProps) {
   const todayKey = formatDateKey(new Date());
@@ -71,10 +71,10 @@ export default function MyScheduleCard({
               const isToday = dateKey === todayKey;
               const entry = shifts[`${currentEmpId}_${dateKey}`];
 
-              // Resolve shift codes
-              const codes = entry?.shiftCodeIds
-                ?.map((id) => shiftCodeById.get(id))
-                .filter(Boolean) as ShiftCode[] | undefined;
+              // Resolve schedule option labels.
+              const codes = entry?.assignmentIds
+                ?.map((id) => assignmentById.get(id))
+                .filter(Boolean) as AssignmentDefinition[] | undefined;
 
               // Resolve absence type
               const absenceId = entry?.absenceTypeId;

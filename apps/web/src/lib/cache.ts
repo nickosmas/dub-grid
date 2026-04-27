@@ -2,7 +2,7 @@ import { Redis } from "@upstash/redis";
 
 // ── TTL Constants ────────���─────────────────────���────────────────────────
 export const TTL = {
-  /** 5 minutes — org config entities (focus areas, shift codes, etc.) */
+  /** 5 minutes — org config entities (focus areas, shifts, jobs, etc.) */
   STABLE: 300,
   /** 2 minutes — employees, users, invitations */
   MODERATE: 120,
@@ -29,8 +29,10 @@ function getRedis(): Redis | null {
 export const CacheKey = {
   // Stable org config
   focusAreas: (orgId: string) => `dg:org:${orgId}:focusAreas`,
-  shiftCodes: (orgId: string, all = false) =>
-    `dg:org:${orgId}:shiftCodes${all ? ":all" : ""}`,
+  assignments: (orgId: string, all = false) =>
+    `dg:org:${orgId}:assignments${all ? ":all" : ""}`,
+  jobs: (orgId: string, all = false) =>
+    `dg:org:${orgId}:jobs${all ? ":all" : ""}`,
   absenceTypes: (orgId: string, all = false) =>
     `dg:org:${orgId}:absenceTypes${all ? ":all" : ""}`,
   shiftCategories: (orgId: string) => `dg:org:${orgId}:shiftCategories`,
@@ -39,7 +41,6 @@ export const CacheKey = {
   orgRoles: (orgId: string) => `dg:org:${orgId}:orgRoles`,
   departments: (orgId: string) => `dg:org:${orgId}:departments`,
   coverageReqs: (orgId: string) => `dg:org:${orgId}:coverageRequirements`,
-  coverageRuleConfigs: (orgId: string) => `dg:org:${orgId}:coverageRuleConfigs`,
   organization: (orgId: string) => `dg:org:${orgId}:organization`,
   allOrganizations: () => `dg:gm:allOrganizations`,
 

@@ -19,7 +19,7 @@ vi.mock("@/lib/db", () => ({
   saveOrganizationRoles: vi.fn(),
   saveDepartments: vi.fn(),
   upsertShiftCategory: vi.fn(),
-  upsertShiftCode: vi.fn(),
+  upsertAssignmentDefinition: vi.fn(),
   updateOrganization: vi.fn(),
 }));
 
@@ -55,6 +55,7 @@ function makeOrganization(): Organization {
     departmentLabel: "Departments",
     shiftDisplayMode: "code",
     timezone: "America/Los_Angeles",
+    payPeriodStartDate: null,
     archivedAt: null,
     suspendedAt: null,
     suspendedReason: null,

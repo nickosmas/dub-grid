@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
-import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, scheduleReviewLimiter } from "@/lib/rate-limit";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { fetchScheduleDraftBreakdown } from "@/lib/server/schedule-draft-safety";
 import logger from "@/lib/logger";
@@ -21,13 +21,16 @@ export async function GET(req: NextRequest) {
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
-  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  const { limited, reset, misconfigured } = await checkRateLimit(
+    scheduleReviewLimiter,
+    user.id,
+  );
   if (misconfigured) {
     return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: "Too many schedule review requests. Please wait a moment and try again." },
       { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
     );
   }

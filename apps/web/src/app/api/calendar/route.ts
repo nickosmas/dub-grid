@@ -5,7 +5,7 @@ import {
 } from "@/lib/api-auth";
 import { generateICS } from "@/lib/ical";
 import {
-  PUBLISHED_SHIFT_COLS,
+  fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
@@ -65,13 +65,11 @@ export async function GET(req: NextRequest) {
     const startKey = start.toISOString().slice(0, 10);
     const endKey = end.toISOString().slice(0, 10);
 
-    const { data: shifts } = await supabase
-      .from("shifts")
-      .select(PUBLISHED_SHIFT_COLS)
-      .eq("emp_id", employee.id)
-      .gte("date", startKey)
-      .lt("date", endKey)
-      .order("date");
+    const shifts = await fetchPublishedShiftRows(supabase, {
+      employeeId: employee.id,
+      startDate: startKey,
+      endDateExclusive: endKey,
+    });
 
     if (!shifts || shifts.length === 0) {
       const empty = generateICS([], `DubGrid — ${employee.first_name} ${employee.last_name}`);
@@ -84,28 +82,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const [{ data: codes }, { data: absenceTypes }] = await Promise.all([
-      supabase
-        .from("shift_codes")
-        .select("id, label, default_start_time, default_end_time")
-        .eq("org_id", employee.org_id)
-        .is("archived_at", null),
+    const [{ data: absenceTypes }] = await Promise.all([
       supabase
         .from("absence_types")
         .select("id, label")
         .eq("org_id", employee.org_id)
         .is("archived_at", null),
     ]);
-    const shiftCodeById = new Map(
-      (codes ?? []).map((code: Record<string, unknown>) => [
-        code.id as number,
-        {
-          label: code.label as string,
-          defaultStartTime: code.default_start_time as string | null,
-          defaultEndTime: code.default_end_time as string | null,
-        },
-      ]),
-    );
     const absenceTypeById = new Map(
       (absenceTypes ?? []).map((row: Record<string, unknown>) => [
         row.id as number,
@@ -122,7 +105,7 @@ export async function GET(req: NextRequest) {
 
     const events = ((shifts ?? []) as unknown as PublishedShiftRow[])
       .map((row) =>
-        resolvePublishedScheduleEntry(row, shiftCodeById, absenceTypeById),
+        resolvePublishedScheduleEntry(row, new Map(), absenceTypeById),
       )
       .flatMap((entry) => {
         if (!entry) return [];
@@ -153,7 +136,7 @@ export async function GET(req: NextRequest) {
         }
 
         return [{
-          uid: `shift-${entry.empId}-${entry.date}-${entry.shiftCodeIds.join("-")}@dubgrid.com`,
+          uid: `shift-${entry.empId}-${entry.date}-${entry.segments?.map((segment) => `${segment.shiftId ?? "shiftless"}-${segment.jobId}`).join("-") ?? "worked"}@dubgrid.com`,
           summary: `${entry.label} — DubGrid`,
           dtstart,
           dtend,

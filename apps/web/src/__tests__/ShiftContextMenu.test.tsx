@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import ShiftContextMenu from "@/components/ShiftContextMenu";
 
-function makeAnchor(): HTMLDivElement {
+function makeElementAnchor(): HTMLDivElement {
   const anchor = document.createElement("div");
   Object.defineProperty(anchor, "getBoundingClientRect", {
     value: () => ({
@@ -23,8 +23,8 @@ function makeAnchor(): HTMLDivElement {
 }
 
 describe("ShiftContextMenu", () => {
-  it("shows Drop shift and Swap without separate pickup or calloff actions", () => {
-    const anchorEl = makeAnchor();
+  it("opens from the selected cell and shows the shared request actions without an arrow", () => {
+    const anchorEl = makeElementAnchor();
 
     render(
       <ShiftContextMenu
@@ -45,13 +45,38 @@ describe("ShiftContextMenu", () => {
 
     expect(screen.getByRole("menuitem", { name: "Drop shift" })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: "Swap" })).toBeInTheDocument();
-    expect(screen.queryByText("Make available for pickup")).not.toBeInTheDocument();
-    expect(screen.queryByText("Call off")).not.toBeInTheDocument();
+    expect(document.body.querySelector('[data-slot="menu-arrow"]')).toBeNull();
   });
 
-  it("calls the shared coverage handler from the menu", async () => {
+  it("closes when the window starts resizing", () => {
+    const anchorEl = makeElementAnchor();
+    const onClose = vi.fn();
+
+    render(
+      <ShiftContextMenu
+        anchorEl={anchorEl}
+        hasShift
+        hasClipboard={false}
+        canEdit={false}
+        canRequest
+        hasActiveRequest={false}
+        onCopy={vi.fn()}
+        onPaste={vi.fn()}
+        onClear={vi.fn()}
+        onNeedCoverage={vi.fn()}
+        onProposeSwap={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    window.dispatchEvent(new Event("resize"));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls the shared coverage handler from the selected cell menu", async () => {
     const user = userEvent.setup();
-    const anchorEl = makeAnchor();
+    const anchorEl = makeElementAnchor();
     const onNeedCoverage = vi.fn();
     const onClose = vi.fn();
 

@@ -45,16 +45,18 @@ export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
     setDragOverIdx(idx);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, idx: number) => {
-    e.preventDefault();
-    setDragOverIdx(idx);
+  const handleDragMove = useCallback((idx: number) => {
+    setDragOverIdx((current) => (current === idx ? current : idx));
   }, []);
 
-  const handleDrop = useCallback(() => {
-    if (draggedIdx === null || dragOverIdx === null || !pendingOrder) return;
+  const handleDrop = useCallback((dropIdx = dragOverIdx, sourceIdx = draggedIdx) => {
+    if (sourceIdx === null || dropIdx === null || !pendingOrder) return;
     const list = [...pendingOrder];
-    const [item] = list.splice(draggedIdx, 1);
-    list.splice(dragOverIdx, 0, item);
+    const [item] = list.splice(sourceIdx, 1);
+    if (!item) return;
+
+    const boundedDropIdx = Math.max(0, Math.min(dropIdx, list.length));
+    list.splice(boundedDropIdx, 0, item);
     setPendingOrder(list);
     setDraggedIdx(null);
     setDragOverIdx(null);
@@ -86,7 +88,7 @@ export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
     draggedIdx,
     dragOverIdx,
     handleDragStart,
-    handleDragOver,
+    handleDragMove,
     handleDrop,
     handleDragEnd,
     displayList,

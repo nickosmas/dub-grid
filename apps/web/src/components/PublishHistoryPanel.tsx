@@ -4,15 +4,26 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/lib/db";
-import type { PublishHistoryEntryWithName, PublishChange, Employee } from "@/types";
+import type {
+  PublishHistoryEntryWithName,
+  PublishChange,
+  Employee,
+  ScheduleCellState,
+  AssignmentDefinition,
+} from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import {
+  createAssignmentDefinitionIdByPairMap,
+  deriveAssignmentDefinitionIdsFromAssignments,
+} from "@/lib/shift-job-segments";
 
 interface PublishHistoryPanelProps {
   orgId: string;
   open: boolean;
   onClose: () => void;
   onSelectEntry: (entry: PublishHistoryEntryWithName) => void;
-  shiftCodeMap: Map<number, string>;
+  assignments: AssignmentDefinition[];
+  assignmentLabelMap: Map<number, string>;
   employees: Employee[];
   absenceTypeMap: Map<number, string>;
 }
@@ -64,16 +75,36 @@ function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
 
 /** Resolve a shift/absence label from change data. Shows the exact absence type. */
 function resolveLabel(
-  codeIds: number[],
+  codeIds: number[] | undefined,
+  state: ScheduleCellState | null | undefined,
   absenceTypeId: number | null | undefined,
-  shiftCodeMap: Map<number, string>,
+  assignmentIdByPair: Map<string, number>,
+  assignmentLabelMap: Map<number, string>,
   absenceTypeMap: Map<number, string>,
 ): string {
+  if (state != null) {
+    if (state.kind === "absence") {
+      return absenceTypeMap.get(state.absenceTypeId ?? -1) ?? `Absence #${state.absenceTypeId}`;
+    }
+    if (state.kind === "worked") {
+      const orderedSegments = [...state.segments].sort((a, b) => a.position - b.position);
+      const derivedIds = deriveAssignmentDefinitionIdsFromAssignments(
+        {
+          shiftIds: orderedSegments.map((segment) => segment.shiftId),
+          jobIds: orderedSegments.map((segment) => segment.jobId),
+        },
+        assignmentIdByPair,
+      );
+      if (derivedIds.length > 0) {
+        return derivedIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/");
+      }
+    }
+  }
   if (absenceTypeId != null) {
     return absenceTypeMap.get(absenceTypeId) ?? `Absence #${absenceTypeId}`;
   }
-  if (codeIds.length > 0) {
-    return codeIds.map(id => shiftCodeMap.get(id) ?? "?").join("/");
+  if ((codeIds?.length ?? 0) > 0) {
+    return (codeIds ?? []).map(id => assignmentLabelMap.get(id) ?? "?").join("/");
   }
   return "";
 }
@@ -92,28 +123,71 @@ function fmtTimeRange(start?: string | null, end?: string | null): string {
   return "";
 }
 
-/** Check if shift codes + absence type are identical between from/to */
+/** Check if canonical state + absence type are identical between from/to */
+function sameCanonicalState(
+  left: ScheduleCellState | null | undefined,
+  right: ScheduleCellState | null | undefined,
+): boolean {
+  if (left == null || right == null) {
+    return false;
+  }
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  if ((left.absenceTypeId ?? null) !== (right.absenceTypeId ?? null)) {
+    return false;
+  }
+
+  const leftSegments =
+    left.kind === "worked"
+      ? [...left.segments].sort((a, b) => a.position - b.position)
+      : [];
+  const rightSegments =
+    right.kind === "worked"
+      ? [...right.segments].sort((a, b) => a.position - b.position)
+      : [];
+
+  return (
+    leftSegments.length === rightSegments.length &&
+    leftSegments.every((segment, index) => {
+      const other = rightSegments[index];
+      return (
+        other != null &&
+        segment.shiftId === other.shiftId &&
+        segment.jobId === other.jobId
+      );
+    })
+  );
+}
+
 function sameShiftContent(change: PublishChange): boolean {
+  if (change.fromState != null || change.toState != null) {
+    return sameCanonicalState(change.fromState, change.toState);
+  }
   const sameAbsence = (change.fromAbsenceTypeId ?? null) === (change.toAbsenceTypeId ?? null);
-  const sameCodes = change.from.length === change.to.length
-    && change.from.every((id, i) => id === change.to[i]);
+  const before = change.from ?? [];
+  const after = change.to ?? [];
+  const sameCodes = before.length === after.length
+    && before.every((id, i) => id === after[i]);
   return sameAbsence && sameCodes;
 }
 
 /** Single change line with accurate descriptions for all edge cases */
 function ChangeRow({
   change,
-  shiftCodeMap,
+  assignmentIdByPair,
+  assignmentLabelMap,
   absenceTypeMap,
 }: {
   change: PublishChange;
-  shiftCodeMap: Map<number, string>;
+  assignmentIdByPair: Map<string, number>;
+  assignmentLabelMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
 }) {
   const dateObj = new Date(change.date + "T00:00:00");
   const dateStr = dateObj.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  const fromLabel = resolveLabel(change.from, change.fromAbsenceTypeId, shiftCodeMap, absenceTypeMap);
-  const toLabel = resolveLabel(change.to, change.toAbsenceTypeId, shiftCodeMap, absenceTypeMap);
+  const fromLabel = resolveLabel(change.from, change.fromState, change.fromAbsenceTypeId, assignmentIdByPair, assignmentLabelMap, absenceTypeMap);
+  const toLabel = resolveLabel(change.to, change.toState, change.toAbsenceTypeId, assignmentIdByPair, assignmentLabelMap, absenceTypeMap);
 
   // Determine if only custom times changed (same shift/absence, different times)
   const timeOnlyChange = change.kind === "modified" && sameShiftContent(change);
@@ -174,12 +248,14 @@ function ChangeRow({
 /** Grouped expanded view: changes grouped by employee name */
 function ExpandedChangesGrouped({
   changes,
-  shiftCodeMap,
+  assignmentIdByPair,
+  assignmentLabelMap,
   empNameMap,
   absenceTypeMap,
 }: {
   changes: PublishChange[];
-  shiftCodeMap: Map<number, string>;
+  assignmentIdByPair: Map<string, number>;
+  assignmentLabelMap: Map<number, string>;
   empNameMap: Map<string, string>;
   absenceTypeMap: Map<number, string>;
 }) {
@@ -228,7 +304,13 @@ function ExpandedChangesGrouped({
             </div>
             <div style={{ paddingLeft: 16, display: "flex", flexDirection: "column", gap: 2 }}>
               {sorted.map((c) => (
-                <ChangeRow key={`${c.empId}-${c.date}-${c.kind}`} change={c} shiftCodeMap={shiftCodeMap} absenceTypeMap={absenceTypeMap} />
+                <ChangeRow
+                  key={`${c.empId}-${c.date}-${c.kind}`}
+                  change={c}
+                  assignmentIdByPair={assignmentIdByPair}
+                  assignmentLabelMap={assignmentLabelMap}
+                  absenceTypeMap={absenceTypeMap}
+                />
               ))}
             </div>
           </div>
@@ -243,7 +325,8 @@ export default function PublishHistoryPanel({
   open,
   onClose,
   onSelectEntry,
-  shiftCodeMap,
+  assignments,
+  assignmentLabelMap,
   employees,
   absenceTypeMap,
 }: PublishHistoryPanelProps) {
@@ -261,6 +344,10 @@ export default function PublishHistoryPanel({
     }
     return map;
   }, [employees]);
+  const assignmentIdByPair = useMemo(
+    () => createAssignmentDefinitionIdByPairMap(assignments),
+    [assignments],
+  );
 
 
 
@@ -415,11 +502,12 @@ export default function PublishHistoryPanel({
 
               {/* Expanded detail — grouped by employee */}
               {isExpanded && (
-                <ExpandedChangesGrouped
-                  changes={entry.changes}
-                  shiftCodeMap={shiftCodeMap}
-                  empNameMap={empNameMap}
-                  absenceTypeMap={absenceTypeMap}
+                    <ExpandedChangesGrouped
+                      changes={entry.changes}
+                      assignmentIdByPair={assignmentIdByPair}
+                      assignmentLabelMap={assignmentLabelMap}
+                      empNameMap={empNameMap}
+                      absenceTypeMap={absenceTypeMap}
                 />
               )}
             </div>

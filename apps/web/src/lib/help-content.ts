@@ -27,8 +27,8 @@ export const helpText = {
       "Display roles shown as tags on the schedule grid (e.g., Charge Nurse). These are cosmetic and don't affect permissions.",
   },
   settings: {
-    shiftCodes:
-      "Shift codes are the labels shown in schedule cells (e.g., D, E, N). Each code can have custom colors and time ranges.",
+    assignments:
+      "Shifts define the primary Day/Evening/Night structure, and jobs add responsibilities like Supervisor or Mentor when needed.",
     orgLabels:
       "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'.",
     adminPermissions:
@@ -36,7 +36,7 @@ export const helpText = {
     indicatorTypes:
       "Indicators are small icons shown on schedule cells to flag notes or special conditions.",
     absenceTypes:
-      "Absence types (e.g., Vacation, Sick) replace the shift code in a cell and are tracked separately.",
+      "Absence types (e.g., Vacation, Sick) replace the worked assignment in a cell and are tracked separately.",
   },
   profile: {
     mfa:

@@ -9,6 +9,17 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { UserPen } from "lucide-react";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey } from "@/lib/utils";
@@ -16,11 +27,13 @@ import { computeDailyTallies, resolveRequirement } from "@/lib/schedule-logic";
 import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
 import {
   Employee,
+  GridCellId,
   ShiftCategory,
-  ShiftCode,
+  AssignmentDefinition,
   FocusArea,
   Department,
   IndicatorType,
+  JobDefinition,
   NamedItem,
   DraftKind,
   PublishChange,
@@ -28,25 +41,57 @@ import {
   AbsenceType,
   ShiftDisplayMode,
   GridOpenShift,
+  ScheduleCellState,
 } from "@/types";
+import { buildScheduleGridModel } from "./schedule-grid/model";
+import type {
+  ScheduleGridHandlers,
+  ScheduleGridInteractionState,
+  ScheduleGridModel,
+} from "./schedule-grid/model";
 import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import {
   borderColor,
   DESIGNATION_COLORS,
   DEFAULT_DESIG_COLOR,
   DRAFT_BORDER_COLORS,
+  getReadableTextOnSurface,
 } from "@/lib/colors";
+import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import {
+  createAssignmentDefinitionIdByPairMap,
+  deriveAssignmentDefinitionIdsFromAssignments,
+} from "@/lib/shift-job-segments";
 import DroppableCell from "./DroppableCell";
 import DraggableShift from "./DraggableShift";
+import { PublishDiffPill } from "./schedule-grid/publishDiffPill";
+import type { ShiftDragData } from "./DraggableShift";
+import type { CellDropData } from "./DroppableCell";
 import { useAuth } from "@/components/AuthProvider";
+import {
+  buildShiftDiffDescriptors,
+  expandDelimitedTimeRanges,
+  type ShiftDiffBadgeDescriptor,
+  type ShiftDiffBorderKind,
+  type ShiftDiffTimeRange,
+} from "@/lib/shift-diff-badges";
 
 function getFocusAreaInitials(name: string): string {
   return name
     .split(/\s+/)
-    .map((w) => w[0])
+    .map((word) => word[0])
     .join("")
     .toUpperCase()
     .slice(0, 3);
+}
+
+function getCrossFocusBadgePalette(
+  style?: Pick<AssignmentDefinition, "color" | "text"> | null,
+) {
+  return {
+    background: style?.color ?? "var(--color-bg)",
+    color: style?.text ?? "var(--color-text-muted)",
+  };
 }
 
 function fmt12hShort(time24: string): string {
@@ -79,37 +124,326 @@ function getPublishDiffBoxShadow(kind: string, fallback: string): string {
   return `0 0 0 1px var(--color-surface), 0 0 0 2.5px ${color}`;
 }
 
-function cellNeedsStackedLayout(args: {
-  draftKind: DraftKind;
-  showDiffOverlay: boolean;
-  publishDiff: (PublishChange & { publishedAt: string; publishedBy: string }) | null;
-  auditName: string | null;
-  showAudit: boolean;
-}): boolean {
-  const { draftKind, showDiffOverlay, publishDiff, auditName, showAudit } = args;
-  const hasAuditLabel = !!auditName && (showAudit || !!draftKind);
-  const hasDraftOrPublishLabel =
-    !!publishDiff || (showDiffOverlay && !!draftKind && draftKind !== "deleted");
-  return hasAuditLabel || hasDraftOrPublishLabel;
+function joinBoxShadows(
+  ...values: Array<string | undefined>
+): string | undefined {
+  const shadows = values.filter((value): value is string => !!value);
+  return shadows.length > 0 ? shadows.join(", ") : undefined;
 }
 
-interface ScheduleGridProps {
+const SINGLE_SHIFT_PILL_RADIUS = 8;
+const MULTI_SHIFT_PILL_RADIUS = 6;
+const RAISED_DIFF_BADGE_TOP_INSET = 10;
+const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 24;
+const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 20;
+
+function areGridCellIdsEqual(
+  left: GridCellId | null | undefined,
+  right: GridCellId | null | undefined,
+): boolean {
+  if (!left || !right) return false;
+  return (
+    left.empId === right.empId &&
+    left.dateKey === right.dateKey &&
+    left.sectionId === right.sectionId
+  );
+}
+
+function getInsetDividerShadow(args: {
+  color: string;
+  side?: "left" | "right";
+  width?: number;
+}): string {
+  const { color, side = "left", width = 1 } = args;
+  const horizontalOffset = side === "left" ? width : -width;
+  return `inset ${horizontalOffset}px 0 0 0 ${color}`;
+}
+
+function cellShowsDraftDiffBadge(args: {
+  draftKind: DraftKind;
+  showDiffOverlay: boolean;
+}): boolean {
+  const { draftKind, showDiffOverlay } = args;
+  return showDiffOverlay && !!draftKind && draftKind !== "deleted";
+}
+
+function formatRelativePublishTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr ago`;
+
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days !== 1 ? "s" : ""} ago`;
+}
+
+function buildPublishTooltip(args: {
+  publishDiff: PublishChange & { publishedAt: string; publishedBy: string };
+  resolvePublisherName?: (userId: string) => string | null;
+  detail?: string;
+}): string {
+  const { publishDiff, resolvePublisherName, detail } = args;
+  const publisherName = publishDiff.publishedBy
+    ? resolvePublisherName?.(publishDiff.publishedBy)
+    : null;
+  const summary = `Published ${formatRelativePublishTime(publishDiff.publishedAt)}${publisherName ? ` by ${publisherName}` : ""}.`;
+
+  return detail ? `${summary} ${detail}` : summary;
+}
+
+function timeRangesFromCustomTimes(args: {
+  customTimes:
+    | {
+        start: string;
+        end: string;
+        perPill?: { start: string; end: string }[];
+      }
+    | null
+    | undefined;
+  count: number;
+}): ShiftDiffTimeRange[] {
+  const { customTimes, count } = args;
+  if (count === 0) return [];
+  if (customTimes?.perPill?.length) {
+    return Array.from({ length: count }, (_, index) => ({
+      start: customTimes.perPill?.[index]?.start ?? null,
+      end: customTimes.perPill?.[index]?.end ?? null,
+    }));
+  }
+  return Array.from({ length: count }, (_, index) => ({
+    start: index === 0 ? (customTimes?.start ?? null) : null,
+    end: index === 0 ? (customTimes?.end ?? null) : null,
+  }));
+}
+
+function splitShiftLabelParts(value: string | null | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split("/")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function assignmentIdsFromPublishState(
+  state: ScheduleCellState | null | undefined,
+  assignmentIdByPair: Map<string, number>,
+): number[] {
+  if (state?.kind !== "worked") return [];
+  const orderedSegments = [...state.segments].sort(
+    (left, right) => left.position - right.position,
+  );
+  return deriveAssignmentDefinitionIdsFromAssignments(
+    {
+      shiftIds: orderedSegments.map((segment) => segment.shiftId),
+      jobIds: orderedSegments.map((segment) => segment.jobId),
+    },
+    assignmentIdByPair,
+  );
+}
+
+function absenceTypeIdFromPublishState(
+  state: ScheduleCellState | null | undefined,
+): number | null {
+  return state?.kind === "absence" ? state.absenceTypeId : null;
+}
+
+function timeRangesFromPublishState(
+  state: ScheduleCellState | null | undefined,
+  fallbackStart: string | null | undefined,
+  fallbackEnd: string | null | undefined,
+  count: number,
+): ShiftDiffTimeRange[] {
+  if (count === 0) return [];
+  return expandDelimitedTimeRanges(
+    state?.customStartTime ?? fallbackStart,
+    state?.customEndTime ?? fallbackEnd,
+    count,
+  );
+}
+
+type GridDiffBadgeConfig = {
+  source: "publish" | "draft";
+  kind: "new" | "modified" | "time" | "deleted";
+  text: string;
+  tooltip?: string;
+  topOffset?: number;
+  rightOffset?: number;
+  leftOffset?: number;
+};
+
+function shouldUseShiftColorForDiffState(args: {
+  isCross: boolean;
+  draftBadge: GridDiffBadgeConfig | null;
+  publishBadge: GridDiffBadgeConfig | null;
+  draftBorderKind?: ShiftDiffBorderKind;
+  publishBorderKind?: ShiftDiffBorderKind;
+}): boolean {
+  const {
+    isCross,
+    draftBadge,
+    publishBadge,
+    draftBorderKind,
+    publishBorderKind,
+  } = args;
+  if (!isCross) return true;
+  return (
+    draftBorderKind === "new" ||
+    draftBorderKind === "modified" ||
+    publishBorderKind === "new" ||
+    publishBorderKind === "modified" ||
+    draftBadge?.kind === "new" ||
+    draftBadge?.kind === "modified" ||
+    publishBadge?.kind === "new" ||
+    publishBadge?.kind === "modified"
+  );
+}
+
+function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
+  const topOffset = badge.topOffset ?? 1;
+  const rightOffset = badge.rightOffset ?? 1;
+  const leftOffset = badge.leftOffset;
+  const dataAttributes =
+    badge.source === "publish"
+      ? { "data-publish-badge": badge.kind }
+      : { "data-draft-badge": badge.kind };
+  const badgeNode = (
+    <PublishDiffPill
+      kind={badge.kind}
+      {...dataAttributes}
+      aria-label={badge.tooltip ?? badge.text}
+      style={{
+        position: "absolute",
+        top: topOffset,
+        ...(leftOffset != null
+          ? {
+              left: leftOffset,
+              maxWidth: `calc(100% - ${leftOffset + 4}px)`,
+            }
+          : {
+              right: rightOffset,
+              maxWidth: "calc(100% - 4px)",
+            }),
+        borderRadius: 3,
+        pointerEvents: badge.tooltip ? "auto" : "none",
+        zIndex: 6,
+      }}
+    >
+      {badge.text}
+    </PublishDiffPill>
+  );
+
+  if (!badge.tooltip) {
+    return badgeNode;
+  }
+
+  return (
+    <MaybeHint content={badge.tooltip} side="top">
+      {badgeNode}
+    </MaybeHint>
+  );
+}
+
+function AuthorBadge({
+  name,
+  leftInset = 5,
+  rightInset = 5,
+  bottomInset = 5,
+}: {
+  name: string;
+  leftInset?: number;
+  rightInset?: number;
+  bottomInset?: number;
+}) {
+  return (
+    <div
+      data-author-pill="true"
+      style={{
+        position: "absolute",
+        left: leftInset,
+        right: rightInset,
+        bottom: bottomInset,
+        display: "flex",
+        justifyContent: "flex-start",
+        pointerEvents: "none",
+        zIndex: 4,
+      }}
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
+          gap: 4,
+          minWidth: 0,
+          maxWidth: "100%",
+          fontSize: "var(--dg-fs-micro)",
+          fontWeight: 600,
+          lineHeight: 1,
+          textAlign: "left",
+          color: "var(--color-text-muted)",
+          padding: "2px 7px",
+          background: "var(--color-surface)",
+          borderRadius: 999,
+          border: "1px solid rgba(0,0,0,0.08)",
+          boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
+          textDecoration: "none",
+        }}
+      >
+        <span
+          aria-hidden="true"
+          data-author-pill-icon="true"
+          style={{
+            flexShrink: 0,
+            lineHeight: 1,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <UserPen size={10} strokeWidth={2.2} />
+        </span>
+        <span
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {name}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+interface LegacyScheduleGridProps {
   filteredEmployees: Employee[];
   allEmployees: Employee[];
   week1: Date[];
   week2: Date[];
   spanWeeks: 1 | 2;
   shiftForKey: (empId: string, date: Date) => string | null;
-  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  assignmentIdsForKey?: (empId: string, date: Date) => number[];
   /** Pass focusAreaId for context-aware label resolution */
-  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
-  handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
+  getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
+  handleCellClick: (
+    emp: Employee,
+    date: Date,
+    focusAreaName?: string,
+    trigger?: "click" | "keyboard",
+  ) => void;
   today: Date;
   highlightEmpIds?: Set<string>;
   focusAreas: FocusArea[];
   departments: Department[];
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
+  historicalAssignments?: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs?: JobDefinition[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
   /** Whether shifts can be dragged (editor-only). Defaults to isCellInteractive. */
@@ -130,10 +464,20 @@ interface ScheduleGridProps {
     end: string;
     perPill?: { start: string; end: string }[];
   } | null;
+  getPublishedCustomShiftTimes?: (
+    empId: string,
+    date: Date,
+  ) => {
+    start: string;
+    end: string;
+    perPill?: { start: string; end: string }[];
+  } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
+  showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
-  publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
+  publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Returns true if the cell's custom times differ from published times. */
   hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
@@ -148,13 +492,14 @@ interface ScheduleGridProps {
   /** Returns the creator's first name for compact grid display */
   createdByNameForKey?: (empId: string, date: Date) => string | null;
   /** Called when mouse enters a cell (for copy-paste hover tracking) */
-  onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
+  onCellHover?: (cellId: GridCellId) => void;
   /** Called on right-click or Shift+F10 of a cell */
   onCellContextMenu?: (
     e: React.MouseEvent | React.KeyboardEvent,
-    empId: string,
+    anchorEl: HTMLElement,
+    cellId: GridCellId,
+    emp: Employee,
     date: Date,
-    focusAreaName: string,
   ) => void;
   /** Retained for compatibility; detailed coverage remains in the separate coverage panel. */
   coverageRequirements?: CoverageRequirement[];
@@ -170,28 +515,36 @@ interface ScheduleGridProps {
   openShifts?: GridOpenShift[];
   /** Callback when a user clicks to claim an open shift */
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
-  /** Cell key for the schedule cell currently open in the shift editor. */
-  selectedCellKey?: string | null;
+  onCellFocus?: (cellId: GridCellId) => void;
+  activeCellId?: GridCellId | null;
 }
 
 interface SectionBlockProps {
+  sectionId: number;
   sectionName: string;
   exclusiveCodeIds: Set<number>;
   employees: Employee[];
   weekDates: Date[];
   todayKey: string;
   shiftForKey: (empId: string, date: Date) => string | null;
-  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  assignmentIdsForKey?: (empId: string, date: Date) => number[];
   /** Pass focusAreaId for context-aware label resolution */
-  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
-  handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
+  getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
+  handleCellClick: (
+    emp: Employee,
+    date: Date,
+    focusAreaName?: string,
+    trigger?: "click" | "keyboard",
+  ) => void;
+  nameColWidth: number;
   colWidth: number;
   fitToContainer?: boolean;
-  splitAtIndex?: number;
   highlightEmpIds?: Set<string>;
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
+  historicalAssignments?: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs?: JobDefinition[];
   indicatorTypes: IndicatorType[];
   isCellInteractive: boolean;
   canDragShifts?: boolean;
@@ -200,9 +553,15 @@ interface SectionBlockProps {
     date: Date,
     focusAreaId?: number,
   ) => number[];
-  showTooltip: (content: string, x: number, y: number) => void;
-  hideTooltip: () => void;
   getCustomShiftTimes?: (
+    empId: string,
+    date: Date,
+  ) => {
+    start: string;
+    end: string;
+    perPill?: { start: string; end: string }[];
+  } | null;
+  getPublishedCustomShiftTimes?: (
     empId: string,
     date: Date,
   ) => {
@@ -212,8 +571,10 @@ interface SectionBlockProps {
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   showDiffOverlay?: boolean;
+  showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
-  publishedShiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
+  publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
     empId: string,
@@ -225,13 +586,15 @@ interface SectionBlockProps {
   cellLocks?: Map<string, { userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
-  onCellHover?: (empId: string, date: Date, focusAreaName: string) => void;
+  onCellHover?: (cellId: GridCellId) => void;
   onCellContextMenu?: (
     e: React.MouseEvent | React.KeyboardEvent,
-    empId: string,
+    anchorEl: HTMLElement,
+    cellId: GridCellId,
+    emp: Employee,
     date: Date,
-    focusAreaName: string,
   ) => void;
+  onCellFocus?: (cellId: GridCellId) => void;
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
@@ -239,37 +602,47 @@ interface SectionBlockProps {
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
-  selectedCellKey?: string | null;
+  activeCellId?: GridCellId | null;
+}
+
+interface ActiveOutlineRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 const SectionBlock = memo(function SectionBlock({
+  sectionId,
   sectionName,
   employees,
   weekDates,
   todayKey,
   shiftForKey,
-  shiftCodeIdsForKey,
+  assignmentIdsForKey,
   getShiftStyle,
   handleCellClick,
+  nameColWidth,
   colWidth,
-  splitAtIndex,
   fitToContainer = false,
   highlightEmpIds,
   focusAreas,
-  shiftCodes,
+  assignments,
+  historicalAssignments = [],
   shiftCategories,
+  jobs = [],
   indicatorTypes,
   isCellInteractive,
   canDragShifts = isCellInteractive,
   activeIndicatorIdsForKey,
-  showTooltip,
-  hideTooltip,
   getCustomShiftTimes,
+  getPublishedCustomShiftTimes,
   draftKindForKey,
   showDiffOverlay,
+  showPublishDiffOverlay,
   publishedLabelForKey,
-  publishedShiftCodeIdsForKey,
-  hasTimeChangesForKey,
+  publishedAssignmentIdsForKey,
+  publishedAbsenceTypeIdForKey,
   publishDiffForKey,
   recentlyPublishedKeys,
   certifications,
@@ -279,6 +652,7 @@ const SectionBlock = memo(function SectionBlock({
   createdByNameForKey,
   onCellHover,
   onCellContextMenu,
+  onCellFocus,
   coverageRequirements,
   absenceTypeMap,
   absenceTypeIdForKey,
@@ -286,13 +660,16 @@ const SectionBlock = memo(function SectionBlock({
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
-  selectedCellKey,
+  activeCellId = null,
 }: SectionBlockProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [activeOutlineRect, setActiveOutlineRect] =
+    useState<ActiveOutlineRect | null>(null);
 
   const updateScrollButtons = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -327,6 +704,77 @@ const SectionBlock = memo(function SectionBlock({
     };
   }, [fitToContainer, updateScrollButtons, weekDates.length, employees.length]);
 
+  useLayoutEffect(() => {
+    const gridEl = gridRef.current;
+    if (!gridEl || !activeCellId || activeCellId.sectionId !== sectionId) {
+      setActiveOutlineRect(null);
+      return;
+    }
+
+    const selector =
+      `[data-slot="cell"]` +
+      `[data-emp-id="${activeCellId.empId}"]` +
+      `[data-date-key="${activeCellId.dateKey}"]` +
+      `[data-section-id="${activeCellId.sectionId}"]`;
+
+    let frame = 0;
+    let resizeObserver: ResizeObserver | null = null;
+
+    const measure = () => {
+      const cellEl = gridEl.querySelector<HTMLElement>(selector);
+      if (!cellEl) {
+        setActiveOutlineRect(null);
+        return;
+      }
+
+      const gridRect = gridEl.getBoundingClientRect();
+      const cellRect = cellEl.getBoundingClientRect();
+      const nextRect = {
+        left: cellRect.left - gridRect.left,
+        top: cellRect.top - gridRect.top,
+        width: cellRect.width + 1,
+        height: cellRect.height + 1,
+      };
+
+      setActiveOutlineRect((prev) => {
+        if (
+          prev &&
+          prev.left === nextRect.left &&
+          prev.top === nextRect.top &&
+          prev.width === nextRect.width &&
+          prev.height === nextRect.height
+        ) {
+          return prev;
+        }
+        return nextRect;
+      });
+
+      if (!resizeObserver) {
+        resizeObserver = new ResizeObserver(() => {
+          window.requestAnimationFrame(measure);
+        });
+        resizeObserver.observe(gridEl);
+        resizeObserver.observe(cellEl);
+      }
+    };
+
+    frame = window.requestAnimationFrame(measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+    };
+  }, [
+    activeCellId,
+    sectionId,
+    fitToContainer,
+    colWidth,
+    nameColWidth,
+    shiftDisplayMode,
+    showDiffOverlay,
+    weekDates,
+    employees.length,
+  ]);
+
   const scrollDays = useCallback(
     (direction: "left" | "right") => {
       const el = scrollContainerRef.current;
@@ -347,152 +795,99 @@ const SectionBlock = memo(function SectionBlock({
     [getShiftStyle, sectionName],
   );
 
-  // Look up shift codes by ID so cross-focus-area shifts render in their own color
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, ShiftCode>();
-    for (const sc of shiftCodes) map.set(sc.id, sc);
+  // Look up assignments by ID so cross-focus-area shifts render in their own color
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const sc of historicalAssignments) map.set(sc.id, sc);
+    for (const sc of assignments) map.set(sc.id, sc);
     return map;
-  }, [shiftCodes]);
+  }, [historicalAssignments, assignments]);
+  const assignmentIdByPair = useMemo(
+    () =>
+      createAssignmentDefinitionIdByPairMap([
+        ...historicalAssignments,
+        ...assignments,
+      ]),
+    [historicalAssignments, assignments],
+  );
 
   const categoryById = useMemo(() => {
     const map = new Map<number, ShiftCategory>();
     for (const cat of shiftCategories) map.set(cat.id, cat);
     return map;
   }, [shiftCategories]);
+  const jobById = useMemo(() => {
+    const map = new Map<number, JobDefinition>();
+    for (const job of jobs) map.set(job.id, job);
+    return map;
+  }, [jobs]);
 
   const getStyleByIdOrLabel = useMemo(
     () =>
-      (label: string, codeId?: number): ShiftCode => {
+      (label: string, codeId?: number): AssignmentDefinition => {
         if (codeId != null) {
-          const byId = shiftCodeById.get(codeId);
+          const byId = assignmentById.get(codeId);
           if (byId) return byId;
         }
         return contextualGetShiftStyle(label);
       },
-    [shiftCodeById, contextualGetShiftStyle],
+    [assignmentById, contextualGetShiftStyle],
   );
 
-  // ── Event delegation helpers ──────────────────────────────────────
-  // Parse cell data-attributes from a delegated event
-  const findCellFromEvent = useCallback(
-    (target: EventTarget | null): { empId: string; dateKey: string } | null => {
-      const el = (target as HTMLElement)?.closest?.(
-        "[data-emp-id]",
-      ) as HTMLElement | null;
-      if (!el) return null;
-      const empId = el.dataset.empId;
-      const dateKey = el.dataset.dateKey;
-      return empId && dateKey ? { empId, dateKey } : null;
+  const getDisplayPartsByIdOrLabel = useCallback(
+    (label: string, codeId?: number) => {
+      const assignment = getStyleByIdOrLabel(label, codeId);
+      const shiftId =
+        assignment.shiftId ?? assignment.categoryId ?? null;
+      const shift =
+        shiftId != null ? (categoryById.get(shiftId) ?? null) : null;
+      const job =
+        assignment.jobId != null
+          ? (jobById.get(assignment.jobId) ?? null)
+          : null;
+
+      return buildShiftDisplayParts({
+        shift,
+        job,
+        assignment: assignment,
+        shiftDisplayMode,
+      });
     },
-    [],
+    [categoryById, getStyleByIdOrLabel, jobById, shiftDisplayMode],
   );
 
-  const employeeById = useMemo(() => {
-    const map = new Map<string, Employee>();
-    for (const e of employees) map.set(e.id, e);
-    return map;
-  }, [employees]);
+  const sectionFocusArea =
+    focusAreas.find((fa) => fa.id === sectionId) ??
+    focusAreas.find((fa) => fa.name === sectionName);
 
-  const handleGridClick = useCallback(
-    (e: React.MouseEvent) => {
-      const cell = findCellFromEvent(e.target);
-      if (!cell) return;
-      const emp = employeeById.get(cell.empId);
-      if (!emp) return;
-      const date = new Date(cell.dateKey + "T00:00:00");
-      const isLocked = !!cellLocks?.get(`${cell.empId}_${cell.dateKey}`);
-      if (isCellInteractive && !isLocked)
-        handleCellClick(emp, date, sectionName);
-    },
-    [
-      findCellFromEvent,
-      employeeById,
-      cellLocks,
-      isCellInteractive,
-      handleCellClick,
-      sectionName,
-    ],
-  );
-
-  const handleGridContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      if (!onCellContextMenu) return;
-      const cell = findCellFromEvent(e.target);
-      if (!cell) return;
-      if (isCellInteractive) {
-        e.preventDefault();
-        const date = new Date(cell.dateKey + "T00:00:00");
-        onCellContextMenu(e, cell.empId, date, sectionName);
-      }
-    },
-    [findCellFromEvent, isCellInteractive, onCellContextMenu, sectionName],
-  );
-
-  const handleGridKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const cell = findCellFromEvent(e.target);
-      if (!cell) return;
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        const emp = employeeById.get(cell.empId);
-        if (!emp) return;
-        const date = new Date(cell.dateKey + "T00:00:00");
-        const isLocked = !!cellLocks?.get(`${cell.empId}_${cell.dateKey}`);
-        if (isCellInteractive && !isLocked)
-          handleCellClick(emp, date, sectionName);
-      }
-      if (
-        e.shiftKey &&
-        e.key === "F10" &&
-        isCellInteractive &&
-        onCellContextMenu
-      ) {
-        e.preventDefault();
-        const date = new Date(cell.dateKey + "T00:00:00");
-        onCellContextMenu(e, cell.empId, date, sectionName);
-      }
-    },
-    [
-      findCellFromEvent,
-      employeeById,
-      cellLocks,
-      isCellInteractive,
-      handleCellClick,
-      onCellContextMenu,
-      sectionName,
-    ],
-  );
-
-  const sectionFocusArea = focusAreas.find((fa) => fa.name === sectionName);
-
-  const countableShiftCodes = useMemo(() => {
+  const countableAssignmentDefinitions = useMemo(() => {
     if (!sectionFocusArea) return [];
-    return shiftCodes.filter(
+    return assignments.filter(
       (sc) => sc.focusAreaId === sectionFocusArea.id || sc.focusAreaId == null,
     );
-  }, [shiftCodes, sectionFocusArea]);
+  }, [assignments, sectionFocusArea]);
 
   const countableSectionCodeIds = useMemo(
-    () => new Set(countableShiftCodes.map((sc) => sc.id)),
-    [countableShiftCodes],
+    () => new Set(countableAssignmentDefinitions.map((sc) => sc.id)),
+    [countableAssignmentDefinitions],
   );
 
   const dailyTotals = useMemo(() => {
-    const fn = shiftCodeIdsForKey ?? (() => []);
+    const fn = assignmentIdsForKey ?? (() => []);
     return weekDates.map((date) =>
       computeDailyTallies(
         employees,
         date,
         fn,
-        shiftCodeById,
+        assignmentById,
         countableSectionCodeIds,
       ),
     );
   }, [
     weekDates,
     employees,
-    shiftCodeIdsForKey,
-    shiftCodeById,
+    assignmentIdsForKey,
+    assignmentById,
     countableSectionCodeIds,
   ]);
 
@@ -500,7 +895,9 @@ const SectionBlock = memo(function SectionBlock({
     const countsByCategory = new Map<number, number[]>();
 
     for (const [dayIndex, dayTotals] of dailyTotals.entries()) {
-      for (const [categoryIdValue, categoryTotals] of Object.entries(dayTotals)) {
+      for (const [categoryIdValue, categoryTotals] of Object.entries(
+        dayTotals,
+      )) {
         const categoryId = Number(categoryIdValue);
         const counts =
           countsByCategory.get(categoryId) ?? Array(weekDates.length).fill(0);
@@ -515,20 +912,23 @@ const SectionBlock = memo(function SectionBlock({
     return Array.from(countsByCategory.entries())
       .sort(([leftCategoryId], [rightCategoryId]) => {
         const leftOrder =
-          categoryById.get(leftCategoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+          categoryById.get(leftCategoryId)?.sortOrder ??
+          Number.MAX_SAFE_INTEGER;
         const rightOrder =
-          categoryById.get(rightCategoryId)?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+          categoryById.get(rightCategoryId)?.sortOrder ??
+          Number.MAX_SAFE_INTEGER;
         if (leftOrder !== rightOrder) return leftOrder - rightOrder;
         const leftLabel =
-          categoryById.get(leftCategoryId)?.name ?? `Category ${leftCategoryId}`;
+          categoryById.get(leftCategoryId)?.name ??
+          `Category ${leftCategoryId}`;
         const rightLabel =
-          categoryById.get(rightCategoryId)?.name ?? `Category ${rightCategoryId}`;
+          categoryById.get(rightCategoryId)?.name ??
+          `Category ${rightCategoryId}`;
         return leftLabel.localeCompare(rightLabel);
       })
       .map(([categoryId, counts]) => ({
         categoryId,
-        label:
-          categoryById.get(categoryId)?.name ?? `Category ${categoryId}`,
+        label: categoryById.get(categoryId)?.name ?? `Category ${categoryId}`,
         counts,
       }));
   }, [dailyTotals, categoryById, weekDates.length]);
@@ -537,21 +937,36 @@ const SectionBlock = memo(function SectionBlock({
 
   const categoryRequirementsByDay = useMemo(() => {
     if (!coverageRequirements?.length || !sectionFocusArea) {
-      return weekDates.map(() => ({} as Record<number, number>));
+      return weekDates.map(() => ({}) as Record<number, number>);
     }
 
     return weekDates.map((date) => {
       const dayOfWeek = date.getDay();
       const requirementsByCategory: Record<number, number> = {};
 
-      for (const code of countableShiftCodes) {
+      for (const code of countableAssignmentDefinitions) {
         if (code.categoryId == null) continue;
-        const resolved = resolveRequirement(
-          coverageRequirements,
-          sectionFocusArea.id,
-          code.id,
-          dayOfWeek,
-        );
+        const resolved =
+          code.jobId != null
+            ? (resolveRequirement(
+                coverageRequirements,
+                sectionFocusArea.id,
+                code.jobId,
+                code.shiftId ?? code.categoryId ?? null,
+                dayOfWeek,
+              ) ??
+              resolveRequirement(
+                coverageRequirements,
+                sectionFocusArea.id,
+                code.id,
+                dayOfWeek,
+              ))
+            : resolveRequirement(
+                coverageRequirements,
+                sectionFocusArea.id,
+                code.id,
+                dayOfWeek,
+              );
         if (!resolved || resolved.minStaff <= 0) continue;
 
         requirementsByCategory[code.categoryId] =
@@ -560,23 +975,18 @@ const SectionBlock = memo(function SectionBlock({
 
       return requirementsByCategory;
     });
-  }, [
-    coverageRequirements,
-    sectionFocusArea,
-    weekDates,
-    countableShiftCodes,
-  ]);
+  }, [coverageRequirements, sectionFocusArea, weekDates, countableAssignmentDefinitions]);
 
   // For cross-focus-area pill detection: map label → home focus area name for
   // labels that belong to another area but NOT this one (or globally).
   const foreignLabelHomeMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const st of shiftCodes) {
+    for (const st of assignments) {
       if (st.focusAreaId == null) continue; // global — never foreign
       const sectionWing = focusAreas.find((w) => w.name === sectionName);
       if (sectionWing && st.focusAreaId === sectionWing.id) continue; // belongs here
       // Belongs to another area — check if there's a local or global definition
-      const hasLocalOrGeneral = shiftCodes.some((s) => {
+      const hasLocalOrGeneral = assignments.some((s) => {
         if (s.label !== st.label) return false;
         return (
           s.focusAreaId == null ||
@@ -590,7 +1000,45 @@ const SectionBlock = memo(function SectionBlock({
       }
     }
     return map;
-  }, [shiftCodes, sectionName, focusAreas, isNameMode]);
+  }, [assignments, sectionName, focusAreas, isNameMode]);
+
+  const buildCellId = useCallback(
+    (empId: string, dateKey: string): GridCellId => ({
+      empId,
+      dateKey,
+      sectionId,
+    }),
+    [sectionId],
+  );
+
+  const triggerCellActivation = useCallback(
+    (
+      emp: Employee,
+      date: Date,
+      isLocked: boolean,
+      trigger: "click" | "keyboard",
+    ) => {
+      if (isCellInteractive && !isLocked) {
+        handleCellClick(emp, date, sectionName, trigger);
+      }
+    },
+    [handleCellClick, isCellInteractive, sectionName],
+  );
+
+  const triggerCellContextMenu = useCallback(
+    (
+      event: React.MouseEvent | React.KeyboardEvent,
+      anchorEl: HTMLElement,
+      cellId: GridCellId,
+      emp: Employee,
+      date: Date,
+    ) => {
+      if (!onCellContextMenu || !isCellInteractive) return;
+      event.preventDefault();
+      onCellContextMenu(event, anchorEl, cellId, emp, date);
+    },
+    [isCellInteractive, onCellContextMenu],
+  );
 
   if (employees.length === 0 && (!openShifts || openShifts.length === 0)) {
     return (
@@ -622,6 +1070,13 @@ const SectionBlock = memo(function SectionBlock({
   }
 
   const gridTemplate = `var(--dg-grid-name-col-current, var(--dg-grid-name-col)) repeat(${weekDates.length}, minmax(var(--dg-grid-col-min-current, var(--dg-grid-col-min)), 1fr))`;
+  const splitAtIndex = weekDates.length > 7 ? 7 : undefined;
+  const isSplitDayDivider = (index: number) =>
+    splitAtIndex !== undefined && index === splitAtIndex;
+  const getDayDividerColor = (index: number) =>
+    isSplitDayDivider(index)
+      ? "var(--color-dark)"
+      : "var(--color-border-light)";
 
   const rowGrid: React.CSSProperties = {
     display: "grid",
@@ -756,1253 +1211,1038 @@ const SectionBlock = memo(function SectionBlock({
             overflowX: fitToContainer ? "hidden" : "auto",
           }}
         >
-        <div
-          role="grid"
-          aria-label={`${sectionName} schedule grid`}
-          onClick={handleGridClick}
-          onContextMenu={handleGridContextMenu}
-          onKeyDown={handleGridKeyDown}
-          style={{
-            display: "grid",
-            gridTemplateColumns: gridTemplate,
-            minWidth: fitToContainer ? undefined : "max-content",
-            width: fitToContainer ? "100%" : undefined,
-          }}
-        >
-          {/* Header row */}
           <div
-            role="row"
-            style={{ ...rowGrid, borderBottom: "2px solid var(--color-dark)" }}
+            ref={gridRef}
+            role="grid"
+            aria-label={`${sectionName} schedule grid`}
+            style={{
+              position: "relative",
+              display: "grid",
+              gridTemplateColumns: gridTemplate,
+              minWidth: fitToContainer ? undefined : "max-content",
+              width: fitToContainer ? "100%" : undefined,
+            }}
           >
-            <div
-              role="columnheader"
-              style={{
-                position: "sticky",
-                left: 0,
-                zIndex: 4,
-                background: "var(--color-bg)",
-                padding: "10px var(--dg-space-md)",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 600,
-                color: "var(--color-text-subtle)",
-                letterSpacing: "0.04em",
-                borderRight: "1px solid var(--color-border-light)",
-                boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-              }}
-            >
-              Staff
-            </div>
-            {weekDates.map((date, i) => {
-              const key = formatDateKey(date);
-              const isToday = key === todayKey;
-              const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
-              return (
-                <div
-                  key={key}
-                  role="columnheader"
-                  style={{
-                    textAlign: "center",
-                    padding: "8px 0",
-                    background: isToday
-                      ? "var(--color-today-bg)"
-                      : "transparent",
-                    borderLeft: isSplit
-                      ? "2px solid var(--color-dark)"
-                      : "1px solid var(--color-border-light)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      fontWeight: 600,
-                      color: isToday
-                        ? "var(--color-today-text)"
-                        : "var(--color-text-subtle)",
-                      letterSpacing: "0.04em",
-                    }}
-                  >
-                    {DAY_LABELS[date.getDay()]}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-title)",
-                      fontWeight: 700,
-                      color: isToday
-                        ? "var(--color-today-text)"
-                        : "var(--color-text-secondary)",
-                      lineHeight: "var(--dg-lh-tight)",
-                      marginTop: 1,
-                    }}
-                  >
-                    {date.getDate()}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Open shifts row */}
-          {openShifts && openShifts.length > 0 && (
-            <div
-              role="row"
-              style={{
-                ...rowGrid,
-                background: "var(--color-warning-bg, #FFF8E1)",
-                borderBottom: "2px dashed var(--color-warning-border, #F59E0B)",
-                alignItems: "stretch",
-              }}
-            >
-              {/* Label cell */}
+            {/* Header row */}
+            <div role="row" style={rowGrid}>
               <div
+                role="columnheader"
                 style={{
                   position: "sticky",
                   left: 0,
-                  zIndex: 3,
-                  background: "var(--color-warning-bg, #FFF8E1)",
-                  display: "flex",
-                  alignItems: "center",
-                  alignSelf: "stretch",
-                  padding: "6px 10px",
-                  fontWeight: 700,
-                  fontSize: "var(--dg-fs-caption)",
-                  color: "var(--color-warning-text, #92400E)",
-                  gap: 6,
-                  whiteSpace: "nowrap",
-                  borderRight: "1px solid var(--color-border)",
+                  zIndex: 4,
+                  background: "var(--color-bg)",
+                  padding: "10px var(--dg-space-md)",
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 600,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.04em",
+                  boxShadow: joinBoxShadows(
+                    "1px 0 0 0 var(--color-border-light)",
+                    "0 1px 0 0 var(--color-dark)",
+                    "2px 0 4px rgba(0,0,0,0.02)",
+                  ),
                 }}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                </svg>
-                Open Shifts
-                <span
-                  style={{
-                    minWidth: 18,
-                    height: 18,
-                    borderRadius: 9,
-                    background: "var(--color-warning)",
-                    color: "#fff",
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 700,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "0 5px",
-                    lineHeight: 1,
-                  }}
-                >
-                  {openShifts.length}
-                </span>
+                Staff
               </div>
-              {/* Date cells */}
-              {weekDates.map((date, ci) => {
-                const dateKey = formatDateKey(date);
-                const isToday = dateKey === todayKey;
-                const isSplit = splitAtIndex != null && ci === splitAtIndex;
-                const cellOpenShifts = openShifts.filter(
-                  (os) => os.date === dateKey,
-                );
+              {weekDates.map((date, index) => {
+                const key = formatDateKey(date);
+                const isToday = key === todayKey;
                 return (
                   <div
-                    key={dateKey}
+                    key={key}
+                    role="columnheader"
+                    className="dg-grid-slot dg-grid-slot--header"
+                    data-leading-divider={
+                      index === 0
+                        ? "none"
+                        : isSplitDayDivider(index)
+                          ? "split"
+                          : "light"
+                    }
+                    data-week-split-start={
+                      isSplitDayDivider(index) ? "true" : undefined
+                    }
+                    data-today={isToday ? "true" : undefined}
                     style={{
-                      padding: "6px",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      alignContent: "flex-start",
-                      alignItems: "flex-start",
-                      gap: 6,
-                      background: isToday ? "var(--color-today-bg)" : undefined,
-                      borderLeft: isSplit
-                        ? "2px solid var(--color-dark)"
-                        : "1px solid var(--color-border-light)",
+                      position: "relative",
+                      zIndex: 2,
+                      textAlign: "center",
+                      padding: "8px 0",
+                      boxShadow: "0 1px 0 0 var(--color-dark)",
                     }}
                   >
-                    {cellOpenShifts.map((os) => {
-                      const sc =
-                        os.shiftCodeIds[0] != null
-                          ? shiftCodeById.get(os.shiftCodeIds[0])
-                          : undefined;
-                      const needed = os.needed ?? 1;
-                      return (
-                        <MaybeHint
-                          key={os.id}
-                          content={
-                            os.calledOffBy
-                              ? `Called off by ${os.calledOffBy}`
-                              : `${needed} needed — click to volunteer`
-                          }
-                          side="top"
-                        >
-                          <button
-                            className="dg-open-shift-btn"
-                            onClick={() => onClaimOpenShift?.(os)}
-                            aria-label={
-                              os.calledOffBy
-                                ? `Called off by ${os.calledOffBy}`
-                                : `${needed} needed — click to volunteer`
-                            }
-                            style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 4,
-                            flex: colWidth < 92 ? "1 1 100%" : "1 1 72px",
-                            width: colWidth < 92 ? "100%" : undefined,
-                            maxWidth: "100%",
-                            padding: "5px 8px",
-                            minWidth: 0,
-                            borderRadius: 6,
-                            border: `1.5px dashed ${sc?.border ?? "var(--color-warning-border, #F59E0B)"}`,
-                            background: sc?.color ?? "var(--color-surface)",
-                            color:
-                              sc?.text ?? "var(--color-warning-text, #92400E)",
-                            fontSize: "var(--dg-fs-caption)",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            lineHeight: 1.3,
-                            overflow: "hidden",
-                          }}
-                            >
-                          <span
-                            style={{
-                              minWidth: 0,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {os.shiftCodeLabel}
-                          </span>
-                          <span
-                            style={{
-                              width: 16,
-                              height: 16,
-                              borderRadius: "50%",
-                              background: sc?.text ?? "var(--color-warning)",
-                              color: sc?.color ?? "#fff",
-                              fontSize: 10,
-                              fontWeight: 700,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              lineHeight: 1,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {needed}
-                          </span>
-                          </button>
-                        </MaybeHint>
-                      );
-                    })}
+                    <div className="dg-grid-slot__chrome" aria-hidden="true" />
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        fontWeight: 600,
+                        color: isToday
+                          ? "var(--color-today-text)"
+                          : "var(--color-text-subtle)",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {DAY_LABELS[date.getDay()]}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-title)",
+                        fontWeight: 700,
+                        color: isToday
+                          ? "var(--color-today-text)"
+                          : "var(--color-text-secondary)",
+                        lineHeight: "var(--dg-lh-tight)",
+                        marginTop: 1,
+                      }}
+                    >
+                      {date.getDate()}
+                    </div>
                   </div>
                 );
               })}
             </div>
-          )}
 
-          {/* Employee rows */}
-          {employees.map((emp, ri) => {
-            const isHighlighted =
-              highlightEmpIds && highlightEmpIds.size > 0
-                ? highlightEmpIds.has(emp.id)
-                : true;
-            const isCurrentUser = !!(
-              emp.userId &&
-              currentUser &&
-              emp.userId === currentUser.id
-            );
-            const rowBg = isCurrentUser
-              ? "var(--color-today-bg)"
-              : "var(--color-surface)";
-            const certAbbr = getCertAbbr(emp.certificationId, certifications);
-            const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
-
-            return (
+            {/* Open shifts row */}
+            {openShifts && openShifts.length > 0 && (
               <div
-                key={emp.id}
                 role="row"
-                className="dg-row-enter"
                 style={{
                   ...rowGrid,
-                  background: rowBg,
-                  opacity: isHighlighted ? 1 : 0.35,
-                  transition: "opacity 150ms ease",
+                  background: "var(--color-warning-bg, #FFF8E1)",
                   alignItems: "stretch",
                 }}
               >
-                {/* Name cell */}
+                {/* Label cell */}
                 <div
-                  role="rowheader"
                   style={{
                     position: "sticky",
                     left: 0,
                     zIndex: 3,
-                    background: rowBg,
-                    padding: "7px var(--dg-space-md)",
+                    background: "var(--color-warning-bg, #FFF8E1)",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                    minWidth: 0,
-                    borderTop:
-                      ri > 0
-                        ? "1px solid var(--color-border-light)"
-                        : undefined,
-                    borderRight: "1px solid var(--color-border-light)",
-                    boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
+                    alignSelf: "stretch",
+                    padding: "6px 10px",
+                    fontWeight: 700,
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-warning-text, #92400E)",
+                    gap: 6,
+                    whiteSpace: "nowrap",
+                    borderBottom:
+                      "2px dashed var(--color-warning-border, #F59E0B)",
+                    boxShadow: "1px 0 0 0 var(--color-border)",
                   }}
                 >
-                  <div
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                  </svg>
+                  Open Shifts
+                  <span
                     style={{
-                      minWidth: 0,
-                      position: "relative",
-                      overflow: "hidden",
-                      display: "flex",
-                      flexDirection: "column",
+                      minWidth: 18,
+                      height: 18,
+                      borderRadius: 9,
+                      background: "var(--color-warning)",
+                      color: "#fff",
+                      fontSize: "var(--dg-fs-badge)",
+                      fontWeight: 700,
+                      display: "inline-flex",
+                      alignItems: "center",
                       justifyContent: "center",
+                      padding: "0 5px",
+                      lineHeight: 1,
                     }}
                   >
-                    <MaybeHint
-                      content={getEmployeeDisplayName(emp)}
-                      side="top"
+                    {openShifts.length}
+                  </span>
+                </div>
+                {/* Date cells */}
+                {weekDates.map((date, index) => {
+                  const dateKey = formatDateKey(date);
+                  const isToday = dateKey === todayKey;
+                  const cellOpenShifts = openShifts.filter(
+                    (os) => os.date === dateKey,
+                  );
+                  return (
+                    <div
+                      key={dateKey}
+                      className="dg-grid-slot dg-grid-slot--open"
+                      data-leading-divider={
+                        index === 0
+                          ? "none"
+                          : isSplitDayDivider(index)
+                            ? "split"
+                            : "light"
+                      }
+                      data-week-split-start={
+                        isSplitDayDivider(index) ? "true" : undefined
+                      }
+                      data-today={isToday ? "true" : undefined}
+                      data-bottom-divider="warning"
+                      style={{
+                        position: "relative",
+                        padding: "6px",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignContent: "flex-start",
+                        alignItems: "flex-start",
+                        gap: 6,
+                      }}
                     >
+                      <div
+                        className="dg-grid-slot__chrome"
+                        aria-hidden="true"
+                      />
+                      {cellOpenShifts.map((os) => {
+                        const sc =
+                          os.assignmentIds[0] != null
+                            ? assignmentById.get(os.assignmentIds[0])
+                            : undefined;
+                        const needed = os.needed ?? 1;
+                        return (
+                          <MaybeHint
+                            key={os.id}
+                            content={
+                              os.calledOffBy
+                                ? `Called off by ${os.calledOffBy}`
+                                : `${needed} needed — click to volunteer`
+                            }
+                            side="top"
+                          >
+                            <button
+                              className="dg-open-shift-btn"
+                              onClick={() => onClaimOpenShift?.(os)}
+                              aria-label={
+                                os.calledOffBy
+                                  ? `Called off by ${os.calledOffBy}`
+                                  : `${needed} needed — click to volunteer`
+                              }
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 4,
+                                flex: colWidth < 92 ? "1 1 100%" : "1 1 72px",
+                                width: colWidth < 92 ? "100%" : undefined,
+                                maxWidth: "100%",
+                                padding: "5px 8px",
+                                minWidth: 0,
+                                borderRadius: 6,
+                                border: `1.5px dashed ${sc?.border ?? "var(--color-warning-border, #F59E0B)"}`,
+                                background: sc?.color ?? "var(--color-surface)",
+                                color:
+                                  sc?.text ??
+                                  "var(--color-warning-text, #92400E)",
+                                fontSize: "var(--dg-fs-caption)",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                lineHeight: 1.3,
+                                overflow: "hidden",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  minWidth: 0,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {os.assignmentLabel}
+                              </span>
+                              <span
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: "50%",
+                                  background:
+                                    sc?.text ?? "var(--color-warning)",
+                                  color: sc?.color ?? "#fff",
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  lineHeight: 1,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {needed}
+                              </span>
+                            </button>
+                          </MaybeHint>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Employee rows */}
+            {employees.map((emp, ri) => {
+              const isHighlighted =
+                highlightEmpIds && highlightEmpIds.size > 0
+                  ? highlightEmpIds.has(emp.id)
+                  : true;
+              const isCurrentUser = !!(
+                emp.userId &&
+                currentUser &&
+                emp.userId === currentUser.id
+              );
+              const rowBg = isCurrentUser
+                ? "var(--color-today-bg)"
+                : "var(--color-surface)";
+              const certAbbr = getCertAbbr(emp.certificationId, certifications);
+              const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
+
+              return (
+                <div
+                  key={emp.id}
+                  role="row"
+                  className="dg-row-enter"
+                  style={{
+                    ...rowGrid,
+                    background: rowBg,
+                    opacity: isHighlighted ? 1 : 0.35,
+                    transition: "opacity 150ms ease",
+                    alignItems: "stretch",
+                  }}
+                >
+                  {/* Name cell */}
+                  <div
+                    role="rowheader"
+                    style={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 3,
+                      background: rowBg,
+                      padding: "7px var(--dg-space-md)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      minWidth: 0,
+                      borderTop:
+                        ri > 0
+                          ? "1px solid var(--color-border-light)"
+                          : undefined,
+                      boxShadow: joinBoxShadows(
+                        "1px 0 0 0 var(--color-border-light)",
+                        "2px 0 4px rgba(0,0,0,0.02)",
+                      ),
+                    }}
+                  >
+                    <div
+                      style={{
+                        minWidth: 0,
+                        position: "relative",
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <MaybeHint
+                        content={getEmployeeDisplayName(emp)}
+                        side="top"
+                      >
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            fontWeight: 600,
+                            color: "var(--color-text-secondary)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            lineHeight: "var(--dg-lh-tight)",
+                          }}
+                        >
+                          {getEmployeeDisplayName(emp)}
+                        </span>
+                      </MaybeHint>
+                      {emp.roleIds.length > 0 && (
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-badge)",
+                            color: "var(--color-text-subtle)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            lineHeight: "var(--dg-lh-tight)",
+                          }}
+                        >
+                          {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
+                        </span>
+                      )}
+                    </div>
+                    {emp.certificationId != null && (
                       <span
                         style={{
-                          fontSize: "var(--dg-fs-label)",
-                          fontWeight: 600,
-                          color: "var(--color-text-secondary)",
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 700,
+                          background: dc.bg,
+                          color: dc.text,
+                          padding: "2px 7px",
+                          borderRadius: 20,
                           whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          lineHeight: "var(--dg-lh-tight)",
+                          flexShrink: 0,
+                          letterSpacing: "0.01em",
                         }}
                       >
-                        {getEmployeeDisplayName(emp)}
-                      </span>
-                    </MaybeHint>
-                    {emp.roleIds.length > 0 && (
-                      <span
-                        style={{
-                          fontSize: "var(--dg-fs-badge)",
-                          color: "var(--color-text-subtle)",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          lineHeight: "var(--dg-lh-tight)",
-                        }}
-                      >
-                        {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
+                        {certAbbr}
                       </span>
                     )}
                   </div>
-                  {emp.certificationId != null && (
-                    <span
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        fontWeight: 700,
-                        background: dc.bg,
-                        color: dc.text,
-                        padding: "2px 7px",
-                        borderRadius: 20,
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                        letterSpacing: "0.01em",
-                      }}
-                    >
-                      {certAbbr}
-                    </span>
-                  )}
-                </div>
 
-                {/* Shift cells */}
-                {(() => {
-                  const rowUsesTallCells = weekDates.some((date) => {
-                    const rowDraftKind = draftKindForKey?.(emp.id, date) ?? null;
-                    const rowPublishDiff =
-                      publishDiffForKey?.(emp.id, date) ?? null;
-                    const rowAuthorName =
-                      createdByNameForKey?.(emp.id, date) ?? null;
-                    return cellNeedsStackedLayout({
-                      draftKind: rowDraftKind,
-                      showDiffOverlay: !!showDiffOverlay,
-                      publishDiff: rowPublishDiff,
-                      auditName: rowAuthorName,
-                      showAudit: !!showAudit,
-                    });
-                  });
+                  {/* Shift cells */}
+                  {(() => {
+                    return weekDates.map((date, index) => {
+                      const dateKey = formatDateKey(date);
+                      const cellKey = `${emp.id}_${dateKey}`;
+                      const isToday = dateKey === todayKey;
+                      const shiftLabel = shiftForKey(emp.id, date);
+                      const cellCodeIds =
+                        assignmentIdsForKey?.(emp.id, date) ?? [];
+                      const draftKind = draftKindForKey?.(emp.id, date) ?? null;
+                      const publishDiff =
+                        publishDiffForKey?.(emp.id, date) ?? null;
+                      const showsPublishDiff = !!(
+                        (showPublishDiffOverlay ?? showDiffOverlay) &&
+                        publishDiff
+                      );
+                      const publishedLabel =
+                        publishedLabelForKey?.(emp.id, date) ?? null;
+                      const publishedCodeIds =
+                        publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
+                      const publishedCustomTimes =
+                        getPublishedCustomShiftTimes?.(emp.id, date) ?? null;
+                      const noteTypes =
+                        activeIndicatorIdsForKey?.(
+                          emp.id,
+                          date,
+                          sectionFocusArea?.id,
+                        ) ?? [];
+                      const customTimes =
+                        getCustomShiftTimes?.(emp.id, date) ?? null;
+                      const cellLock = cellLocks?.get(cellKey);
+                      const isLocked = !!cellLock;
+                      const auditName =
+                        createdByNameForKey?.(emp.id, date) ?? null;
+                      const shouldShowAuthorName =
+                        !!auditName && (showAudit || !!draftKind);
+                      const shouldComputeDraftDiff =
+                        !!draftKind && draftKind !== "deleted";
+                      const showsDraftBadge = cellShowsDraftDiffBadge({
+                        draftKind,
+                        showDiffOverlay: !!showDiffOverlay,
+                      });
+                      const currentAbsenceTypeId =
+                        absenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const publishedAbsenceTypeId =
+                        publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
+                      const cellAbsenceType =
+                        currentAbsenceTypeId != null
+                          ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
+                          : null;
 
-                  return weekDates.map((date, di) => {
-                  const dateKey = formatDateKey(date);
-                  const cellKey = `${emp.id}_${dateKey}`;
-                  const isToday = dateKey === todayKey;
-                  const isSplit =
-                    splitAtIndex !== undefined && di === splitAtIndex;
-                  const shiftCode = shiftForKey(emp.id, date);
-                  const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
-                  const draftKind = draftKindForKey?.(emp.id, date) ?? null;
-                  const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
-                  const publishedLabel =
-                    publishedLabelForKey?.(emp.id, date) ?? null;
-                  const publishedCodeIds =
-                    publishedShiftCodeIdsForKey?.(emp.id, date) ?? [];
-                  const cellHasTimeEdits =
-                    hasTimeChangesForKey?.(emp.id, date) ?? false;
-                  const noteTypes =
-                    activeIndicatorIdsForKey?.(
-                      emp.id,
-                      date,
-                      sectionFocusArea?.id,
-                    ) ?? [];
-                  const customTimes =
-                    getCustomShiftTimes?.(emp.id, date) ?? null;
-                  const cellLock = cellLocks?.get(cellKey);
-                  const isLocked = !!cellLock;
-                  const isSelectedPreview = selectedCellKey === cellKey;
-                  const auditName = createdByNameForKey?.(emp.id, date) ?? null;
-                  const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
-                  const hasStackedLayout = cellNeedsStackedLayout({
-                    draftKind,
-                    showDiffOverlay: !!showDiffOverlay,
-                    publishDiff,
-                    auditName,
-                    showAudit: !!showAudit,
-                  });
-                  const cellAbsenceTypeId =
-                    absenceTypeIdForKey?.(emp.id, date) ?? null;
-                  const cellAbsenceType =
-                    cellAbsenceTypeId != null
-                      ? (absenceTypeMap?.get(cellAbsenceTypeId) ?? null)
-                      : null;
+                      const showDiffCellTint =
+                        (!!showDiffOverlay && !!draftKind) ||
+                        showsPublishDiff;
+                      const topDivider =
+                        ri > 0
+                          ? "light"
+                          : showDiffCellTint
+                            ? (openShifts?.length ?? 0) > 0
+                              ? "warning"
+                              : "dark"
+                            : undefined;
+                      const cellId = buildCellId(emp.id, dateKey);
+                      const isActiveCell = areGridCellIdsEqual(
+                        activeCellId,
+                        cellId,
+                      );
+                      const hasDraggableEntry =
+                        canDragShifts &&
+                        !isLocked &&
+                        !!shiftLabel &&
+                        shiftLabel !== "OFF" &&
+                        draftKind !== "deleted";
+                      const firstStyle = hasDraggableEntry
+                        ? getStyleByIdOrLabel(
+                            shiftLabel.split("/")[0],
+                            cellCodeIds[0],
+                          )
+                        : null;
+                      const leadingDividerInset = index === 0 ? 0 : 1;
+                      // The first employee row still sits under a painted divider
+                      // from the header or open-shifts row, so account for that
+                      // visible stroke when placing inset pills.
+                      const topDividerInset =
+                        ri > 0 ? 1 : (openShifts?.length ?? 0) > 0 ? 2 : 1;
+                      const insetFromVisibleCellLeft = (base: number) =>
+                        `${base + leadingDividerInset}px`;
+                      const insetFromVisibleCellTop = (base: number) =>
+                        `${base + topDividerInset}px`;
 
-                  const isRecentlyPublished =
-                    !draftKind &&
-                    recentlyPublishedKeys?.has(`${emp.id}_${dateKey}`);
-                  const hasDraggableEntry =
-                    canDragShifts &&
-                    !isLocked &&
-                    !!shiftCode &&
-                    shiftCode !== "OFF" &&
-                    draftKind !== "deleted";
-                  const firstStyle = hasDraggableEntry
-                    ? getStyleByIdOrLabel(
-                        shiftCode.split("/")[0],
-                        cellCodeIds[0],
-                      )
-                    : null;
-                  const baseBoxShadow =
-                    isSplit && ri > 0
-                      ? "inset 0 1px 0 var(--color-border-light)"
-                      : undefined;
-                  const selectedPreviewBoxShadow = isSelectedPreview
-                    ? "inset 0 0 0 2px var(--color-border-focus), 0 0 0 1px rgba(37, 99, 235, 0.32)"
-                    : undefined;
-                  const cellBoxShadow = [
-                    selectedPreviewBoxShadow,
-                    baseBoxShadow,
-                  ]
-                    .filter(Boolean)
-                    .join(", ");
-
-                  return (
-                    <DroppableCell
-                      key={dateKey}
-                      id={`drop_${emp.id}_${dateKey}_${sectionName}`}
-                      data={{
-                        empId: emp.id,
-                        date,
-                        dateKey,
-                        focusAreaName: sectionName,
-                      }}
-                      disabled={!isCellInteractive || isLocked}
-                      className="dg-grid-cell"
-                      role="gridcell"
-                      aria-label={
-                        shiftCode && shiftCode !== "OFF"
-                          ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftCode}`
-                          : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
-                      }
-                      tabIndex={isCellInteractive ? 0 : -1}
-                      data-emp-id={emp.id}
-                      data-date-key={dateKey}
-                      data-interactive={isCellInteractive ? "true" : "false"}
-                      data-locked={isLocked ? "true" : "false"}
-                      data-selected-preview={isSelectedPreview ? "true" : "false"}
-                      data-empty={
-                        !shiftCode || shiftCode === "OFF" ? "true" : "false"
-                      }
-                      style={{
-                        height: rowUsesTallCells
-                          ? weekDates.length > 7
-                            ? "72px"
-                            : "var(--dg-grid-cell-height-audit)"
-                          : "var(--dg-grid-cell-height)",
-                        borderTop:
-                          ri > 0 && !isSplit
-                            ? "1px solid var(--color-border-light)"
-                            : undefined,
-                        borderLeft: isSplit
-                          ? "2px solid var(--color-dark)"
-                          : "1px solid var(--color-border-light)",
-                        boxShadow: cellBoxShadow || undefined,
-                        background: isLocked
-                          ? "rgba(37, 99, 235, 0.08)"
-                          : isToday
-                            ? "var(--color-today-bg)"
-                            : isRecentlyPublished
-                              ? "rgba(59, 130, 246, 0.06)"
-                              : "transparent",
-                        zIndex: isSelectedPreview ? 2 : undefined,
-                      }}
-                      onMouseEnter={(e) => {
-                        onCellHover?.(emp.id, date, sectionName);
-                        if (shiftCode && shiftCode !== "OFF") {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const content = cellAbsenceType
-                            ? isNameMode
-                              ? cellAbsenceType.name
-                              : cellAbsenceType.label
-                            : shiftCode
-                                .split("/")
-                                .map((l, li) => {
-                                  const style = getStyleByIdOrLabel(
-                                    l,
-                                    cellCodeIds[li],
-                                  );
-                                  const codeEntry =
-                                    cellCodeIds[li] != null
-                                      ? shiftCodeById.get(cellCodeIds[li])
-                                      : undefined;
-                                  const isForeign =
-                                    codeEntry?.focusAreaId != null &&
-                                    sectionFocusArea != null &&
-                                    codeEntry.focusAreaId !==
-                                      sectionFocusArea.id;
-                                  const homeFa = isForeign
-                                    ? focusAreas.find(
-                                        (fa) =>
-                                          fa.id === codeEntry!.focusAreaId,
-                                      )?.name
-                                    : foreignLabelHomeMap.get(l);
-                                  return homeFa
-                                    ? `${style.name} (${homeFa})`
-                                    : style.name;
-                                })
-                                .join(" / ");
-                          showTooltip(
-                            content,
-                            rect.left + rect.width / 2,
-                            rect.top,
-                          );
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        hideTooltip();
-                      }}
-                    >
-                      {shiftCode && shiftCode !== "OFF" ? (
-                        <DraggableShift
-                          id={`drag_${emp.id}_${dateKey}_${sectionName}`}
+                      return (
+                        <DroppableCell
+                          key={dateKey}
+                          id={`drop_${emp.id}_${dateKey}_${sectionName}`}
                           data={{
-                            empId: emp.id,
-                            date,
-                            dateKey,
-                            label: shiftCode,
-                            shiftCodeIds: cellCodeIds,
-                            absenceTypeId: cellAbsenceTypeId,
-                            customStartTime: customTimes?.start ?? null,
-                            customEndTime: customTimes?.end ?? null,
-                            focusAreaName: sectionName,
-                            pillColor:
-                              cellAbsenceType?.color ??
-                              firstStyle?.color ??
-                              "var(--color-bg)",
-                            pillText:
-                              cellAbsenceType?.text ??
-                              firstStyle?.text ??
-                              "var(--color-text-muted)",
+                            cellId,
                           }}
-                          disabled={!hasDraggableEntry}
+                          disabled={!isCellInteractive || isLocked}
+                          className="dg-grid-cell"
+                          role="gridcell"
+                          aria-label={
+                            shiftLabel && shiftLabel !== "OFF"
+                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftLabel}`
+                              : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
+                          }
+                          tabIndex={isCellInteractive ? 0 : -1}
+                          data-emp-id={emp.id}
+                          data-date-key={dateKey}
+                          data-section-id={sectionId}
+                          data-interactive={
+                            isCellInteractive ? "true" : "false"
+                          }
+                          data-locked={isLocked ? "true" : "false"}
+                          data-empty={
+                            !shiftLabel || shiftLabel === "OFF"
+                              ? "true"
+                              : "false"
+                          }
+                          data-slot="cell"
+                          data-leading-divider={
+                            index === 0
+                              ? "none"
+                              : isSplitDayDivider(index)
+                                ? "split"
+                                : "light"
+                          }
+                          data-week-split-start={
+                            isSplitDayDivider(index) ? "true" : undefined
+                          }
+                          data-today={isToday ? "true" : undefined}
+                          data-top-divider={topDivider}
+                          data-active={isActiveCell ? "true" : undefined}
+                          style={{
+                            height: "var(--dg-grid-cell-height)",
+                            background: showDiffCellTint ? rowBg : undefined,
+                            zIndex: showDiffCellTint
+                              ? 8
+                              : ri === 0
+                                ? 5
+                                : undefined,
+                          }}
+                          onFocus={() => onCellFocus?.(cellId)}
+                          onMouseEnter={() => onCellHover?.(cellId)}
+                          onClick={() =>
+                            triggerCellActivation(
+                              emp,
+                              date,
+                              isLocked || !isCellInteractive,
+                              "click",
+                            )
+                          }
+                          onContextMenu={(event) =>
+                            triggerCellContextMenu(
+                              event,
+                              event.currentTarget,
+                              cellId,
+                              emp,
+                              date,
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              triggerCellActivation(
+                                emp,
+                                date,
+                                isLocked || !isCellInteractive,
+                                "keyboard",
+                              );
+                            }
+                            if (event.shiftKey && event.key === "F10") {
+                              triggerCellContextMenu(
+                                event,
+                                event.currentTarget,
+                                cellId,
+                                emp,
+                                date,
+                              );
+                            }
+                          }}
                         >
-                          {(() => {
-                            const labels = shiftCode.split("/");
-
-                            // Per-pill publish diff: compare from[i] vs to[i] positionally
-                            const isPubDiff = !draftKind && publishDiff;
-                            const pubFrom = isPubDiff ? publishDiff!.from : [];
-                            const pubTo = isPubDiff ? publishDiff!.to : [];
-
-                            // For each pill index, determine if it changed vs the old state
-                            function pillPublishStatus(
-                              pillIndex: number,
-                            ): "new" | "modified" | "unchanged" | null {
-                              if (!isPubDiff) return null;
-                              const toId = pubTo[pillIndex];
-                              const fromId = pubFrom[pillIndex];
-                              if (fromId == null) return "new"; // no old pill at this index → added
-                              if (fromId !== toId) return "modified"; // old pill differs → changed
-                              return "unchanged"; // same code at same position
-                            }
-
-                            // Cell-level label below the pill(s) with temporal tooltip
-                            const publishTooltip =
-                              isPubDiff && publishDiff
-                                ? (() => {
-                                    const diff =
-                                      Date.now() -
-                                      new Date(
-                                        publishDiff.publishedAt,
-                                      ).getTime();
-                                    const mins = Math.floor(diff / 60000);
-                                    let timeAgo: string;
-                                    if (mins < 1) timeAgo = "just now";
-                                    else if (mins < 60)
-                                      timeAgo = `${mins} min ago`;
-                                    else {
-                                      const hrs = Math.floor(mins / 60);
-                                      if (hrs < 24) timeAgo = `${hrs} hr ago`;
-                                      else {
-                                        const days = Math.floor(hrs / 24);
-                                        timeAgo = `${days} day${days !== 1 ? "s" : ""} ago`;
-                                      }
-                                    }
-                                    const name = publishDiff.publishedBy
-                                      ? resolvePublisherName?.(
-                                          publishDiff.publishedBy,
-                                        )
+                          <div
+                            className="dg-grid-cell__content"
+                            style={{
+                              zIndex: showDiffCellTint ? 4 : undefined,
+                              overflow: "visible",
+                            }}
+                          >
+                            {shiftLabel && shiftLabel !== "OFF" ? (
+                              <DraggableShift
+                                id={`drag_${emp.id}_${dateKey}_${sectionName}`}
+                                data={{
+                                  cellId,
+                                  label: shiftLabel,
+                                  payload: {
+                                    kind: currentAbsenceTypeId != null ? "absence" : "worked",
+                                    segments:
+                                      currentAbsenceTypeId != null
+                                        ? []
+                                        : cellCodeIds
+                                            .map((assignmentId, position) => {
+                                              const assignment =
+                                                assignmentById.get(assignmentId);
+                                              if (assignment?.jobId == null) {
+                                                return null;
+                                              }
+                                              return {
+                                                shiftId:
+                                                  assignment.shiftId ??
+                                                  assignment.categoryId ??
+                                                  null,
+                                                jobId: assignment.jobId,
+                                                position,
+                                              };
+                                            })
+                                            .filter(
+                                              (
+                                                segment,
+                                              ): segment is {
+                                                shiftId: number | null;
+                                                jobId: number;
+                                                position: number;
+                                              } => segment != null,
+                                            ),
+                                    absenceTypeId: currentAbsenceTypeId,
+                                    customStartTime: customTimes?.start ?? null,
+                                    customEndTime: customTimes?.end ?? null,
+                                    seriesId: null,
+                                    fromRecurring: false,
+                                  },
+                                  pillColor:
+                                    cellAbsenceType?.color ??
+                                    firstStyle?.color ??
+                                    "var(--color-bg)",
+                                  pillText:
+                                    cellAbsenceType?.text ??
+                                    firstStyle?.text ??
+                                    "var(--color-text-muted)",
+                                }}
+                                disabled={!hasDraggableEntry}
+                              >
+                                {(() => {
+                                  const labels = shiftLabel.split("/");
+                                  const isPubDiff =
+                                    !draftKind && showsPublishDiff
+                                      ? publishDiff
                                       : null;
-                                    return `Published ${timeAgo}${name ? ` by ${name}` : ""}`;
-                                  })()
-                                : undefined;
-
-                            const resolveOldLabel = (): string => {
-                              if (publishDiff?.fromAbsenceTypeId != null) {
-                                const at = absenceTypeMap?.get(
-                                  Number(publishDiff.fromAbsenceTypeId),
-                                );
-                                return at
-                                  ? isNameMode
-                                    ? at.name
-                                    : at.label
-                                  : "?";
-                              }
-                              return pubFrom
-                                .map((id) => {
-                                  const sc = shiftCodeById.get(id);
-                                  return sc
-                                    ? isNameMode
-                                      ? sc.name || sc.label
-                                      : sc.label
-                                    : "?";
-                                })
-                                .join("/");
-                            };
-
-                            // Detect time-only changes (same shift/absence, only custom times differ)
-                            const sameContent =
-                              isPubDiff &&
-                              publishDiff &&
-                              (publishDiff.fromAbsenceTypeId ?? null) ===
-                                (publishDiff.toAbsenceTypeId ?? null) &&
-                              publishDiff.from.length ===
-                                publishDiff.to.length &&
-                              publishDiff.from.every(
-                                (id, idx) => id === publishDiff.to[idx],
-                              );
-                            const hadTime =
-                              publishDiff?.fromCustomStart ||
-                              publishDiff?.fromCustomEnd;
-                            const hasTime =
-                              publishDiff?.toCustomStart ||
-                              publishDiff?.toCustomEnd;
-                            const timeAdded = !hadTime && hasTime;
-                            const timeEdited =
-                              hadTime &&
-                              hasTime &&
-                              (publishDiff?.fromCustomStart !==
-                                publishDiff?.toCustomStart ||
-                                publishDiff?.fromCustomEnd !==
-                                  publishDiff?.toCustomEnd);
-                            const timeRemoved = hadTime && !hasTime;
-
-                            let publishBadge: {
-                              text: string;
-                              color: string;
-                              tooltip?: string;
-                            } | null = null;
-                            if (isPubDiff) {
-                              if (publishDiff!.kind === "new") {
-                                publishBadge = {
-                                  text: "New",
-                                  color: "var(--color-success-text)",
-                                  tooltip: publishTooltip,
-                                };
-                              } else if (publishDiff!.kind === "modified") {
-                                if (sameContent) {
-                                  // Only times changed — show time-specific badge
-                                  const timeBadge = timeAdded
-                                    ? "Added time"
-                                    : timeEdited
-                                      ? "Edited time"
-                                      : timeRemoved
-                                        ? "Time removed"
-                                        : "Updated";
-                                  publishBadge = {
-                                    text: timeBadge,
-                                    color: "var(--color-primary)",
-                                    tooltip: publishTooltip,
+                                  const publishFrom =
+                                    publishDiff?.from ??
+                                    assignmentIdsFromPublishState(
+                                      publishDiff?.fromState,
+                                      assignmentIdByPair,
+                                    );
+                                  const publishTo =
+                                    publishDiff?.to ??
+                                    assignmentIdsFromPublishState(
+                                      publishDiff?.toState,
+                                      assignmentIdByPair,
+                                    );
+                                  const currentShiftLabels =
+                                    splitShiftLabelParts(shiftLabel);
+                                  const publishedShiftLabels =
+                                    splitShiftLabelParts(publishedLabel);
+                                  const resolveGridShiftLabel = (
+                                    assignmentId: number,
+                                  ) => {
+                                    const assignmentEntry =
+                                      assignmentById.get(assignmentId);
+                                    if (!assignmentEntry) return "?";
+                                    return isNameMode
+                                      ? assignmentEntry.name ||
+                                          assignmentEntry.label
+                                      : assignmentEntry.label;
                                   };
-                                } else {
-                                  publishBadge = {
-                                    text: `was: ${resolveOldLabel()}`,
-                                    color: "var(--color-primary)",
-                                    tooltip: publishTooltip,
+                                  const resolveGridAbsenceLabel = (
+                                    absenceTypeId: number,
+                                  ) => {
+                                    const absenceType =
+                                      absenceTypeMap?.get(absenceTypeId);
+                                    if (!absenceType) return "?";
+                                    return isNameMode
+                                      ? absenceType.name || absenceType.label
+                                      : absenceType.label;
                                   };
-                                }
-                              }
-                            }
+                                  const draftDiff = shouldComputeDraftDiff
+                                    ? buildShiftDiffDescriptors({
+                                        before: {
+                                          assignmentIds: publishedCodeIds,
+                                          absenceTypeId: publishedAbsenceTypeId,
+                                          timeRanges: timeRangesFromCustomTimes(
+                                            {
+                                              customTimes: publishedCustomTimes,
+                                              count: publishedCodeIds.length,
+                                            },
+                                          ),
+                                        },
+                                        after: {
+                                          assignmentIds: cellCodeIds,
+                                          absenceTypeId: currentAbsenceTypeId,
+                                          timeRanges: timeRangesFromCustomTimes(
+                                            {
+                                              customTimes,
+                                              count: cellCodeIds.length,
+                                            },
+                                          ),
+                                        },
+                                        beforeShiftLabels: publishedShiftLabels,
+                                        afterShiftLabels: currentShiftLabels,
+                                        resolveAssignmentDefinitionLabel:
+                                          resolveGridShiftLabel,
+                                        resolveAbsenceLabel:
+                                          resolveGridAbsenceLabel,
+                                      })
+                                    : null;
+                                  const publishDiffSummary = isPubDiff
+                                    ? buildShiftDiffDescriptors({
+                                        before: {
+                                          assignmentIds: publishFrom,
+                                          absenceTypeId:
+                                            publishDiff!.fromAbsenceTypeId ??
+                                            absenceTypeIdFromPublishState(
+                                              publishDiff?.fromState,
+                                            ),
+                                          timeRanges: timeRangesFromPublishState(
+                                            publishDiff?.fromState,
+                                            publishDiff?.fromCustomStart,
+                                            publishDiff?.fromCustomEnd,
+                                            publishFrom.length,
+                                          ),
+                                        },
+                                        after: {
+                                          assignmentIds: publishTo,
+                                          absenceTypeId:
+                                            publishDiff!.toAbsenceTypeId ??
+                                            absenceTypeIdFromPublishState(
+                                              publishDiff?.toState,
+                                            ),
+                                          timeRanges: timeRangesFromPublishState(
+                                            publishDiff?.toState,
+                                            publishDiff?.toCustomStart,
+                                            publishDiff?.toCustomEnd,
+                                            publishTo.length,
+                                          ),
+                                        },
+                                        beforeShiftLabels:
+                                          publishDiff?.fromSegments?.map(
+                                            (segment) => segment.label ?? "?",
+                                          ),
+                                        afterShiftLabels:
+                                          publishDiff?.toSegments?.map(
+                                            (segment) => segment.label ?? "?",
+                                          ) ?? currentShiftLabels,
+                                        resolveAssignmentDefinitionLabel:
+                                          resolveGridShiftLabel,
+                                        resolveAbsenceLabel:
+                                          resolveGridAbsenceLabel,
+                                      })
+                                    : null;
 
-                            if (labels.length === 1) {
-                              const label = labels[0];
-                              const isAbsence = cellAbsenceType != null;
-                              const style = isAbsence
-                                ? {
-                                    ...getStyleByIdOrLabel(
-                                      label,
-                                      cellCodeIds[0],
-                                    ),
-                                    color: cellAbsenceType!.color,
-                                    text: cellAbsenceType!.text,
+                                  let publishBadge: GridDiffBadgeConfig | null =
+                                    null;
+                                  if (
+                                    isPubDiff &&
+                                    publishDiffSummary?.cellBadge &&
+                                    publishDiffSummary.cellBadge.text ===
+                                      "Changed"
+                                  ) {
+                                    publishBadge = {
+                                      source: "publish",
+                                      kind: publishDiffSummary.cellBadge.kind,
+                                      text: publishDiffSummary.cellBadge.text,
+                                      tooltip: buildPublishTooltip({
+                                        publishDiff: publishDiff!,
+                                        resolvePublisherName,
+                                        detail:
+                                          publishDiffSummary.cellBadge.detail,
+                                      }),
+                                    };
                                   }
-                                : getStyleByIdOrLabel(label, cellCodeIds[0]);
-                              const codeEntry0 =
-                                cellCodeIds[0] != null
-                                  ? shiftCodeById.get(cellCodeIds[0])
-                                  : undefined;
-                              const cat0 =
-                                codeEntry0?.categoryId != null
-                                  ? categoryById.get(codeEntry0.categoryId)
-                                  : undefined;
-                              const isOvernight =
-                                !isAbsence &&
-                                isOvernightTimes(
-                                  customTimes?.start ??
-                                    codeEntry0?.defaultStartTime ??
-                                    cat0?.startTime,
-                                  customTimes?.end ??
-                                    codeEntry0?.defaultEndTime ??
-                                    cat0?.endTime,
-                                );
-                              const isCross =
-                                !isAbsence &&
-                                label !== "X" &&
-                                codeEntry0?.focusAreaId != null &&
-                                sectionFocusArea != null &&
-                                codeEntry0.focusAreaId !== sectionFocusArea.id;
-                              const crossHomeFa = isCross
-                                ? focusAreas.find(
-                                    (fa) => fa.id === codeEntry0!.focusAreaId,
-                                  )
-                                : undefined;
-                              // Compute effective border: draft indicators use dashed border
-                              const absenceBorder = isAbsence
-                                ? `1px solid ${cellAbsenceType!.border}`
-                                : `1px solid ${borderColor(style.text)}`;
-                              const effectiveBorder = draftKind
-                                ? getDraftBorder(draftKind, absenceBorder)
-                                : absenceBorder;
-                              const singleBottomInset = hasStackedLayout
-                                ? shouldShowAuthorName && publishBadge
-                                  ? "32px"
-                                  : "20px"
-                                : customTimes
-                                  ? "3px"
-                                  : "4px";
+                                  const publishRingKind =
+                                    publishBadge?.kind === "new" ||
+                                    publishBadge?.kind === "modified"
+                                      ? publishBadge.kind
+                                      : null;
 
-                              return (
-                                <>
-                                  <div
-                                    style={{
-                                      position: "absolute",
-                                      top: customTimes ? "3px" : "4px",
-                                      right: "4px",
-                                      bottom: singleBottomInset,
-                                      left: "4px",
-                                      background: isCross
-                                        ? "var(--color-surface)"
-                                        : style.color,
-                                      opacity:
-                                        draftKind === "deleted" ? 0.5 : 1,
-                                      border: effectiveBorder,
-                                      borderRadius: 8,
-                                      color: style.text,
-                                      boxShadow:
-                                        pillPublishStatus(0) === "new" ||
-                                        pillPublishStatus(0) === "modified"
-                                          ? getPublishDiffBoxShadow(
-                                              pillPublishStatus(0)!,
-                                              borderColor(style.text),
-                                            )
-                                          : "none",
-                                      cursor: "pointer",
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      alignItems: "center",
-                                      justifyContent:
-                                        showDiffOverlay &&
-                                        draftKind &&
-                                        draftKind !== "deleted"
-                                          ? "flex-start"
-                                          : "center",
-                                      padding: isNameMode
-                                        ? "2px 6px"
-                                        : "2px 3px",
-                                      paddingTop:
-                                        showDiffOverlay &&
-                                        draftKind &&
-                                        draftKind !== "deleted"
-                                          ? 4
-                                          : 2,
-                                      paddingLeft:
-                                        isCross && crossHomeFa
-                                          ? 20
-                                          : isNameMode
-                                            ? 6
-                                            : 3,
-                                      overflow: "hidden",
-                                      textDecoration:
-                                        draftKind === "deleted"
-                                          ? "line-through"
-                                          : "none",
-                                    }}
-                                  >
-                                    {isCross && crossHomeFa && (
-                                      <span
-                                        style={{
-                                          position: "absolute",
-                                          top: 0,
-                                          bottom: 0,
-                                          left: 0,
-                                          display: "flex",
-                                          alignItems: "center",
-                                          fontSize: "var(--dg-fs-footnote)",
-                                          fontWeight: 800,
-                                          lineHeight: 1,
-                                          background:
-                                            "var(--color-bg-secondary)",
-                                          color: "var(--color-text-secondary)",
-                                          borderRadius: "2px 0 0 2px",
-                                          padding: "0 3px",
-                                          letterSpacing: "0.02em",
-                                          pointerEvents: "none",
-                                        }}
-                                      >
-                                        {getFocusAreaInitials(crossHomeFa.name)}
-                                      </span>
-                                    )}
-                                    <MaybeHint
-                                      content={isNameMode ? label : undefined}
-                                      side="top"
-                                    >
-                                      <span
-                                        style={
-                                        isNameMode
-                                          ? {
-                                              fontSize: "var(--dg-fs-caption)",
-                                              fontWeight: 800,
-                                              lineHeight: 1.2,
-                                              textAlign: "center" as const,
-                                              maxWidth: "100%",
-                                              overflowWrap:
-                                                "break-word" as const,
-                                              display: "-webkit-box",
-                                              WebkitBoxOrient:
-                                                "vertical" as const,
-                                              WebkitLineClamp: customTimes
-                                                ? 1
-                                                : 2,
-                                              overflow: "hidden",
-                                            }
-                                          : {
-                                              fontSize: "var(--dg-fs-title)",
-                                              fontWeight: 800,
-                                              lineHeight: 1,
-                                            }
+                                  let draftBadge: GridDiffBadgeConfig | null =
+                                    null;
+                                  if (
+                                    showsDraftBadge &&
+                                    draftDiff?.cellBadge &&
+                                    draftDiff.cellBadge.text === "Changed"
+                                  ) {
+                                    draftBadge = {
+                                      source: "draft",
+                                      kind: draftDiff.cellBadge.kind,
+                                      text: draftDiff.cellBadge.text,
+                                      tooltip: draftDiff.cellBadge.detail,
+                                    };
+                                  }
+
+                                  const buildPillBadge = (args: {
+                                    source: "publish" | "draft";
+                                    descriptor:
+                                      | ShiftDiffBadgeDescriptor
+                                      | null
+                                      | undefined;
+                                  }): GridDiffBadgeConfig | null => {
+                                    const { source, descriptor } = args;
+                                    if (
+                                      !descriptor ||
+                                      (descriptor.kind === "new" &&
+                                        descriptor.text === "New")
+                                    ) {
+                                      return null;
+                                    }
+
+                                    return {
+                                      source,
+                                      kind: descriptor.kind,
+                                      text: descriptor.text,
+                                      tooltip:
+                                        source === "publish" && publishDiff
+                                          ? buildPublishTooltip({
+                                              publishDiff,
+                                              resolvePublisherName,
+                                              detail: descriptor.detail,
+                                            })
+                                          : descriptor.detail,
+                                    };
+                                  };
+
+                                  if (labels.length === 1) {
+                                    const label = labels[0];
+                                    const isAbsence = cellAbsenceType != null;
+                                    const style = isAbsence
+                                      ? {
+                                          ...getStyleByIdOrLabel(
+                                            label,
+                                            cellCodeIds[0],
+                                          ),
+                                          color: cellAbsenceType!.color,
+                                          text: cellAbsenceType!.text,
                                         }
-                                      >
-                                        {label}
-                                        {!customTimes && isOvernight && (
-                                          <sup
-                                            style={{
-                                              fontSize: "0.5em",
-                                              fontWeight: 700,
-                                              opacity: 0.5,
-                                              marginLeft: 1,
-                                            }}
-                                          >
-                                            +1
-                                          </sup>
-                                        )}
-                                      </span>
-                                    </MaybeHint>
-                                    {customTimes && (
-                                      <span
-                                        style={{
-                                          fontSize: "var(--dg-fs-footnote)",
-                                          fontWeight: 500,
-                                          lineHeight: 1,
-                                          marginTop: 4,
-                                          opacity: 0.7,
-                                          letterSpacing: "0.02em",
-                                        }}
-                                      >
-                                        {fmt12hShort(customTimes.start)}–
-                                        {fmt12hShort(customTimes.end)}
-                                        {isOvernight && (
-                                          <sup
-                                            style={{
-                                              fontSize: "0.7em",
-                                              fontWeight: 700,
-                                              marginLeft: 1,
-                                              opacity: 1,
-                                            }}
-                                          >
-                                            +1
-                                          </sup>
-                                        )}
-                                      </span>
-                                    )}
-                                    {showDiffOverlay &&
-                                      draftKind === "modified" &&
-                                      publishedLabel &&
-                                      shiftCode !== publishedLabel && (
-                                        <MaybeHint
-                                          content={
-                                            isNameMode
-                                              ? `was: ${publishedLabel}`
-                                              : undefined
-                                          }
-                                          side="top"
-                                        >
-                                          <span
-                                            style={{
-                                            position: "absolute",
-                                            bottom: 2,
-                                            left: "50%",
-                                            transform: "translateX(-50%)",
-                                            fontSize: "var(--dg-fs-label)",
-                                            fontWeight: 700,
-                                            color: "var(--color-warning)",
-                                            whiteSpace: "nowrap",
-                                            pointerEvents: "none",
-                                            lineHeight: 1,
-                                            maxWidth: "calc(100% - 8px)",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            }}
-                                          >
-                                            was: {publishedLabel}
-                                          </span>
-                                        </MaybeHint>
-                                      )}
-                                    {showDiffOverlay && draftKind === "new" && (
-                                      <span
-                                        style={{
-                                          position: "absolute",
-                                          bottom: 2,
-                                          left: "50%",
-                                          transform: "translateX(-50%)",
-                                          fontSize: "var(--dg-fs-label)",
-                                          fontWeight: 800,
-                                          color: "var(--color-success-text)",
-                                          whiteSpace: "nowrap",
-                                          pointerEvents: "none",
-                                        }}
-                                      >
-                                        new
-                                      </span>
-                                    )}
-                                    {noteTypes.length > 0 && (
-                                      <div
-                                        style={{
-                                          position: "absolute",
-                                          bottom:
-                                            showDiffOverlay && draftKind
-                                              ? 15
-                                              : 3,
-                                          right: 4,
-                                          display: "flex",
-                                          gap: 2,
-                                        }}
-                                      >
-                                        {indicatorTypes
-                                          .filter((ind) =>
-                                            noteTypes.includes(ind.id),
-                                          )
-                                          .map((ind) => (
-                                            <MaybeHint
-                                              key={ind.name}
-                                              content={ind.name}
-                                              side="top"
-                                            >
-                                              <div
-                                                style={{
-                                                  width: 10,
-                                                  height: 10,
-                                                  borderRadius: "50%",
-                                                  background: ind.color,
-                                                  border:
-                                                    "1.5px solid rgba(255,255,255,0.9)",
-                                                  flexShrink: 0,
-                                                }}
-                                              />
-                                            </MaybeHint>
-                                          ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {shouldShowAuthorName && auditName && (
-                                    <span
-                                      style={{
-                                        position: "absolute",
-                                        bottom: publishBadge ? 16 : 2,
-                                        left: "50%",
-                                        transform: "translateX(-50%)",
-                                        maxWidth: "calc(100% - 12px)",
-                                        fontSize: "var(--dg-fs-micro)",
-                                        fontWeight: 600,
-                                        lineHeight: 1,
-                                        textAlign: "center",
-                                        color: "var(--color-text-muted)",
-                                        pointerEvents: "none",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                        padding: "1px 5px",
-                                        background: "var(--color-surface)",
-                                        borderRadius: 4,
-                                        border: "1px solid rgba(0,0,0,0.08)",
-                                        boxShadow:
-                                          "0 0.5px 1px rgba(0,0,0,0.06)",
-                                        zIndex: 2,
-                                        textDecoration: "none",
-                                      }}
-                                    >
-                                      {auditName}
-                                    </span>
-                                  )}
-                                  {publishBadge && (
-                                    <MaybeHint
-                                      content={publishBadge.tooltip}
-                                      side="top"
-                                    >
-                                      <span
-                                        style={{
-                                        position: "absolute",
-                                        bottom: 2,
-                                        left: "50%",
-                                        transform: "translateX(-50%)",
-                                        fontSize: "var(--dg-fs-footnote)",
-                                        fontWeight: 700,
-                                        lineHeight: 1,
-                                        color: publishBadge.color,
-                                        pointerEvents: publishBadge.tooltip
-                                          ? "auto"
-                                          : "none",
-                                        whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        {publishBadge.text}
-                                      </span>
-                                    </MaybeHint>
-                                  )}
-                                </>
-                              );
-                            }
-
-                            // Multi-pill: render each shift as a separate vertical pill
-                            const hasMultiPillLabel =
-                              (showDiffOverlay &&
-                                draftKind &&
-                                draftKind !== "deleted") ||
-                              publishBadge;
-                            const hasBottomLabel =
-                              hasMultiPillLabel || shouldShowAuthorName;
-                            const multiBottomInset = hasStackedLayout
-                              ? hasMultiPillLabel && shouldShowAuthorName
-                                ? "32px"
-                                : "20px"
-                              : hasBottomLabel
-                                ? "16px"
-                                : "3px";
-                            // When cell is 'modified' but all codes match published, it's a metadata-only
-                            // change (custom times, notes, etc.) — all pills should show dashed borders.
-                            const isMetadataOnlyChange =
-                              draftKind === "modified" &&
-                              publishedCodeIds.length > 0 &&
-                              cellCodeIds.length === publishedCodeIds.length &&
-                              cellCodeIds.every(
-                                (id, i) => id === publishedCodeIds[i],
-                              );
-                            return (
-                              <>
-                                <div
-                                  style={{
-                                    position: "absolute",
-                                    top: "3px",
-                                    right: "3px",
-                                    bottom: multiBottomInset,
-                                    left: "3px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: 1,
-                                    alignItems: "stretch",
-                                    opacity: draftKind === "deleted" ? 0.5 : 1,
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "row",
-                                      gap: 1,
-                                      flex: 1,
-                                      minHeight: 0,
-                                      alignItems: "stretch",
-                                    }}
-                                  >
-                                    {labels.map((label, li) => {
-                                      const style = getStyleByIdOrLabel(
-                                        label,
-                                        cellCodeIds[li],
-                                      );
-                                      const codeEntryLi =
-                                        cellCodeIds[li] != null
-                                          ? shiftCodeById.get(cellCodeIds[li])
-                                          : undefined;
-                                      const isCross =
-                                        label !== "X" &&
-                                        codeEntryLi?.focusAreaId != null &&
-                                        sectionFocusArea != null &&
-                                        codeEntryLi.focusAreaId !==
-                                          sectionFocusArea.id;
-                                      const crossHomeFaLi = isCross
-                                        ? focusAreas.find(
-                                            (fa) =>
-                                              fa.id ===
-                                              codeEntryLi!.focusAreaId,
+                                      : getStyleByIdOrLabel(
+                                          label,
+                                          cellCodeIds[0],
+                                        );
+                                    const codeEntry0 =
+                                      cellCodeIds[0] != null
+                                        ? assignmentById.get(cellCodeIds[0])
+                                        : undefined;
+                                    const cat0 =
+                                      codeEntry0?.categoryId != null
+                                        ? categoryById.get(
+                                            codeEntry0.categoryId,
                                           )
                                         : undefined;
-                                      const isNewPill =
-                                        draftKind &&
-                                        publishedCodeIds.length > 0 &&
-                                        cellCodeIds[li] != null &&
-                                        !publishedCodeIds.includes(
-                                          cellCodeIds[li],
-                                        );
-                                      const isExistingPillEdited =
-                                        draftKind === "modified" &&
-                                        publishedCodeIds.includes(
-                                          cellCodeIds[li],
-                                        ) &&
-                                        cellHasTimeEdits;
-                                      const pillBorder =
-                                        isNewPill ||
-                                        draftKind === "new" ||
-                                        isMetadataOnlyChange ||
-                                        isExistingPillEdited
-                                          ? `2px dashed ${DRAFT_BORDER_COLORS[draftKind!]}`
-                                          : `1px solid ${borderColor(style.text)}`;
-                                      const pillTime =
-                                        customTimes?.perPill?.[li] ??
-                                        (li === 0 && !customTimes?.perPill
-                                          ? customTimes
-                                          : null);
-                                      const hasTime =
-                                        pillTime &&
-                                        (pillTime.start || pillTime.end);
-                                      const catLi =
-                                        codeEntryLi?.categoryId != null
-                                          ? categoryById.get(
-                                              codeEntryLi.categoryId,
-                                            )
-                                          : undefined;
-                                      const isPillOvernight = isOvernightTimes(
-                                        pillTime?.start ??
-                                          codeEntryLi?.defaultStartTime ??
-                                          catLi?.startTime,
-                                        pillTime?.end ??
-                                          codeEntryLi?.defaultEndTime ??
-                                          catLi?.endTime,
+                                    const isOvernight =
+                                      !isAbsence &&
+                                      isOvernightTimes(
+                                        customTimes?.start ??
+                                          codeEntry0?.defaultStartTime ??
+                                          cat0?.startTime,
+                                        customTimes?.end ??
+                                          codeEntry0?.defaultEndTime ??
+                                          cat0?.endTime,
                                       );
-
-                                      return (
+                                    const isCross =
+                                      !isAbsence &&
+                                      label !== "X" &&
+                                      codeEntry0?.focusAreaId != null &&
+                                      sectionFocusArea != null &&
+                                      codeEntry0.focusAreaId !==
+                                        sectionFocusArea.id;
+                                    const displayParts = isAbsence
+                                      ? {
+                                          primaryLabel: label,
+                                          secondaryLabel: null,
+                                        }
+                                      : getDisplayPartsByIdOrLabel(
+                                          label,
+                                          cellCodeIds[0],
+                                        );
+                                    const crossHomeFa = isCross
+                                      ? focusAreas.find(
+                                          (fa) =>
+                                            fa.id === codeEntry0!.focusAreaId,
+                                        )
+                                      : undefined;
+                                    const singleDraftDiffBorderKind: ShiftDiffBorderKind =
+                                      draftDiff?.pillDiffs[0]?.borderKind ??
+                                      (draftKind === "new" ||
+                                      draftKind === "modified"
+                                        ? draftKind
+                                        : null);
+                                    const singleDraftBorderKind: DraftKind =
+                                      singleDraftDiffBorderKind ?? draftKind;
+                                    const singlePublishRingKind =
+                                      publishDiffSummary?.pillDiffs[0]
+                                        ?.borderKind ?? publishRingKind;
+                                    const singleBottomInset = customTimes
+                                      ? "3px"
+                                      : "4px";
+                                    const singleAuthorLeftInset =
+                                      5 + leadingDividerInset;
+                                    const singleAuthorBottomInset =
+                                      (customTimes ? 3 : 4) + 1;
+                                    const singleUsesShiftColor =
+                                      shouldUseShiftColorForDiffState({
+                                        isCross,
+                                        draftBadge,
+                                        publishBadge,
+                                        draftBorderKind:
+                                          singleDraftDiffBorderKind,
+                                        publishBorderKind:
+                                          singlePublishRingKind,
+                                      });
+                                    const singleForegroundColor =
+                                      singleUsesShiftColor
+                                        ? style.text
+                                        : getReadableTextOnSurface(
+                                            style.color,
+                                            style.text,
+                                          );
+                                    // Compute effective border: draft indicators use dashed border
+                                    const absenceBorder = isAbsence
+                                      ? `1px solid ${cellAbsenceType!.border}`
+                                      : `1px solid ${borderColor(singleForegroundColor)}`;
+                                    const effectiveBorder =
+                                      singleDraftBorderKind
+                                        ? getDraftBorder(
+                                            singleDraftBorderKind,
+                                            absenceBorder,
+                                          )
+                                        : absenceBorder;
+                                    const singlePillBadge =
+                                      (showsDraftBadge && draftBadge == null
+                                        ? buildPillBadge({
+                                            source: "draft",
+                                            descriptor:
+                                              draftDiff?.pillDiffs[0]?.badge,
+                                          })
+                                        : null) ??
+                                      (publishBadge == null
+                                        ? buildPillBadge({
+                                            source: "publish",
+                                            descriptor:
+                                              publishDiffSummary?.pillDiffs[0]
+                                                ?.badge,
+                                          })
+                                        : null);
+                                    const singleHasRaisedDiffBadge = !!(
+                                      singlePillBadge ||
+                                      draftBadge ||
+                                      publishBadge
+                                    );
+                                    const singleCrossFocusPill =
+                                      isCross && crossHomeFa
+                                        ? crossHomeFa
+                                        : null;
+                                    const singleCrossFocusPalette =
+                                      getCrossFocusBadgePalette(style);
+                                    const showSingleSecondaryLine =
+                                      !!displayParts.secondaryLabel;
+                                    const singleDisplayLabel =
+                                      displayParts.primaryLabel;
+                                    return (
+                                      <>
                                         <div
-                                          key={li}
+                                          data-shift-pill="single"
                                           style={{
-                                            flex: 1,
-                                            background: isCross
-                                              ? "var(--color-surface)"
-                                              : style.color,
-                                            border:
-                                              draftKind === "deleted"
-                                                ? getDraftBorder(
-                                                    draftKind,
-                                                    `1px solid ${borderColor(style.text)}`,
-                                                  )
-                                                : pillBorder,
-                                            borderRadius: 6,
-                                            color: style.text,
-                                            boxShadow: (() => {
-                                              const ps = pillPublishStatus(li);
-                                              return ps === "new" ||
-                                                ps === "modified"
+                                            position: "absolute",
+                                            top: insetFromVisibleCellTop(
+                                              singleHasRaisedDiffBadge
+                                                ? RAISED_DIFF_BADGE_TOP_INSET
+                                                : customTimes
+                                                  ? 3
+                                                  : 4,
+                                            ),
+                                            right: "4px",
+                                            bottom: singleBottomInset,
+                                            left: insetFromVisibleCellLeft(4),
+                                            background: singleUsesShiftColor
+                                              ? style.color
+                                              : "var(--color-surface)",
+                                            opacity:
+                                              draftKind === "deleted" ? 0.5 : 1,
+                                            border: effectiveBorder,
+                                            borderRadius:
+                                              SINGLE_SHIFT_PILL_RADIUS,
+                                            color: singleForegroundColor,
+                                            boxShadow:
+                                              singlePublishRingKind === "new" ||
+                                              singlePublishRingKind ===
+                                                "modified"
                                                 ? getPublishDiffBoxShadow(
-                                                    ps,
-                                                    borderColor(style.text),
+                                                    singlePublishRingKind,
+                                                    borderColor(
+                                                      singleForegroundColor,
+                                                    ),
                                                   )
-                                                : "none";
-                                            })(),
+                                                : "none",
+                                            cursor: "pointer",
                                             display: "flex",
                                             flexDirection: "column",
                                             alignItems: "center",
                                             justifyContent: "center",
-                                            gap: 1,
-                                            fontSize: isNameMode
-                                              ? "var(--dg-fs-micro)"
-                                              : "var(--dg-fs-caption)",
-                                            fontWeight: 800,
-                                            position: "relative",
-                                            cursor: "pointer",
+                                            padding: isNameMode
+                                              ? "2px 6px"
+                                              : "2px 3px",
+                                            paddingTop: 2,
+                                            paddingLeft:
+                                              singleCrossFocusPill
+                                                ? SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                : isNameMode
+                                                  ? 6
+                                                  : 3,
+                                            overflow: singlePillBadge
+                                              ? "visible"
+                                              : "hidden",
                                             textDecoration:
                                               draftKind === "deleted"
                                                 ? "line-through"
                                                 : "none",
-                                            lineHeight: isNameMode ? 1.2 : 1,
-                                            overflow: "hidden",
-                                            minWidth: 0,
-                                            padding: isNameMode
-                                              ? "2px 4px"
-                                              : "2px 3px",
-                                            paddingLeft:
-                                              isCross && crossHomeFaLi
-                                                ? 18
-                                                : isNameMode
-                                                  ? 4
-                                                  : 3,
                                           }}
                                         >
-                                          {isCross && crossHomeFaLi && (
+                                          {singlePillBadge && (
+                                            <GridDiffBadge
+                                              badge={{
+                                                ...singlePillBadge,
+                                                topOffset: -8,
+                                                leftOffset: 4,
+                                              }}
+                                            />
+                                          )}
+                                          {singleCrossFocusPill && (
                                             <span
                                               style={{
                                                 position: "absolute",
@@ -2011,61 +2251,78 @@ const SectionBlock = memo(function SectionBlock({
                                                 left: 0,
                                                 display: "flex",
                                                 alignItems: "center",
-                                                fontSize: "var(--dg-fs-micro)",
+                                                fontSize:
+                                                  "var(--dg-fs-footnote)",
                                                 fontWeight: 800,
                                                 lineHeight: 1,
                                                 background:
-                                                  "var(--color-bg-secondary)",
+                                                  singleCrossFocusPalette.background,
                                                 color:
-                                                  "var(--color-text-secondary)",
+                                                  singleCrossFocusPalette.color,
                                                 borderRadius: "2px 0 0 2px",
-                                                padding: "0 2px",
+                                                padding: "0 3px",
                                                 letterSpacing: "0.02em",
                                                 pointerEvents: "none",
                                               }}
                                             >
                                               {getFocusAreaInitials(
-                                                crossHomeFaLi.name,
+                                                singleCrossFocusPill.name,
                                               )}
                                             </span>
                                           )}
-                                          <MaybeHint
-                                            content={
-                                              isNameMode ? label : undefined
-                                            }
-                                            side="top"
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              flexDirection: "column",
+                                              alignItems: "center",
+                                              gap: showSingleSecondaryLine
+                                                ? 1
+                                                : 0,
+                                              maxWidth: "100%",
+                                              minWidth: 0,
+                                            }}
                                           >
                                             <span
                                               style={
-                                              isNameMode
-                                                ? {
-                                                    textAlign:
-                                                      "center" as const,
-                                                    maxWidth: "100%",
-                                                    overflowWrap:
-                                                      "break-word" as const,
-                                                    display: "-webkit-box",
-                                                    WebkitBoxOrient:
-                                                      "vertical" as const,
-                                                    WebkitLineClamp: hasTime
-                                                      ? 1
-                                                      : 2,
-                                                    overflow: "hidden",
-                                                    lineHeight: 1.2,
-                                                  }
-                                                : {
-                                                    whiteSpace: "nowrap",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    maxWidth: "100%",
-                                                  }
+                                                isNameMode
+                                                  ? {
+                                                      fontSize:
+                                                        "var(--dg-fs-caption)",
+                                                      fontWeight: 800,
+                                                      lineHeight: 1.2,
+                                                      textAlign:
+                                                        "center" as const,
+                                                      maxWidth: "100%",
+                                                      overflowWrap:
+                                                        "break-word" as const,
+                                                      display: "-webkit-box",
+                                                      WebkitBoxOrient:
+                                                        "vertical" as const,
+                                                      WebkitLineClamp:
+                                                        showSingleSecondaryLine
+                                                          ? 1
+                                                          : customTimes
+                                                            ? 1
+                                                            : 2,
+                                                      overflow: "hidden",
+                                                    }
+                                                  : {
+                                                      fontSize:
+                                                        "var(--dg-fs-title)",
+                                                      fontWeight: 800,
+                                                      lineHeight: 1,
+                                                      whiteSpace: "nowrap",
+                                                      overflow: "hidden",
+                                                      textOverflow: "ellipsis",
+                                                      maxWidth: "100%",
+                                                    }
                                               }
                                             >
-                                              {label}
-                                              {!hasTime && isPillOvernight && (
+                                              {singleDisplayLabel}
+                                              {!customTimes && isOvernight && (
                                                 <sup
                                                   style={{
-                                                    fontSize: "0.65em",
+                                                    fontSize: "0.5em",
                                                     fontWeight: 700,
                                                     opacity: 0.5,
                                                     marginLeft: 1,
@@ -2075,26 +2332,42 @@ const SectionBlock = memo(function SectionBlock({
                                                 </sup>
                                               )}
                                             </span>
-                                          </MaybeHint>
-                                          {hasTime && (
+                                            {showSingleSecondaryLine ? (
+                                              <span
+                                                style={{
+                                                  fontSize:
+                                                    "var(--dg-fs-footnote)",
+                                                  fontWeight: 700,
+                                                  lineHeight: 1,
+                                                  opacity: 0.78,
+                                                  whiteSpace: "nowrap",
+                                                  overflow: "hidden",
+                                                  textOverflow: "ellipsis",
+                                                  maxWidth: "100%",
+                                                }}
+                                              >
+                                                {displayParts.secondaryLabel}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                          {customTimes && (
                                             <span
                                               style={{
-                                                fontSize: "var(--dg-fs-micro)",
+                                                fontSize:
+                                                  "var(--dg-fs-footnote)",
                                                 fontWeight: 500,
-                                                opacity: 0.7,
                                                 lineHeight: 1,
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                maxWidth: "100%",
+                                                marginTop: 4,
+                                                opacity: 0.7,
+                                                letterSpacing: "0.02em",
                                               }}
                                             >
-                                              {fmt12hShort(pillTime!.start)}–
-                                              {fmt12hShort(pillTime!.end)}
-                                              {isPillOvernight && (
+                                              {fmt12hShort(customTimes.start)}–
+                                              {fmt12hShort(customTimes.end)}
+                                              {isOvernight && (
                                                 <sup
                                                   style={{
-                                                    fontSize: "0.65em",
+                                                    fontSize: "0.7em",
                                                     fontWeight: 700,
                                                     marginLeft: 1,
                                                     opacity: 1,
@@ -2105,503 +2378,896 @@ const SectionBlock = memo(function SectionBlock({
                                               )}
                                             </span>
                                           )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  {noteTypes.length > 0 && (
-                                    <div
-                                      style={{
-                                        position: "absolute",
-                                        top: 2,
-                                        right: 2,
-                                        display: "flex",
-                                        gap: 2,
-                                        zIndex: 1,
-                                      }}
-                                    >
-                                      {indicatorTypes
-                                        .filter((ind) =>
-                                          noteTypes.includes(ind.id),
-                                        )
-                                        .map((ind) => (
-                                          <MaybeHint
-                                            key={ind.name}
-                                            content={ind.name}
-                                            side="top"
-                                          >
+                                          {noteTypes.length > 0 && (
                                             <div
                                               style={{
-                                                width: 10,
-                                                height: 10,
-                                                borderRadius: "50%",
-                                                background: ind.color,
-                                                border:
-                                                  "1.5px solid rgba(255,255,255,0.9)",
-                                                flexShrink: 0,
+                                                position: "absolute",
+                                                bottom: shouldShowAuthorName
+                                                  ? 18
+                                                  : 3,
+                                                right: 4,
+                                                display: "flex",
+                                                gap: 2,
+                                              }}
+                                            >
+                                              {indicatorTypes
+                                                .filter((ind) =>
+                                                  noteTypes.includes(ind.id),
+                                                )
+                                                .map((ind) => (
+                                                  <MaybeHint
+                                                    key={ind.name}
+                                                    content={ind.name}
+                                                    side="top"
+                                                  >
+                                                    <div
+                                                      style={{
+                                                        width: 10,
+                                                        height: 10,
+                                                        borderRadius: "50%",
+                                                        background: ind.color,
+                                                        border:
+                                                          "1.5px solid rgba(255,255,255,0.9)",
+                                                        flexShrink: 0,
+                                                      }}
+                                                    />
+                                                  </MaybeHint>
+                                                ))}
+                                            </div>
+                                          )}
+                                          {(draftBadge || publishBadge) && (
+                                            <GridDiffBadge
+                                              badge={{
+                                                ...(draftBadge ??
+                                                  publishBadge!),
+                                                topOffset: -8,
+                                                rightOffset: 4,
                                               }}
                                             />
-                                          </MaybeHint>
-                                        ))}
-                                    </div>
-                                  )}
-                                </div>
-                                {shouldShowAuthorName && auditName && (
-                                  <span
-                                    style={{
-                                      position: "absolute",
-                                      bottom: hasMultiPillLabel ? 16 : 2,
-                                      left: "50%",
-                                      transform: "translateX(-50%)",
-                                      maxWidth: "calc(100% - 12px)",
-                                      fontSize: "var(--dg-fs-micro)",
-                                      fontWeight: 600,
-                                      lineHeight: 1,
-                                      textAlign: "center",
-                                      color: "var(--color-text-muted)",
-                                      pointerEvents: "none",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                      padding: "1px 5px",
-                                      background: "var(--color-surface)",
-                                      borderRadius: 4,
-                                      border: "1px solid rgba(0,0,0,0.08)",
-                                      boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
-                                      zIndex: 2,
-                                      textDecoration: "none",
-                                    }}
-                                  >
-                                    {auditName}
-                                  </span>
-                                )}
-                                {showDiffOverlay &&
-                                  draftKind === "modified" &&
-                                  publishedLabel &&
-                                  shiftCode !== publishedLabel && (
-                                    <MaybeHint
-                                      content={
-                                        isNameMode
-                                          ? `was: ${publishedLabel}`
-                                          : undefined
-                                      }
-                                      side="top"
-                                    >
-                                      <span
+                                          )}
+                                        </div>
+                                        {shouldShowAuthorName && auditName && (
+                                          <AuthorBadge
+                                            name={auditName}
+                                            leftInset={singleAuthorLeftInset}
+                                            rightInset={
+                                              noteTypes.length > 0 ? 21 : 5
+                                            }
+                                            bottomInset={
+                                              singleAuthorBottomInset
+                                            }
+                                          />
+                                        )}
+                                      </>
+                                    );
+                                  }
+
+                                  // Multi-pill: render each shift as a separate vertical pill
+                                  const multiBottomInset = "3px";
+                                  const multiAuthorLeftInset =
+                                    4 + leadingDividerInset;
+                                  const multiHasRaisedDiffBadge =
+                                    showsDraftBadge || showsPublishDiff;
+                                  return (
+                                    <>
+                                      <div
                                         style={{
-                                        position: "absolute",
-                                        bottom: 2,
-                                        left: "50%",
-                                        transform: "translateX(-50%)",
-                                        fontSize: "var(--dg-fs-footnote)",
-                                        fontWeight: 700,
-                                        color: "var(--color-warning)",
-                                        whiteSpace: "nowrap",
-                                        pointerEvents: "none",
-                                        lineHeight: 1,
-                                        zIndex: 1,
-                                        maxWidth: "calc(100% - 8px)",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
+                                          position: "absolute",
+                                          top: insetFromVisibleCellTop(
+                                            multiHasRaisedDiffBadge
+                                              ? RAISED_DIFF_BADGE_TOP_INSET
+                                              : 3,
+                                          ),
+                                          right: "3px",
+                                          bottom: multiBottomInset,
+                                          left: insetFromVisibleCellLeft(3),
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: 1,
+                                          alignItems: "stretch",
+                                          opacity:
+                                            draftKind === "deleted" ? 0.5 : 1,
                                         }}
                                       >
-                                        was: {publishedLabel}
-                                      </span>
-                                    </MaybeHint>
-                                  )}
-                                {showDiffOverlay && draftKind === "new" && (
-                                  <span
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            flexDirection: "row",
+                                            gap: 1,
+                                            flex: 1,
+                                            minHeight: 0,
+                                            alignItems: "stretch",
+                                          }}
+                                        >
+                                          {labels.map((label, li) => {
+                                            const style = getStyleByIdOrLabel(
+                                              label,
+                                              cellCodeIds[li],
+                                            );
+                                            const codeEntryLi =
+                                              cellCodeIds[li] != null
+                                                ? assignmentById.get(
+                                                    cellCodeIds[li],
+                                                  )
+                                                : undefined;
+                                            const isCross =
+                                              label !== "X" &&
+                                              codeEntryLi?.focusAreaId !=
+                                                null &&
+                                              sectionFocusArea != null &&
+                                              codeEntryLi.focusAreaId !==
+                                                sectionFocusArea.id;
+                                            const displayParts =
+                                              getDisplayPartsByIdOrLabel(
+                                                label,
+                                                cellCodeIds[li],
+                                              );
+                                            const crossHomeFaLi = isCross
+                                              ? focusAreas.find(
+                                                  (fa) =>
+                                                    fa.id ===
+                                                    codeEntryLi!.focusAreaId,
+                                                )
+                                              : undefined;
+                                            const draftPillDiff = draftDiff
+                                              ?.pillDiffs[li] ?? {
+                                              borderKind:
+                                                draftKind === "new" ||
+                                                draftKind === "modified"
+                                                  ? draftKind
+                                                  : null,
+                                              badge: null,
+                                            };
+                                            const draftPillBorderKind: DraftKind =
+                                              draftPillDiff.borderKind ??
+                                              draftKind;
+                                            const publishRingStatus =
+                                              publishDiffSummary?.pillDiffs[li]
+                                                ?.borderKind ?? null;
+                                            const multiUsesShiftColor =
+                                              shouldUseShiftColorForDiffState({
+                                                isCross,
+                                                draftBadge,
+                                                publishBadge,
+                                                draftBorderKind:
+                                                  draftPillDiff.borderKind,
+                                                publishBorderKind:
+                                                  publishRingStatus,
+                                              });
+                                            const multiForegroundColor =
+                                              multiUsesShiftColor
+                                                ? style.text
+                                                : getReadableTextOnSurface(
+                                                    style.color,
+                                                    style.text,
+                                                  );
+                                            const pillBadge =
+                                              (showsDraftBadge &&
+                                              draftBadge == null
+                                                ? buildPillBadge({
+                                                    source: "draft",
+                                                    descriptor:
+                                                      draftDiff?.pillDiffs[li]
+                                                        ?.badge,
+                                                  })
+                                                : null) ??
+                                              (publishBadge == null
+                                                ? buildPillBadge({
+                                                    source: "publish",
+                                                    descriptor:
+                                                      publishDiffSummary
+                                                        ?.pillDiffs[li]?.badge,
+                                                  })
+                                                : null);
+                                            const pillBorder =
+                                              draftPillBorderKind
+                                                ? getDraftBorder(
+                                                    draftPillBorderKind,
+                                                    `1px solid ${borderColor(multiForegroundColor)}`,
+                                                  )
+                                                : `1px solid ${borderColor(multiForegroundColor)}`;
+                                            const pillTime =
+                                              customTimes?.perPill?.[li] ??
+                                              (li === 0 && !customTimes?.perPill
+                                                ? customTimes
+                                                : null);
+                                            const hasTime =
+                                              pillTime &&
+                                              (pillTime.start || pillTime.end);
+                                            const catLi =
+                                              codeEntryLi?.categoryId != null
+                                                ? categoryById.get(
+                                                    codeEntryLi.categoryId,
+                                                  )
+                                                : undefined;
+                                            const isPillOvernight =
+                                              isOvernightTimes(
+                                                pillTime?.start ??
+                                                  codeEntryLi?.defaultStartTime ??
+                                                  catLi?.startTime,
+                                                pillTime?.end ??
+                                                  codeEntryLi?.defaultEndTime ??
+                                                  catLi?.endTime,
+                                              );
+                                            const multiCrossFocusPill =
+                                              isCross && crossHomeFaLi
+                                                ? crossHomeFaLi
+                                                : null;
+                                            const multiCrossFocusPalette =
+                                              getCrossFocusBadgePalette(style);
+                                            const showMultiSecondaryLine =
+                                              !!displayParts.secondaryLabel;
+                                            const multiDisplayLabel =
+                                              displayParts.primaryLabel;
+
+                                            return (
+                                              <div
+                                                key={li}
+                                                data-shift-pill="multi"
+                                                style={{
+                                                  flex: 1,
+                                                  background:
+                                                    multiUsesShiftColor
+                                                      ? style.color
+                                                      : "var(--color-surface)",
+                                                  border: pillBorder,
+                                                  borderRadius:
+                                                    MULTI_SHIFT_PILL_RADIUS,
+                                                  color: multiForegroundColor,
+                                                  boxShadow: (() => {
+                                                    return publishRingStatus ===
+                                                      "new" ||
+                                                      publishRingStatus ===
+                                                        "modified"
+                                                      ? getPublishDiffBoxShadow(
+                                                          publishRingStatus,
+                                                          borderColor(
+                                                            multiForegroundColor,
+                                                          ),
+                                                        )
+                                                      : "none";
+                                                  })(),
+                                                  display: "flex",
+                                                  flexDirection: "column",
+                                                  alignItems: "center",
+                                                  justifyContent: "center",
+                                                  gap: 1,
+                                                  fontSize: isNameMode
+                                                    ? "var(--dg-fs-micro)"
+                                                    : "var(--dg-fs-caption)",
+                                                  fontWeight: 800,
+                                                  position: "relative",
+                                                  cursor: "pointer",
+                                                  textDecoration:
+                                                    draftKind === "deleted"
+                                                      ? "line-through"
+                                                      : "none",
+                                                  lineHeight: isNameMode
+                                                    ? 1.2
+                                                    : 1,
+                                                  overflow: pillBadge
+                                                    ? "visible"
+                                                    : "hidden",
+                                                  minWidth: 0,
+                                                  padding: isNameMode
+                                                    ? "2px 4px"
+                                                    : "2px 3px",
+                                                  paddingTop: 2,
+                                                  paddingLeft:
+                                                    multiCrossFocusPill
+                                                      ? MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING
+                                                      : isNameMode
+                                                        ? 4
+                                                        : 3,
+                                                }}
+                                              >
+                                                {pillBadge && (
+                                                  <GridDiffBadge
+                                                    badge={{
+                                                      ...pillBadge,
+                                                      topOffset: -8,
+                                                      leftOffset: 4,
+                                                    }}
+                                                  />
+                                                )}
+                                                {multiCrossFocusPill && (
+                                                  <span
+                                                    style={{
+                                                      position: "absolute",
+                                                      top: 0,
+                                                      bottom: 0,
+                                                      left: 0,
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      fontSize:
+                                                        "var(--dg-fs-micro)",
+                                                      fontWeight: 800,
+                                                      lineHeight: 1,
+                                                      background:
+                                                        multiCrossFocusPalette.background,
+                                                      color:
+                                                        multiCrossFocusPalette.color,
+                                                      borderRadius:
+                                                        "2px 0 0 2px",
+                                                      padding: "0 2px",
+                                                      letterSpacing: "0.02em",
+                                                      pointerEvents: "none",
+                                                    }}
+                                                  >
+                                                    {getFocusAreaInitials(
+                                                      multiCrossFocusPill.name,
+                                                    )}
+                                                  </span>
+                                                )}
+                                                <div
+                                                  style={{
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    alignItems: "center",
+                                                    gap: showMultiSecondaryLine
+                                                      ? 1
+                                                      : 0,
+                                                    maxWidth: "100%",
+                                                    minWidth: 0,
+                                                  }}
+                                                >
+                                                  <span
+                                                    style={
+                                                      isNameMode
+                                                        ? {
+                                                            textAlign:
+                                                              "center" as const,
+                                                            maxWidth: "100%",
+                                                            overflowWrap:
+                                                              "break-word" as const,
+                                                            display:
+                                                              "-webkit-box",
+                                                            WebkitBoxOrient:
+                                                              "vertical" as const,
+                                                            WebkitLineClamp:
+                                                              showMultiSecondaryLine
+                                                                ? 1
+                                                                : hasTime
+                                                                  ? 1
+                                                                  : 2,
+                                                            overflow: "hidden",
+                                                            lineHeight: 1.2,
+                                                          }
+                                                        : {
+                                                            whiteSpace:
+                                                              "nowrap",
+                                                            overflow: "hidden",
+                                                            textOverflow:
+                                                              "ellipsis",
+                                                            maxWidth: "100%",
+                                                          }
+                                                    }
+                                                  >
+                                                    {multiDisplayLabel}
+                                                    {!hasTime &&
+                                                      isPillOvernight && (
+                                                        <sup
+                                                          style={{
+                                                            fontSize: "0.65em",
+                                                            fontWeight: 700,
+                                                            opacity: 0.5,
+                                                            marginLeft: 1,
+                                                          }}
+                                                        >
+                                                          +1
+                                                        </sup>
+                                                      )}
+                                                  </span>
+                                                  {showMultiSecondaryLine ? (
+                                                    <span
+                                                      style={{
+                                                        fontSize:
+                                                          "var(--dg-fs-micro)",
+                                                        fontWeight: 700,
+                                                        opacity: 0.78,
+                                                        lineHeight: 1,
+                                                        whiteSpace: "nowrap",
+                                                        overflow: "hidden",
+                                                        textOverflow:
+                                                          "ellipsis",
+                                                        maxWidth: "100%",
+                                                      }}
+                                                    >
+                                                      {
+                                                        displayParts.secondaryLabel
+                                                      }
+                                                    </span>
+                                                  ) : null}
+                                                </div>
+                                                {hasTime && (
+                                                  <span
+                                                    style={{
+                                                      fontSize:
+                                                        "var(--dg-fs-micro)",
+                                                      fontWeight: 500,
+                                                      opacity: 0.7,
+                                                      lineHeight: 1,
+                                                      whiteSpace: "nowrap",
+                                                      overflow: "hidden",
+                                                      textOverflow: "ellipsis",
+                                                      maxWidth: "100%",
+                                                    }}
+                                                  >
+                                                    {fmt12hShort(
+                                                      pillTime!.start,
+                                                    )}
+                                                    –
+                                                    {fmt12hShort(pillTime!.end)}
+                                                    {isPillOvernight && (
+                                                      <sup
+                                                        style={{
+                                                          fontSize: "0.65em",
+                                                          fontWeight: 700,
+                                                          marginLeft: 1,
+                                                          opacity: 1,
+                                                        }}
+                                                      >
+                                                        +1
+                                                      </sup>
+                                                    )}
+                                                  </span>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                        {noteTypes.length > 0 && (
+                                          <div
+                                            style={{
+                                              position: "absolute",
+                                              top: 2,
+                                              right: 2,
+                                              display: "flex",
+                                              gap: 2,
+                                              zIndex: 1,
+                                            }}
+                                          >
+                                            {indicatorTypes
+                                              .filter((ind) =>
+                                                noteTypes.includes(ind.id),
+                                              )
+                                              .map((ind) => (
+                                                <MaybeHint
+                                                  key={ind.name}
+                                                  content={ind.name}
+                                                  side="top"
+                                                >
+                                                  <div
+                                                    style={{
+                                                      width: 10,
+                                                      height: 10,
+                                                      borderRadius: "50%",
+                                                      background: ind.color,
+                                                      border:
+                                                        "1.5px solid rgba(255,255,255,0.9)",
+                                                      flexShrink: 0,
+                                                    }}
+                                                  />
+                                                </MaybeHint>
+                                              ))}
+                                          </div>
+                                        )}
+                                        {(draftBadge || publishBadge) && (
+                                          <GridDiffBadge
+                                            badge={{
+                                              ...(draftBadge ?? publishBadge!),
+                                              topOffset:
+                                                noteTypes.length > 0 ? 8 : -8,
+                                              rightOffset:
+                                                noteTypes.length > 0 ? 14 : 3,
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                      {shouldShowAuthorName && auditName && (
+                                        <AuthorBadge
+                                          name={auditName}
+                                          leftInset={multiAuthorLeftInset}
+                                          rightInset={4}
+                                          bottomInset={4}
+                                        />
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </DraggableShift>
+                            ) : (showDiffOverlay &&
+                                draftKind === "deleted" &&
+                                publishedLabel) ||
+                              (showsPublishDiff &&
+                                publishDiff?.kind === "deleted" &&
+                                ((publishDiff.from ?? []).length > 0 ||
+                                  publishDiff.fromAbsenceTypeId != null ||
+                                  publishDiff.fromState?.kind === "worked" ||
+                                  publishDiff.fromState?.kind ===
+                                    "absence")) ? (
+                              (() => {
+                                const isDraftDelete = draftKind === "deleted";
+                                const publishDeletedFromIds =
+                                  publishDiff?.from ??
+                                  assignmentIdsFromPublishState(
+                                    publishDiff?.fromState,
+                                    assignmentIdByPair,
+                                  );
+                                const publishDeletedAbsenceTypeId =
+                                  publishDiff?.fromAbsenceTypeId ??
+                                  absenceTypeIdFromPublishState(
+                                    publishDiff?.fromState,
+                                  );
+                                const deletedLabel = isDraftDelete
+                                  ? publishedLabel!
+                                  : publishDeletedAbsenceTypeId != null
+                                    ? (() => {
+                                        const at = absenceTypeMap?.get(
+                                          Number(publishDeletedAbsenceTypeId),
+                                        );
+                                        return at
+                                          ? isNameMode
+                                            ? at.name
+                                            : at.label
+                                          : "?";
+                                      })()
+                                    : publishDeletedFromIds
+                                        .map((id) => {
+                                          const sc = assignmentById.get(id);
+                                          return sc
+                                            ? isNameMode
+                                              ? sc.name || sc.label
+                                              : sc.label
+                                            : "?";
+                                        })
+                                        .join("/");
+                                const deletedTooltip =
+                                  !isDraftDelete && publishDiff
+                                    ? buildPublishTooltip({
+                                        publishDiff,
+                                        resolvePublisherName,
+                                        detail: `Deleted ${deletedLabel}.`,
+                                      })
+                                    : undefined;
+                                const deletedPill = (
+                                  <div
+                                    data-shift-pill="deleted"
+                                    aria-label={
+                                      deletedTooltip ?? "Deleted shift"
+                                    }
                                     style={{
                                       position: "absolute",
-                                      bottom: 2,
-                                      left: "50%",
-                                      transform: "translateX(-50%)",
-                                      fontSize: "var(--dg-fs-footnote)",
-                                      fontWeight: 800,
-                                      color: "var(--color-success-text)",
-                                      whiteSpace: "nowrap",
-                                      pointerEvents: "none",
-                                      zIndex: 1,
+                                      top: insetFromVisibleCellTop(
+                                        RAISED_DIFF_BADGE_TOP_INSET,
+                                      ),
+                                      right: "4px",
+                                      bottom: "4px",
+                                      left: insetFromVisibleCellLeft(4),
+                                      background: "var(--color-danger-bg)",
+                                      border: isDraftDelete
+                                        ? "2px dashed var(--color-danger-dark)"
+                                        : "1px solid var(--color-danger-border)",
+                                      borderRadius: 8,
+                                      ...(isDraftDelete
+                                        ? {}
+                                        : {
+                                            boxShadow:
+                                              "0 0 0 1px var(--color-surface), 0 0 0 2.5px var(--color-danger-dark)",
+                                          }),
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      color: "var(--color-danger-dark)",
+                                      overflow: "visible",
                                     }}
                                   >
-                                    new
-                                  </span>
-                                )}
-                                {publishBadge && (
-                                  <MaybeHint
-                                    content={publishBadge.tooltip}
-                                    side="top"
-                                  >
+                                    <GridDiffBadge
+                                      badge={{
+                                        source: isDraftDelete
+                                          ? "draft"
+                                          : "publish",
+                                        kind: "deleted",
+                                        text: "Deleted",
+                                        tooltip: deletedTooltip,
+                                        topOffset: -8,
+                                        leftOffset: 4,
+                                      }}
+                                    />
                                     <span
                                       style={{
-                                      position: "absolute",
-                                      bottom: 2,
-                                      left: "50%",
-                                      transform: "translateX(-50%)",
-                                      fontSize: "var(--dg-fs-footnote)",
-                                      fontWeight: 700,
-                                      color: publishBadge.color,
-                                      whiteSpace: "nowrap",
-                                      pointerEvents: publishBadge.tooltip
-                                        ? "auto"
-                                        : "none",
-                                      lineHeight: 1,
-                                      zIndex: 1,
+                                        fontSize: "var(--dg-fs-title)",
+                                        fontWeight: 800,
+                                        lineHeight: 1,
                                       }}
                                     >
-                                      {publishBadge.text}
+                                      {deletedLabel}
                                     </span>
-                                  </MaybeHint>
+                                  </div>
+                                );
+                                return (
+                                  <>
+                                    {deletedPill}
+                                    {shouldShowAuthorName && auditName && (
+                                      <AuthorBadge
+                                        name={auditName}
+                                        leftInset={5 + leadingDividerInset}
+                                        rightInset={5}
+                                        bottomInset={5}
+                                      />
+                                    )}
+                                  </>
+                                );
+                              })()
+                            ) : (
+                              <>
+                                {shiftLabel === "OFF" && (
+                                  <span
+                                    style={{
+                                      fontSize: "var(--dg-fs-micro)",
+                                      fontWeight: 600,
+                                      color: "var(--color-text-faint)",
+                                      letterSpacing: "0.06em",
+                                      userSelect: "none",
+                                    }}
+                                  >
+                                    OFF
+                                  </span>
+                                )}
+                                {noteTypes.length > 0 && (
+                                  <div
+                                    style={{
+                                      position: "absolute",
+                                      top: 5,
+                                      right: 5,
+                                      display: "flex",
+                                      gap: 2,
+                                    }}
+                                  >
+                                    {indicatorTypes
+                                      .filter((ind) =>
+                                        noteTypes.includes(ind.id),
+                                      )
+                                      .map((ind) => (
+                                        <MaybeHint
+                                          key={ind.name}
+                                          content={ind.name}
+                                          side="top"
+                                        >
+                                          <div
+                                            style={{
+                                              width: 10,
+                                              height: 10,
+                                              borderRadius: "50%",
+                                              background: ind.color,
+                                              border:
+                                                "1.5px solid rgba(255,255,255,0.85)",
+                                              flexShrink: 0,
+                                            }}
+                                          />
+                                        </MaybeHint>
+                                      ))}
+                                  </div>
                                 )}
                               </>
-                            );
-                          })()}
-                        </DraggableShift>
-                      ) : (showDiffOverlay &&
-                          draftKind === "deleted" &&
-                          publishedLabel) ||
-                        (publishDiff?.kind === "deleted" &&
-                          (publishDiff.from.length > 0 ||
-                            publishDiff.fromAbsenceTypeId != null)) ? (
-                        (() => {
-                          const isDraftDelete = draftKind === "deleted";
-                          const deletedLabel = isDraftDelete
-                            ? publishedLabel!
-                            : publishDiff!.fromAbsenceTypeId != null
-                              ? (() => {
-                                  const at = absenceTypeMap?.get(
-                                    Number(publishDiff!.fromAbsenceTypeId),
-                                  );
-                                  return at
-                                    ? isNameMode
-                                      ? at.name
-                                      : at.label
-                                    : "?";
-                                })()
-                              : publishDiff!.from
-                                  .map((id) => {
-                                    const sc = shiftCodeById.get(id);
-                                    return sc
-                                      ? isNameMode
-                                        ? sc.name || sc.label
-                                        : sc.label
-                                      : "?";
-                                  })
-                                  .join("/");
-                          return (
-                            <>
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: "4px",
-                                  right: "4px",
-                                  bottom: auditName ? "16px" : "4px",
-                                  left: "4px",
-                                  background: "var(--color-danger-bg)",
-                                  border: isDraftDelete
-                                    ? "2px dashed var(--color-danger-dark)"
-                                    : "1px solid var(--color-danger-border)",
-                                  borderRadius: 8,
-                                  ...(isDraftDelete
-                                    ? {}
-                                    : {
-                                        boxShadow:
-                                          "0 0 0 1px var(--color-surface), 0 0 0 2.5px var(--color-danger-dark)",
-                                      }),
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: "var(--color-danger-dark)",
-                                  overflow: "hidden",
-                                }}
+                            )}
+                            {isLocked && cellLock && (
+                              <MaybeHint
+                                content={`Being edited by ${cellLock.userName}`}
+                                side="top"
                               >
                                 <span
                                   style={{
-                                    fontSize: "var(--dg-fs-title)",
-                                    fontWeight: 800,
-                                    lineHeight: 1,
-                                  }}
-                                >
-                                  {deletedLabel}
-                                </span>
-                                <span
-                                  style={{
-                                    fontSize: "var(--dg-fs-badge)",
-                                    fontWeight: 700,
-                                    lineHeight: 1,
-                                    color: "var(--color-danger-dark)",
-                                    pointerEvents: "none",
-                                    whiteSpace: "nowrap",
-                                    marginTop: 2,
-                                  }}
-                                >
-                                  Deleted
-                                </span>
-                              </div>
-                              {auditName && (
-                                <span
-                                  style={{
                                     position: "absolute",
-                                    bottom: 2,
-                                    left: "50%",
-                                    transform: "translateX(-50%)",
-                                    maxWidth: "calc(100% - 12px)",
-                                    fontSize: "var(--dg-fs-micro)",
-                                    fontWeight: 600,
+                                    top: 2,
+                                    right: 2,
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: "50%",
+                                    background: "var(--color-brand)",
+                                    color: "var(--color-text-inverse)",
+                                    fontSize: 9,
+                                    fontWeight: 700,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
                                     lineHeight: 1,
-                                    textAlign: "center",
-                                    color: "var(--color-text-muted)",
-                                    pointerEvents: "none",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                    padding: "1px 5px",
-                                    background: "var(--color-surface)",
-                                    borderRadius: 4,
-                                    border: "1px solid rgba(0,0,0,0.08)",
-                                    boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
                                     zIndex: 2,
-                                    textDecoration: "none",
+                                    pointerEvents: "none",
                                   }}
                                 >
-                                  {auditName}
+                                  {cellLock.userName
+                                    .split(/\s+/)
+                                    .map((w) => w[0])
+                                    .join("")
+                                    .toUpperCase()
+                                    .slice(0, 2)}
                                 </span>
-                              )}
-                            </>
-                          );
-                        })()
-                      ) : (
-                        <>
-                          {shiftCode === "OFF" && (
-                            <span
-                              style={{
-                                fontSize: "var(--dg-fs-micro)",
-                                fontWeight: 600,
-                                color: "var(--color-text-faint)",
-                                letterSpacing: "0.06em",
-                                userSelect: "none",
-                              }}
-                            >
-                              OFF
-                            </span>
-                          )}
-                          {noteTypes.length > 0 && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: 5,
-                                right: 5,
-                                display: "flex",
-                                gap: 2,
-                              }}
-                            >
-                              {indicatorTypes
-                                .filter((ind) => noteTypes.includes(ind.id))
-                                .map((ind) => (
-                                  <MaybeHint
-                                    key={ind.name}
-                                    content={ind.name}
-                                    side="top"
-                                  >
-                                    <div
-                                      style={{
-                                        width: 10,
-                                        height: 10,
-                                        borderRadius: "50%",
-                                        background: ind.color,
-                                        border:
-                                          "1.5px solid rgba(255,255,255,0.85)",
-                                        flexShrink: 0,
-                                      }}
-                                    />
-                                  </MaybeHint>
-                                ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {isLocked && cellLock && (
-                        <MaybeHint
-                          content={`Being edited by ${cellLock.userName}`}
-                          side="top"
-                        >
-                          <span
-                            style={{
-                              position: "absolute",
-                              top: 2,
-                              right: 2,
-                              width: 20,
-                              height: 20,
-                              borderRadius: "50%",
-                              background: "var(--color-brand)",
-                              color: "var(--color-text-inverse)",
-                              fontSize: 9,
-                              fontWeight: 700,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              lineHeight: 1,
-                              zIndex: 2,
-                              pointerEvents: "none",
-                            }}
-                          >
-                            {cellLock.userName
-                              .split(/\s+/)
-                              .map((w) => w[0])
-                              .join("")
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </span>
-                        </MaybeHint>
-                      )}
-                    </DroppableCell>
-                  );
-                  });
-                })()}
-              </div>
-            );
-          })}
-
-          {hasAnyTotals &&
-            totalRows.map((row, rowIndex) => {
-              const isLastRow = rowIndex === totalRows.length - 1;
-              return (
-                <div
-                  key={`total-row-${row.label}`}
-                  className="dg-row-enter"
-                  data-tally-row={`category-${row.categoryId}`}
-                  style={{
-                    ...rowGrid,
-                    borderTop:
-                      rowIndex === 0 ? "1px solid var(--color-border)" : undefined,
-                    background: "var(--color-surface)",
-                  }}
-                >
-                  <div
-                    data-tally-label={row.label}
-                    style={{
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 1,
-                      background: "var(--color-surface)",
-                      padding: "6px 14px",
-                      fontSize: "var(--dg-fs-badge)",
-                      fontWeight: 700,
-                      color: "var(--color-text-muted)",
-                      letterSpacing: "0.04em",
-                      display: "flex",
-                      alignItems: "center",
-                      borderRight: "1px solid var(--color-border-light)",
-                      borderBottom: isLastRow
-                        ? undefined
-                        : "1px solid var(--color-border-light)",
-                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-                    }}
-                  >
-                    <MaybeHint
-                      content={isNameMode ? row.label : undefined}
-                      side="top"
-                    >
-                      <span
-                        style={{
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {row.label}
-                      </span>
-                    </MaybeHint>
-                  </div>
-                  {weekDates.map((date, index) => {
-                    const count = row.counts[index] ?? 0;
-                    const required =
-                      categoryRequirementsByDay[index]?.[row.categoryId] ?? 0;
-                    const hasRequirement = required > 0;
-                    const isMet = count >= required;
-                    const displayValue =
-                      count > 0 || hasRequirement ? String(count) : "-";
-                    const hintContent = hasRequirement
-                      ? `${row.label}: ${count}/${required}`
-                      : count > 0
-                        ? `${row.label}: ${count}`
-                        : undefined;
-                    return (
-                      <div
-                        key={`${row.label}-${date.toISOString()}`}
-                        data-tally-count={`${row.categoryId}-${index}`}
-                        data-tally-status={
-                          hasRequirement ? (isMet ? "covered" : "short") : "none"
-                        }
-                        style={{
-                          textAlign: "center",
-                          padding: "8px 6px",
-                          borderLeft:
-                            splitAtIndex !== undefined && index === splitAtIndex
-                              ? "2px solid var(--color-dark)"
-                              : "1px solid var(--color-border-light)",
-                          borderBottom: isLastRow
-                            ? undefined
-                            : "1px solid var(--color-border-light)",
-                          fontSize: "var(--dg-fs-badge)",
-                          lineHeight: 1.4,
-                          color: hasRequirement
-                            ? isMet
-                              ? "var(--color-success-text)"
-                              : "var(--color-danger-dark)"
-                            : "var(--color-text-muted)",
-                          background: hasRequirement
-                            ? isMet
-                              ? "rgba(22, 163, 74, 0.12)"
-                              : "rgba(220, 38, 38, 0.12)"
-                            : "var(--color-surface)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 600,
-                          fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                        }}
-                      >
-                        {hintContent ? (
-                          <MaybeHint
-                            content={hintContent}
-                            side="top"
-                          >
-                            <span>{displayValue}</span>
-                          </MaybeHint>
-                        ) : (
-                          displayValue
-                        )}
-                      </div>
-                    );
-                  })}
+                              </MaybeHint>
+                            )}
+                          </div>
+                          <div
+                            className="dg-grid-cell__chrome"
+                            aria-hidden="true"
+                          />
+                        </DroppableCell>
+                      );
+                    });
+                  })()}
                 </div>
               );
             })}
-        </div>
+
+            {hasAnyTotals &&
+              totalRows.map((row, rowIndex) => {
+                const isLastRow = rowIndex === totalRows.length - 1;
+                return (
+                  <div
+                    key={`total-row-${row.label}`}
+                    className="dg-row-enter"
+                    data-tally-row={`category-${row.categoryId}`}
+                    style={{
+                      ...rowGrid,
+                      borderTop:
+                        rowIndex === 0
+                          ? "1px solid var(--color-border)"
+                          : undefined,
+                      background: "var(--color-surface)",
+                    }}
+                  >
+                    <div
+                      data-tally-label={row.label}
+                      style={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 1,
+                        background: "var(--color-surface)",
+                        padding: "6px 14px",
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        color: "var(--color-text-muted)",
+                        letterSpacing: "0.04em",
+                        display: "flex",
+                        alignItems: "center",
+                        borderBottom: isLastRow
+                          ? undefined
+                          : "1px solid var(--color-border-light)",
+                        boxShadow: joinBoxShadows(
+                          "1px 0 0 0 var(--color-border-light)",
+                          "2px 0 4px rgba(0,0,0,0.02)",
+                        ),
+                      }}
+                    >
+                      <MaybeHint
+                        content={isNameMode ? row.label : undefined}
+                        side="top"
+                      >
+                        <span
+                          style={{
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {row.label}
+                        </span>
+                      </MaybeHint>
+                    </div>
+                    {weekDates.map((date, index) => {
+                      const count = row.counts[index] ?? 0;
+                      const required =
+                        categoryRequirementsByDay[index]?.[row.categoryId] ?? 0;
+                      const hasRequirement = required > 0;
+                      const isMet = count >= required;
+                      const displayValue =
+                        count > 0 || hasRequirement ? String(count) : "-";
+                      const hintContent = hasRequirement
+                        ? `${row.label}: ${count}/${required}`
+                        : count > 0
+                          ? `${row.label}: ${count}`
+                          : undefined;
+                      return (
+                        <div
+                          key={`${row.label}-${date.toISOString()}`}
+                          className="dg-grid-slot dg-grid-slot--tally"
+                          data-tally-count={`${row.categoryId}-${index}`}
+                          data-tally-status={
+                            hasRequirement
+                              ? isMet
+                                ? "covered"
+                                : "short"
+                              : "none"
+                          }
+                          data-leading-divider={
+                            index === 0
+                              ? "none"
+                              : isSplitDayDivider(index)
+                                ? "split"
+                                : "light"
+                          }
+                          data-week-split-start={
+                            isSplitDayDivider(index) ? "true" : undefined
+                          }
+                          data-bottom-divider={isLastRow ? undefined : "light"}
+                          style={{
+                            position: "relative",
+                            textAlign: "center",
+                            padding: "8px 6px",
+                            fontSize: "var(--dg-fs-badge)",
+                            lineHeight: 1.4,
+                            color: hasRequirement
+                              ? isMet
+                                ? "var(--color-success-text)"
+                                : "var(--color-danger-dark)"
+                              : "var(--color-text-muted)",
+                            background: hasRequirement
+                              ? isMet
+                                ? "rgba(22, 163, 74, 0.12)"
+                                : "rgba(220, 38, 38, 0.12)"
+                              : "var(--color-surface)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 600,
+                            fontFamily:
+                              "var(--font-dm-mono), 'DM Mono', monospace",
+                          }}
+                        >
+                          <div
+                            className="dg-grid-slot__chrome"
+                            aria-hidden="true"
+                          />
+                          {hintContent ? (
+                            <MaybeHint content={hintContent} side="top">
+                              <span>{displayValue}</span>
+                            </MaybeHint>
+                          ) : (
+                            displayValue
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            {activeOutlineRect ? (
+              <div
+                className="dg-grid-active-outline"
+                aria-hidden="true"
+                style={{
+                  left: activeOutlineRect.left,
+                  top: activeOutlineRect.top,
+                  width: activeOutlineRect.width,
+                  height: activeOutlineRect.height,
+                }}
+              />
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
   );
 });
 
-const ScheduleGrid = memo(function ScheduleGrid({
+const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   filteredEmployees,
   allEmployees,
   week1,
   week2,
   spanWeeks,
   shiftForKey,
-  shiftCodeIdsForKey,
+  assignmentIdsForKey,
   getShiftStyle,
   handleCellClick,
   today,
   highlightEmpIds,
   focusAreas,
   departments,
-  shiftCodes,
+  assignments,
+  historicalAssignments = [],
   shiftCategories,
+  jobs = [],
   indicatorTypes = [],
   isCellInteractive = true,
   canDragShifts,
@@ -2610,10 +3276,13 @@ const ScheduleGrid = memo(function ScheduleGrid({
   certifications = [],
   orgRoles = [],
   getCustomShiftTimes,
+  getPublishedCustomShiftTimes,
   draftKindForKey,
   showDiffOverlay,
+  showPublishDiffOverlay,
   publishedLabelForKey,
-  publishedShiftCodeIdsForKey,
+  publishedAssignmentIdsForKey,
+  publishedAbsenceTypeIdForKey,
   hasTimeChangesForKey,
   publishDiffForKey,
   recentlyPublishedKeys,
@@ -2622,6 +3291,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
   createdByNameForKey,
   onCellHover,
   onCellContextMenu,
+  onCellFocus,
   coverageRequirements,
   absenceTypeMap,
   absenceTypeIdForKey,
@@ -2629,43 +3299,9 @@ const ScheduleGrid = memo(function ScheduleGrid({
   resolvePublisherName,
   openShifts,
   onClaimOpenShift,
-  selectedCellKey,
-}: ScheduleGridProps) {
-  const tooltipRef = useRef<HTMLDivElement>(null);
-  const tooltipTextRef = useRef<HTMLSpanElement>(null);
-  const tooltipVisibleRef = useRef(false);
+  activeCellId = null,
+}: LegacyScheduleGridProps) {
   const todayKey = useMemo(() => formatDateKey(today), [today]);
-
-  const showTooltipFn = useCallback((content: string, x: number, y: number) => {
-    const el = tooltipRef.current;
-    const textEl = tooltipTextRef.current;
-    if (!el || !textEl) return;
-    textEl.textContent = content;
-    el.style.left = `${x}px`;
-    el.style.top = `${y - 8}px`;
-    el.style.display = "block";
-    tooltipVisibleRef.current = true;
-  }, []);
-
-  const hideTooltipFn = useCallback(() => {
-    const el = tooltipRef.current;
-    if (!el) return;
-    el.style.display = "none";
-    tooltipVisibleRef.current = false;
-  }, []);
-
-  // Dismiss tooltip on scroll/resize so it doesn't float detached
-  useEffect(() => {
-    const dismiss = () => {
-      if (tooltipVisibleRef.current) hideTooltipFn();
-    };
-    window.addEventListener("scroll", dismiss, true);
-    window.addEventListener("resize", dismiss);
-    return () => {
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("resize", dismiss);
-    };
-  }, [hideTooltipFn]);
 
   const departmentSections = useMemo(() => {
     // Get scheduled departments, sorted
@@ -2723,7 +3359,6 @@ const ScheduleGrid = memo(function ScheduleGrid({
     () => (spanWeeks === 2 ? [...week1, ...week2] : week1),
     [spanWeeks, week1, week2],
   );
-  const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -2744,13 +3379,24 @@ const ScheduleGrid = memo(function ScheduleGrid({
     [focusAreas],
   );
 
+  const assignmentLookupById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const assignment of historicalAssignments) {
+      map.set(assignment.id, assignment);
+    }
+    for (const assignment of assignments) {
+      map.set(assignment.id, assignment);
+    }
+    return map;
+  }, [historicalAssignments, assignments]);
+
   // For each section, compute which shift code IDs belong to it
   const exclusiveCodeIdsPerSection = useMemo(() => {
     return Object.fromEntries(
       sections.map((section) => {
         const focusAreaId = focusAreaIdByName[section];
         const ids = new Set(
-          shiftCodes
+          assignments
             .filter(
               (st) => focusAreaId != null && st.focusAreaId === focusAreaId,
             )
@@ -2759,7 +3405,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         return [section, ids];
       }),
     );
-  }, [sections, shiftCodes, focusAreaIdByName]);
+  }, [sections, assignments, focusAreaIdByName]);
 
   const openShiftSectionIds = useMemo(
     () => new Set((openShifts ?? []).map((shift) => shift.focusAreaId)),
@@ -2783,11 +3429,11 @@ const ScheduleGrid = memo(function ScheduleGrid({
         ? rawHomeEmps
         : rawHomeEmps.filter((emp) =>
             allDates.some((date) => {
-              const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+              const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
               return codeIds.some(
                 (id) =>
                   exclusiveCodeIds.has(id) ||
-                  shiftCodes.find((sc) => sc.id === id)?.focusAreaId === null,
+                  assignmentLookupById.get(id)?.focusAreaId === null,
               );
             }),
           );
@@ -2796,7 +3442,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           e.focusAreaIds.length > 0 &&
           (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
           allDates.some((date) => {
-            const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+            const codeIds = assignmentIdsForKey?.(e.id, date) ?? [];
             return codeIds.some((id) => exclusiveCodeIds.has(id));
           }),
       );
@@ -2810,8 +3456,8 @@ const ScheduleGrid = memo(function ScheduleGrid({
       allEmployees,
       isCellInteractive,
       allDates,
-      shiftCodeIdsForKey,
-      shiftCodes,
+      assignmentIdsForKey,
+      assignmentLookupById,
     ],
   );
 
@@ -2828,80 +3474,12 @@ const ScheduleGrid = memo(function ScheduleGrid({
   );
 
   const hasOpenShifts = (openShifts?.length ?? 0) > 0;
-  const hasStackedCellContent = useMemo(() => {
-    if (spanWeeks !== 2) return false;
-    if (showAudit || showDiffOverlay) return true;
-    if (!draftKindForKey && !publishDiffForKey && !createdByNameForKey) {
-      return false;
-    }
-
-    return renderedDepartmentSections.some(({ focusAreas: deptFAs }) =>
-      deptFAs.some((fa) => {
-        const sectionId = focusAreaIdByName[fa.name] ?? fa.id;
-        const exclusiveCodeIds =
-          exclusiveCodeIdsPerSection[fa.name] ?? new Set<number>();
-        const rawHomeEmps = filteredEmployees.filter(
-          (e) => sectionId != null && e.focusAreaIds.includes(sectionId),
-        );
-        const homeEmps = isCellInteractive
-          ? rawHomeEmps
-          : rawHomeEmps.filter((emp) =>
-              allDates.some((date) => {
-                const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
-                return codeIds.some(
-                  (id) =>
-                    exclusiveCodeIds.has(id) ||
-                    shiftCodes.find((sc) => sc.id === id)?.focusAreaId === null,
-                );
-              }),
-            );
-        const guestEmps = allEmployees.filter(
-          (e) =>
-            e.focusAreaIds.length > 0 &&
-            (sectionId == null || !e.focusAreaIds.includes(sectionId)) &&
-            allDates.some((date) => {
-              const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
-              return codeIds.some((id) => exclusiveCodeIds.has(id));
-            }),
-        );
-        const sectionEmps = [...homeEmps, ...guestEmps];
-
-        return sectionEmps.some((emp) =>
-          allDates.some((date) =>
-            cellNeedsStackedLayout({
-              draftKind: draftKindForKey?.(emp.id, date) ?? null,
-              showDiffOverlay: !!showDiffOverlay,
-              publishDiff: publishDiffForKey?.(emp.id, date) ?? null,
-              auditName: createdByNameForKey?.(emp.id, date) ?? null,
-              showAudit: !!showAudit,
-            }),
-          ),
-        );
-      }),
-    );
-  }, [
-    spanWeeks,
-    showAudit,
-    showDiffOverlay,
-    draftKindForKey,
-    publishDiffForKey,
-    createdByNameForKey,
-    renderedDepartmentSections,
-    focusAreaIdByName,
-    exclusiveCodeIdsPerSection,
-    filteredEmployees,
-    isCellInteractive,
-    allDates,
-    shiftCodeIdsForKey,
-    shiftCodes,
-    allEmployees,
-  ]);
   const gridLayout = getScheduleGridLayout({
     spanWeeks,
     shiftDisplayMode,
     containerWidth,
     hasOpenShifts,
-    hasStackedCellContent,
+    hasStackedCellContent: false,
   });
   const { nameColWidth, colWidth, fitToContainer } = gridLayout;
   const hasAnySections = renderedDepartmentSections.length > 0;
@@ -3015,42 +3593,6 @@ const ScheduleGrid = memo(function ScheduleGrid({
         </div>
       ) : (
         <>
-          <div
-            ref={tooltipRef}
-            style={{
-              display: "none",
-              position: "fixed",
-              transform: "translate(-50%, -100%)",
-              background: "var(--color-surface)",
-              padding: "8px 14px",
-              borderRadius: "var(--dg-radius-lg)",
-              boxShadow: `
-                0 10px 25px -5px rgba(0, 0, 0, 0.1),
-                0 8px 10px -6px rgba(0, 0, 0, 0.1),
-                0 0 0 1px rgba(0,0,0,0.05)
-              `,
-              zIndex: 1000,
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 700,
-              color: "var(--color-text-primary)",
-              whiteSpace: "nowrap",
-              pointerEvents: "none",
-            }}
-          >
-            <span ref={tooltipTextRef} />
-            <div
-              style={{
-                position: "absolute",
-                bottom: -4,
-                left: "50%",
-                transform: "translateX(-50%) rotate(45deg)",
-                width: 10,
-                height: 10,
-                background: "var(--color-surface)",
-                boxShadow: "2px 2px 2px rgba(0,0,0,0.02)",
-              }}
-            />
-          </div>
           {/* Flat FA sections — departments provide ordering but don't appear visually */}
           {renderedDepartmentSections.map(
             ({ department: dept, focusAreas: deptFAs }) => (
@@ -3070,11 +3612,11 @@ const ScheduleGrid = memo(function ScheduleGrid({
                     : rawHomeEmps.filter((emp) =>
                         allDates.some((date) => {
                           const codeIds =
-                            shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                            assignmentIdsForKey?.(emp.id, date) ?? [];
                           return codeIds.some(
                             (id) =>
                               exclusiveCodeIds.has(id) ||
-                              shiftCodes.find((sc) => sc.id === id)
+                              assignments.find((sc) => sc.id === id)
                                 ?.focusAreaId === null,
                           );
                         }),
@@ -3085,7 +3627,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
                       (sectionId == null ||
                         !e.focusAreaIds.includes(sectionId)) &&
                       allDates.some((date) => {
-                        const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+                        const codeIds = assignmentIdsForKey?.(e.id, date) ?? [];
                         return codeIds.some((id) => exclusiveCodeIds.has(id));
                       }),
                   );
@@ -3094,33 +3636,41 @@ const ScheduleGrid = memo(function ScheduleGrid({
                   return (
                     <SectionBlock
                       key={fa.id}
+                      sectionId={sectionId}
                       sectionName={sectionName}
                       exclusiveCodeIds={exclusiveCodeIds}
                       employees={sectionEmps}
                       weekDates={allDates}
                       todayKey={todayKey}
                       shiftForKey={shiftForKey}
-                      shiftCodeIdsForKey={shiftCodeIdsForKey}
+                      assignmentIdsForKey={assignmentIdsForKey}
                       getShiftStyle={getShiftStyle}
                       handleCellClick={handleCellClick}
+                      nameColWidth={nameColWidth}
                       colWidth={colWidth}
                       fitToContainer={fitToContainer}
-                      splitAtIndex={splitAtIndex}
                       highlightEmpIds={highlightEmpIds}
                       focusAreas={focusAreas}
-                      shiftCodes={shiftCodes}
+                      assignments={assignments}
+                      historicalAssignments={historicalAssignments}
                       shiftCategories={shiftCategories}
+                      jobs={jobs}
                       indicatorTypes={indicatorTypes}
                       isCellInteractive={isCellInteractive}
                       canDragShifts={canDragShifts ?? isCellInteractive}
                       activeIndicatorIdsForKey={activeIndicatorIdsForKey}
-                      showTooltip={showTooltipFn}
-                      hideTooltip={hideTooltipFn}
                       getCustomShiftTimes={getCustomShiftTimes}
+                      getPublishedCustomShiftTimes={
+                        getPublishedCustomShiftTimes
+                      }
                       draftKindForKey={draftKindForKey}
                       showDiffOverlay={showDiffOverlay}
+                      showPublishDiffOverlay={showPublishDiffOverlay}
                       publishedLabelForKey={publishedLabelForKey}
-                      publishedShiftCodeIdsForKey={publishedShiftCodeIdsForKey}
+                      publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
+                      publishedAbsenceTypeIdForKey={
+                        publishedAbsenceTypeIdForKey
+                      }
                       hasTimeChangesForKey={hasTimeChangesForKey}
                       publishDiffForKey={publishDiffForKey}
                       recentlyPublishedKeys={recentlyPublishedKeys}
@@ -3131,17 +3681,18 @@ const ScheduleGrid = memo(function ScheduleGrid({
                       createdByNameForKey={createdByNameForKey}
                       onCellHover={onCellHover}
                       onCellContextMenu={onCellContextMenu}
+                      onCellFocus={onCellFocus}
                       coverageRequirements={coverageRequirements}
                       absenceTypeMap={absenceTypeMap}
                       absenceTypeIdForKey={absenceTypeIdForKey}
                       shiftDisplayMode={shiftDisplayMode}
                       resolvePublisherName={resolvePublisherName}
-                      selectedCellKey={selectedCellKey}
                       openShifts={openShifts?.filter(
                         (os) =>
                           sectionId != null && os.focusAreaId === sectionId,
                       )}
                       onClaimOpenShift={onClaimOpenShift}
+                      activeCellId={activeCellId}
                     />
                   );
                 })}
@@ -3153,5 +3704,254 @@ const ScheduleGrid = memo(function ScheduleGrid({
     </div>
   );
 });
+
+export interface ScheduleGridProps {
+  model: ScheduleGridModel;
+  interactionState: ScheduleGridInteractionState;
+  handlers: ScheduleGridHandlers;
+}
+
+const ScheduleGrid = memo(function ScheduleGrid({
+  model,
+  interactionState,
+  handlers,
+}: ScheduleGridProps) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor),
+  );
+  const [activeDrag, setActiveDrag] = useState<ShiftDragData | null>(null);
+  const activeDragModeRef = useRef<"move" | "copy">("move");
+  const focusedCellIdRef = useRef<GridCellId | null>(null);
+  const hoveredCellIdRef = useRef<GridCellId | null>(null);
+
+  const sectionIdByName = useMemo(
+    () =>
+      new Map(
+        model.focusAreas.map((focusArea) => [focusArea.name, focusArea.id]),
+      ),
+    [model.focusAreas],
+  );
+
+  const handleLegacyCellClick = useCallback<
+    LegacyScheduleGridProps["handleCellClick"]
+  >(
+    (emp, date, focusAreaName, trigger = "click") => {
+      const fallbackSectionId = emp.focusAreaIds[0] ?? null;
+      const sectionId =
+        (focusAreaName ? sectionIdByName.get(focusAreaName) : null) ??
+        fallbackSectionId;
+      if (sectionId == null) return;
+      const cellId = {
+        empId: emp.id,
+        dateKey: formatDateKey(date),
+        sectionId,
+      };
+      handlers.onActivateCell({
+        cellId,
+        emp,
+        date,
+        trigger,
+      });
+    },
+    [handlers, sectionIdByName],
+  );
+
+  const handleLegacyContextMenu = useCallback<
+    NonNullable<LegacyScheduleGridProps["onCellContextMenu"]>
+  >(
+    (event, anchorEl, cellId, emp, date) => {
+      handlers.onOpenCellMenu?.({
+        event,
+        anchorEl,
+        cellId,
+        emp,
+        date,
+        trigger: event.type === "contextmenu" ? "contextmenu" : "keyboard",
+      });
+    },
+    [handlers],
+  );
+
+  const handleCellFocus = useCallback((cellId: GridCellId) => {
+    focusedCellIdRef.current = cellId;
+  }, []);
+
+  const handleCellHover = useCallback((cellId: GridCellId) => {
+    hoveredCellIdRef.current = cellId;
+  }, []);
+
+  const resolveKeyboardTarget = useCallback(() => {
+    return (
+      interactionState.contextMenuCellId ??
+      focusedCellIdRef.current ??
+      hoveredCellIdRef.current
+    );
+  }, [interactionState.contextMenuCellId]);
+  const activeCellId = interactionState.activeCellId;
+
+  useEffect(() => {
+    if (!handlers.onCopyCell && !handlers.onPasteCell) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod) return;
+
+      const targetCell = resolveKeyboardTarget();
+      if (!targetCell) return;
+
+      if (event.key === "c") {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) return;
+        event.preventDefault();
+        handlers.onCopyCell?.(targetCell);
+      } else if (event.key === "v") {
+        event.preventDefault();
+        handlers.onPasteCell?.(targetCell);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handlers, resolveKeyboardTarget]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const data = event.active.data.current as ShiftDragData | undefined;
+    if (!data) return;
+
+    const activatorEvent = event.activatorEvent;
+    const wantsCopy =
+      (activatorEvent instanceof MouseEvent ||
+        activatorEvent instanceof KeyboardEvent) &&
+      activatorEvent.shiftKey;
+    setActiveDrag(data);
+    activeDragModeRef.current = wantsCopy ? "copy" : "move";
+    document.documentElement.dataset.dragging = "true";
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setActiveDrag(null);
+      delete document.documentElement.dataset.dragging;
+      const dragMode = activeDragModeRef.current;
+      activeDragModeRef.current = "move";
+
+      const dragData = event.active.data.current as ShiftDragData | undefined;
+      const dropData = event.over?.data.current as CellDropData | undefined;
+      if (!dragData || !dropData) return;
+      if (
+        dragData.cellId.empId === dropData.cellId.empId &&
+        dragData.cellId.dateKey === dropData.cellId.dateKey &&
+        dragData.cellId.sectionId === dropData.cellId.sectionId
+      ) {
+        return;
+      }
+
+      handlers.onMoveEntry?.({
+        sourceCellId: dragData.cellId,
+        targetCellId: dropData.cellId,
+        payload: dragData.payload,
+        mode: dragMode,
+      });
+    },
+    [handlers],
+  );
+
+  return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <LegacyScheduleGrid
+        filteredEmployees={model.filteredEmployees}
+        allEmployees={model.allEmployees}
+        week1={model.week1}
+        week2={model.week2}
+        spanWeeks={model.spanWeeks}
+        shiftForKey={model.accessors.shiftForKey}
+        assignmentIdsForKey={model.accessors.assignmentIdsForKey}
+        getShiftStyle={model.accessors.getShiftStyle}
+        handleCellClick={handleLegacyCellClick}
+        today={model.today}
+        highlightEmpIds={model.options.highlightEmpIds}
+        focusAreas={model.focusAreas}
+        departments={Array.from(model.departmentsById.values())}
+        assignments={model.assignments}
+        historicalAssignments={model.historicalAssignments}
+        shiftCategories={model.shiftCategories}
+        jobs={model.jobs}
+        indicatorTypes={model.indicatorTypes}
+        isCellInteractive={model.options.isCellInteractive}
+        canDragShifts={model.options.canDragShifts}
+        activeIndicatorIdsForKey={model.accessors.activeIndicatorIdsForKey}
+        activeFocusArea={model.activeFocusArea}
+        certifications={model.certifications}
+        orgRoles={model.orgRoles}
+        getCustomShiftTimes={model.accessors.getCustomShiftTimes}
+        getPublishedCustomShiftTimes={
+          model.accessors.getPublishedCustomShiftTimes
+        }
+        draftKindForKey={model.accessors.draftKindForKey}
+        showDiffOverlay={model.options.showDiffOverlay}
+        showPublishDiffOverlay={model.options.showPublishDiffOverlay}
+        publishedLabelForKey={model.accessors.publishedLabelForKey}
+        publishedAssignmentIdsForKey={
+          model.accessors.publishedAssignmentIdsForKey
+        }
+        publishedAbsenceTypeIdForKey={
+          model.accessors.publishedAbsenceTypeIdForKey
+        }
+        hasTimeChangesForKey={model.accessors.hasTimeChangesForKey}
+        publishDiffForKey={model.accessors.publishDiffForKey}
+        recentlyPublishedKeys={model.recentlyPublishedKeys}
+        cellLocks={model.cellLocks}
+        showAudit={model.options.showAudit}
+        createdByNameForKey={model.accessors.createdByNameForKey}
+        onCellHover={handleCellHover}
+        onCellContextMenu={handleLegacyContextMenu}
+        onCellFocus={handleCellFocus}
+        coverageRequirements={model.coverageRequirements}
+        absenceTypeMap={model.absenceTypeMap}
+        absenceTypeIdForKey={model.accessors.absenceTypeIdForKey}
+        shiftDisplayMode={model.options.shiftDisplayMode}
+        resolvePublisherName={model.resolvePublisherName}
+        openShifts={model.openShifts}
+        onClaimOpenShift={handlers.onClaimOpenShift}
+        activeCellId={activeCellId}
+      />
+      <DragOverlay dropAnimation={null}>
+        {activeDrag && (
+          <div
+            style={{
+              background: activeDrag.pillColor,
+              color: activeDrag.pillText,
+              border: `1px solid ${activeDrag.pillText}20`,
+              borderRadius: 8,
+              padding: "6px 16px",
+              fontSize: "var(--dg-fs-title)",
+              fontWeight: 800,
+              boxShadow: "var(--shadow-drag)",
+              cursor: "grabbing",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {activeDrag.label}
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  );
+});
+
+export { buildScheduleGridModel } from "./schedule-grid/model";
+export type {
+  ScheduleGridHandlers,
+  ScheduleGridInteractionState,
+  ScheduleGridModel,
+} from "./schedule-grid/model";
 
 export default ScheduleGrid;

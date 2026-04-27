@@ -46,7 +46,7 @@
   },
   "settings": {
     "organization": "Organization",
-    "shiftCodes": "Schedule Codes",
+    "assignments": "Jobs + Shifts",
     "indicators": "Indicators",
     "staffConfig": "Staff Config",
     "displayMode": "Display Mode",

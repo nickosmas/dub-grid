@@ -29,7 +29,10 @@ export async function PATCH(
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   const parsed = mobileUpdateShiftRequestBodySchema.safeParse(body);
@@ -55,11 +58,14 @@ export async function PATCH(
       }
 
       case "respond": {
-        const { error } = await auth.userClient.rpc("respond_to_shift_request", {
-          p_request_id: id,
-          p_emp_id: parsed.data.empId,
-          p_accept: parsed.data.accept,
-        });
+        const { error } = await auth.userClient.rpc(
+          "respond_to_shift_request",
+          {
+            p_request_id: id,
+            p_emp_id: parsed.data.empId,
+            p_accept: parsed.data.accept,
+          },
+        );
         if (error) throw error;
         break;
       }
@@ -83,8 +89,8 @@ export async function PATCH(
           orgId: auth.currentOrg.id,
           requestId: id,
           requestType:
-            ((requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ??
-              "pickup"),
+            (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ??
+            "pickup",
           approved: parsed.data.approved,
           adminNote: parsed.data.note,
         });
@@ -99,6 +105,45 @@ export async function PATCH(
         if (error) throw error;
         break;
       }
+
+      case "volunteer_open_shift": {
+        if (
+          parsed.data.state.kind !== "worked" ||
+          parsed.data.state.segments.length === 0
+        ) {
+          return NextResponse.json(
+            { error: "Open-shift volunteering requires a worked assignment" },
+            { status: 400 },
+          );
+        }
+
+        const { data: requestId, error } = await auth.userClient.rpc(
+          "volunteer_for_open_shift",
+          {
+            p_org_id: auth.currentOrg.id,
+            p_emp_id: parsed.data.empId,
+            p_shift_date: parsed.data.shiftDate,
+            p_shift_ids: parsed.data.state.segments.map(
+              (segment) => segment.shiftId,
+            ),
+            p_job_ids: parsed.data.state.segments.map(
+              (segment) => segment.jobId,
+            ),
+            p_focus_area_id: parsed.data.focusAreaId,
+            p_custom_start_time: parsed.data.state.customStartTime ?? null,
+            p_custom_end_time: parsed.data.state.customEndTime ?? null,
+          },
+        );
+        if (error || !requestId)
+          throw error ?? new Error("Unable to volunteer");
+        await dispatchNotificationEvent(auth.user.id, {
+          action: "shift_request_created",
+          orgId: auth.currentOrg.id,
+          requestId: requestId as string,
+          requestType: "pickup",
+        });
+        break;
+      }
     }
 
     return NextResponse.json(
@@ -107,9 +152,6 @@ export async function PATCH(
       }),
     );
   } catch (err) {
-    return NextResponse.json(
-      { error: errorMessage(err) },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

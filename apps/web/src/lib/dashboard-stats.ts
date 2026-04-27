@@ -5,11 +5,10 @@
 
 import type {
   ShiftMap,
-  ShiftCode,
+  AssignmentDefinition,
   Employee,
   FocusArea,
   CoverageRequirement,
-  CoverageRuleConfig,
   ShiftCategory,
   ShiftRequest,
   PublishHistoryEntry,
@@ -17,7 +16,7 @@ import type {
   Invitation,
 } from "@/types";
 import {
-  buildShiftCodeIdsByFocusArea,
+  buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
   computeCoverageCategorySnapshots,
 } from "@/lib/schedule-logic";
 
@@ -42,7 +41,12 @@ export interface OTAlert {
 export interface WeeklyStats {
   totalShifts: { value: number; prevValue: number; delta: number };
   coverage: { pct: number; prevPct: number; delta: number; openSlots: number };
-  staffScheduled: { scheduled: number; total: number; prevScheduled: number; delta: number };
+  staffScheduled: {
+    scheduled: number;
+    total: number;
+    prevScheduled: number;
+    delta: number;
+  };
   otAlerts: { count: number; prevCount: number; delta: number };
 }
 
@@ -65,20 +69,20 @@ export interface OpenShift {
   date: Date;
   dayOfWeek: string;
   dayOfMonth: number;
-  requirementShiftCodeId: number;
-  eligibleShiftCodeIds: number[];
-  preferredOpenShiftCodeId: number;
+  requirementAssignmentDefinitionId: number;
+  eligibleAssignmentDefinitionIds: number[];
+  preferredOpenAssignmentDefinitionId: number;
   ruleLabel: string;
-  shiftCodeLabel: string;
+  assignmentLabel: string;
   focusAreaName: string;
   timeRange: string;
   needed: number;
   urgency: "high" | "medium" | "low";
 }
 
-export interface ShiftCodeCount {
-  shiftCodeId: number;
-  shiftCodeLabel: string;
+export interface AssignmentCount {
+  assignmentId: number;
+  assignmentLabel: string;
   color: string;
   count: number;
 }
@@ -87,7 +91,7 @@ export interface FocusAreaBreakdown {
   focusAreaId: number;
   focusAreaName: string;
   total: number;
-  codes: ShiftCodeCount[];
+  codes: AssignmentCount[];
 }
 
 export interface ShiftTypeBreakdown {
@@ -135,7 +139,9 @@ function formatTime12h(time: string): string {
   const [h, m] = time.split(":").map(Number);
   const ampm = h >= 12 ? "pm" : "am";
   const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m ? `${hour12}:${String(m).padStart(2, "0")}${ampm}` : `${hour12}${ampm}`;
+  return m
+    ? `${hour12}:${String(m).padStart(2, "0")}${ampm}`
+    : `${hour12}${ampm}`;
 }
 
 function parseShiftKey(key: string): { empId: string; dateKey: string } {
@@ -145,10 +151,10 @@ function parseShiftKey(key: string): { empId: string; dateKey: string } {
 
 /** Returns true if at least one shift code is a work shift (all codes are work shifts now). */
 function hasWorkShift(
-  shiftCodeIds: number[],
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentIds: number[],
+  assignmentById: Map<number, AssignmentDefinition>,
 ): boolean {
-  return shiftCodeIds.some((id) => shiftCodeById.has(id));
+  return assignmentIds.some((id) => assignmentById.has(id));
 }
 
 // ─── Date Helpers ───────────────────────────────────────
@@ -206,19 +212,19 @@ export function filterShiftsByWeek(
 
 /** Resolve effective break minutes for a shift code: category → 0. */
 export function resolveBreakMinutes(
-  shiftCode: ShiftCode,
+  assignment: AssignmentDefinition,
   categoryById?: Map<number, ShiftCategory>,
 ): number {
-  if (categoryById && shiftCode.categoryId != null) {
-    const cat = categoryById.get(shiftCode.categoryId);
+  if (categoryById && assignment.categoryId != null) {
+    const cat = categoryById.get(assignment.categoryId);
     if (cat?.breakMinutes != null) return cat.breakMinutes;
   }
   return 0;
 }
 
 export function computeShiftDurationHours(
-  shiftCodeIds: number[],
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentIds: number[],
+  assignmentById: Map<number, AssignmentDefinition>,
   customStartTime?: string | null,
   customEndTime?: string | null,
   categoryById?: Map<number, ShiftCategory>,
@@ -232,13 +238,20 @@ export function computeShiftDurationHours(
       for (let i = 0; i < Math.max(starts.length, ends.length); i++) {
         const s = starts[i] || "";
         const e = ends[i] || "";
-        const sc = shiftCodeIds[i] != null ? shiftCodeById.get(shiftCodeIds[i]) : undefined;
+        const sc =
+          assignmentIds[i] != null
+            ? assignmentById.get(assignmentIds[i])
+            : undefined;
         if (s && e) {
           let h = durationHoursFromTimes(s, e);
-          if (sc) h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
+          if (sc)
+            h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
           total += h;
         } else if (sc?.defaultStartTime && sc.defaultEndTime) {
-          let h = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
+          let h = durationHoursFromTimes(
+            sc.defaultStartTime,
+            sc.defaultEndTime,
+          );
           h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
           total += h;
         }
@@ -247,8 +260,8 @@ export function computeShiftDurationHours(
     }
     let hours = durationHoursFromTimes(customStartTime, customEndTime);
     // Deduct break from the first code
-    for (const codeId of shiftCodeIds) {
-      const sc = shiftCodeById.get(codeId);
+    for (const codeId of assignmentIds) {
+      const sc = assignmentById.get(codeId);
       if (sc) {
         hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
         break;
@@ -257,12 +270,15 @@ export function computeShiftDurationHours(
     return hours;
   }
   let total = 0;
-  for (const codeId of shiftCodeIds) {
-    const sc = shiftCodeById.get(codeId);
+  for (const codeId of assignmentIds) {
+    const sc = assignmentById.get(codeId);
     if (!sc) continue;
     if (sc.defaultStartTime && sc.defaultEndTime) {
       // Level 2: shift code custom times
-      let hours = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
+      let hours = durationHoursFromTimes(
+        sc.defaultStartTime,
+        sc.defaultEndTime,
+      );
       hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
       total += hours;
     } else if (categoryById && sc.categoryId != null) {
@@ -273,9 +289,13 @@ export function computeShiftDurationHours(
         hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
         total += hours;
       }
-    } else if (sc.defaultDurationHours != null || sc.defaultDurationMinutes != null) {
+    } else if (
+      sc.defaultDurationHours != null ||
+      sc.defaultDurationMinutes != null
+    ) {
       // General codes: use duration
-      let hours = (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
+      let hours =
+        (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
       hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
       total += hours;
     }
@@ -287,7 +307,7 @@ export function computeEmployeeWeeklyHours(
   empId: string,
   weekDateKeys: string[],
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
   otThreshold = 40,
   categoryById?: Map<number, ShiftCategory>,
 ): EmployeeHours {
@@ -296,13 +316,13 @@ export function computeEmployeeWeeklyHours(
 
   for (const dateKey of weekDateKeys) {
     const entry = shifts[`${empId}_${dateKey}`];
-    if (!entry || entry.isDelete || entry.shiftCodeIds.length === 0) {
+    if (!entry || entry.isDelete || entry.assignmentIds.length === 0) {
       dailyHours[dateKey] = 0;
       continue;
     }
     const hours = computeShiftDurationHours(
-      entry.shiftCodeIds,
-      shiftCodeById,
+      entry.assignmentIds,
+      assignmentById,
       entry.customStartTime,
       entry.customEndTime,
       categoryById,
@@ -325,12 +345,19 @@ export function computeAllEmployeeHours(
   employees: Employee[],
   weekDateKeys: string[],
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
   otThreshold = 40,
   categoryById?: Map<number, ShiftCategory>,
 ): EmployeeHours[] {
   return employees.map((emp) =>
-    computeEmployeeWeeklyHours(emp.id, weekDateKeys, shifts, shiftCodeById, otThreshold, categoryById),
+    computeEmployeeWeeklyHours(
+      emp.id,
+      weekDateKeys,
+      shifts,
+      assignmentById,
+      otThreshold,
+      categoryById,
+    ),
   );
 }
 
@@ -350,7 +377,9 @@ export function computeOTAlerts(
       const fa = faId != null ? faMap.get(faId) : undefined;
       return {
         empId: h.empId,
-        empName: emp ? `${emp.firstName.charAt(0)}. ${emp.lastName}` : "Unknown",
+        empName: emp
+          ? `${emp.firstName.charAt(0)}. ${emp.lastName}`
+          : "Unknown",
         totalHours: h.totalHours,
         overtimeHours: h.overtimeHours,
         focusAreaName: fa?.name ?? "",
@@ -363,12 +392,15 @@ export function computeOTAlerts(
 
 export function countShifts(
   weekShifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
 ): number {
   let count = 0;
   for (const entry of Object.values(weekShifts)) {
     if (entry.isDelete) continue;
-    if (entry.shiftCodeIds.length > 0 && hasWorkShift(entry.shiftCodeIds, shiftCodeById)) {
+    if (
+      entry.assignmentIds.length > 0 &&
+      hasWorkShift(entry.assignmentIds, assignmentById)
+    ) {
       count++;
     }
   }
@@ -377,13 +409,16 @@ export function countShifts(
 
 export function countStaffScheduled(
   weekShifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
 ): number {
   const empIds = new Set<string>();
   for (const key of Object.keys(weekShifts)) {
     const entry = weekShifts[key];
     if (entry.isDelete) continue;
-    if (entry.shiftCodeIds.length > 0 && hasWorkShift(entry.shiftCodeIds, shiftCodeById)) {
+    if (
+      entry.assignmentIds.length > 0 &&
+      hasWorkShift(entry.assignmentIds, assignmentById)
+    ) {
       empIds.add(parseShiftKey(key).empId);
     }
   }
@@ -393,9 +428,8 @@ export function countStaffScheduled(
 /** Compute overall coverage % and open slot count for a week. */
 export function computeCoveragePctAndSlots(
   focusAreas: FocusArea[],
-  shiftCodes: ShiftCode[],
+  assignments: AssignmentDefinition[],
   requirements: CoverageRequirement[],
-  coverageRuleConfigs: CoverageRuleConfig[],
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
@@ -406,19 +440,22 @@ export function computeCoveragePctAndSlots(
 
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
-    empsByFa.set(fa.id, employees.filter((e) => e.focusAreaIds.includes(fa.id)));
+    empsByFa.set(
+      fa.id,
+      employees.filter((e) => e.focusAreaIds.includes(fa.id)),
+    );
   }
 
-  const codesByFa = buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes);
-  void coverageRuleConfigs;
+  const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
-    shiftCodes,
+    assignments,
     requirements,
     weekDates,
     empsByFa,
-    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.shiftCodeIds ?? [],
+    (empId, lookupDate) =>
+      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
   );
   let totalRequired = 0;
@@ -429,26 +466,40 @@ export function computeCoveragePctAndSlots(
     totalFilled += Math.min(snapshot.status.actual, snapshot.status.required);
   }
 
-  const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
+  const pct =
+    totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
   return { pct, openSlots: totalRequired - totalFilled, totalRequired };
 }
 
 /** Derive global coverage stats from pre-computed section data. */
-export function coverageFromSections(
-  sections: SectionCoverage[],
-): { pct: number; openSlots: number } {
+export function coverageFromSections(sections: SectionCoverage[]): {
+  pct: number;
+  openSlots: number;
+} {
   const totalRequired = sections.reduce((s, sec) => s + sec.requiredTotal, 0);
   const totalFilled = sections.reduce((s, sec) => s + sec.filledTotal, 0);
   return {
-    pct: totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100,
+    pct:
+      totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100,
     openSlots: totalRequired - totalFilled,
   };
 }
 
 /** Assemble the 4 stat card values with week-over-week deltas. */
 export function computeWeeklyStats(
-  current: { shiftCount: number; coveragePct: number; openSlots: number; staffScheduled: number; otCount: number },
-  prev: { shiftCount: number; coveragePct: number; staffScheduled: number; otCount: number },
+  current: {
+    shiftCount: number;
+    coveragePct: number;
+    openSlots: number;
+    staffScheduled: number;
+    otCount: number;
+  },
+  prev: {
+    shiftCount: number;
+    coveragePct: number;
+    staffScheduled: number;
+    otCount: number;
+  },
   totalActiveStaff: number,
 ): WeeklyStats {
   return {
@@ -485,31 +536,35 @@ export function computeCoverageBySection(
   shifts: ShiftMap,
   employees: Employee[],
   coverageRequirements: CoverageRequirement[],
-  coverageRuleConfigs: CoverageRuleConfig[],
-  shiftCodes: ShiftCode[],
+  assignments: AssignmentDefinition[],
 ): SectionCoverage[] {
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
-    empsByFa.set(fa.id, employees.filter((e) => e.focusAreaIds.includes(fa.id)));
+    empsByFa.set(
+      fa.id,
+      employees.filter((e) => e.focusAreaIds.includes(fa.id)),
+    );
   }
 
-  const codesByFa = buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes);
-  void coverageRuleConfigs;
+  const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
-    shiftCodes,
+    assignments,
     coverageRequirements,
     weekDates,
     empsByFa,
-    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.shiftCodeIds ?? [],
+    (empId, lookupDate) =>
+      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
   );
 
   const allSections = focusAreas.map((fa) => {
     const faEmps = empsByFa.get(fa.id) ?? [];
     const faCodes = codesByFa.get(fa.id) ?? new Set();
-    const faSnapshots = snapshots.filter((snapshot) => snapshot.focusAreaId === fa.id);
+    const faSnapshots = snapshots.filter(
+      (snapshot) => snapshot.focusAreaId === fa.id,
+    );
     let totalFilled = 0;
     let totalRequired = 0;
 
@@ -531,10 +586,7 @@ export function computeCoverageBySection(
       let staffCount = 0;
       for (const emp of faEmps) {
         const shift = shifts[`${emp.id}_${dateKey}`];
-        if (
-          shift &&
-          shift.shiftCodeIds.some((id) => faCodes.has(id))
-        ) {
+        if (shift && shift.assignmentIds.some((id) => faCodes.has(id))) {
           staffCount++;
         }
       }
@@ -549,9 +601,7 @@ export function computeCoverageBySection(
     });
 
     const pct =
-      totalRequired > 0
-        ? Math.round((totalFilled / totalRequired) * 100)
-        : 100;
+      totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
 
     return {
       focusAreaId: fa.id,
@@ -571,34 +621,36 @@ export function computeCoverageBySection(
 
 export function computeOpenShifts(
   focusAreas: FocusArea[],
-  shiftCodes: ShiftCode[],
+  assignments: AssignmentDefinition[],
   coverageRequirements: CoverageRequirement[],
-  coverageRuleConfigs: CoverageRuleConfig[],
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
-  shiftCodeDisplayMap?: Map<number, string>,
+  assignmentById: Map<number, AssignmentDefinition>,
+  assignmentLabelMap?: Map<number, string>,
 ): OpenShift[] {
   const openShifts: OpenShift[] = [];
 
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
-    empsByFa.set(fa.id, employees.filter((e) => e.focusAreaIds.includes(fa.id)));
+    empsByFa.set(
+      fa.id,
+      employees.filter((e) => e.focusAreaIds.includes(fa.id)),
+    );
   }
 
-  const codesByFa = buildShiftCodeIdsByFocusArea(focusAreas, shiftCodes);
-  void coverageRuleConfigs;
+  const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
-    shiftCodes,
+    assignments,
     coverageRequirements,
     weekDates,
     empsByFa,
-    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.shiftCodeIds ?? [],
+    (empId, lookupDate) =>
+      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
-    shiftCodeDisplayMap,
+    assignmentLabelMap,
   );
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -607,14 +659,20 @@ export function computeOpenShifts(
     const needed = snapshot.status.required - snapshot.status.actual;
     if (needed <= 0) continue;
 
-    const sc = shiftCodeById.get(snapshot.preferredOpenShiftCodeId);
+    const sc = assignmentById.get(snapshot.preferredOpenAssignmentDefinitionId);
     if (!sc) continue;
 
     const daysUntil = Math.floor(
       (snapshot.date.getTime() - today.getTime()) / 86400000,
     );
     const urgency: OpenShift["urgency"] =
-      daysUntil < 0 ? "low" : daysUntil <= 1 ? "high" : daysUntil <= 3 ? "medium" : "low";
+      daysUntil < 0
+        ? "low"
+        : daysUntil <= 1
+          ? "high"
+          : daysUntil <= 3
+            ? "medium"
+            : "low";
 
     let timeRange = "";
     if (sc.defaultStartTime && sc.defaultEndTime) {
@@ -624,18 +682,20 @@ export function computeOpenShifts(
     const label =
       snapshot.shiftCategoryName !== "Uncategorized"
         ? snapshot.shiftCategoryName
-        : (shiftCodeDisplayMap?.get(sc.id) ?? sc.name ?? sc.label);
+        : (assignmentLabelMap?.get(sc.id) ?? sc.name ?? sc.label);
 
     openShifts.push({
       id: `${snapshot.focusAreaId}_${snapshot.shiftCategoryId}_${formatDateKey(snapshot.date)}`,
       date: snapshot.date,
       dayOfWeek: SHORT_DAYS[snapshot.date.getDay()],
       dayOfMonth: snapshot.date.getDate(),
-      requirementShiftCodeId: snapshot.preferredOpenShiftCodeId,
-      eligibleShiftCodeIds: snapshot.eligibleShiftCodeIds,
-      preferredOpenShiftCodeId: snapshot.preferredOpenShiftCodeId,
+      requirementAssignmentDefinitionId:
+        snapshot.preferredOpenAssignmentDefinitionId,
+      eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
+      preferredOpenAssignmentDefinitionId:
+        snapshot.preferredOpenAssignmentDefinitionId,
       ruleLabel: label,
-      shiftCodeLabel: label,
+      assignmentLabel: label,
       focusAreaName: snapshot.focusAreaName,
       timeRange,
       needed,
@@ -654,33 +714,27 @@ export function computeOpenShifts(
 
 export function computeShiftBreakdown(
   weekShifts: ShiftMap,
-  shiftCodeById: Map<number, ShiftCode>,
+  assignmentById: Map<number, AssignmentDefinition>,
   _shiftCategories: ShiftCategory[],
   focusAreas: FocusArea[],
-  employees: Employee[],
-  shiftCodeDisplayMap?: Map<number, string>,
+  _employees: Employee[],
+  assignmentLabelMap?: Map<number, string>,
 ): ShiftTypeBreakdown {
-  // Count by (focusAreaId, shiftCodeId) pair
+  // Count by (focusAreaId, assignmentId) pair
   const faCounts = new Map<number, Map<number, number>>();
   let totalShifts = 0;
-  const empMap = new Map(employees.map((e) => [e.id, e]));
-
-  for (const [key, entry] of Object.entries(weekShifts)) {
+  for (const entry of Object.values(weekShifts)) {
     if (entry.isDelete) continue;
-    if (entry.shiftCodeIds.length === 0) continue;
-    if (!hasWorkShift(entry.shiftCodeIds, shiftCodeById)) continue;
+    if (entry.assignmentIds.length === 0) continue;
+    if (!hasWorkShift(entry.assignmentIds, assignmentById)) continue;
 
     totalShifts++;
 
-    const { empId } = parseShiftKey(key);
-    const emp = empMap.get(empId);
-
     // Count the first non-off shift code, grouped by the shift code's focus area
-    for (const codeId of entry.shiftCodeIds) {
-      const sc = shiftCodeById.get(codeId);
+    for (const codeId of entry.assignmentIds) {
+      const sc = assignmentById.get(codeId);
       if (sc) {
-        // Use the shift code's focus area; fall back to the employee's
-        const faId = sc.focusAreaId ?? emp?.focusAreaIds[0] ?? -1;
+        const faId = sc.focusAreaId ?? -1;
         if (!faCounts.has(faId)) faCounts.set(faId, new Map());
         const codeCounts = faCounts.get(faId)!;
         codeCounts.set(codeId, (codeCounts.get(codeId) ?? 0) + 1);
@@ -694,12 +748,14 @@ export function computeShiftBreakdown(
   const byFocusArea: FocusAreaBreakdown[] = Array.from(faCounts.entries())
     .map(([faId, codeCounts]) => {
       const fa = faById.get(faId);
-      const codes: ShiftCodeCount[] = Array.from(codeCounts.entries())
+      const codes: AssignmentCount[] = Array.from(codeCounts.entries())
         .map(([codeId, count]) => {
-          const sc = shiftCodeById.get(codeId);
+          const sc = assignmentById.get(codeId);
           return {
-            shiftCodeId: codeId,
-            shiftCodeLabel: shiftCodeDisplayMap?.get(codeId) ?? (sc?.name || sc?.label || "Unknown"),
+            assignmentId: codeId,
+            assignmentLabel:
+              assignmentLabelMap?.get(codeId) ??
+              (sc?.name || sc?.label || "Unknown"),
             color: sc?.color || "#CED4DA",
             count,
           };
@@ -830,9 +886,8 @@ export function buildActivityFeed(
  */
 export function computeCoverageTrendData(
   focusAreas: FocusArea[],
-  shiftCodes: ShiftCode[],
+  assignments: AssignmentDefinition[],
   coverageRequirements: CoverageRequirement[],
-  coverageRuleConfigs: CoverageRuleConfig[],
   allEmployees: Employee[],
   allShifts: ShiftMap,
   periodStart: Date,
@@ -855,15 +910,17 @@ export function computeCoverageTrendData(
     const periodShifts = filterShiftsByWeek(allShifts, startKey, endKey);
     const coverage = computeCoveragePctAndSlots(
       focusAreas,
-      shiftCodes,
+      assignments,
       coverageRequirements,
-      coverageRuleConfigs,
       periodDates,
       activeEmployees,
       periodShifts,
     );
 
-    const staffScheduled = countStaffScheduled(periodShifts, new Map(shiftCodes.map((sc) => [sc.id, sc])));
+    const staffScheduled = countStaffScheduled(
+      periodShifts,
+      new Map(assignments.map((sc) => [sc.id, sc])),
+    );
     const totalSlots = coverage.totalRequired || 0;
 
     trend.push({

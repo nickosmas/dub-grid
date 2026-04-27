@@ -1,6 +1,6 @@
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-/* ── Shift codes from Calm Haven seed ── */
+/* ── Assignment labels from Calm Haven seed ── */
 const SHIFTS = [
   { label: "D", color: "#FECACA", text: "#991B1B" },
   { label: "Ds", color: "#FED7AA", text: "#9A3412" },

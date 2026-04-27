@@ -17,6 +17,7 @@ export type OrganizationSettingsKey =
   | "departmentLabel"
   | "shiftDisplayMode"
   | "enforceConflictPrevention"
+  | "payPeriodStartDate"
   | "dataRetentionDays"
   | "featureOverrides";
 
@@ -75,7 +76,7 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
   focusAreaLabel: { label: "Focus Areas Label", sensitive: false },
   certificationLabel: { label: "Certifications Label", sensitive: false },
   roleLabel: { label: "Roles Label", sensitive: false },
-  departmentLabel: { label: "Departments Label", sensitive: false },
+  departmentLabel: { label: "Scheduled Departments Label", sensitive: false },
   shiftDisplayMode: {
     label: "Shift Display Mode",
     sensitive: false,
@@ -83,6 +84,10 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
       value === "code" || value === "name"
         ? SHIFT_DISPLAY_MODE_LABELS[value]
         : DEFAULT_EMPTY,
+  },
+  payPeriodStartDate: {
+    label: "Pay Period Start Date",
+    sensitive: true,
   },
   enforceConflictPrevention: {
     label: "Conflict Prevention",
@@ -125,6 +130,7 @@ export function pickOrganizationSettings(
     departmentLabel: organization.departmentLabel,
     shiftDisplayMode: organization.shiftDisplayMode,
     enforceConflictPrevention: organization.enforceConflictPrevention,
+    payPeriodStartDate: organization.payPeriodStartDate,
     dataRetentionDays: organization.dataRetentionDays,
     featureOverrides: organization.featureOverrides ?? {},
   };

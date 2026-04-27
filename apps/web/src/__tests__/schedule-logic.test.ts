@@ -9,9 +9,8 @@ import {
   checkCrossDateOverlap,
   checkSameDayOverlaps,
   resolveRequirement,
-  resolveCoverageRules,
   computeCoverageStatus,
-  buildShiftCodeIdsByFocusArea,
+  buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
   computeCoverageGaps,
   buildPublishedDateSet,
   filterPublishedDates,
@@ -19,11 +18,10 @@ import {
 } from "@/lib/schedule-logic";
 import {
   makeEmployee,
-  makeShiftCode,
+  makeAssignmentDefinition as makeAssignmentDefinition,
   makeFocusArea,
   makeShiftCategory,
   makeCoverageRequirement,
-  makeCoverageRuleConfig,
 } from "./factories";
 import { formatDateKey } from "@/lib/utils";
 
@@ -32,49 +30,49 @@ import { formatDateKey } from "@/lib/utils";
 describe("isEmployeeQualified", () => {
   it("returns true when shift has no restrictions", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [], focusAreaId: null });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [], focusAreaId: null });
     expect(isEmployeeQualified(emp, code)).toBe(true);
   });
 
   it("returns true when shift has undefined requiredCertificationIds", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: undefined, focusAreaId: null });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: undefined, focusAreaId: null });
     expect(isEmployeeQualified(emp, code)).toBe(true);
   });
 
   it("returns true when employee has matching cert and focus area", () => {
     const emp = makeEmployee({ certificationId: 5, focusAreaIds: [1, 2] });
-    const code = makeShiftCode({ requiredCertificationIds: [5, 6], focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5, 6], focusAreaId: 2 });
     expect(isEmployeeQualified(emp, code)).toBe(true);
   });
 
   it("returns false when employee lacks required certification", () => {
     const emp = makeEmployee({ certificationId: 3, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [5, 6], focusAreaId: null });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5, 6], focusAreaId: null });
     expect(isEmployeeQualified(emp, code)).toBe(false);
   });
 
   it("returns false when employee has null certificationId and shift requires certs", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [5], focusAreaId: null });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5], focusAreaId: null });
     expect(isEmployeeQualified(emp, code)).toBe(false);
   });
 
   it("returns false when employee is not in the shift focus area", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1, 3] });
-    const code = makeShiftCode({ requiredCertificationIds: [], focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [], focusAreaId: 2 });
     expect(isEmployeeQualified(emp, code)).toBe(false);
   });
 
   it("returns false when employee has empty focusAreaIds and shift requires focus area", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [] });
-    const code = makeShiftCode({ focusAreaId: 1 });
+    const code = makeAssignmentDefinition({ focusAreaId: 1 });
     expect(isEmployeeQualified(emp, code)).toBe(false);
   });
 
   it("returns false when both cert and focus area fail", () => {
     const emp = makeEmployee({ certificationId: 1, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [5], focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5], focusAreaId: 2 });
     expect(isEmployeeQualified(emp, code)).toBe(false);
   });
 });
@@ -84,10 +82,10 @@ describe("hasVisibleGridShiftEntry", () => {
     expect(
       hasVisibleGridShiftEntry({
         label: "D",
-        shiftCodeIds: [1],
+        assignmentIds: [1],
         isDraft: false,
         draftKind: null,
-        publishedShiftCodeIds: [1],
+        publishedAssignmentDefinitionIds: [1],
         publishedLabel: "D",
       }),
     ).toBe(true);
@@ -97,11 +95,11 @@ describe("hasVisibleGridShiftEntry", () => {
     expect(
       hasVisibleGridShiftEntry({
         label: "VAC",
-        shiftCodeIds: [],
+        assignmentIds: [],
         absenceTypeId: 3,
         isDraft: true,
         draftKind: "new",
-        publishedShiftCodeIds: [],
+        publishedAssignmentDefinitionIds: [],
         publishedLabel: "",
       }),
     ).toBe(true);
@@ -111,11 +109,11 @@ describe("hasVisibleGridShiftEntry", () => {
     expect(
       hasVisibleGridShiftEntry({
         label: "OFF",
-        shiftCodeIds: [],
+        assignmentIds: [],
         isDelete: true,
         isDraft: true,
         draftKind: "deleted",
-        publishedShiftCodeIds: [1],
+        publishedAssignmentDefinitionIds: [1],
         publishedLabel: "D",
       }),
     ).toBe(false);
@@ -131,13 +129,13 @@ describe("hasVisibleGridShiftEntry", () => {
 describe("getDisqualificationReasons", () => {
   it("returns empty array for qualified employee", () => {
     const emp = makeEmployee({ certificationId: 5, focusAreaIds: [2] });
-    const code = makeShiftCode({ requiredCertificationIds: [5], focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5], focusAreaId: 2 });
     expect(getDisqualificationReasons(emp, code)).toEqual([]);
   });
 
   it("returns focus area reason with name from map", () => {
     const emp = makeEmployee({ focusAreaIds: [1] });
-    const code = makeShiftCode({ focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ focusAreaId: 2 });
     const faNames = new Map([[2, "Emergency"]]);
     const reasons = getDisqualificationReasons(emp, code, faNames);
     expect(reasons).toEqual(["not assigned to Emergency"]);
@@ -145,14 +143,14 @@ describe("getDisqualificationReasons", () => {
 
   it("returns focus area reason with fallback ID when no name map", () => {
     const emp = makeEmployee({ focusAreaIds: [1] });
-    const code = makeShiftCode({ focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ focusAreaId: 2 });
     const reasons = getDisqualificationReasons(emp, code);
     expect(reasons).toEqual(["not assigned to focus area #2"]);
   });
 
   it("returns certification reason with name from map", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [5], focusAreaId: null });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5], focusAreaId: null });
     const certNames = new Map([[5, "RN"]]);
     const reasons = getDisqualificationReasons(emp, code, undefined, certNames);
     expect(reasons).toEqual(["requires RN"]);
@@ -160,14 +158,14 @@ describe("getDisqualificationReasons", () => {
 
   it("returns certification reason with fallback ID when no name map", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [5, 6], focusAreaId: null });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5, 6], focusAreaId: null });
     const reasons = getDisqualificationReasons(emp, code);
     expect(reasons).toEqual(["requires cert #5 or cert #6"]);
   });
 
   it("returns both reasons when both fail", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeShiftCode({ requiredCertificationIds: [5], focusAreaId: 2 });
+    const code = makeAssignmentDefinition({ requiredCertificationIds: [5], focusAreaId: 2 });
     const reasons = getDisqualificationReasons(emp, code);
     expect(reasons).toHaveLength(2);
     expect(reasons[0]).toContain("not assigned to");
@@ -183,7 +181,7 @@ describe("getDisqualificationReasons", () => {
         fc.constantFrom(null as number | null, 1, 2, 3),
         (certId, focusAreaIds, reqCerts, focusAreaId) => {
           const emp = makeEmployee({ certificationId: certId, focusAreaIds });
-          const code = makeShiftCode({ requiredCertificationIds: reqCerts, focusAreaId });
+          const code = makeAssignmentDefinition({ requiredCertificationIds: reqCerts, focusAreaId });
           const qualified = isEmployeeQualified(emp, code);
           const reasons = getDisqualificationReasons(emp, code);
           expect(reasons.length === 0).toBe(qualified);
@@ -395,7 +393,7 @@ describe("checkSameDayOverlaps", () => {
 describe("resolveRequirement", () => {
   it("returns day-specific match", () => {
     const reqs = [
-      makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: 1, minStaff: 5 }),
+      makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
     ];
     const result = resolveRequirement(reqs, 1, 10, 1);
     expect(result).toEqual({ minStaff: 5 });
@@ -403,7 +401,7 @@ describe("resolveRequirement", () => {
 
   it("falls back to every-day when no day-specific match", () => {
     const reqs = [
-      makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 }),
+      makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
     ];
     const result = resolveRequirement(reqs, 1, 10, 2);
     expect(result).toEqual({ minStaff: 3 });
@@ -411,7 +409,7 @@ describe("resolveRequirement", () => {
 
   it("returns null when neither day-specific nor every-day match", () => {
     const reqs = [
-      makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: 1, minStaff: 5 }),
+      makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
     ];
     const result = resolveRequirement(reqs, 1, 10, 3);
     expect(result).toBeNull();
@@ -419,8 +417,8 @@ describe("resolveRequirement", () => {
 
   it("day-specific takes precedence over every-day", () => {
     const reqs = [
-      makeCoverageRequirement({ id: 1, focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 }),
-      makeCoverageRequirement({ id: 2, focusAreaId: 1, shiftCodeId: 10, dayOfWeek: 1, minStaff: 7 }),
+      makeCoverageRequirement({ id: 1, focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
+      makeCoverageRequirement({ id: 2, focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 7 }),
     ];
     const result = resolveRequirement(reqs, 1, 10, 1);
     expect(result).toEqual({ minStaff: 7 });
@@ -428,7 +426,7 @@ describe("resolveRequirement", () => {
 
   it("returns null when focusAreaId does not match", () => {
     const reqs = [
-      makeCoverageRequirement({ focusAreaId: 2, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 }),
+      makeCoverageRequirement({ focusAreaId: 2, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
     ];
     const result = resolveRequirement(reqs, 1, 10, 0);
     expect(result).toBeNull();
@@ -497,83 +495,19 @@ describe("computeCoverageStatus", () => {
   });
 });
 
-describe("resolveCoverageRules", () => {
-  it("defaults to exact-code behavior when no config exists", () => {
-    const code = makeShiftCode({ id: 10, label: "D", focusAreaId: 1, categoryId: 1 });
-    const requirement = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10 });
-
-    const rules = resolveCoverageRules([requirement], [], [code]);
-
-    expect(rules).toEqual([
-      {
-        id: "1:10",
-        orgId: "org1",
-        focusAreaId: 1,
-        requirementShiftCodeId: 10,
-        eligibleShiftCodeIds: [10],
-        preferredOpenShiftCodeId: 10,
-        ruleLabel: "D",
-        shiftCategoryId: 1,
-      },
-    ]);
-  });
-
-  it("includes configured eligible shift codes in the same focus area and category", () => {
-    const base = makeShiftCode({ id: 10, label: "D", focusAreaId: 1, categoryId: 1 });
-    const supervisor = makeShiftCode({ id: 11, label: "Ds", focusAreaId: 1, categoryId: 1 });
-    const mentoring = makeShiftCode({ id: 12, label: "(D)", focusAreaId: 1, categoryId: 1 });
-    const wrongArea = makeShiftCode({ id: 13, label: "D-other", focusAreaId: 2, categoryId: 1 });
-    const wrongCategory = makeShiftCode({ id: 14, label: "E", focusAreaId: 1, categoryId: 2 });
-    const requirement = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10 });
-    const config = makeCoverageRuleConfig({
-      focusAreaId: 1,
-      requirementShiftCodeId: 10,
-      eligibleShiftCodeIds: [10, 11, 12, 13, 14],
-      preferredOpenShiftCodeId: 12,
-    });
-
-    const rules = resolveCoverageRules(
-      [requirement],
-      [config],
-      [base, supervisor, mentoring, wrongArea, wrongCategory],
-    );
-
-    expect(rules[0]?.ruleLabel).toBe("D");
-    expect(rules[0]?.eligibleShiftCodeIds).toEqual([10, 11, 12]);
-    expect(rules[0]?.preferredOpenShiftCodeId).toBe(12);
-  });
-
-  it("falls back to the base code when configured eligible codes become invalid", () => {
-    const base = makeShiftCode({ id: 10, label: "D", focusAreaId: 1, categoryId: 1 });
-    const archived = makeShiftCode({ id: 11, label: "Ds", focusAreaId: 1, categoryId: 1, archivedAt: "2026-01-01" });
-    const requirement = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10 });
-    const config = makeCoverageRuleConfig({
-      focusAreaId: 1,
-      requirementShiftCodeId: 10,
-      eligibleShiftCodeIds: [11],
-      preferredOpenShiftCodeId: 11,
-    });
-
-    const rules = resolveCoverageRules([requirement], [config], [base, archived]);
-
-    expect(rules[0]?.eligibleShiftCodeIds).toEqual([10]);
-    expect(rules[0]?.preferredOpenShiftCodeId).toBe(10);
-  });
-});
-
 // ── computeCoverageGaps ──────────────────────────────────────────────────────
 
 describe("computeCoverageGaps", () => {
   const date = new Date(2024, 0, 15); // Monday (day 1)
 
-  it("includes general shift codes in each focus area's eligible code set", () => {
+  it("includes general assignments in each focus area's eligible set", () => {
     const icu = makeFocusArea({ id: 1, name: "ICU" });
     const er = makeFocusArea({ id: 2, name: "ER" });
-    const generalCode = makeShiftCode({ id: 10, label: "Ofc", focusAreaId: null });
-    const icuCode = makeShiftCode({ id: 11, label: "D", focusAreaId: 1 });
-    const erCode = makeShiftCode({ id: 12, label: "N", focusAreaId: 2 });
+    const generalCode = makeAssignmentDefinition({ id: 10, label: "Ofc", focusAreaId: null });
+    const icuCode = makeAssignmentDefinition({ id: 11, label: "D", focusAreaId: 1 });
+    const erCode = makeAssignmentDefinition({ id: 12, label: "N", focusAreaId: 2 });
 
-    const result = buildShiftCodeIdsByFocusArea(
+    const result = buildAssignmentIdsByFocusArea(
       [icu, er],
       [generalCode, icuCode, erCode],
     );
@@ -585,8 +519,8 @@ describe("computeCoverageGaps", () => {
   it("returns empty when all requirements met", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const code = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 1 });
+    const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 1 });
     const emp = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
 
     const gaps = computeCoverageGaps(
@@ -594,7 +528,6 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [req],
-      [],
       [date],
       new Map([[1, [emp]]]),
       () => [10],
@@ -607,15 +540,14 @@ describe("computeCoverageGaps", () => {
   it("returns gap when requirement is not met", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const code = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
+    const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
 
     const gaps = computeCoverageGaps(
       [fa],
       [cat],
       [code],
       [req],
-      [],
       [date],
       new Map([[1, []]]), // no employees
       () => [],
@@ -624,13 +556,13 @@ describe("computeCoverageGaps", () => {
     );
     expect(gaps).toHaveLength(1);
     expect(gaps[0].focusAreaId).toBe(1);
-    expect(gaps[0].shiftCodeId).toBe(10);
+    expect(gaps[0].assignmentId).toBe(10);
     expect(gaps[0].status.actual).toBe(0);
     expect(gaps[0].status.required).toBe(3);
     expect(gaps[0].shortageDetails).toEqual([
       {
-        shiftCodeId: 10,
-        shiftCodeLabel: "D",
+        assignmentId: 10,
+        assignmentLabel: "D",
         required: 3,
         actual: 0,
         shortage: 3,
@@ -638,18 +570,17 @@ describe("computeCoverageGaps", () => {
     ]);
   });
 
-  it("skips shift codes not in section", () => {
+  it("skips assignments not in section", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const code = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 2 }); // different focus area
-    const req = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
+    const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 2 }); // different focus area
+    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
 
     const gaps = computeCoverageGaps(
       [fa],
       [cat],
       [code],
       [req],
-      [],
       [date],
       new Map([[1, []]]),
       () => [],
@@ -662,14 +593,13 @@ describe("computeCoverageGaps", () => {
   it("returns empty when no requirements exist", () => {
     const fa = makeFocusArea({ id: 1 });
     const cat = makeShiftCategory({ id: 1 });
-    const code = makeShiftCode({ id: 10, categoryId: 1 });
+    const code = makeAssignmentDefinition({ id: 10, categoryId: 1 });
 
     const gaps = computeCoverageGaps(
       [fa],
       [cat],
       [code],
       [], // no requirements
-      [],
       [date],
       new Map([[1, []]]),
       () => [],
@@ -682,15 +612,14 @@ describe("computeCoverageGaps", () => {
   it("returns correct category name from shift category map", () => {
     const fa = makeFocusArea({ id: 1, name: "ER" });
     const cat = makeShiftCategory({ id: 2, name: "Evening" });
-    const code = makeShiftCode({ id: 20, label: "E", categoryId: 2, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 20, dayOfWeek: null, minStaff: 2 });
+    const code = makeAssignmentDefinition({ id: 20, label: "E", categoryId: 2, focusAreaId: 1 });
+    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 20, dayOfWeek: null, minStaff: 2 });
 
     const gaps = computeCoverageGaps(
       [fa],
       [cat],
       [code],
       [req],
-      [],
       [date],
       new Map([[1, []]]),
       () => [],
@@ -705,16 +634,10 @@ describe("computeCoverageGaps", () => {
   it("counts overlapping eligible codes toward a flexible coverage rule", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const day = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const supervisor = makeShiftCode({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
-    const mentoring = makeShiftCode({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
-    const config = makeCoverageRuleConfig({
-      focusAreaId: 1,
-      requirementShiftCodeId: 10,
-      eligibleShiftCodeIds: [10, 11, 12],
-      preferredOpenShiftCodeId: 10,
-    });
+    const day = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const supervisor = makeAssignmentDefinition({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
+    const mentoring = makeAssignmentDefinition({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
+    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
     const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
@@ -724,7 +647,6 @@ describe("computeCoverageGaps", () => {
       [cat],
       [day, supervisor, mentoring],
       [req],
-      [config],
       [date],
       new Map([[1, [emp1, emp2, emp3]]]),
       (empId: string) =>
@@ -743,11 +665,11 @@ describe("computeCoverageGaps", () => {
   it("stays green when category staffing is met even if an exact code is short", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const day = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const supervisor = makeShiftCode({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
-    const mentoring = makeShiftCode({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
-    const dayReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
-    const supReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 11, dayOfWeek: null, minStaff: 1 });
+    const day = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const supervisor = makeAssignmentDefinition({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
+    const mentoring = makeAssignmentDefinition({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
+    const dayReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const supReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 11, dayOfWeek: null, minStaff: 1 });
     const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
@@ -759,7 +681,6 @@ describe("computeCoverageGaps", () => {
       [cat],
       [day, supervisor, mentoring],
       [dayReq, supReq],
-      [],
       [date],
       new Map([[1, [emp1, emp2, emp3, emp4, emp5]]]),
       (empId: string) => {
@@ -781,17 +702,10 @@ describe("computeCoverageGaps", () => {
   it("goes red when the category total is short and lists exact-code shortages as detail", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const day = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const supervisor = makeShiftCode({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
-    const dayReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 10, dayOfWeek: null, minStaff: 3 });
-    const supReq = makeCoverageRequirement({ focusAreaId: 1, shiftCodeId: 11, dayOfWeek: null, minStaff: 1 });
-    const config = makeCoverageRuleConfig({
-      focusAreaId: 1,
-      requirementShiftCodeId: 10,
-      eligibleShiftCodeIds: [10, 11],
-      preferredOpenShiftCodeId: 10,
-      id: 99,
-    });
+    const day = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const supervisor = makeAssignmentDefinition({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
+    const dayReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const supReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 11, dayOfWeek: null, minStaff: 1 });
     const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
@@ -801,7 +715,6 @@ describe("computeCoverageGaps", () => {
       [cat],
       [day, supervisor],
       [dayReq, supReq],
-      [config],
       [date],
       new Map([[1, [emp1, emp2, emp3]]]),
       (empId: string) =>
@@ -819,8 +732,8 @@ describe("computeCoverageGaps", () => {
     expect(gaps[0].status.required).toBe(4);
     expect(gaps[0].shortageDetails).toEqual([
       {
-        shiftCodeId: 10,
-        shiftCodeLabel: "D",
+        assignmentId: 10,
+        assignmentLabel: "D",
         required: 3,
         actual: 2,
         shortage: 1,
@@ -833,16 +746,16 @@ describe("computeCoverageGaps", () => {
     const march2 = new Date(2026, 2, 2);
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
-    const code = makeShiftCode({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
+    const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
     const reqDay1 = makeCoverageRequirement({
       focusAreaId: 1,
-      shiftCodeId: 10,
+      assignmentId: 10,
       dayOfWeek: march1.getDay(),
       minStaff: 1,
     });
     const reqDay2 = makeCoverageRequirement({
       focusAreaId: 1,
-      shiftCodeId: 10,
+      assignmentId: 10,
       dayOfWeek: march2.getDay(),
       minStaff: 1,
     });
@@ -862,7 +775,6 @@ describe("computeCoverageGaps", () => {
       [cat],
       [code],
       [reqDay1, reqDay2],
-      [],
       publishedDates,
       new Map([[1, []]]),
       () => [],

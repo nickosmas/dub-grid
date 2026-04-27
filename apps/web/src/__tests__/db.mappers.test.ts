@@ -2,17 +2,20 @@ import { describe, it, expect } from "vitest";
 import {
   rowToOrganization,
   rowToFocusArea,
-  rowToShiftCode,
+  rowToJobDefinition,
+  rowToAssignmentDefinition,
   rowToAbsenceType,
   rowToShiftRequest,
 } from "@/lib/db";
 import type {
   DbOrganization,
   DbFocusArea,
-  DbShiftCode,
+  DbJobDefinition,
+  DbAssignmentDefinition,
   DbAbsenceType,
   DbShiftRequest,
 } from "@/lib/db";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 
 // ── rowToOrganization ──────────────────────────────────────────────────────────
 
@@ -37,6 +40,7 @@ describe("rowToOrganization", () => {
       department_label: null,
       shift_display_mode: null,
       timezone: null,
+      pay_period_start_date: "2026-04-20",
       archived_at: null,
       suspended_at: null,
       suspended_reason: null,
@@ -63,6 +67,7 @@ describe("rowToOrganization", () => {
     expect(result.addressCountry).toBe("United States");
     expect(result.phone).toBe("555-1234");
     expect(result.employeeCount).toBe(42);
+    expect(result.payPeriodStartDate).toBe("2026-04-20");
   });
 
   it("maps employee_count: null to employeeCount: null", () => {
@@ -85,6 +90,7 @@ describe("rowToOrganization", () => {
       department_label: null,
       shift_display_mode: null,
       timezone: null,
+      pay_period_start_date: null,
       archived_at: null,
       suspended_at: null,
       suspended_reason: null,
@@ -103,6 +109,8 @@ describe("rowToOrganization", () => {
     expect(result.employeeCount).toBeNull();
     expect(result.addressLine1).toBe("456 Oak Ave");
     expect(result.address).toBe("456 Oak Ave");
+    expect(result.departmentLabel).toBe("Scheduled Departments");
+    expect(result.payPeriodStartDate).toBeNull();
   });
 });
 
@@ -114,6 +122,7 @@ describe("rowToFocusArea", () => {
       id: 7,
       org_id: "org-abc",
       name: "East Section",
+      color: "#BFDBFE",
       sort_order: 3,
       department_id: null,
       archived_at: null,
@@ -124,6 +133,7 @@ describe("rowToFocusArea", () => {
     expect(result.id).toBe(7);
     expect(result.orgId).toBe("org-abc");
     expect(result.name).toBe("East Section");
+    expect(result.color).toBe("#BFDBFE");
     expect(result.sortOrder).toBe(3);
     expect(result.archivedAt).toBeNull();
   });
@@ -133,6 +143,7 @@ describe("rowToFocusArea", () => {
       id: 8,
       org_id: "org-abc",
       name: "Archived Section",
+      color: null,
       sort_order: 4,
       department_id: null,
       archived_at: "2026-03-10T12:00:00Z",
@@ -140,12 +151,72 @@ describe("rowToFocusArea", () => {
 
     const result = rowToFocusArea(row);
     expect(result.archivedAt).toBe("2026-03-10T12:00:00Z");
+    expect(result.color).toBe("#E2E8F0");
   });
 });
 
-// ── rowToShiftCode ────────────────────────────────────────────────────────────
+// ── rowToJobDefinition ───────────────────────────────────────────────────────
 
-const baseShiftCodeRow: DbShiftCode = {
+describe("rowToJobDefinition", () => {
+  it("maps multi-focus-area and department placement arrays", () => {
+    const row: DbJobDefinition = {
+      id: 11,
+      org_id: "org-abc",
+      name: "Supervisor",
+      abbr: "SUP",
+      show_on_grid: true,
+      assignment_mode: "with_shift",
+      eligibility_mode: "and",
+      focus_area_ids: [3, 7],
+      department_ids: [2],
+      applicable_shift_ids: [10, 11],
+      eligible_role_ids: [5],
+      required_certification_ids: [9],
+      color: "#E2E8F0",
+      border_color: "#CBD5E1",
+      text_color: "#1E293B",
+      shift_time_overrides: {
+        "10": {
+          startTime: "08:00:00",
+          endTime: "16:00:00",
+        },
+      },
+      shift_color_overrides: {
+        "11": "#BFDBFE",
+      },
+      default_start_time: "07:00:00",
+      default_end_time: "15:00:00",
+      default_duration_hours: null,
+      default_duration_minutes: null,
+      sort_order: 1,
+      system_key: null,
+      archived_at: null,
+    };
+
+    const result = rowToJobDefinition(row);
+
+    expect(result.focusAreaIds).toEqual([3, 7]);
+    expect(result.focusAreaId).toBe(3);
+    expect(result.departmentIds).toEqual([2]);
+    expect(result.applicableShiftIds).toEqual([10, 11]);
+    expect(result.eligibilityMode).toBe("and");
+    expect(result.shiftTimeOverrides).toEqual({
+      "10": {
+        startTime: "08:00",
+        endTime: "16:00",
+      },
+    });
+    expect(result.shiftColorOverrides).toEqual({
+      "11": "#BFDBFE",
+    });
+    expect(result.defaultStartTime).toBe("07:00");
+    expect(result.defaultEndTime).toBe("15:00");
+  });
+});
+
+// ── rowToAssignmentDefinition ────────────────────────────────────────────────────────────
+
+const baseAssignmentDefinitionRow: DbAssignmentDefinition = {
   id: 1,
   org_id: "org-1",
   label: "D",
@@ -154,6 +225,8 @@ const baseShiftCodeRow: DbShiftCode = {
   border_color: "#000",
   text_color: "#333",
   category_id: null,
+  shift_id: null,
+  job_id: null,
   is_general: false,
   focus_area_id: null,
   sort_order: 0,
@@ -165,75 +238,75 @@ const baseShiftCodeRow: DbShiftCode = {
   archived_at: null,
 };
 
-describe("rowToShiftCode", () => {
+describe("rowToAssignmentDefinition", () => {
   it("category_id: null maps to categoryId: null", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, category_id: null });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, category_id: null });
     expect(result.categoryId).toBeNull();
   });
 
   it("category_id: 5 maps to categoryId: 5", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, category_id: 5 });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, category_id: 5 });
     expect(result.categoryId).toBe(5);
   });
 
   it("is_general: false maps to isGeneral: false", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, is_general: false });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, is_general: false });
     expect(result.isGeneral).toBe(false);
   });
 
   it("is_general: true maps to isGeneral: true", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, is_general: true });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, is_general: true });
     expect(result.isGeneral).toBe(true);
   });
 
   it("focus_area_id: null maps to focusAreaId: null", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, focus_area_id: null });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, focus_area_id: null });
     expect(result.focusAreaId).toBeNull();
   });
 
   it("focus_area_id: 7 maps to focusAreaId: 7", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, focus_area_id: 7 });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, focus_area_id: 7 });
     expect(result.focusAreaId).toBe(7);
   });
 
   it("archived_at: null maps to archivedAt: null", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, archived_at: null });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, archived_at: null });
     expect(result.archivedAt).toBeNull();
   });
 
   it("archived_at: timestamp maps to archivedAt: string", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, archived_at: "2026-03-10T12:00:00Z" });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, archived_at: "2026-03-10T12:00:00Z" });
     expect(result.archivedAt).toBe("2026-03-10T12:00:00Z");
   });
 
   it("default_duration_hours: null maps to defaultDurationHours: null", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_hours: null });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_hours: null });
     expect(result.defaultDurationHours).toBeNull();
   });
 
   it("default_duration_hours: 8 maps to defaultDurationHours: 8", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_hours: 8 });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_hours: 8 });
     expect(result.defaultDurationHours).toBe(8);
   });
 
   it("default_duration_minutes: null maps to defaultDurationMinutes: null", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_minutes: null });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_minutes: null });
     expect(result.defaultDurationMinutes).toBeNull();
   });
 
   it("default_duration_minutes: 30 maps to defaultDurationMinutes: 30", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_duration_minutes: 30 });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_minutes: 30 });
     expect(result.defaultDurationMinutes).toBe(30);
   });
 });
 
-// ── Property 9: rowToShiftCode field mapping ──────────────────────────────────
+// ── Property 9: rowToAssignmentDefinition field mapping ──────────────────────────────────
 
 import * as fc from "fast-check";
 
-// Feature: comprehensive-test-suite, Property 9: rowToShiftCode field mapping
-describe("rowToShiftCode — Property 9: field mapping correctness", () => {
-  const arbDbShiftCode = fc.record({
+// Feature: comprehensive-test-suite, Property 9: rowToAssignmentDefinition field mapping
+describe("rowToAssignmentDefinition — Property 9: field mapping correctness", () => {
+  const arbDbAssignmentDefinition = fc.record({
     id: fc.integer({ min: 1 }),
     org_id: fc.string({ minLength: 1 }),
     label: fc.string({ minLength: 1 }),
@@ -242,6 +315,8 @@ describe("rowToShiftCode — Property 9: field mapping correctness", () => {
     border_color: fc.string(),
     text_color: fc.string(),
     category_id: fc.option(fc.integer({ min: 1 }), { nil: null }),
+    shift_id: fc.option(fc.integer({ min: 1 }), { nil: null }),
+    job_id: fc.option(fc.integer({ min: 1 }), { nil: null }),
     is_general: fc.boolean(),
     focus_area_id: fc.option(fc.integer({ min: 1 }), { nil: null }),
     sort_order: fc.integer({ min: 0 }),
@@ -256,8 +331,8 @@ describe("rowToShiftCode — Property 9: field mapping correctness", () => {
 
   it("category_id passes through correctly; is_general preserves boolean value", () => {
     fc.assert(
-      fc.property(arbDbShiftCode, (row) => {
-        const result = rowToShiftCode(row);
+      fc.property(arbDbAssignmentDefinition, (row) => {
+        const result = rowToAssignmentDefinition(row);
 
         // categoryId round-trips
         expect(result.categoryId).toBe(row.category_id ?? null);
@@ -309,9 +384,12 @@ describe("rowToAbsenceType", () => {
 // ── rowToShiftRequest ────────────────────────────────────────────────────────
 
 describe("rowToShiftRequest", () => {
-  const shiftCodeMap = new Map<number, string>([[44, "D"]]);
+  const assignmentLabelMap = new Map<number, string>([[44, "D"]]);
 
-  it("normalizes stringified bigint shift code ids before resolving labels", () => {
+  it("derives request labels from canonical shift/job pairs", () => {
+    const assignmentIdByPair = createAssignmentDefinitionIdByPairMap([
+      { id: 44, shiftId: 101, jobId: 91, archivedAt: null },
+    ]);
     const row = {
       id: "req-1",
       org_id: "org-1",
@@ -321,18 +399,20 @@ describe("rowToShiftRequest", () => {
       requester_first_name: "Nic",
       requester_last_name: "Kosmas",
       requester_shift_date: "2026-04-18",
-      requester_shift_code_ids: ["44"] as unknown as number[],
-      requester_focus_area_id: 12,
-      requester_custom_start_time: null,
-      requester_custom_end_time: null,
+      requester_state: {
+        kind: "worked",
+        segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+        absenceTypeId: null,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
       target_emp_id: null,
       target_first_name: null,
       target_last_name: null,
       target_shift_date: null,
-      target_shift_code_ids: null,
-      target_focus_area_id: null,
-      target_custom_start_time: null,
-      target_custom_end_time: null,
+      target_state: null,
       absence_type_id: null,
       parent_request_id: null,
       admin_user_id: null,
@@ -343,10 +423,80 @@ describe("rowToShiftRequest", () => {
       updated_at: "2026-04-18T12:00:00.000Z",
     } satisfies DbShiftRequest;
 
-    const result = rowToShiftRequest(row, shiftCodeMap);
+    const result = rowToShiftRequest(
+      row,
+      assignmentLabelMap,
+      undefined,
+      assignmentIdByPair,
+    );
 
-    expect(result.requesterShiftCodeIds).toEqual([44]);
+    expect(result.requesterAssignmentDefinitionIds).toEqual([44]);
     expect(result.requesterShiftLabel).toBe("D");
+  });
+
+  it("derives request fields from canonical request state", () => {
+    const row = {
+      id: "req-2",
+      org_id: "org-1",
+      type: "swap",
+      status: "open",
+      requester_emp_id: "emp-1",
+      requester_first_name: "Nic",
+      requester_last_name: "Kosmas",
+      requester_shift_date: "2026-04-18",
+      requester_state: {
+        kind: "worked",
+        segments: [{ shiftId: 101, jobId: 91, position: 0 }],
+        absenceTypeId: null,
+        customStartTime: "07:00:00",
+        customEndTime: "15:00:00",
+        seriesId: null,
+        fromRecurring: false,
+      },
+      target_emp_id: "emp-2",
+      target_first_name: "Sarah",
+      target_last_name: "Jenkins",
+      target_shift_date: "2026-04-19",
+      target_state: {
+        kind: "worked",
+        segments: [{ shiftId: 102, jobId: 92, position: 0 }],
+        absenceTypeId: null,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      },
+      absence_type_id: null,
+      parent_request_id: null,
+      admin_user_id: null,
+      admin_note: null,
+      expires_at: "2026-04-21T12:00:00.000Z",
+      resolved_at: null,
+      created_at: "2026-04-18T12:00:00.000Z",
+      updated_at: "2026-04-18T12:00:00.000Z",
+    } satisfies DbShiftRequest;
+
+    const result = rowToShiftRequest(
+      row,
+      new Map([
+        [44, "D"],
+        [45, "E"],
+      ]),
+      undefined,
+      new Map([
+        ["101:91", 44],
+        ["102:92", 45],
+      ]),
+    );
+
+    expect(result.requesterShiftIds).toEqual([101]);
+    expect(result.requesterJobIds).toEqual([91]);
+    expect(result.requesterAssignmentDefinitionIds).toEqual([44]);
+    expect(result.requesterShiftLabel).toBe("D");
+    expect(result.targetShiftIds).toEqual([102]);
+    expect(result.targetJobIds).toEqual([92]);
+    expect(result.targetAssignmentDefinitionIds).toEqual([45]);
+    expect(result.targetShiftLabel).toBe("E");
   });
 });
 
@@ -511,26 +661,26 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
   });
 });
 
-// ── trimTime behavior via rowToShiftCode ─────────────────────────────────────
+// ── trimTime behavior via rowToAssignmentDefinition ─────────────────────────────────────
 
-describe("rowToShiftCode trimTime behavior", () => {
+describe("rowToAssignmentDefinition trimTime behavior", () => {
   it("strips seconds from default_start_time: '07:00:00' → '07:00'", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_start_time: "07:00:00" });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_start_time: "07:00:00" });
     expect(result.defaultStartTime).toBe("07:00");
   });
 
   it("keeps default_start_time already in HH:MM format: '07:00' → '07:00'", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_start_time: "07:00" });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_start_time: "07:00" });
     expect(result.defaultStartTime).toBe("07:00");
   });
 
   it("maps default_start_time: null → null", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_start_time: null });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_start_time: null });
     expect(result.defaultStartTime).toBeNull();
   });
 
   it("strips seconds from default_end_time: '15:30:45' → '15:30'", () => {
-    const result = rowToShiftCode({ ...baseShiftCodeRow, default_end_time: "15:30:45" });
+    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_end_time: "15:30:45" });
     expect(result.defaultEndTime).toBe("15:30");
   });
 });

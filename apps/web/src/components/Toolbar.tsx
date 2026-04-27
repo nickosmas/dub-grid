@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useRef, useEffect, useLayoutEffect, useCallback, Fragment } from "react";
+import { useMemo, useState, useRef, useCallback, Fragment } from "react";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
-import { createPortal } from "react-dom";
+import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { addDays, formatDate } from "@/lib/utils";
 import { FocusArea } from "@/types";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -125,62 +125,33 @@ function ToolsMenu({
   onRequestsToggle?: () => void;
   onPublishHistory?: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  const updatePosition = useCallback(() => {
-    const trigger = triggerRef.current;
-    if (!trigger) return;
-    const rect = trigger.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + 6,
-      left: rect.right,
-    });
-  }, [triggerRef]);
-
-  useLayoutEffect(() => { updatePosition(); }, [updatePosition]);
-
-  useEffect(() => {
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [updatePosition]);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (
-        menuRef.current?.contains(e.target as Node) ||
-        triggerRef.current?.contains(e.target as Node)
-      ) return;
-      onClose();
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose, triggerRef]);
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      role="menu"
-      className="dg-menu"
-      style={{
-        position: "fixed",
-        top: pos.top,
-        left: pos.left,
-        transform: "translateX(-100%)",
-        zIndex: 9999,
-        minWidth: 200,
+  return (
+    <Menu
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
       }}
     >
+      <MenuContent
+        anchor={triggerRef}
+        side="bottom"
+        align="end"
+        sideOffset={6}
+        positionMethod="fixed"
+        collisionPadding={8}
+        collisionAvoidance={{
+          side: "flip",
+          align: "shift",
+          fallbackAxisSide: "none",
+        }}
+        finalFocus={triggerRef}
+        style={{ minWidth: 200 }}
+      >
       {/* Authors toggle */}
       {onAuditToggle && (
         <Hint content={hint("Show who last edited each shift")} side="left">
-          <button
-            role="menuitem"
-            className="dg-menu-item"
+          <MenuItem
+            closeOnClick={false}
             onClick={onAuditToggle}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -189,17 +160,15 @@ function ToolsMenu({
             </svg>
             <span style={{ flex: 1 }}>Authors</span>
             <ToggleSwitch on={!!showAudit} />
-          </button>
+          </MenuItem>
         </Hint>
       )}
 
       {/* Requests */}
       {onRequestsToggle && (
         <Hint content={hint("Manage shift pickups, swaps, and calloffs")} side="left">
-          <button
-            role="menuitem"
-            className="dg-menu-item"
-            onClick={() => { onRequestsToggle(); onClose(); }}
+          <MenuItem
+            onClick={() => { onRequestsToggle(); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="17 1 21 5 17 9" />
@@ -213,16 +182,14 @@ function ToolsMenu({
                 {(requestsBadgeCount ?? 0) > 99 ? "99+" : requestsBadgeCount}
               </span>
             )}
-          </button>
+          </MenuItem>
         </Hint>
       )}
 
       {/* Print */}
       {onPrintOpen && (
-        <button
-          role="menuitem"
-          className="dg-menu-item"
-          onClick={() => { onPrintOpen(); onClose(); }}
+        <MenuItem
+          onClick={() => { onPrintOpen(); }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="6 9 6 2 18 2 18 9" />
@@ -230,15 +197,13 @@ function ToolsMenu({
             <rect x="6" y="14" width="12" height="8" />
           </svg>
           Print
-        </button>
+        </MenuItem>
       )}
 
       {/* Export CSV */}
       {onExportCSV && (
-        <button
-          role="menuitem"
-          className="dg-menu-item"
-          onClick={() => { onExportCSV(); onClose(); }}
+        <MenuItem
+          onClick={() => { onExportCSV(); }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -246,35 +211,31 @@ function ToolsMenu({
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
           Export CSV
-        </button>
+        </MenuItem>
       )}
 
       {/* Publish History */}
       {onPublishHistory && (
         <Hint content={hint("View all past schedule publications and changes")} side="left">
-          <button
-            role="menuitem"
-            className="dg-menu-item"
-            onClick={() => { onPublishHistory(); onClose(); }}
+          <MenuItem
+            onClick={() => { onPublishHistory(); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
             Publish History
-          </button>
+          </MenuItem>
         </Hint>
       )}
 
       {/* Auto Fill */}
       {canApplyRecurringSchedule && onApplyRecurring && (
         <Hint content={hint("Apply all recurring shift templates to the schedule")} side="left">
-          <button
-            role="menuitem"
-            className="dg-menu-item"
+          <MenuItem
             data-tour="toolbar-autofill"
             disabled={isApplyingRecurring}
-            onClick={() => { onApplyRecurring(); onClose(); }}
+            onClick={() => { onApplyRecurring(); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -284,30 +245,28 @@ function ToolsMenu({
               <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" />
             </svg>
             {isApplyingRecurring ? "Filling…" : "Auto Fill"}
-          </button>
+          </MenuItem>
         </Hint>
       )}
 
       {/* Import Previous Schedule */}
       {canImportPrevious && onImportPrevious && (
         <Hint content={hint("Copy shifts from the previous period into this one")} side="left">
-          <button
-            role="menuitem"
-            className="dg-menu-item"
+          <MenuItem
             data-tour="toolbar-import"
             disabled={isImportingPrevious}
-            onClick={() => { onImportPrevious(); onClose(); }}
+            onClick={() => { onImportPrevious(); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="1 4 1 10 7 10" />
               <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
             </svg>
             {isImportingPrevious ? "Importing..." : "Import Previous Schedule"}
-          </button>
+          </MenuItem>
         </Hint>
       )}
-    </div>,
-    document.body,
+      </MenuContent>
+    </Menu>
   );
 }
 

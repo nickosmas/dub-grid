@@ -1,71 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  classifyPersistedDraftShift,
-  hasPublishedShiftContent,
-  type DraftBreakdown,
-} from "@/lib/draft-utils";
-import type { DbShift } from "@/lib/db/types";
+import type { DraftBreakdown } from "@/lib/draft-utils";
+import type { DbScheduleCell } from "@/lib/db/types";
 import { getServiceClient } from "@/lib/supabase-service";
-
-const DISCARD_DELETE_BATCH_SIZE = 50;
-const POSTGREST_UNSAFE = /[(),."\\]/;
-
-type DraftShiftRow = Omit<
-  Pick<
-    DbShift,
-    | "emp_id"
-    | "date"
-    | "draft_shift_code_ids"
-    | "published_shift_code_ids"
-    | "draft_absence_type_id"
-    | "published_absence_type_id"
-    | "draft_is_delete"
-    | "draft_custom_start_time"
-    | "draft_custom_end_time"
-    | "published_custom_start_time"
-    | "published_custom_end_time"
-    | "version"
-  >,
-  "version"
-> & {
-  version?: number;
-};
-
-type DraftShiftQueryRow = DraftShiftRow & {
-  updated_by?: string | null;
-  employees?: Array<{ org_id: string }>;
-};
-
-function assertSafeFilterValue(value: string, label: string): void {
-  if (POSTGREST_UNSAFE.test(value)) {
-    throw new Error(`Unsafe PostgREST filter value for ${label}`);
-  }
-}
-
-function hasPublishedState(shift: DraftShiftRow): boolean {
-  return hasPublishedShiftContent(shift);
-}
-
-export function hasResidualDraftState(shift: DraftShiftRow): boolean {
-  const draftIds = shift.draft_shift_code_ids ?? [];
-  const draftAbsId = shift.draft_absence_type_id ?? null;
-  const draftStartTime = shift.draft_custom_start_time ?? null;
-  const draftEndTime = shift.draft_custom_end_time ?? null;
-
-  return (
-    shift.draft_is_delete
-    || draftIds.length > 0
-    || draftAbsId != null
-    || draftStartTime != null
-    || draftEndTime != null
-  );
-}
-
-export function classifyDraftShift(
-  shift: DraftShiftRow,
-): "new" | "modified" | "deleted" | null {
-  return classifyPersistedDraftShift(shift);
-}
+import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 
 export async function fetchScheduleDraftBreakdown(input: {
   orgId: string;
@@ -75,17 +12,20 @@ export async function fetchScheduleDraftBreakdown(input: {
   serviceClient?: SupabaseClient;
 }): Promise<DraftBreakdown> {
   const serviceClient = input.serviceClient ?? getServiceClient();
-  let shiftQuery = serviceClient
-    .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, updated_by, employees!inner(org_id)")
-    .eq("employees.org_id", input.orgId);
+  let scheduleCellQuery = serviceClient
+    .from("schedule_cells")
+    .select(
+      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+    )
+    .eq("org_id", input.orgId);
 
-  if (input.startDate) shiftQuery = shiftQuery.gte("date", input.startDate);
-  if (input.endDate) shiftQuery = shiftQuery.lte("date", input.endDate);
-  if (input.updatedBy) shiftQuery = shiftQuery.eq("updated_by", input.updatedBy);
+  if (input.startDate) scheduleCellQuery = scheduleCellQuery.gte("date", input.startDate);
+  if (input.endDate) scheduleCellQuery = scheduleCellQuery.lte("date", input.endDate);
+  if (input.updatedBy) scheduleCellQuery = scheduleCellQuery.eq("updated_by", input.updatedBy);
 
-  const { data: shiftRows, error: shiftError } = await shiftQuery;
-  if (shiftError) throw shiftError;
+  const { data: scheduleCellRows, error: scheduleCellError } =
+    await scheduleCellQuery;
+  if (scheduleCellError) throw scheduleCellError;
 
   let noteQuery = serviceClient
     .from("schedule_notes")
@@ -103,8 +43,15 @@ export async function fetchScheduleDraftBreakdown(input: {
   let modifiedShifts = 0;
   let deletedShifts = 0;
 
-  for (const row of (shiftRows ?? []) as DraftShiftQueryRow[]) {
-    const kind = classifyDraftShift(row);
+  for (const row of (scheduleCellRows ?? []) as DbScheduleCell[]) {
+    const kind = mapNormalizedScheduleCellRowToScheduleEntry(
+      row,
+      {
+        isScheduler: true,
+        assignmentLabelMap: new Map<number, string>(),
+        absenceTypeMap: new Map<number, string>(),
+      },
+    )?.draftKind ?? null;
     if (kind === "new") newShifts += 1;
     if (kind === "modified") modifiedShifts += 1;
     if (kind === "deleted") deletedShifts += 1;
@@ -151,82 +98,66 @@ export async function discardScheduleDraftsDirect(input: {
   serviceClient?: SupabaseClient;
 }): Promise<void> {
   const serviceClient = input.serviceClient ?? getServiceClient();
-  let shiftQuery = serviceClient
-    .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, version, updated_by, employees!inner(org_id)")
-    .eq("employees.org_id", input.orgId);
+  let scheduleCellQuery = serviceClient
+    .from("schedule_cells")
+    .select("id, version, snapshots:schedule_cell_snapshots(id, snapshot_kind)")
+    .eq("org_id", input.orgId);
 
-  if (input.userId) shiftQuery = shiftQuery.eq("updated_by", input.userId);
+  if (input.userId) scheduleCellQuery = scheduleCellQuery.eq("updated_by", input.userId);
 
-  const { data: shifts, error: fetchError } = await shiftQuery;
+  const { data: scheduleCells, error: fetchError } = await scheduleCellQuery;
   if (fetchError) throw fetchError;
 
-  const toUpsert: {
-    emp_id: string;
-    date: string;
-    draft_shift_code_ids: number[];
-    published_shift_code_ids: number[];
-    draft_absence_type_id: number | null;
-    published_absence_type_id: number | null;
-    draft_is_delete: boolean;
-    draft_custom_start_time: string | null;
-    draft_custom_end_time: string | null;
+  const cells = (scheduleCells ?? []) as Array<{
+    id: string;
     version: number;
-  }[] = [];
-  const toDelete: { emp_id: string; date: string }[] = [];
+    snapshots?: Array<{ id: string; snapshot_kind: "draft" | "published" }>;
+  }>;
 
-  for (const shift of (shifts ?? []) as DraftShiftQueryRow[]) {
-    if (!hasResidualDraftState(shift)) continue;
+  const draftSnapshotIdsToDelete: string[] = [];
+  const cellIdsToDelete: string[] = [];
+  const cellsToTouch: Array<{ id: string; version: number }> = [];
 
-    const hasPublished = hasPublishedState(shift);
-    const pubIds = shift.published_shift_code_ids ?? [];
-    const pubAbsId = shift.published_absence_type_id ?? null;
-    const pubStartTime = shift.published_custom_start_time ?? null;
-    const pubEndTime = shift.published_custom_end_time ?? null;
+  for (const cell of cells) {
+    const draftSnapshot = (cell.snapshots ?? []).find((snapshot) => snapshot.snapshot_kind === "draft");
+    if (!draftSnapshot) continue;
 
+    const hasPublished = (cell.snapshots ?? []).some((snapshot) => snapshot.snapshot_kind === "published");
     if (hasPublished) {
-      toUpsert.push({
-        emp_id: shift.emp_id,
-        date: shift.date,
-        draft_shift_code_ids: pubIds,
-        published_shift_code_ids: pubIds,
-        draft_absence_type_id: pubAbsId,
-        published_absence_type_id: pubAbsId,
-        draft_is_delete: false,
-        draft_custom_start_time: pubStartTime,
-        draft_custom_end_time: pubEndTime,
-        version: (shift.version ?? 0) + 1,
-      });
+      draftSnapshotIdsToDelete.push(draftSnapshot.id);
+      cellsToTouch.push({ id: cell.id, version: cell.version });
     } else {
-      toDelete.push({ emp_id: shift.emp_id, date: shift.date });
+      cellIdsToDelete.push(cell.id);
     }
   }
 
-  if (toUpsert.length > 0) {
-    const { error: upsertError } = await serviceClient
-      .from("shifts")
-      .upsert(toUpsert, { onConflict: "emp_id,date" });
-    if (upsertError) throw upsertError;
+  if (draftSnapshotIdsToDelete.length > 0) {
+    const { error: deleteDraftsError } = await serviceClient
+      .from("schedule_cell_snapshots")
+      .delete()
+      .in("id", draftSnapshotIdsToDelete);
+    if (deleteDraftsError) throw deleteDraftsError;
   }
 
-  if (toDelete.length > 0) {
-    for (const entry of toDelete) {
-      assertSafeFilterValue(entry.emp_id, "emp_id");
-      assertSafeFilterValue(entry.date, "date");
-    }
+  if (cellIdsToDelete.length > 0) {
+    const { error: deleteCellsError } = await serviceClient
+      .from("schedule_cells")
+      .delete()
+      .in("id", cellIdsToDelete);
+    if (deleteCellsError) throw deleteCellsError;
+  }
 
-    for (let index = 0; index < toDelete.length; index += DISCARD_DELETE_BATCH_SIZE) {
-      const batch = toDelete.slice(index, index + DISCARD_DELETE_BATCH_SIZE);
-      const orClauses = batch
-        .map((entry) => `and(emp_id.eq.${entry.emp_id},date.eq.${entry.date})`)
-        .join(",");
-
-      const { error: deleteError } = await serviceClient
-        .from("shifts")
-        .delete()
-        .or(orClauses);
-      if (deleteError) throw deleteError;
-    }
+  for (const cell of cellsToTouch) {
+    const { error: touchError } = await serviceClient
+      .from("schedule_cells")
+      .update({
+        version: cell.version + 1,
+        updated_by: input.userId ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cell.id)
+      .eq("version", cell.version);
+    if (touchError) throw touchError;
   }
 
   let noteDeleteQuery = serviceClient

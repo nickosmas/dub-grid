@@ -41,7 +41,7 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
 
 function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShifts: number }) {
   const segments = fa.codes.map((c) => ({
-    label: c.shiftCodeLabel,
+    label: c.assignmentLabel,
     value: c.count,
     color: c.color,
   }));
@@ -76,7 +76,7 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
           {fa.codes.map((c) => {
             const codePct = fa.total > 0 ? Math.round((c.count / fa.total) * 100) : 0;
             return (
-              <div key={c.shiftCodeId} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div key={c.assignmentId} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span
                   style={{
                     width: 9,
@@ -95,9 +95,9 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                   }}
-                  aria-label={c.shiftCodeLabel}
+                  aria-label={c.assignmentLabel}
                 >
-                  {c.shiftCodeLabel}
+                  {c.assignmentLabel}
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-primary)", flexShrink: 0 }}>
                   {c.count}

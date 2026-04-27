@@ -14,7 +14,7 @@ import { useLogout } from "@/hooks";
  */
 export default function SetupGuard({ children }: { children: React.ReactNode }) {
   const perms = usePermissions();
-  const { setupStatus, loading: orgLoading, org } = useOrganizationData();
+  const { setupStatus, loading: orgLoading, org } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
   const { signOutLocal } = useLogout();
 

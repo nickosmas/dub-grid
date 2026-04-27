@@ -2,17 +2,12 @@
 
 import React, { useRef, useEffect } from "react";
 import { useDraggable } from "@dnd-kit/core";
+import type { GridCellId, ScheduleCellInput } from "@/types";
 
 export interface ShiftDragData {
-  empId: string;
-  date: Date;
-  dateKey: string;
+  cellId: GridCellId;
   label: string;
-  shiftCodeIds: number[];
-  absenceTypeId: number | null;
-  customStartTime: string | null;
-  customEndTime: string | null;
-  focusAreaName: string;
+  payload: ScheduleCellInput;
   pillColor: string;
   pillText: string;
 }
@@ -61,40 +56,13 @@ export default function DraggableShift({
         right: 0,
         bottom: 0,
         left: 0,
+        display: "flex",
         opacity: isDragging ? 0.5 : 1,
         transform: isDragging ? "scale(0.95)" : "none",
         transition: "opacity 150ms ease, transform 150ms ease",
         cursor: disabled ? undefined : "grab",
       }}
     >
-      {/* Grip handle — visible on hover */}
-      {!disabled && (
-        <div
-          className="dg-drag-grip"
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            left: 2,
-            top: "50%",
-            transform: "translateY(-50%)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            opacity: 0,
-            transition: "opacity 150ms ease",
-            pointerEvents: "none",
-            zIndex: 1,
-          }}
-        >
-          {/* 6-dot grip pattern */}
-          {[0, 1, 2].map(r => (
-            <div key={r} style={{ display: "flex", gap: 2 }}>
-              <div style={{ width: 3, height: 3, borderRadius: "50%", background: "currentColor", opacity: 0.4 }} />
-              <div style={{ width: 3, height: 3, borderRadius: "50%", background: "currentColor", opacity: 0.4 }} />
-            </div>
-          ))}
-        </div>
-      )}
       {children}
     </div>
   );

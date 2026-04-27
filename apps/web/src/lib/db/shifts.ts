@@ -1,9 +1,15 @@
 import {
-  supabase, OptimisticLockError, resolveCodeLabels, logAudit,
+  supabase, OptimisticLockError, logAudit,
 } from "./shared";
-import type { DbShift } from "./types";
-import { mapDbShiftRowToShiftEntry } from "./shift-row-mapper";
-import type { ShiftMap } from "@/types";
+import { fetchAssignmentDefinitions } from "./config";
+import type { DbScheduleCell } from "./types";
+import type { ScheduleCellInput, ScheduleCellSegmentInput, ShiftMap } from "@/types";
+import {
+  buildShiftJobPairKey,
+  createAssignmentDefinitionIdByPairMap,
+  type SegmentCompatibilityMaps,
+} from "@/lib/shift-job-segments";
+import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 
 const MAX_RANGE_DAYS = 366;
 
@@ -19,32 +25,60 @@ function assertDateRange(startDate?: string, endDate?: string): void {
 export async function fetchShifts(
   orgId: string,
   isScheduler: boolean,
-  shiftCodeMap: Map<number, string>,
+  assignmentLabelMap: Map<number, string>,
   absenceTypeMap?: Map<number, string>,
   startDate?: string,
   endDate?: string,
+  segmentCompatibility?: SegmentCompatibilityMaps | null,
 ): Promise<ShiftMap> {
   assertDateRange(startDate, endDate);
-  // Intentionally does NOT filter employees.archived_at — historical shifts for
-  // terminated employees must remain visible in past schedule views. Write policies
-  // (admin_insert_shifts, admin_update_shifts) enforce archived_at IS NULL at the
-  // RLS layer, so no new shifts can be created for archived employees.
+  return fetchNormalizedShifts(
+    orgId,
+    isScheduler,
+    assignmentLabelMap,
+    absenceTypeMap,
+    startDate,
+    endDate,
+    segmentCompatibility,
+  );
+}
+
+async function fetchNormalizedShifts(
+  orgId: string,
+  isScheduler: boolean,
+  assignmentLabelMap: Map<number, string>,
+  absenceTypeMap?: Map<number, string>,
+  startDate?: string,
+  endDate?: string,
+  segmentCompatibility?: SegmentCompatibilityMaps | null,
+): Promise<ShiftMap> {
   let query = supabase
-    .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, version, series_id, from_recurring, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, created_by, updated_by, created_at, updated_at, employees!inner(org_id)")
-    .eq("employees.org_id", orgId);
+    .from("schedule_cells")
+    .select(
+      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+    )
+    .eq("org_id", orgId);
   if (startDate) query = query.gte("date", startDate);
   if (endDate) query = query.lte("date", endDate);
   const { data, error } = await query;
   if (error) throw error;
 
+  let assignmentIdByPair: Map<string, number> | undefined;
+  if (!segmentCompatibility && (data?.length ?? 0) > 0) {
+    assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
+      await fetchAssignmentDefinitions(orgId, true),
+    );
+  }
+
   const atMap = absenceTypeMap ?? new Map<number, string>();
   const map: ShiftMap = {};
-  for (const row of data as DbShift[]) {
-    const entry = mapDbShiftRowToShiftEntry(row, {
+  for (const row of (data ?? []) as DbScheduleCell[]) {
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
       isScheduler,
-      shiftCodeMap,
+      assignmentLabelMap,
+      assignmentIdByPair,
       absenceTypeMap: atMap,
+      segmentCompatibility,
     });
     if (entry) {
       map[`${row.emp_id}_${row.date}`] = entry;
@@ -53,22 +87,156 @@ export async function fetchShifts(
   return map;
 }
 
+function sortSegments(
+  segments: ScheduleCellSegmentInput[],
+): ScheduleCellSegmentInput[] {
+  return [...segments].sort((left, right) => left.position - right.position);
+}
+
+async function resolveAssignmentDefinitionIdsForSegments(
+  orgId: string,
+  segments: ScheduleCellSegmentInput[],
+): Promise<number[]> {
+  if (segments.length === 0) return [];
+
+  const orderedSegments = sortSegments(segments);
+  const codeByPair = createAssignmentDefinitionIdByPairMap(
+    await fetchAssignmentDefinitions(orgId, true),
+  );
+
+  return orderedSegments
+    .map((segment) =>
+      codeByPair.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)) ?? null,
+    )
+    .filter((assignmentId): assignmentId is number => assignmentId != null);
+}
+
+async function resolveScheduleCellStorage(
+  orgId: string,
+  input: ScheduleCellInput,
+): Promise<{
+  shiftIds: Array<number | null>;
+  jobIds: number[];
+  assignmentIds: number[];
+  absenceTypeId: number | null;
+  customStartTime: string | null;
+  customEndTime: string | null;
+}> {
+  if (input.kind === "deleted") {
+    return {
+      shiftIds: [],
+      jobIds: [],
+      assignmentIds: [],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+    };
+  }
+
+  if (input.kind === "absence") {
+    return {
+      shiftIds: [],
+      jobIds: [],
+      assignmentIds: [],
+      absenceTypeId: input.absenceTypeId ?? null,
+      customStartTime: null,
+      customEndTime: null,
+    };
+  }
+
+  const orderedSegments = sortSegments(input.segments);
+  return {
+    shiftIds: orderedSegments.map((segment) => segment.shiftId),
+    jobIds: orderedSegments.map((segment) => segment.jobId),
+    assignmentIds: await resolveAssignmentDefinitionIdsForSegments(orgId, orderedSegments),
+    absenceTypeId: null,
+    customStartTime: input.customStartTime ?? null,
+    customEndTime: input.customEndTime ?? null,
+  };
+}
+
+type ScheduleCellSnapshotPayload = {
+  cell_id: string;
+  org_id: string;
+  emp_id: string;
+  date: string;
+  version: number;
+  focus_area_id: number | null;
+  series_id: string | null;
+  from_recurring: boolean;
+  state_kind: "worked" | "absence" | "deleted";
+  absence_type_id: number | null;
+  custom_start_time: string | null;
+  custom_end_time: string | null;
+  shift_ids: Array<number | null>;
+  job_ids: number[];
+};
+
+async function fetchScheduleCellSnapshotPayload(
+  orgId: string,
+  empId: string,
+  date: string,
+  snapshotKind: "draft" | "published",
+): Promise<ScheduleCellSnapshotPayload | null> {
+  const { data, error } = await supabase.rpc("get_schedule_cell_snapshot_payload", {
+    p_org_id: orgId,
+    p_emp_id: empId,
+    p_date: date,
+    p_snapshot_kind: snapshotKind,
+  });
+
+  if (error) throw error;
+  const rows = (data ?? []) as ScheduleCellSnapshotPayload[];
+  return rows[0] ?? null;
+}
+
+async function readCurrentScheduleCellVersion(
+  orgId: string,
+  empId: string,
+  date: string,
+): Promise<number | undefined> {
+  const { data, error } = await supabase
+    .from("schedule_cells")
+    .select("version")
+    .eq("org_id", orgId)
+    .eq("emp_id", empId)
+    .eq("date", date)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data?.version as number | undefined) ?? undefined;
+}
+
+async function throwOptimisticLock(
+  empId: string,
+  date: string,
+  orgId: string,
+  expectedVersion: number,
+): Promise<never> {
+  throw new OptimisticLockError(
+    `${empId}:${date}`,
+    expectedVersion,
+    await readCurrentScheduleCellVersion(orgId, empId, date),
+  );
+}
+
 /**
- * Checks if any shift codes in the array have overlapping default time ranges.
+ * Checks if any assignment definitions in the array have overlapping default time ranges.
  * Returns the first overlapping pair or null if no conflicts.
  * Mirrors the DB trigger logic for immediate client-side feedback.
  */
-export async function checkShiftCodeOverlap(
-  shiftCodeIds: number[],
+export async function checkAssignmentDefinitionOverlap(
+  orgId: string,
+  assignmentIds: number[],
 ): Promise<{ labelA: string; labelB: string } | null> {
-  if (shiftCodeIds.length < 2) return null;
+  if (assignmentIds.length < 2) return null;
 
-  const { data: codes, error } = await supabase
-    .from("shift_codes")
-    .select("id, label, default_start_time, default_end_time")
-    .in("id", shiftCodeIds);
-
-  if (error || !codes) return null;
+  const codeById = new Map(
+    (await fetchAssignmentDefinitions(orgId, true)).map((assignment) => [
+      assignment.id,
+      assignment,
+    ]),
+  );
 
   // Convert TIME string "HH:MM:SS" to minutes from midnight
   function toMinutes(time: string | null): number | null {
@@ -77,12 +245,14 @@ export async function checkShiftCodeOverlap(
     return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
   }
 
-  const parsed = codes
-    .map((c: { id: number; label: string; default_start_time: string | null; default_end_time: string | null }) => ({
-      id: c.id,
-      label: c.label,
-      start: toMinutes(c.default_start_time),
-      end: toMinutes(c.default_end_time),
+  const parsed = assignmentIds
+    .map((assignmentId) => codeById.get(assignmentId) ?? null)
+    .filter((assignment): assignment is NonNullable<typeof assignment> => assignment != null)
+    .map((assignment) => ({
+      id: assignment.id,
+      label: assignment.label,
+      start: toMinutes(assignment.defaultStartTime ?? null),
+      end: toMinutes(assignment.defaultEndTime ?? null),
     }))
     .filter((c: { start: number | null; end: number | null }) => c.start !== null && c.end !== null);
 
@@ -104,81 +274,61 @@ export async function checkShiftCodeOverlap(
 export async function upsertShift(
   empId: string,
   date: string,
-  shiftCodeIds: number[],
+  input: ScheduleCellInput,
   orgId: string,
-  customStartTime?: string | null,
-  customEndTime?: string | null,
   expectedVersion?: number,
-  absenceTypeId?: number | null,
 ): Promise<void> {
+  if (input.kind === "deleted") {
+    await deleteShift(empId, date, orgId, expectedVersion);
+    return;
+  }
+
+  const {
+    shiftIds,
+    jobIds,
+    assignmentIds,
+    absenceTypeId,
+    customStartTime,
+    customEndTime,
+  } = await resolveScheduleCellStorage(orgId, input);
   // Client-side overlap check for immediate feedback
-  if (shiftCodeIds.length >= 2 && absenceTypeId == null) {
-    const overlap = await checkShiftCodeOverlap(shiftCodeIds);
+  if (assignmentIds.length >= 2 && absenceTypeId == null) {
+    const overlap = await checkAssignmentDefinitionOverlap(orgId, assignmentIds);
     if (overlap) {
       throw new Error(
-        `Shift codes "${overlap.labelA}" and "${overlap.labelB}" have overlapping time ranges`,
+        `Assignments "${overlap.labelA}" and "${overlap.labelB}" have overlapping time ranges`,
       );
     }
   }
-
-  const payload: Record<string, unknown> = {
-    emp_id: empId,
-    date,
-    org_id: orgId,
-    draft_shift_code_ids: absenceTypeId != null ? [] : shiftCodeIds,
-    draft_absence_type_id: absenceTypeId ?? null,
-    draft_is_delete: false,
-  };
-  if (customStartTime !== undefined) payload.draft_custom_start_time = customStartTime;
-  if (customEndTime !== undefined) payload.draft_custom_end_time = customEndTime;
-
-  if (expectedVersion !== undefined) {
-    // Existing shift: use update with optimistic lock
-    payload.version = expectedVersion + 1;
-    const { data, error } = await supabase
-      .from("shifts")
-      .update(payload)
-      .eq("org_id", orgId)
-      .eq("emp_id", empId)
-      .eq("date", date)
-      .eq("version", expectedVersion)
-      .select("version")
-      .single();
-    if (error) {
-      if (error.code === "PGRST116") {
-        const { data: currentShift } = await supabase
-          .from("shifts")
-          .select("version")
-          .eq("emp_id", empId)
-          .eq("date", date)
-          .single();
-        throw new OptimisticLockError(
-          `${empId}:${date}`,
-          expectedVersion,
-          currentShift?.version,
-        );
-      }
-      throw error;
+  const { error } = await supabase.rpc("write_schedule_cell_snapshot", {
+    p_org_id: orgId,
+    p_emp_id: empId,
+    p_date: date,
+    p_snapshot_kind: "draft",
+    p_state_kind: input.kind,
+    p_shift_ids: shiftIds,
+    p_job_ids: jobIds,
+    p_absence_type_id: absenceTypeId ?? null,
+    p_custom_start_time: customStartTime ?? null,
+    p_custom_end_time: customEndTime ?? null,
+    p_series_id: input.seriesId ?? null,
+    p_from_recurring: input.fromRecurring ?? false,
+    p_expected_version: expectedVersion ?? 0,
+  });
+  if (error) {
+    if (error.message?.includes("Optimistic lock failed")) {
+      await throwOptimisticLock(empId, date, orgId, expectedVersion ?? 0);
     }
-    if (!data) {
-      throw new OptimisticLockError(`${empId}:${date}`, expectedVersion);
-    }
-  } else {
-    // New shift: insert only — do NOT upsert, to avoid silently overwriting
-    // a concurrent insert by another user without incrementing the version.
-    const { error } = await supabase
-      .from("shifts")
-      .insert(payload);
-    if (error) {
-      // 23505 = unique_violation (row already exists from a concurrent insert)
-      if (error.code === "23505") {
-        throw new OptimisticLockError(`${empId}:${date}`, 0);
-      }
-      throw error;
-    }
+    throw error;
   }
   const action = expectedVersion !== undefined ? "shift.updated" : "shift.created";
-  void logAudit(action, "shift", `${empId}:${date}`, { shiftCodeIds, absenceTypeId }, orgId);
+  void logAudit(
+    action,
+    "shift",
+    `${empId}:${date}`,
+    { input, assignmentIds, absenceTypeId },
+    orgId,
+  );
 }
 
 /** Updates only the draft custom start/end time for an existing shift row. */
@@ -190,101 +340,71 @@ export async function upsertShiftTimes(
   orgId: string,
   expectedVersion?: number,
 ): Promise<void> {
-  const payload: Record<string, unknown> = {
-    emp_id: empId,
+  const draftPayload = await fetchScheduleCellSnapshotPayload(
+    orgId,
+    empId,
     date,
-    org_id: orgId,
-    draft_custom_start_time: customStartTime,
-    draft_custom_end_time: customEndTime,
-  };
+    "draft",
+  );
+  const publishedPayload = await fetchScheduleCellSnapshotPayload(
+    orgId,
+    empId,
+    date,
+    "published",
+  );
+  const sourcePayload =
+    draftPayload?.state_kind === "worked"
+      ? draftPayload
+      : publishedPayload?.state_kind === "worked"
+        ? publishedPayload
+        : null;
 
-  if (expectedVersion !== undefined) {
-    payload.version = expectedVersion + 1;
-    const { data, error } = await supabase
-      .from("shifts")
-      .update(payload)
-      .eq("org_id", orgId)
-      .eq("emp_id", empId)
-      .eq("date", date)
-      .eq("version", expectedVersion)
-      .select("version")
-      .single();
-    if (error) {
-      if (error.code === "PGRST116") {
-        const { data: currentShift } = await supabase
-          .from("shifts")
-          .select("version")
-          .eq("org_id", orgId)
-          .eq("emp_id", empId)
-          .eq("date", date)
-          .single();
-        throw new OptimisticLockError(
-          `${empId}:${date}`,
-          expectedVersion,
-          currentShift?.version,
-        );
-      }
-      throw error;
+  if (!sourcePayload) {
+    throw new Error("Cannot set custom times without a worked schedule cell");
+  }
+
+  const { error } = await supabase.rpc("write_schedule_cell_snapshot", {
+    p_org_id: orgId,
+    p_emp_id: empId,
+    p_date: date,
+    p_snapshot_kind: "draft",
+    p_state_kind: "worked",
+    p_shift_ids: sourcePayload.shift_ids ?? [],
+    p_job_ids: sourcePayload.job_ids ?? [],
+    p_absence_type_id: null,
+    p_custom_start_time: customStartTime,
+    p_custom_end_time: customEndTime,
+    p_series_id: sourcePayload.series_id ?? null,
+    p_from_recurring: sourcePayload.from_recurring ?? false,
+    p_focus_area_id: sourcePayload.focus_area_id ?? null,
+    p_expected_version: expectedVersion ?? sourcePayload.version ?? 0,
+  });
+
+  if (error) {
+    if (error.message?.includes("Optimistic lock failed")) {
+      await throwOptimisticLock(
+        empId,
+        date,
+        orgId,
+        expectedVersion ?? sourcePayload.version ?? 0,
+      );
     }
-    if (!data) {
-      throw new OptimisticLockError(`${empId}:${date}`, expectedVersion);
-    }
-  } else {
-    const { error } = await supabase
-      .from("shifts")
-      .upsert(payload, { onConflict: "emp_id,date" });
-    if (error) throw error;
+    throw error;
   }
 }
 
 export async function deleteShift(empId: string, date: string, orgId: string, expectedVersion?: number): Promise<void> {
-  // Soft delete: set draft_is_delete so the publish RPC knows to clear it.
-  // Uses update (not upsert) to avoid creating orphaned rows when no shift exists.
-  const payload: Record<string, unknown> = {
-    draft_shift_code_ids: [],
-    draft_absence_type_id: null,
-    draft_is_delete: true,
-  };
-
-  if (expectedVersion !== undefined) {
-    payload.version = expectedVersion + 1;
-    const { data, error } = await supabase
-      .from("shifts")
-      .update(payload)
-      .eq("org_id", orgId)
-      .eq("emp_id", empId)
-      .eq("date", date)
-      .eq("version", expectedVersion)
-      .select("version")
-      .single();
-    if (error) {
-      if (error.code === "PGRST116") {
-        const { data: currentShift } = await supabase
-          .from("shifts")
-          .select("version")
-          .eq("org_id", orgId)
-          .eq("emp_id", empId)
-          .eq("date", date)
-          .single();
-        throw new OptimisticLockError(
-          `${empId}:${date}`,
-          expectedVersion,
-          currentShift?.version,
-        );
-      }
-      throw error;
+  const { error } = await supabase.rpc("delete_schedule_cell_draft", {
+    p_org_id: orgId,
+    p_emp_id: empId,
+    p_date: date,
+    p_expected_version: expectedVersion ?? null,
+  });
+  if (error) {
+    if (error.message?.includes("Optimistic lock failed")) {
+      await throwOptimisticLock(empId, date, orgId, expectedVersion ?? 0);
     }
-    if (!data) {
-      throw new OptimisticLockError(`${empId}:${date}`, expectedVersion);
-    }
-  } else {
-    const { error } = await supabase
-      .from("shifts")
-      .update(payload)
-      .eq("org_id", orgId)
-      .eq("emp_id", empId)
-      .eq("date", date);
-    if (error) throw error;
+    throw error;
   }
   void logAudit("shift.deleted", "shift", `${empId}:${date}`, {}, orgId);
 }
@@ -299,19 +419,30 @@ export async function moveShift(
   sourceDate: string,
   targetEmpId: string,
   targetDate: string,
-  shiftCodeIds: number[],
-  absenceTypeId?: number | null,
+  input: ScheduleCellInput,
   dragMode: "move" | "copy" = "move",
   expectedVersion?: number,
 ): Promise<void> {
+  const {
+    shiftIds,
+    jobIds,
+    assignmentIds,
+    absenceTypeId,
+    customStartTime,
+    customEndTime,
+  } = await resolveScheduleCellStorage(orgId, input);
   const { error } = await supabase.rpc("move_shift", {
     p_org_id: orgId,
     p_source_emp_id: sourceEmpId,
     p_source_date: sourceDate,
     p_target_emp_id: targetEmpId,
     p_target_date: targetDate,
-    p_shift_code_ids: shiftCodeIds,
+    p_kind: input.kind,
+    p_shift_ids: shiftIds,
+    p_job_ids: jobIds,
     p_absence_type_id: absenceTypeId ?? null,
+    p_custom_start_time: customStartTime ?? null,
+    p_custom_end_time: customEndTime ?? null,
     p_drag_mode: dragMode,
     p_expected_version: expectedVersion ?? null,
   });
@@ -327,7 +458,8 @@ export async function moveShift(
   void logAudit("shift.moved", "shift", `${sourceEmpId}:${sourceDate}`, {
     targetEmpId,
     targetDate,
-    shiftCodeIds,
+    input,
+    assignmentIds,
     absenceTypeId: absenceTypeId ?? null,
     dragMode,
   }, orgId);

@@ -8,6 +8,7 @@ import {
   updateOrganizationSettings,
 } from "@/lib/db";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 
 export default function ScheduleRules({
   organization,
@@ -19,15 +20,24 @@ export default function ScheduleRules({
   const [enforceConflictPrevention, setEnforceConflictPrevention] = useState(
     organization.enforceConflictPrevention,
   );
+  const [payPeriodStartDate, setPayPeriodStartDate] = useState(
+    organization.payPeriodStartDate ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnforceConflictPrevention(organization.enforceConflictPrevention);
-  }, [organization.enforceConflictPrevention, organization.updatedAt]);
+    setPayPeriodStartDate(organization.payPeriodStartDate ?? "");
+  }, [
+    organization.enforceConflictPrevention,
+    organization.payPeriodStartDate,
+    organization.updatedAt,
+  ]);
 
   const isModified =
-    enforceConflictPrevention !== organization.enforceConflictPrevention;
+    enforceConflictPrevention !== organization.enforceConflictPrevention
+    || payPeriodStartDate !== (organization.payPeriodStartDate ?? "");
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -41,17 +51,15 @@ export default function ScheduleRules({
         orgId: organization.id,
         expectedUpdatedAt: organization.updatedAt,
         enforceConflictPrevention,
+        payPeriodStartDate: payPeriodStartDate || null,
       });
       onOrganizationSave(updated);
-      toast.success(
-        enforceConflictPrevention
-          ? "Conflict enforcement enabled"
-          : "Conflict enforcement disabled",
-      );
+      toast.success("Schedule rules saved");
     } catch (err) {
       if (err instanceof OrganizationSettingsConflictError) {
         onOrganizationSave(err.latestOrganization);
         setEnforceConflictPrevention(err.latestOrganization.enforceConflictPrevention);
+        setPayPeriodStartDate(err.latestOrganization.payPeriodStartDate ?? "");
         toast.error("Schedule rules changed elsewhere. Review the latest values and try again.");
       } else {
         toast.error("Failed to update setting");
@@ -60,7 +68,13 @@ export default function ScheduleRules({
       setSaving(false);
       setConfirmOpen(false);
     }
-  }, [enforceConflictPrevention, onOrganizationSave, organization.id, organization.updatedAt]);
+  }, [
+    enforceConflictPrevention,
+    onOrganizationSave,
+    organization.id,
+    organization.updatedAt,
+    payPeriodStartDate,
+  ]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -86,6 +100,29 @@ export default function ScheduleRules({
               transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
             }} />
           </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div>
+          <label
+            htmlFor="pay-period-start-date"
+            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
+          >
+            Biweekly pay period start date
+          </label>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
+            Set one anchor date and DubGrid will align every 2-week schedule view to that repeating pay period. Leave blank to keep 2-week views aligned to calendar weeks.
+          </div>
+        </div>
+        <div style={{ maxWidth: 260 }}>
+          <CalendarDatePicker
+            id="pay-period-start-date"
+            value={payPeriodStartDate}
+            onChange={setPayPeriodStartDate}
+            label="Biweekly pay period start date"
+            allowClear
+          />
         </div>
       </div>
 

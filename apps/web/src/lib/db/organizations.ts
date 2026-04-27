@@ -77,6 +77,7 @@ export async function updateOrganization(org: Organization): Promise<void> {
       department_label: org.departmentLabel || null,
       shift_display_mode: org.shiftDisplayMode || 'code',
       timezone: org.timezone || null,
+      pay_period_start_date: org.payPeriodStartDate || null,
       enforce_conflict_prevention: org.enforceConflictPrevention ?? false,
       data_retention_days: org.dataRetentionDays ?? 365,
       feature_overrides: org.featureOverrides ?? {},

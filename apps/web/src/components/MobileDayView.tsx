@@ -6,7 +6,7 @@ import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import {
   Employee,
-  ShiftCode,
+  AssignmentDefinition,
   ShiftCategory,
   FocusArea,
   IndicatorType,
@@ -29,12 +29,12 @@ interface MobileDayViewProps {
   allEmployees: Employee[];
   dates: Date[];
   shiftForKey: (empId: string, date: Date) => string | null;
-  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
-  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   handleCellClick: (emp: Employee, date: Date, focusAreaName?: string) => void;
   today: Date;
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
@@ -65,12 +65,12 @@ export default function MobileDayView({
   filteredEmployees,
   dates,
   shiftForKey,
-  shiftCodeIdsForKey,
+  assignmentIdsForKey,
   getShiftStyle,
   handleCellClick,
   today,
   focusAreas,
-  shiftCodes,
+  assignments,
   isCellInteractive = false,
   activeIndicatorIdsForKey,
   activeFocusArea,
@@ -101,9 +101,9 @@ export default function MobileDayView({
     [focusAreas],
   );
 
-  const shiftCodeById = useMemo(
-    () => new Map(shiftCodes.map((sc) => [sc.id, sc])),
-    [shiftCodes],
+  const assignmentById = useMemo(
+    () => new Map(assignments.map((sc) => [sc.id, sc])),
+    [assignments],
   );
 
   // For each section, exclusive code IDs
@@ -112,7 +112,7 @@ export default function MobileDayView({
       sections.map((section) => {
         const focusAreaId = focusAreaIdByName[section];
         const ids = new Set(
-          shiftCodes
+          assignments
             .filter(
               (st) => focusAreaId != null && st.focusAreaId === focusAreaId,
             )
@@ -121,7 +121,7 @@ export default function MobileDayView({
         return [section, ids];
       }),
     );
-  }, [sections, shiftCodes, focusAreaIdByName]);
+  }, [sections, assignments, focusAreaIdByName]);
 
   // Focus area initials lookup (e.g. "Skilled Nursing" → "SN")
   const focusAreaInitials = useMemo(
@@ -152,11 +152,11 @@ export default function MobileDayView({
         ? rawHomeEmps
         : rawHomeEmps.filter((emp) =>
             visibleDates.some((date) => {
-              const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+              const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
               return codeIds.some(
                 (id) =>
                   exclusiveCodeIds.has(id) ||
-                  shiftCodeById.get(id)?.focusAreaId == null,
+                  assignmentById.get(id)?.focusAreaId == null,
               );
             }),
           );
@@ -164,7 +164,7 @@ export default function MobileDayView({
         if (sectionId != null && emp.focusAreaIds.includes(sectionId))
           return false;
         return visibleDates.some((date) => {
-          const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+          const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
           return codeIds.some((id) => exclusiveCodeIds.has(id));
         });
       });
@@ -177,8 +177,8 @@ export default function MobileDayView({
     filteredEmployees,
     isCellInteractive,
     visibleDates,
-    shiftCodeIdsForKey,
-    shiftCodeById,
+    assignmentIdsForKey,
+    assignmentById,
   ]);
 
   return (
@@ -197,11 +197,11 @@ export default function MobileDayView({
           ? rawHomeEmps
           : rawHomeEmps.filter((emp) =>
               visibleDates.some((date) => {
-                const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                 return codeIds.some(
                   (id) =>
                     exclusiveCodeIds.has(id) ||
-                    shiftCodeById.get(id)?.focusAreaId == null,
+                    assignmentById.get(id)?.focusAreaId == null,
                 );
               }),
             );
@@ -211,7 +211,7 @@ export default function MobileDayView({
           if (sectionId != null && emp.focusAreaIds.includes(sectionId))
             return false;
           return visibleDates.some((date) => {
-            const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+            const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
             return codeIds.some((id) => exclusiveCodeIds.has(id));
           });
         });
@@ -221,13 +221,13 @@ export default function MobileDayView({
 
         // Tally — aggregate across all visible dates
         const tallies: Record<string, Record<string, number>> = {};
-        if (shiftCodeIdsForKey) {
+        if (assignmentIdsForKey) {
           for (const date of visibleDates) {
             const dayTallies = computeDailyTallies(
               sectionEmps,
               date,
-              shiftCodeIdsForKey,
-              shiftCodeById,
+              assignmentIdsForKey,
+              assignmentById,
               exclusiveCodeIds,
             );
             for (const [catId, catTally] of Object.entries(dayTallies)) {
@@ -391,7 +391,7 @@ export default function MobileDayView({
                     const isToday = dk === todayKey;
                     const combinedLabel = shiftForKey(emp.id, date) ?? "";
                     const labelParts = combinedLabel.split("/");
-                    const codeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                    const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                     const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                     const hasIndicators =
                       activeIndicatorIdsForKey && sectionId != null
@@ -424,7 +424,7 @@ export default function MobileDayView({
                           },
                         ]
                       : codeIds.map((id, idx) => {
-                          const sc = shiftCodeById.get(id);
+                          const sc = assignmentById.get(id);
                           if (!sc) {
                             const label = labelParts[idx]?.trim() || String(id);
                             const style = getShiftStyle(label, sectionName);
@@ -645,7 +645,7 @@ export default function MobileDayView({
               >
                 {Object.entries(tallies).map(([catId, tally]) =>
                   Object.entries(tally).map(([label, count]) => {
-                    const sc = shiftCodes.find(
+                    const sc = assignments.find(
                       (s) => s.label === label || s.name === label,
                     );
                     const displayLabel =

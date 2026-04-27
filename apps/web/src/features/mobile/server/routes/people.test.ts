@@ -48,6 +48,10 @@ describe("mobile people route", () => {
         email: "mina@dubgrid.com",
         status: "active",
         focusAreaIds: [1, 2],
+        contactNotes: "Weekend availability",
+        statusChangedAt: "2026-04-20T12:00:00.000Z",
+        statusNote: "",
+        version: 7,
       },
     ]);
 
@@ -68,6 +72,10 @@ describe("mobile people route", () => {
         email: "mina@dubgrid.com",
         status: "active",
         focusAreaIds: [1, 2],
+        contactNotes: "Weekend availability",
+        statusChangedAt: "2026-04-20T12:00:00.000Z",
+        statusNote: "",
+        version: 7,
       },
     ]);
   });

@@ -9,7 +9,7 @@ describe("OverviewTab", () => {
       <OverviewTab
         employee={makeEmployee({ focusAreaIds: [1, 2] })}
         shifts={{}}
-        shiftCodeById={new Map()}
+        assignmentById={new Map()}
         categoryById={new Map()}
         focusAreas={[
           makeFocusArea({ id: 1, name: "ICU" }),

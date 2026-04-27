@@ -3,10 +3,28 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
 import DashboardEmptyState from "./DashboardEmptyState";
 
-const BADGE_STYLES: Record<OpenShift["urgency"], { bg: string; color: string; border: string; label: string }> = {
-  high: { bg: "var(--color-danger-bg)", color: "var(--color-danger)", border: "var(--color-danger-border)", label: "Urgent" },
-  medium: { bg: "var(--color-warning-bg)", color: "var(--color-warning)", border: "var(--color-warning-border)", label: "Open" },
-  low: { bg: "var(--color-success-bg)", color: "var(--color-success-text)", border: "var(--color-success-border)", label: "Open" },
+const BADGE_STYLES: Record<
+  OpenShift["urgency"],
+  { bg: string; color: string; border: string; label: string }
+> = {
+  high: {
+    bg: "var(--color-danger-bg)",
+    color: "var(--color-danger)",
+    border: "var(--color-danger-border)",
+    label: "Urgent",
+  },
+  medium: {
+    bg: "var(--color-warning-bg)",
+    color: "var(--color-warning)",
+    border: "var(--color-warning-border)",
+    label: "Open",
+  },
+  low: {
+    bg: "var(--color-success-bg)",
+    color: "var(--color-success-text)",
+    border: "var(--color-success-border)",
+    label: "Open",
+  },
 };
 
 interface OpenShiftsCardProps {
@@ -39,14 +57,12 @@ export default function OpenShiftsCard({
       {/* Header */}
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">
-            Open shifts
-          </div>
-          <div className="dg-card-subtitle">
-            {subtitle}
-          </div>
+          <div className="dg-card-title">Open shifts</div>
+          <div className="dg-card-subtitle">{subtitle}</div>
         </div>
-        {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
+        {onExpand && (
+          <ExpandButton onClick={onExpand} label="Expand open shifts" />
+        )}
       </div>
 
       <div className="dg-card-body">
@@ -72,6 +88,13 @@ export default function OpenShiftsCard({
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {visible.map((shift) => {
               const badge = BADGE_STYLES[shift.urgency];
+              const metaText = [
+                shift.focusAreaName,
+                shift.timeRange,
+                shift.needed > 1 ? `${shift.needed} needed` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <div
                   key={shift.id}
@@ -87,30 +110,68 @@ export default function OpenShiftsCard({
                 >
                   {/* Date block */}
                   <div style={{ textAlign: "center", minWidth: 34 }}>
-                    <div style={{ fontSize: 10, color: "var(--color-text-subtle)", fontWeight: 500 }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "var(--color-text-subtle)",
+                        fontWeight: 500,
+                      }}
+                    >
                       {shift.dayOfWeek}
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1 }}>
+                    <div
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 700,
+                        color: "var(--color-text-primary)",
+                        lineHeight: 1,
+                      }}
+                    >
                       {shift.dayOfMonth}
                     </div>
                   </div>
 
-                  <div style={{ width: 1, height: 36, background: "var(--color-border)" }} />
+                  <div
+                    style={{
+                      width: 1,
+                      height: 36,
+                      background: "var(--color-border)",
+                    }}
+                  />
 
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-primary)" }}>
-                      {shift.shiftCodeLabel}
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--color-text-primary)",
+                      }}
+                    >
+                      {shift.assignmentLabel}
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 1 }}>
-                      {shift.focusAreaName}
-                      {shift.timeRange && ` \u00B7 ${shift.timeRange}`}
-                      {shift.needed > 1 && ` \u00B7 ${shift.needed} needed`}
-                    </div>
+                    {metaText ? (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--color-text-subtle)",
+                          marginTop: 1,
+                        }}
+                      >
+                        {metaText}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Badge + Volunteer */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      flexShrink: 0,
+                    }}
+                  >
                     <span
                       style={{
                         fontSize: 10,

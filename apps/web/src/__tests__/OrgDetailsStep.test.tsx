@@ -40,6 +40,7 @@ function makeOrganization(): Organization {
     departmentLabel: "Departments",
     shiftDisplayMode: "code",
     timezone: "America/Los_Angeles",
+    payPeriodStartDate: null,
     archivedAt: null,
     suspendedAt: null,
     suspendedReason: null,

@@ -3,10 +3,9 @@ import type { ShiftRequestsData } from "@/hooks/useShiftRequests";
 import type {
   Organization,
   FocusArea,
-  ShiftCode,
+  AssignmentDefinition,
   ShiftCategory,
   CoverageRequirement,
-  CoverageRuleConfig,
   Employee,
   ShiftMap,
   PublishHistoryEntry,
@@ -29,12 +28,11 @@ export interface DashboardContentProps {
   // Organization
   org: Organization;
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
-  coverageRuleConfigs: CoverageRuleConfig[];
-  shiftCodeMap: Map<number, string>;
-  shiftCodeById: Map<number, ShiftCode>;
+  assignmentLabelMap: Map<number, string>;
+  assignmentById: Map<number, AssignmentDefinition>;
   employees: Employee[];
   activeEmployees: Employee[];
 

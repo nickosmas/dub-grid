@@ -4,7 +4,7 @@ const requireMobileAuth = vi.fn();
 const fetchMobileAbsenceTypes = vi.fn();
 const fetchMobileFocusAreas = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
-const fetchMobileNotifications = vi.fn();
+const fetchMobileUnreadNotificationCount = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
@@ -12,7 +12,7 @@ vi.mock("@/features/mobile/server", () => ({
   fetchMobileFocusAreas,
   requireMobileAuth,
   fetchLinkedEmployeeForUser,
-  fetchMobileNotifications,
+  fetchMobileUnreadNotificationCount,
   mapOrganizationToMobileConfig,
 }));
 
@@ -59,8 +59,8 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         canManageEmployees: false,
         canViewFocusAreas: false,
         canManageFocusAreas: false,
-        canViewShiftCodes: false,
-        canManageShiftCodes: false,
+        canViewScheduleDefinitions: false,
+        canManageScheduleDefinitions: false,
         canViewIndicatorTypes: false,
         canManageIndicatorTypes: false,
         canManageOrgSettings: false,
@@ -104,10 +104,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         name: "ICU",
       },
     ]);
-    fetchMobileNotifications.mockResolvedValue({
-      unreadCount: 4,
-      notifications: [],
-    });
+    fetchMobileUnreadNotificationCount.mockResolvedValue(4);
     mapOrganizationToMobileConfig.mockReturnValue({
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
       name: "DubGrid Health",
@@ -131,10 +128,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
 
     expect(response.status).toBe(200);
     expect(fetchLinkedEmployeeForUser).toHaveBeenCalled();
-    expect(fetchMobileNotifications).toHaveBeenCalledWith(
-      {},
-      { limit: 1, offset: 0 },
-    );
+    expect(fetchMobileUnreadNotificationCount).toHaveBeenCalledWith({});
     expect(payload).toMatchObject({
       user: {
         email: "manager@dubgrid.com",

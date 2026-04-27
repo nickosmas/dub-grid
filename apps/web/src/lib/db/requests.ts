@@ -1,17 +1,23 @@
 import {
-  supabase, assertSafeFilterValue, logAudit, resolveCodeLabels,
+  supabase, assertSafeFilterValue, logAudit,
 } from "./shared";
+import { fetchAssignmentDefinitions } from "./config";
 import type { DbShiftRequest } from "./types";
 import { rowToShiftRequest } from "./mappers";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type {
-  ShiftRequest, ShiftRequestType, ShiftRequestStatus, GridOpenShift,
+  GridOpenShift,
+  ScheduleCellInput,
+  ShiftRequest,
+  ShiftRequestStatus,
+  ShiftRequestType,
 } from "@/types";
 
 // ── Shift Requests ───────────────────────────────────────────────────────────
 
 export async function fetchShiftRequests(
   orgId: string,
-  shiftCodeMap: Map<number, string>,
+  assignmentLabelMap: Map<number, string>,
   filters?: {
     status?: ShiftRequestStatus[];
     type?: ShiftRequestType;
@@ -44,6 +50,10 @@ export async function fetchShiftRequests(
   const { data, error } = await query;
   if (error) throw error;
 
+  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
+    await fetchAssignmentDefinitions(orgId, true),
+  );
+
   return (data ?? []).map((row: Record<string, unknown>) => {
     const requester = row.requester as {
       first_name: string;
@@ -60,16 +70,12 @@ export async function fetchShiftRequests(
       status: row.status as ShiftRequestStatus,
       requester_emp_id: row.requester_emp_id as string,
       requester_shift_date: row.requester_shift_date as string,
-      requester_shift_code_ids: row.requester_shift_code_ids as number[],
-      requester_focus_area_id: row.requester_focus_area_id as number | null,
-      requester_custom_start_time: row.requester_custom_start_time as string | null,
-      requester_custom_end_time: row.requester_custom_end_time as string | null,
+      requester_state:
+        row.requester_state as ScheduleCellInput,
       target_emp_id: row.target_emp_id as string | null,
       target_shift_date: row.target_shift_date as string | null,
-      target_shift_code_ids: row.target_shift_code_ids as number[] | null,
-      target_focus_area_id: row.target_focus_area_id as number | null,
-      target_custom_start_time: row.target_custom_start_time as string | null,
-      target_custom_end_time: row.target_custom_end_time as string | null,
+      target_state:
+        (row.target_state as ScheduleCellInput | null | undefined) ?? null,
       absence_type_id: row.absence_type_id as number | null,
       parent_request_id: row.parent_request_id as string | null,
       admin_user_id: row.admin_user_id as string | null,
@@ -83,7 +89,7 @@ export async function fetchShiftRequests(
       target_first_name: target?.first_name ?? null,
       target_last_name: target?.last_name ?? null,
     };
-    return rowToShiftRequest(mapped, shiftCodeMap);
+    return rowToShiftRequest(mapped, assignmentLabelMap, undefined, assignmentIdByPair);
   });
 }
 
@@ -139,19 +145,22 @@ export async function volunteerForOpenShift(
   orgId: string,
   empId: string,
   shiftDate: string,
-  shiftCodeIds: number[],
+  input: ScheduleCellInput,
   focusAreaId: number,
-  customStartTime: string | null,
-  customEndTime: string | null
 ): Promise<string> {
+  if (input.kind !== "worked" || input.segments.length === 0) {
+    throw new Error("Open-shift volunteering requires a worked assignment");
+  }
+
   const { data, error } = await supabase.rpc("volunteer_for_open_shift", {
     p_org_id: orgId,
     p_emp_id: empId,
     p_shift_date: shiftDate,
-    p_shift_code_ids: shiftCodeIds,
+    p_shift_ids: input.segments.map((segment) => segment.shiftId),
+    p_job_ids: input.segments.map((segment) => segment.jobId),
     p_focus_area_id: focusAreaId,
-    p_custom_start_time: customStartTime,
-    p_custom_end_time: customEndTime,
+    p_custom_start_time: input.customStartTime ?? null,
+    p_custom_end_time: input.customEndTime ?? null,
   });
   if (error) throw error;
   return data as string;
@@ -206,7 +215,7 @@ export async function fetchCalloffOpenShifts(
   orgId: string,
   startDate: string,
   endDate: string,
-  shiftCodeMap: Map<number, string>
+  assignmentLabelMap: Map<number, string>
 ): Promise<GridOpenShift[]> {
   // Fetch pickup requests spawned from approved calloffs (parent_request_id IS NOT NULL)
   const { data, error } = await supabase
@@ -223,15 +232,51 @@ export async function fetchCalloffOpenShifts(
 
   if (error) throw error;
 
+  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
+    await fetchAssignmentDefinitions(orgId, true),
+  );
+
   return (data ?? []).map((row: Record<string, unknown>) => {
     const requester = row.requester as {
       first_name: string;
       last_name: string;
       focus_area_ids: number[];
     } | null;
-    const codeIds = (row.requester_shift_code_ids as number[]) ?? [];
+    const mapped: DbShiftRequest = {
+      id: row.id as string,
+      org_id: row.org_id as string,
+      type: row.type as ShiftRequestType,
+      status: row.status as ShiftRequestStatus,
+      requester_emp_id: row.requester_emp_id as string,
+      requester_shift_date: row.requester_shift_date as string,
+      requester_state:
+        row.requester_state as ScheduleCellInput,
+      target_emp_id: row.target_emp_id as string | null,
+      target_shift_date: row.target_shift_date as string | null,
+      target_state:
+        (row.target_state as ScheduleCellInput | null | undefined) ?? null,
+      absence_type_id: row.absence_type_id as number | null,
+      parent_request_id: row.parent_request_id as string | null,
+      admin_user_id: row.admin_user_id as string | null,
+      admin_note: row.admin_note as string | null,
+      expires_at: row.expires_at as string,
+      resolved_at: row.resolved_at as string | null,
+      created_at: row.created_at as string,
+      updated_at: row.updated_at as string,
+      requester_first_name: requester?.first_name,
+      requester_last_name: requester?.last_name,
+      target_first_name: null,
+      target_last_name: null,
+    };
+    const request = rowToShiftRequest(
+      mapped,
+      assignmentLabelMap,
+      undefined,
+      assignmentIdByPair,
+    );
     // BUG 1.7: Determine focusAreaId, omit shifts with focusAreaId=0
-    const resolvedFocusAreaId = (row.requester_focus_area_id as number) ?? requester?.focus_area_ids?.[0];
+    const resolvedFocusAreaId =
+      request.requesterFocusAreaId ?? requester?.focus_area_ids?.[0];
     if (resolvedFocusAreaId == null) {
       // Skip this open shift if we cannot determine a valid focus area
       console.warn(
@@ -240,18 +285,18 @@ export async function fetchCalloffOpenShifts(
       return null;
     }
     return {
-      id: row.id as string,
+      id: request.id,
       source: "calloff" as const,
-      date: row.requester_shift_date as string,
+      date: request.requesterShiftDate,
       focusAreaId: resolvedFocusAreaId,
-      shiftCodeIds: codeIds,
-      shiftCodeLabel: resolveCodeLabels(codeIds, shiftCodeMap),
-      customStartTime: (row.requester_custom_start_time as string) ?? null,
-      customEndTime: (row.requester_custom_end_time as string) ?? null,
-      calledOffBy: [requester?.first_name, requester?.last_name]
-        .filter(Boolean)
-        .join(" ") || undefined,
-      requestId: row.id as string,
+      shiftIds: request.requesterShiftIds,
+      jobIds: request.requesterJobIds,
+      assignmentIds: request.requesterAssignmentDefinitionIds,
+      assignmentLabel: request.requesterShiftLabel,
+      customStartTime: request.requesterCustomStartTime,
+      customEndTime: request.requesterCustomEndTime,
+      calledOffBy: request.requesterName || undefined,
+      requestId: request.id,
       needed: 1,
     };
   }).filter((item: GridOpenShift | null) => item !== null) as GridOpenShift[];

@@ -7,20 +7,20 @@ describe("buildRealtimeDraftDiff", () => {
     const previousShifts: ShiftMap = {
       "emp-1_2026-04-16": {
         label: "DAY",
-        shiftCodeIds: [1],
+        assignmentIds: [1],
         isDraft: true,
         draftKind: "new",
-        publishedShiftCodeIds: [],
+        publishedAssignmentDefinitionIds: [],
         publishedLabel: "",
       },
     };
     const nextShifts: ShiftMap = {
       "emp-1_2026-04-16": {
         label: "NOC",
-        shiftCodeIds: [2],
+        assignmentIds: [2],
         isDraft: true,
         draftKind: "modified",
-        publishedShiftCodeIds: [1],
+        publishedAssignmentDefinitionIds: [1],
         publishedLabel: "DAY",
       },
     };

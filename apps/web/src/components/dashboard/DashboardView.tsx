@@ -9,10 +9,9 @@ import type { Permissions } from "@/hooks";
 import type {
   Organization,
   FocusArea,
-  ShiftCode,
+  AssignmentDefinition,
   ShiftCategory,
   CoverageRequirement,
-  CoverageRuleConfig,
   Employee,
   AbsenceType,
   ShiftMap,
@@ -100,12 +99,11 @@ type ExpandedPanel =
 interface DashboardViewProps {
   org: Organization;
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
-  coverageRuleConfigs: CoverageRuleConfig[];
-  shiftCodeMap: Map<number, string>;
-  shiftCodeById: Map<number, ShiftCode>;
+  assignmentLabelMap: Map<number, string>;
+  assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeMap: Map<number, string>;
   absenceTypes: AbsenceType[];
   certifications: NamedItem[];
@@ -118,12 +116,11 @@ interface DashboardViewProps {
 export default function DashboardView({
   org,
   focusAreas,
-  shiftCodes,
+  assignments,
   shiftCategories,
   coverageRequirements,
-  coverageRuleConfigs,
-  shiftCodeMap,
-  shiftCodeById,
+  assignmentLabelMap,
+  assignmentById,
   absenceTypeMap,
   absenceTypes,
   certifications,
@@ -241,9 +238,9 @@ export default function DashboardView({
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
-  const shiftCodeMapRef = useRef(shiftCodeMap);
+  const assignmentLabelMapRef = useRef(assignmentLabelMap);
   useEffect(() => {
-    shiftCodeMapRef.current = shiftCodeMap;
+    assignmentLabelMapRef.current = assignmentLabelMap;
   });
   const absenceTypeMapRef = useRef(absenceTypeMap);
   useEffect(() => {
@@ -262,7 +259,7 @@ export default function DashboardView({
       fetchShifts(
         orgId,
         isScheduler,
-        shiftCodeMapRef.current,
+        assignmentLabelMapRef.current,
         absenceTypeMapRef.current,
         fetchStart,
         fetchEnd,
@@ -272,7 +269,7 @@ export default function DashboardView({
       ),
       fetchPublishHistory(orgId, 20, 0).catch(() => []),
       fetchInvitations(orgId).catch(() => []),
-      fetchShiftRequests(orgId, shiftCodeMapRef.current).catch(() => []),
+      fetchShiftRequests(orgId, assignmentLabelMapRef.current).catch(() => []),
     ])
       .then(
         ([
@@ -325,7 +322,7 @@ export default function DashboardView({
 
   const shiftRequests = useShiftRequests(
     orgId,
-    shiftCodeMap,
+    assignmentLabelMap,
     currentEmpId,
     permissions.canApproveShiftRequests,
   );
@@ -379,7 +376,7 @@ export default function DashboardView({
         activeEmployees,
         periodDateKeys,
         currentPeriodShifts,
-        shiftCodeById,
+        assignmentById,
         40,
         categoryById,
       ),
@@ -387,7 +384,7 @@ export default function DashboardView({
       activeEmployees,
       periodDateKeys,
       currentPeriodShifts,
-      shiftCodeById,
+      assignmentById,
       categoryById,
     ],
   );
@@ -398,7 +395,7 @@ export default function DashboardView({
         activeEmployees,
         prevPeriodDateKeys,
         prevPeriodShifts,
-        shiftCodeById,
+        assignmentById,
         40,
         categoryById,
       ),
@@ -406,7 +403,7 @@ export default function DashboardView({
       activeEmployees,
       prevPeriodDateKeys,
       prevPeriodShifts,
-      shiftCodeById,
+      assignmentById,
       categoryById,
     ],
   );
@@ -431,8 +428,7 @@ export default function DashboardView({
         currentPeriodShifts,
         activeEmployees,
         coverageRequirements,
-        coverageRuleConfigs,
-        shiftCodes,
+        assignments,
       ),
     [
       focusAreas,
@@ -440,8 +436,7 @@ export default function DashboardView({
       currentPeriodShifts,
       activeEmployees,
       coverageRequirements,
-      coverageRuleConfigs,
-      shiftCodes,
+      assignments,
     ],
   );
 
@@ -451,9 +446,8 @@ export default function DashboardView({
     const prevPeriodDates = getDatesInRange(prevPeriodStart, periodDays);
     const prevCoverage = computeCoveragePctAndSlots(
       focusAreas,
-      shiftCodes,
+      assignments,
       coverageRequirements,
-      coverageRuleConfigs,
       prevPeriodDates,
       activeEmployees,
       prevPeriodShifts,
@@ -461,16 +455,16 @@ export default function DashboardView({
 
     return computeWeeklyStats(
       {
-        shiftCount: countShifts(currentPeriodShifts, shiftCodeById),
+        shiftCount: countShifts(currentPeriodShifts, assignmentById),
         coveragePct: currentCoverage.pct,
         openSlots: currentCoverage.openSlots,
-        staffScheduled: countStaffScheduled(currentPeriodShifts, shiftCodeById),
+        staffScheduled: countStaffScheduled(currentPeriodShifts, assignmentById),
         otCount: otAlerts.length,
       },
       {
-        shiftCount: countShifts(prevPeriodShifts, shiftCodeById),
+        shiftCount: countShifts(prevPeriodShifts, assignmentById),
         coveragePct: prevCoverage.pct,
-        staffScheduled: countStaffScheduled(prevPeriodShifts, shiftCodeById),
+        staffScheduled: countStaffScheduled(prevPeriodShifts, assignmentById),
         otCount: prevOtCount,
       },
       activeEmployees.length,
@@ -479,11 +473,10 @@ export default function DashboardView({
     sectionCoverage,
     currentPeriodShifts,
     prevPeriodShifts,
-    shiftCodeById,
+    assignmentById,
     focusAreas,
-    shiftCodes,
+    assignments,
     coverageRequirements,
-    coverageRuleConfigs,
     prevPeriodStart,
     periodDays,
     activeEmployees,
@@ -496,25 +489,23 @@ export default function DashboardView({
     () =>
       computeOpenShifts(
         focusAreas,
-        shiftCodes,
+        assignments,
         coverageRequirements,
-        coverageRuleConfigs,
         publishedPeriodDates,
         activeEmployees,
         currentPeriodShifts,
-        shiftCodeById,
-        shiftCodeMap,
+        assignmentById,
+        assignmentLabelMap,
       ),
     [
       focusAreas,
-      shiftCodes,
+      assignments,
       coverageRequirements,
-      coverageRuleConfigs,
       publishedPeriodDates,
       activeEmployees,
       currentPeriodShifts,
-      shiftCodeById,
-      shiftCodeMap,
+      assignmentById,
+      assignmentLabelMap,
     ],
   );
 
@@ -523,19 +514,19 @@ export default function DashboardView({
     () =>
       computeShiftBreakdown(
         currentPeriodShifts,
-        shiftCodeById,
+        assignmentById,
         shiftCategories,
         focusAreas,
         activeEmployees,
-        shiftCodeMap,
+        assignmentLabelMap,
       ),
     [
       currentPeriodShifts,
-      shiftCodeById,
+      assignmentById,
       shiftCategories,
       focusAreas,
       activeEmployees,
-      shiftCodeMap,
+      assignmentLabelMap,
     ],
   );
 
@@ -549,9 +540,8 @@ export default function DashboardView({
     () =>
       computeCoverageTrendData(
         focusAreas,
-        shiftCodes,
+        assignments,
         coverageRequirements,
-        coverageRuleConfigs,
         activeEmployees,
         allShifts,
         periodStart,
@@ -559,9 +549,8 @@ export default function DashboardView({
       ),
     [
       focusAreas,
-      shiftCodes,
+      assignments,
       coverageRequirements,
-      coverageRuleConfigs,
       activeEmployees,
       allShifts,
       periodStart,
@@ -771,12 +760,11 @@ export default function DashboardView({
   const contentProps = {
     org,
     focusAreas,
-    shiftCodes,
+    assignments,
     shiftCategories,
     coverageRequirements,
-    coverageRuleConfigs,
-    shiftCodeMap,
-    shiftCodeById,
+    assignmentLabelMap,
+    assignmentById,
     employees,
     activeEmployees,
     permissions,
@@ -874,9 +862,9 @@ export default function DashboardView({
                 href: "/settings?section=staff-certifications",
               },
               {
-                done: shiftCodes.length > 0,
-                label: "Add shift codes",
-                href: "/settings?section=schedule-codes",
+                done: assignments.length > 0,
+                label: "Add shifts and jobs",
+                href: "/settings?section=schedule-jobs",
               },
               {
                 done: employees.length > 0,
@@ -884,7 +872,7 @@ export default function DashboardView({
                 href: "/people",
               },
               {
-                done: employees.length > 0 && shiftCodes.length > 0,
+                done: employees.length > 0 && assignments.length > 0,
                 label: "Create your first schedule",
                 href: "/schedule",
               },
@@ -913,11 +901,10 @@ export default function DashboardView({
             periodDays={periodDays}
             activeEmployees={activeEmployees}
             focusAreas={focusAreas}
-            shiftCodes={shiftCodes}
-            shiftCodeById={shiftCodeById}
+            assignments={assignments}
+            assignmentById={assignmentById}
             shiftCategories={shiftCategories}
             coverageRequirements={coverageRequirements}
-            coverageRuleConfigs={coverageRuleConfigs}
             categoryById={categoryById}
             showOT={showOT}
             hasRequirements={coverageRequirements.length > 0}

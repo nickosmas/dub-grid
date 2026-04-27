@@ -1,4 +1,11 @@
-import type { EmployeeStatus, ShiftRequestType, ShiftRequestStatus } from "@/types";
+import type {
+  EmployeeStatus,
+  RecurringScheduleDraft,
+  ScheduleCellState,
+  ScheduleCellInput,
+  ShiftRequestStatus,
+  ShiftRequestType,
+} from "@/types";
 
 // ── DB row shapes ─────────────────────────────────────────────────────────────
 
@@ -21,6 +28,7 @@ export interface DbOrganization {
   department_label: string | null;
   shift_display_mode: string | null;
   timezone: string | null;
+  pay_period_start_date: string | null;
   archived_at: string | null;
   suspended_at: string | null;
   suspended_reason: string | null;
@@ -39,6 +47,7 @@ export interface DbFocusArea {
   org_id: string;
   department_id: number | null;
   name: string;
+  color: string | null;
   sort_order: number;
   archived_at: string | null;
 }
@@ -95,12 +104,40 @@ export interface DbShiftCategory {
   id: number;
   org_id: string;
   name: string;
-  color: string;
+  abbr: string | null;
   start_time: string | null;
   end_time: string | null;
+  color: string | null;
   sort_order: number;
   focus_area_id: number | null;
   break_minutes: number | null;
+  archived_at: string | null;
+}
+
+export interface DbJobDefinition {
+  id: number;
+  org_id: string;
+  name: string;
+  abbr: string;
+  show_on_grid: boolean;
+  assignment_mode: "with_shift" | "shiftless" | "both" | null;
+  eligibility_mode: "and" | "or" | null;
+  focus_area_ids: number[];
+  department_ids: number[];
+  applicable_shift_ids: number[];
+  eligible_role_ids: number[];
+  required_certification_ids: number[];
+  color: string;
+  border_color: string;
+  text_color: string;
+  shift_time_overrides: Record<string, { startTime: string | null; endTime: string | null }> | null;
+  shift_color_overrides: Record<string, string> | null;
+  default_start_time: string | null;
+  default_end_time: string | null;
+  default_duration_hours: number | null;
+  default_duration_minutes: number | null;
+  sort_order: number;
+  system_key: string | null;
   archived_at: string | null;
 }
 
@@ -108,27 +145,13 @@ export interface DbCoverageRequirement {
   id: number;
   org_id: string;
   focus_area_id: number;
-  shift_code_id: number;
+  job_id: number | null;
+  preferred_shift_id: number | null;
   day_of_week: number | null;
   min_staff: number;
 }
 
-export interface DbCoverageRuleConfig {
-  id: number;
-  org_id: string;
-  focus_area_id: number;
-  requirement_shift_code_id: number;
-  preferred_open_shift_code_id: number;
-}
-
-export interface DbCoverageRuleConfigCode {
-  id: number;
-  config_id: number;
-  org_id: string;
-  eligible_shift_code_id: number;
-}
-
-export interface DbShiftCode {
+export interface DbAssignmentDefinition {
   id: number;
   org_id: string;
   label: string;
@@ -137,6 +160,8 @@ export interface DbShiftCode {
   border_color: string;
   text_color: string;
   category_id: number | null;
+  shift_id: number | null;
+  job_id: number | null;
   is_general: boolean;
   focus_area_id: number | null;
   sort_order: number;
@@ -170,25 +195,45 @@ export interface DbEmployee {
   version: number;
 }
 
-export interface DbShift {
+export interface DbScheduleCellSegment {
+  id: string;
+  snapshot_id: string;
+  org_id: string;
+  position: number;
+  shift_id: number | null;
+  job_id: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface DbScheduleCellSnapshot {
+  id: string;
+  cell_id: string;
+  org_id: string;
+  snapshot_kind: "draft" | "published";
+  state_kind: "worked" | "absence" | "deleted";
+  absence_type_id: number | null;
+  custom_start_time: string | null;
+  custom_end_time: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  segments?: DbScheduleCellSegment[] | null;
+}
+
+export interface DbScheduleCell {
+  id: string;
   emp_id: string;
   date: string;
-  draft_shift_code_ids: number[];
-  published_shift_code_ids: number[];
-  draft_absence_type_id: number | null;
-  published_absence_type_id: number | null;
-  draft_is_delete: boolean;
+  org_id: string;
+  focus_area_id?: number | null;
   version: number;
   series_id?: string | null;
   from_recurring?: boolean;
-  draft_custom_start_time?: string | null;
-  draft_custom_end_time?: string | null;
-  published_custom_start_time?: string | null;
-  published_custom_end_time?: string | null;
   created_by?: string | null;
   updated_by?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  snapshots?: DbScheduleCellSnapshot[] | null;
 }
 
 export interface DbScheduleNote {
@@ -209,6 +254,7 @@ export interface DbNamedItem {
   org_id: string;
   name: string;
   abbr: string;
+  is_schedule_role?: boolean | null;
   department_id: number | null;
   sort_order: number;
   archived_at: string | null;
@@ -240,8 +286,7 @@ export interface DbRecurringShift {
   emp_id: string;
   org_id: string;
   day_of_week: number;
-  shift_code_id: number | null;
-  absence_type_id: number | null;
+  state: ScheduleCellState;
   effective_from: string;
   effective_until: string | null;
   created_at: string;
@@ -253,7 +298,7 @@ export interface RecurringDraft {
   id: string;
   orgId: string;
   savedBy: string;
-  draftData: Record<string, Record<number, string>>;
+  draftData: RecurringScheduleDraft;
   savedAt: string;
 }
 
@@ -270,16 +315,10 @@ export interface DbShiftRequest {
   status: ShiftRequestStatus;
   requester_emp_id: string;
   requester_shift_date: string;
-  requester_shift_code_ids: number[];
-  requester_focus_area_id: number | null;
-  requester_custom_start_time: string | null;
-  requester_custom_end_time: string | null;
+  requester_state: ScheduleCellState;
   target_emp_id: string | null;
   target_shift_date: string | null;
-  target_shift_code_ids: number[] | null;
-  target_focus_area_id: number | null;
-  target_custom_start_time: string | null;
-  target_custom_end_time: string | null;
+  target_state?: ScheduleCellState | null;
   absence_type_id: number | null;
   parent_request_id: string | null;
   admin_user_id: string | null;
@@ -294,3 +333,5 @@ export interface DbShiftRequest {
   target_first_name?: string | null;
   target_last_name?: string | null;
 }
+
+export type { ScheduleCellInput };

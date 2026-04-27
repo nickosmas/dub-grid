@@ -56,17 +56,25 @@ export async function GET(req: NextRequest) {
       serviceClient.from("notification_preferences").select("*").eq("user_id", userId),
     ]);
 
-    // Fetch shifts for linked employees
+    // Fetch canonical schedule cells for linked employees.
     const employeeIds = (employeesResult.data ?? []).map((e: { id: string }) => e.id);
-    let shifts: unknown[] = [];
+    let scheduleCells: unknown[] = [];
     if (employeeIds.length > 0) {
-      const { data: shiftData } = await serviceClient
-        .from("shifts")
-        .select("*")
+      const { data: scheduleCellData, error: scheduleCellError } = await serviceClient
+        .from("schedule_cells")
+        .select(`
+          *,
+          snapshots:schedule_cell_snapshots(
+            *,
+            segments:schedule_cell_segments(*)
+          )
+        `)
         .in("emp_id", employeeIds)
         .order("date", { ascending: false })
         .limit(5000);
-      shifts = shiftData ?? [];
+
+      if (scheduleCellError) throw scheduleCellError;
+      scheduleCells = scheduleCellData ?? [];
     }
 
     const exportData = {
@@ -76,7 +84,7 @@ export async function GET(req: NextRequest) {
       profile: profileResult.data ?? null,
       organization_memberships: membershipsResult.data ?? [],
       employees: employeesResult.data ?? [],
-      shifts,
+      schedule_cells: scheduleCells,
       audit_log: auditResult.data ?? [],
       cookie_consents: consentsResult.data ?? [],
       terms_acceptances: termsResult.data ?? [],
@@ -91,9 +99,9 @@ export async function GET(req: NextRequest) {
       resource_type: "data_export",
       resource_id: userId,
       details: {
-        tables_exported: 8,
+        tables_exported: 9,
         employee_count: employeeIds.length,
-        shift_count: shifts.length,
+        schedule_record_count: scheduleCells.length,
       },
     });
 

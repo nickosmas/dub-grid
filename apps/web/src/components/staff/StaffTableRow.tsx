@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
@@ -16,13 +17,12 @@ function hashCode(s: string): number {
   return Math.abs(h);
 }
 
-interface StaffTableRowProps {
+interface StaffRowSharedProps {
   emp: Employee;
   globalIndex: number;
   isExpanded: boolean;
   isReordering: boolean;
   isDragging: boolean;
-  isDropTarget: boolean;
   canManageEmployees: boolean;
   isSelected: boolean;
   focusAreas: FocusArea[];
@@ -31,19 +31,47 @@ interface StaffTableRowProps {
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onToggleSelect: (empId: string) => void;
   onRowClick: (empId: string) => void;
-  onDragStart: (idx: number) => void;
-  onDragOver: (e: React.DragEvent, idx: number) => void;
-  onDrop: () => void;
-  onDragEnd: () => void;
 }
 
-export function StaffTableRow({
+interface StaffTableRowProps extends StaffRowSharedProps {}
+
+interface StaffReorderListRowProps extends StaffRowSharedProps {
+  onRowRef?: (employeeId: string, node: HTMLDivElement | null) => void;
+  dragOffsetY?: number;
+  dragPhase?: "dragging" | "settling";
+  onReorderPointerDown?: (event: React.PointerEvent<HTMLDivElement>, idx: number) => void;
+  onReorderPointerMove?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onReorderPointerEnd?: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onReorderPointerCancel?: (event: React.PointerEvent<HTMLDivElement>) => void;
+}
+
+interface StaffRowCellsProps extends StaffRowSharedProps {
+  variant: "table" | "grid";
+}
+
+function StaffCell({
+  variant,
+  tableClassName,
+  gridClassName,
+  children,
+}: {
+  variant: "table" | "grid";
+  tableClassName: string;
+  gridClassName: string;
+  children: ReactNode;
+}) {
+  if (variant === "table") {
+    return <TableCell className={tableClassName}>{children}</TableCell>;
+  }
+
+  return <div className={gridClassName}>{children}</div>;
+}
+
+function StaffRowCells({
   emp,
   globalIndex,
   isExpanded,
   isReordering,
-  isDragging,
-  isDropTarget,
   canManageEmployees,
   isSelected,
   focusAreas,
@@ -52,36 +80,24 @@ export function StaffTableRow({
   pendingInviteByEmployeeId,
   onToggleSelect,
   onRowClick,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onDragEnd,
-}: StaffTableRowProps) {
+  variant,
+}: StaffRowCellsProps) {
   const { user: currentUser } = useAuth();
   const hue = hashCode(emp.id) % 360;
   const displayName = getEmployeeDisplayName(emp);
   const initials = getInitials(displayName);
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
   const profileHref = getEmployeeProfileHref(emp.id, emp.userId, currentUser?.id ?? null);
+  const rankNumber = isReordering ? globalIndex + 1 : emp.seniority;
 
   return (
-    <TableRow
-      className={`transition-colors ${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${!isReordering && canManageEmployees ? "cursor-pointer" : ""} ${isReordering ? "cursor-grab" : ""} dg-row-enter`}
-      draggable={isReordering}
-      onDragStart={isReordering ? () => onDragStart(globalIndex) : undefined}
-      onDragOver={isReordering ? (e) => onDragOver(e, globalIndex) : undefined}
-      onDrop={isReordering ? onDrop : undefined}
-      onDragEnd={isReordering ? onDragEnd : undefined}
-      onClick={!isReordering && canManageEmployees ? () => onRowClick(emp.id) : undefined}
-      style={{
-        opacity: isDragging ? 0.5 : 1,
-        borderTop: isDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
-        borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
-        boxShadow: isExpanded ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)" : undefined,
-      }}
-    >
+    <>
       {/* Checkbox / Drag handle / Seniority # */}
-      <TableCell className="pl-6 py-4 w-[60px]">
+      <StaffCell
+        variant={variant}
+        tableClassName="pl-6 py-4 w-[60px]"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex pl-6 py-4"
+      >
         <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
           {isReordering && (
             <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" className="shrink-0">
@@ -102,12 +118,16 @@ export function StaffTableRow({
               className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
             />
           )}
-          <span className="text-[var(--dg-fs-footnote)] font-medium">{emp.seniority}</span>
+          <span className="text-[var(--dg-fs-footnote)] font-medium">{rankNumber}</span>
         </div>
-      </TableCell>
+      </StaffCell>
 
       {/* Name */}
-      <TableCell className="py-4">
+      <StaffCell
+        variant={variant}
+        tableClassName="py-4"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--name flex py-4"
+      >
         <div className="flex items-center gap-3 min-w-0">
           <Avatar>
             <AvatarFallback
@@ -125,6 +145,7 @@ export function StaffTableRow({
             <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--color-text-primary)] truncate">
               <Link
                 href={profileHref}
+                draggable={false}
                 onClick={(e) => e.stopPropagation()}
                 className="hover:underline truncate"
                 style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
@@ -142,10 +163,14 @@ export function StaffTableRow({
             )}
           </div>
         </div>
-      </TableCell>
+      </StaffCell>
 
       {/* Focus Areas */}
-      <TableCell className="hidden md:table-cell py-4">
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden md:table-cell py-4"
+        gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
+      >
         <div className="flex gap-1 flex-wrap">
           {emp.focusAreaIds.map((faId) => {
             const fa = focusAreas.find((f) => f.id === faId);
@@ -165,10 +190,14 @@ export function StaffTableRow({
             );
           })}
         </div>
-      </TableCell>
+      </StaffCell>
 
       {/* Certification */}
-      <TableCell className="hidden md:table-cell py-4">
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden md:table-cell py-4"
+        gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
+      >
         <span
           className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
           style={{
@@ -178,17 +207,25 @@ export function StaffTableRow({
         >
           {getCertAbbr(emp.certificationId, certifications)}
         </span>
-      </TableCell>
+      </StaffCell>
 
       {/* Roles */}
-      <TableCell className="hidden lg:table-cell py-4">
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden lg:table-cell py-4"
+        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+      >
         <span className="text-[12px] text-[var(--color-text-muted)]">
           {emp.roleIds.length > 0 ? getRoleAbbrs(emp.roleIds, roles).join(", ") : "\u2014"}
         </span>
-      </TableCell>
+      </StaffCell>
 
       {/* Account status */}
-      <TableCell className="hidden lg:table-cell py-4">
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden lg:table-cell py-4"
+        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+      >
         {emp.userId ? (
           <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap bg-[var(--color-success-bg)] text-[var(--color-success-text)]">
             Linked
@@ -206,10 +243,14 @@ export function StaffTableRow({
             No email
           </span>
         )}
-      </TableCell>
+      </StaffCell>
 
       {/* Chevron */}
-      <TableCell className="pr-6 py-4 w-[40px] text-right">
+      <StaffCell
+        variant={variant}
+        tableClassName="pr-6 py-4 w-[40px] text-right"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--chevron flex pr-6 py-4"
+      >
         <div
           className="flex items-center justify-center"
           style={{
@@ -221,7 +262,87 @@ export function StaffTableRow({
             <polyline points="9 6 15 12 9 18" />
           </svg>
         </div>
-      </TableCell>
+      </StaffCell>
+    </>
+  );
+}
+
+export function StaffTableRow(props: StaffTableRowProps) {
+  const {
+    emp,
+    isExpanded,
+    isReordering,
+    isDragging,
+    canManageEmployees,
+    onRowClick,
+  } = props;
+
+  return (
+    <TableRow
+      className={`${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${!isReordering && canManageEmployees ? "cursor-pointer" : ""}`}
+      data-dragging={isDragging ? "true" : undefined}
+      draggable={false}
+      onClick={!isReordering && canManageEmployees ? () => onRowClick(emp.id) : undefined}
+      style={{
+        borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
+        boxShadow: isExpanded ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)" : undefined,
+      }}
+    >
+      <StaffRowCells {...props} variant="table" />
     </TableRow>
+  );
+}
+
+export function StaffReorderListRow({
+  emp,
+  globalIndex,
+  isDragging,
+  isExpanded,
+  isReordering,
+  canManageEmployees,
+  onRowRef,
+  dragOffsetY = 0,
+  dragPhase,
+  onReorderPointerDown,
+  onReorderPointerMove,
+  onReorderPointerEnd,
+  onReorderPointerCancel,
+  ...props
+}: StaffReorderListRowProps) {
+  const setRowRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      onRowRef?.(emp.id, node);
+    },
+    [emp.id, onRowRef],
+  );
+  const rowStyle = {
+    transform: `translate3d(0, ${dragOffsetY}px, 0)`,
+  } as CSSProperties;
+
+  return (
+    <div
+      ref={setRowRef}
+      className="dg-staff-directory-row"
+      data-dragging={isDragging ? "true" : undefined}
+      data-drag-phase={isDragging ? dragPhase : undefined}
+      data-moving={!isDragging && dragOffsetY !== 0 ? "true" : undefined}
+      draggable={false}
+      onPointerDown={onReorderPointerDown ? (event) => onReorderPointerDown(event, globalIndex) : undefined}
+      onPointerMove={onReorderPointerMove}
+      onPointerUp={onReorderPointerEnd}
+      onPointerCancel={onReorderPointerCancel}
+      style={rowStyle}
+    >
+      <StaffRowCells
+        {...props}
+        emp={emp}
+        globalIndex={globalIndex}
+        isExpanded={isExpanded}
+        isReordering={isReordering}
+        isDragging={isDragging}
+        canManageEmployees={canManageEmployees}
+        variant="grid"
+      />
+    </div>
   );
 }

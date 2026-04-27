@@ -2,10 +2,12 @@ import {
   supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit,
   EMPLOYEE_COLS, DEPARTMENT_COLS, OptimisticLockError,
 } from "./shared";
+import { fetchAssignmentDefinitions } from "./config";
 import { parseNameMismatchResponse } from "@/lib/account-linking";
-import type { DbEmployee, DbInvitation, DbShift } from "./types";
-import { mapDbShiftRowToShiftEntry } from "./shift-row-mapper";
+import type { DbEmployee, DbInvitation, DbScheduleCell } from "./types";
 import { rowToEmployee, employeeToRow, rowToDepartment, rowToInvitation } from "./mappers";
+import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type {
   Employee, Department, ShiftMap, Invitation,
   AdminPermissions, EmployeeStatus,
@@ -109,15 +111,17 @@ export async function saveDepartments(
 }
 
 export async function checkDepartmentDependencies(deptId: number, orgId: string): Promise<{ hasDependencies: boolean; summary: string }> {
-  const [empRes, faRes, roleRes] = await Promise.all([
+  const [empRes, faRes, roleRes, jobRes] = await Promise.all([
     supabase.from("employees").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).contains("department_ids", [deptId]),
     supabase.from("focus_areas").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).eq("department_id", deptId),
     supabase.from("organization_roles").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).eq("department_id", deptId),
+    supabase.from("jobs").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).contains("department_ids", [deptId]),
   ]);
   const parts = [
     empRes.count ? `${empRes.count} employee${empRes.count !== 1 ? "s" : ""}` : "",
     faRes.count ? `${faRes.count} focus area${faRes.count !== 1 ? "s" : ""}` : "",
     roleRes.count ? `${roleRes.count} role${roleRes.count !== 1 ? "s" : ""}` : "",
+    jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
   ].filter(Boolean);
   if (parts.length === 0) return { hasDependencies: false, summary: "" };
   return { hasDependencies: true, summary: `Used by ${parts.join(" and ")}` };
@@ -508,7 +512,7 @@ const MAX_RANGE_DAYS = 366;
 export async function fetchEmployeeShifts(
   empId: string,
   orgId: string,
-  shiftCodeMap: Map<number, string>,
+  assignmentLabelMap: Map<number, string>,
   absenceTypeMap?: Map<number, string>,
   startDate?: string,
   endDate?: string,
@@ -519,23 +523,31 @@ export async function fetchEmployeeShifts(
       throw new Error(`Shift query range exceeds ${MAX_RANGE_DAYS} days`);
     }
   }
-  let query = supabase
-    .from("shifts")
-    .select("emp_id, date, draft_shift_code_ids, published_shift_code_ids, draft_absence_type_id, published_absence_type_id, draft_is_delete, version, series_id, from_recurring, draft_custom_start_time, draft_custom_end_time, published_custom_start_time, published_custom_end_time, created_by, updated_by, created_at, updated_at")
-    .eq("emp_id", empId);
-  if (startDate) query = query.gte("date", startDate);
-  if (endDate) query = query.lte("date", endDate);
-  query = query.order("date", { ascending: false });
+  const atMap = absenceTypeMap ?? new Map<number, string>();
+  const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
+    await fetchAssignmentDefinitions(orgId, true),
+  );
 
-  const { data, error } = await query;
+  let normalizedQuery = supabase
+    .from("schedule_cells")
+    .select(
+      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+    )
+    .eq("org_id", orgId)
+    .eq("emp_id", empId)
+    .order("date", { ascending: false });
+  if (startDate) normalizedQuery = normalizedQuery.gte("date", startDate);
+  if (endDate) normalizedQuery = normalizedQuery.lte("date", endDate);
+
+  const { data, error } = await normalizedQuery;
   if (error) throw error;
 
-  const atMap = absenceTypeMap ?? new Map<number, string>();
   const map: ShiftMap = {};
-  for (const row of data as DbShift[]) {
-    const entry = mapDbShiftRowToShiftEntry(row, {
+  for (const row of (data ?? []) as DbScheduleCell[]) {
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
       isScheduler: true,
-      shiftCodeMap,
+      assignmentLabelMap,
+      assignmentIdByPair,
       absenceTypeMap: atMap,
     });
     if (entry) {

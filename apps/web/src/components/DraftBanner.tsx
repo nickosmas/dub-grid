@@ -2,6 +2,7 @@
 
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import ButtonSpinner from "@/components/ButtonSpinner";
+import ChangeLegend from "@/components/ChangeLegend";
 import { Eye, EyeOff } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -67,6 +68,7 @@ export default function DraftBanner({
       ) : (
         <span>Unpublished changes</span>
       )}
+      {showDiff && <ChangeLegend />}
       <div className="dg-draft-banner-actions">
         {onToggleDiff && (
           <Hint content={hint("Highlight differences from the published schedule")} side="bottom">

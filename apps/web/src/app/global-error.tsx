@@ -14,8 +14,8 @@ export default function GlobalError({
     Sentry.captureException(error);
   }, [error]);
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <div
           style={{
             minHeight: "100vh",

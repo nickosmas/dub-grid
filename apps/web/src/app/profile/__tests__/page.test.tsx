@@ -161,12 +161,12 @@ describe("ProfilePageContent", () => {
     mockUseOrganizationData.mockReturnValue({
       org: { shiftDisplayMode: "code" },
       focusAreas: [],
-      shiftCodes: [],
+      assignments: [],
       shiftCategories: [],
       absenceTypes: [],
       certifications: [],
       orgRoles: [],
-      shiftCodeMap: new Map(),
+      assignmentLabelMap: new Map(),
       absenceTypeMap: new Map(),
     });
 

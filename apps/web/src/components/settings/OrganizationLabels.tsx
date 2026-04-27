@@ -58,7 +58,7 @@ export default function OrganizationLabels({
         focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
         certificationLabel: form.certificationLabel.trim() || "Certifications",
         roleLabel: form.roleLabel.trim() || "Roles",
-        departmentLabel: form.departmentLabel.trim() || "Departments",
+        departmentLabel: form.departmentLabel.trim() || "Scheduled Departments",
       };
       const persisted = await updateOrganizationSettings({
         orgId: organization.id,
@@ -97,7 +97,7 @@ export default function OrganizationLabels({
     focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
     certificationLabel: form.certificationLabel.trim() || "Certifications",
     roleLabel: form.roleLabel.trim() || "Roles",
-    departmentLabel: form.departmentLabel.trim() || "Departments",
+    departmentLabel: form.departmentLabel.trim() || "Scheduled Departments",
   };
   const explainerPoints = [
     {
@@ -106,7 +106,7 @@ export default function OrganizationLabels({
     },
     {
       title: "Labels change wording, not behavior",
-      description: "Renaming a section updates the language people see across the app, but it does not change permissions, scheduling logic, or data relationships.",
+      description: "Renaming a section updates the language people see across the app, but it does not change permissions, scheduling logic, or data relationships. The department label applies to scheduled departments only.",
     },
     {
       title: "Keep labels short and consistent",
@@ -207,6 +207,9 @@ export default function OrganizationLabels({
                     {previewLabels.departmentLabel}: Operations
                   </div>
                   <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
+                    Management Departments: Administration
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
                     Filter by {previewLabels.focusAreaLabel.toLowerCase()}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
@@ -265,17 +268,17 @@ export default function OrganizationLabels({
               </p>
             </div>
             <div>
-              <label style={labelStyle}>DEPARTMENTS LABEL</label>
+              <label style={labelStyle}>SCHEDULED DEPARTMENTS LABEL</label>
               <input
                 value={form.departmentLabel}
                 onChange={(e) => setForm((p) => ({ ...p, departmentLabel: e.target.value }))}
-                placeholder="Departments"
+                placeholder="Scheduled Departments"
                 maxLength={30}
                 className="dg-input"
                 readOnly={readOnly}
               />
               <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
-                e.g. Departments, Teams, Divisions
+                e.g. Scheduled Departments, Teams, Service Lines
               </p>
             </div>
           </div>

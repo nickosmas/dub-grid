@@ -2,8 +2,8 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DATES = [22, 23, 24, 25, 26, 27, 28];
 const TODAY_INDEX = 0; // Sun Mar 22
 
-/* ── Shift codes from Calm Haven seed ── */
-const SHIFT_CODES = [
+/* ── Assignment labels from Calm Haven seed ── */
+const SHIFT_LABELS = [
   { label: "D", color: "#FECACA", text: "#991B1B" },
   { label: "Ds", color: "#FED7AA", text: "#9A3412" },
   { label: "E", color: "#FECACA", text: "#991B1B" },
@@ -66,7 +66,7 @@ function borderColor(textHex: string) {
 }
 
 function ShiftCell({ shiftIdx, isToday }: { shiftIdx: number | null; isToday: boolean }) {
-  const shift = shiftIdx !== null ? SHIFT_CODES[shiftIdx] : null;
+  const shift = shiftIdx !== null ? SHIFT_LABELS[shiftIdx] : null;
   return (
     <div
       style={{

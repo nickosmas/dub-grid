@@ -3,7 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
+import {
+  clearSupabaseBrowserAuthState,
+  getVerifiedBrowserUser,
+  isRecoverableBrowserAuthError,
+} from "@/lib/browser-auth";
 import { setSentryUser } from "@/lib/sentry";
 
 interface AuthContextType {
@@ -73,19 +77,31 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     // Initial session check with timeout — stale cookies from a different
     // Supabase instance (e.g. remote→local switch) can cause getSession()
     // to hang indefinitely on token refresh. The timeout clears the dead
     // session so the app doesn't spin forever.
     const checkSession = async () => {
       try {
+        const params = new URLSearchParams(window.location.search);
+        const isVerifiedLoginHandoff =
+          window.location.pathname === "/login" &&
+          params.get("verified") === "1";
+        if (isVerifiedLoginHandoff) {
+          clearSupabaseBrowserAuthState();
+        }
+
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("session_timeout")), 5000),
         );
         const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
         if (error) {
-          await supabase.auth.signOut({ scope: "local" });
+          if (isRecoverableBrowserAuthError(error)) {
+            clearSupabaseBrowserAuthState();
+          }
           setUser(null);
           setSentryUser(null);
           return;
@@ -102,9 +118,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (session?.refresh_token && verifiedUser) {
           trackSession(verifiedUser.id).catch(() => {});
         }
-      } catch {
-        // Timeout or network error — clear any stale cookies
-        try { await supabase.auth.signOut({ scope: "local" }); } catch { /* ignore */ }
+      } catch (error) {
+        // Timeout or stale auth state — clear persisted browser auth so the app
+        // can recover cleanly on the next login attempt without noisy refresh-token errors.
+        if (isRecoverableBrowserAuthError(error) || (error instanceof Error && error.message === "session_timeout")) {
+          clearSupabaseBrowserAuthState();
+        }
         setUser(null);
         setSentryUser(null);
       } finally {

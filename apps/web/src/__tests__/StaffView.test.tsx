@@ -1,15 +1,18 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
-import { Employee, FocusArea, NamedItem } from "@/types";
+import { Employee, FocusArea, NamedItem, ScheduleCellSegmentInput } from "@/types";
 import { upsertRecurringShift } from "@/lib/db";
 
 const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
   mockToastSuccess: vi.fn(),
   mockToastError: vi.fn(),
+}));
+const { mockShiftPickerRender } = vi.hoisted(() => ({
+  mockShiftPickerRender: vi.fn(),
 }));
 
 let mockSearchParams = new URLSearchParams();
@@ -59,35 +62,50 @@ vi.mock("@/components/AuthProvider", () => ({
 
 vi.mock("@/components/ShiftPicker", () => ({
   default: ({
-    shiftCodes = [],
+    assignments = [],
     absenceTypes = [],
+    orgRoles = [],
+    certifications = [],
     onSelect,
     onAbsenceSelect,
   }: {
-    shiftCodes?: Array<{ id: number; label: string }>;
-    absenceTypes?: Array<{ id: number; label: string }>;
-    onSelect: (label: string, shiftCodeIds: number[]) => void;
-    onAbsenceSelect?: (absenceType: { id: number; label: string }) => void;
-  }) => (
-    <div>
-      {shiftCodes.map((shiftCode) => (
-        <button
-          key={shiftCode.id}
-          onClick={() => onSelect(shiftCode.label, [shiftCode.id])}
-        >
-          {`pick-${shiftCode.label}`}
-        </button>
-      ))}
-      {absenceTypes.map((absenceType) => (
-        <button
-          key={`absence-${absenceType.id}`}
-          onClick={() => onAbsenceSelect?.(absenceType)}
-        >
-          {`absence-${absenceType.label}`}
-        </button>
-      ))}
-    </div>
-  ),
+      assignments?: Array<{ id: number; label: string }>;
+      absenceTypes?: Array<{ id: number; label: string }>;
+      orgRoles?: Array<{ id: number }>;
+      certifications?: Array<{ id: number }>;
+      onSelect: (segments: ScheduleCellSegmentInput[]) => void;
+      onAbsenceSelect?: (absenceType: { id: number; label: string }) => void;
+    }) => {
+      mockShiftPickerRender({ assignments, absenceTypes, orgRoles, certifications });
+      return (
+        <div>
+        {assignments.map((assignment) => (
+          <button
+            key={assignment.id}
+            onClick={() =>
+              onSelect([
+                {
+                  shiftId: null,
+                  jobId: assignment.id,
+                  position: 0,
+                },
+              ])
+            }
+          >
+            {`pick-${assignment.label}`}
+          </button>
+        ))}
+        {absenceTypes.map((absenceType) => (
+          <button
+            key={`absence-${absenceType.id}`}
+            onClick={() => onAbsenceSelect?.(absenceType)}
+          >
+            {`absence-${absenceType.label}`}
+          </button>
+        ))}
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -131,7 +149,39 @@ vi.mock("@base-ui/react/popover", () => {
       Trigger: ({ children, ...props }: { children: React.ReactNode; render?: unknown; [key: string]: unknown }) => <button {...props}>{children}</button>,
       Portal: passthrough,
       Positioner: passthrough,
-      Popup: ({ children, className }: { children: React.ReactNode; className?: string }) => <div className={className}>{children}</div>,
+      Popup: ({
+        children,
+        className,
+      }: {
+        children: React.ReactNode;
+        className?:
+          | string
+          | ((state: { open: boolean; side: string; align: string }) => string | undefined);
+      }) => (
+        <div className={typeof className === "function" ? className({ open: true, side: "bottom", align: "start" }) : className}>
+          {children}
+        </div>
+      ),
+      Arrow: ({
+        className,
+      }: {
+        className?:
+          | string
+          | ((state: { open: boolean; side: string; align: string; uncentered: boolean }) => string | undefined);
+      }) => (
+        <div
+          className={
+            typeof className === "function"
+              ? className({
+                  open: true,
+                  side: "bottom",
+                  align: "start",
+                  uncentered: false,
+                })
+              : className
+          }
+        />
+      ),
     },
   };
 });
@@ -213,6 +263,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSearchParams = new URLSearchParams();
   mockCurrentUser = null;
+  mockShiftPickerRender.mockReset();
 });
 
 describe("StaffView", () => {
@@ -329,7 +380,7 @@ describe("StaffView", () => {
         <StaffView
           {...defaultProps}
           orgId="org-1"
-          shiftCodes={[
+          assignments={[
             {
               id: 101,
               orgId: "org-1",
@@ -365,10 +416,120 @@ describe("StaffView", () => {
         "emp-2",
         "org-1",
         0,
-        101,
+        {
+          kind: "worked",
+          segments: [
+            {
+              shiftId: null,
+              jobId: 101,
+              position: 0,
+            },
+          ],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: true,
+        },
         expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       );
       expect(mockToastSuccess).toHaveBeenCalledWith("Recurring schedules saved");
+    });
+
+    it("passes recurring picker ranking inputs so shift options can stay correctly ordered", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+      const user = userEvent.setup();
+
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          assignments={[
+            {
+              id: 101,
+              orgId: "org-1",
+              label: "D",
+              name: "Day",
+              color: "#dbeafe",
+              border: "#93c5fd",
+              text: "#1d4ed8",
+              categoryId: null,
+              focusAreaId: null,
+              sortOrder: 0,
+              requiredCertificationIds: [],
+              defaultStartTime: "07:00",
+              defaultEndTime: "15:00",
+              defaultDurationHours: 8,
+              defaultDurationMinutes: 0,
+              archivedAt: null,
+            },
+          ]}
+          canViewRecurringShifts
+          canManageRecurringShifts
+        />,
+      );
+
+      expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
+      await user.click(screen.getAllByRole("gridcell")[0]);
+
+      expect(mockShiftPickerRender).toHaveBeenCalled();
+      const lastCall = mockShiftPickerRender.mock.calls.at(-1)?.[0] as {
+        orgRoles: NamedItem[];
+        certifications: NamedItem[];
+      };
+      expect(lastCall.orgRoles.map((role) => role.id)).toEqual(defaultRoles.map((role) => role.id));
+      expect(lastCall.certifications.map((certification) => certification.id)).toEqual(
+        defaultCertifications.map((certification) => certification.id),
+      );
+    });
+
+    it("closes the recurring picker when the window starts resizing", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+      const user = userEvent.setup();
+
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          assignments={[
+            {
+              id: 101,
+              orgId: "org-1",
+              label: "D",
+              name: "Day",
+              color: "#dbeafe",
+              border: "#93c5fd",
+              text: "#1d4ed8",
+              categoryId: null,
+              focusAreaId: null,
+              sortOrder: 0,
+              requiredCertificationIds: [],
+              defaultStartTime: "07:00",
+              defaultEndTime: "15:00",
+              defaultDurationHours: 8,
+              defaultDurationMinutes: 0,
+              archivedAt: null,
+            },
+          ]}
+          canViewRecurringShifts
+          canManageRecurringShifts
+        />,
+      );
+
+      expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
+
+      await user.click(screen.getAllByRole("gridcell")[0]);
+      expect(screen.getByRole("button", { name: "pick-D" })).toBeInTheDocument();
+
+      act(() => {
+        window.dispatchEvent(new Event("resize"));
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole("button", { name: "pick-D" }),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 });

@@ -5,13 +5,13 @@ import React from "react";
 // ── Section IDs ──────────────────────────────────────────────────────────────
 export type SectionId =
   | "org-general" | "org-labels" | "org-display"
-  | "schedule-rules" | "schedule-categories" | "schedule-codes" | "schedule-coverage"
+  | "schedule-rules" | "schedule-shifts" | "schedule-jobs" | "schedule-absence-types" | "schedule-coverage"
   | "staff-certifications" | "staff-roles" | "staff-departments" | "staff-indicators"
   | "platform-impersonation";
 
 export const VALID_SECTIONS: SectionId[] = [
   "org-general", "org-labels", "org-display",
-  "schedule-rules", "schedule-categories", "schedule-codes", "schedule-coverage",
+  "schedule-rules", "schedule-shifts", "schedule-jobs", "schedule-absence-types", "schedule-coverage",
   "staff-certifications", "staff-roles", "staff-departments", "staff-indicators",
   "platform-impersonation",
 ];
@@ -20,8 +20,8 @@ export const VALID_SECTIONS: SectionId[] = [
 const OLD_TO_NEW: Record<string, SectionId> = {
   "organization": "org-general",
   "display-mode": "org-display",
-  "shift-categories": "schedule-categories",
-  "shift-codes": "schedule-codes",
+  "shift-categories": "schedule-shifts",
+  "shift-codes": "schedule-jobs",
   "coverage": "schedule-coverage",
   "indicators": "staff-indicators",
   "staff-config": "staff-certifications",
@@ -73,8 +73,8 @@ export interface NavPermissions {
   canViewOrgLabels: boolean;
   canManageFocusAreas: boolean;
   canViewFocusAreas: boolean;
-  canManageShiftCodes: boolean;
-  canViewShiftCodes: boolean;
+  canManageScheduleDefinitions: boolean;
+  canViewScheduleDefinitions: boolean;
   canManageIndicatorTypes: boolean;
   canViewIndicatorTypes: boolean;
   canManageOrgSettings: boolean;
@@ -84,9 +84,10 @@ export interface NavPermissions {
 
 export function buildNavGroups(
   perms: NavPermissions,
-  overrides?: { shiftCodesLabel?: string; focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string; departmentLabel?: string },
+  overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string; departmentLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
+  const scheduledDepartmentLabel = overrides?.departmentLabel ?? "Scheduled Departments";
 
   if (perms.canAccessSettings) {
     const orgItems: NavItem[] = [];
@@ -97,8 +98,8 @@ export function buildNavGroups(
 
   if (perms.canAccessSettings) {
     const staffItems: NavItem[] = [];
-    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: overrides?.departmentLabel ?? "Departments", icon: iconDepartment, description: "Organize your workforce into scheduled and management departments, and define focus areas within each." });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, description: "Display roles shown as tags on the schedule grid (e.g., Supervisor). These are cosmetic and don't affect permissions." });
+    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: scheduledDepartmentLabel, icon: iconDepartment, description: "Organize your scheduled departments, focus areas, and management departments." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, description: "Manage visible role tags and choose which ones actually count for job eligibility on the schedule." });
     if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations, description: "The certification badge shown next to the employee's name on the schedule grid." });
     if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff & Designations", items: staffItems });
   }
@@ -107,9 +108,10 @@ export function buildNavGroups(
     const schedItems: NavItem[] = [];
     if (perms.canManageOrgSettings) schedItems.push({ id: "org-display", label: "Shift Display Mode", icon: iconDisplay, description: "Choose how shifts appear on the schedule grid — short codes or full names." });
     if (perms.isSuperAdmin) schedItems.push({ id: "schedule-rules", label: "Schedule Rules", icon: iconRules, description: "Configure automated scheduling rules and constraints." });
-    if (perms.canManageShiftCodes || perms.canViewShiftCodes) schedItems.push({ id: "schedule-categories", label: "Shift Categories", icon: iconTag, description: "Group shifts by type (e.g. Day, Evening, Night) with default times and colors." });
-    if (perms.canManageShiftCodes || perms.canViewShiftCodes) schedItems.push({ id: "schedule-codes", label: overrides?.shiftCodesLabel ?? "Schedule Codes", icon: iconCalendar, description: "Define the individual shifts available for scheduling, including codes, names, times, and required certifications." });
-    if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", icon: iconCoverage, description: "Set minimum staffing requirements per shift and day so the schedule can flag when coverage falls short." });
+    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-shifts", label: "Shifts", icon: iconTag, description: "Configure your core Day, Evening, Night, and similar shift definitions with default times and colors." });
+    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-jobs", label: "Jobs", icon: iconCalendar, description: "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility." });
+    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-absence-types", label: "Absence Types", icon: iconCalendar, description: "Manage PTO, sick, vacation, calloff, and other non-worked schedule labels." });
+    if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", icon: iconCoverage, description: "Set minimum staffing requirements by focus area and assignable shift/job combination." });
     if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes) schedItems.push({ id: "staff-indicators", label: "Indicators", icon: iconIndicator, description: "Define custom indicators that can be attached to shift cells on the schedule." });
     if (schedItems.length > 0) groups.push({ id: "scheduling", label: "Scheduling", items: schedItems });
   }
@@ -136,5 +138,13 @@ export function getDefaultSection(perms: NavPermissions): SectionId {
 /** Get max content width for a section. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getMaxWidth(section: SectionId): number {
+  if (section === "schedule-jobs") {
+    return 1120;
+  }
+
+  if (section === "staff-roles" || section === "staff-certifications") {
+    return 1120;
+  }
+
   return 860;
 }

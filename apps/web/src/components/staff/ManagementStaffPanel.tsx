@@ -61,6 +61,7 @@ function getManagementStaffDraft(person: DirectoryPerson): ManagementStaffDraft 
 interface ManagementStaffPanelProps {
   person: DirectoryPerson;
   departments: NamedItem[];
+  /** Label for management departments on the access roster. */
   departmentLabel: string;
   canManageScheduleEmployees: boolean;
   canManageManagementAccess: boolean;

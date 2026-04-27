@@ -164,7 +164,7 @@ export async function requireMobileAuth(
   const currentOrgResult = await serviceClient
     .from("organizations")
     .select(
-      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides, updated_at",
+      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides, updated_at",
     )
     .eq("id", currentOrgId)
     .single();

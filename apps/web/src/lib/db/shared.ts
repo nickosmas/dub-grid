@@ -55,7 +55,7 @@ function normalizeNumericId(value: number | string): number | null {
   return null;
 }
 
-/** Resolve an array of shift_code IDs to a slash-separated label string. */
+/** Resolve an array of assignment IDs to a slash-separated label string. */
 export function resolveCodeLabels(
   ids: Array<number | string>,
   codeMap: Map<number, string>,
@@ -70,16 +70,16 @@ export function resolveCodeLabels(
 
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
-export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides, updated_at";
-export const FOCUS_AREA_COLS = "id, org_id, department_id, name, sort_order, archived_at";
+export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides, updated_at";
+export const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 export const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
-export const SHIFT_CODE_COLS = "id, org_id, label, name, color, border_color, text_color, category_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
-export const SHIFT_CATEGORY_COLS = "id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes, archived_at";
+export const SHIFT_CODE_COLS = "id, org_id, label, name, color, border_color, text_color, category_id, shift_id, job_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
+export const SHIFT_CATEGORY_COLS = "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
+export const JOB_COLS = "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
 export const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_id, sort_order, archived_at";
+export const ORG_ROLE_COLS = "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
 export const EMPLOYEE_COLS = "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
-export const COVERAGE_REQ_COLS = "id, org_id, focus_area_id, shift_code_id, day_of_week, min_staff";
-export const COVERAGE_RULE_CONFIG_COLS = "id, org_id, focus_area_id, requirement_shift_code_id, preferred_open_shift_code_id";
-export const COVERAGE_RULE_CONFIG_CODE_COLS = "id, config_id, org_id, eligible_shift_code_id";
+export const COVERAGE_REQ_COLS = "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
 export const ABSENCE_TYPE_COLS = "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 export const INDICATOR_TYPE_COLS = "id, org_id, name, color, sort_order, archived_at";
-export const RECURRING_SHIFT_COLS = "id, emp_id, org_id, day_of_week, shift_code_id, absence_type_id, effective_from, effective_until, created_at, updated_at, archived_at";
+export const RECURRING_SHIFT_COLS = "id, emp_id, org_id, day_of_week, state, effective_from, effective_until, created_at, updated_at, archived_at";

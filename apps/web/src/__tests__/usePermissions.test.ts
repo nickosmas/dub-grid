@@ -287,7 +287,7 @@ describe("usePermissions hook", () => {
                   canViewStaff: true,
                   canManageEmployees: false,
                   canManageFocusAreas: false,
-                  canManageShiftCodes: false,
+                  canManageScheduleDefinitions: false,
                   canManageIndicatorTypes: false,
                   canManageOrgSettings: false,
                   canManageOrgLabels: false,
@@ -542,10 +542,10 @@ describe("applyViewImplications", () => {
     expect(result.canViewFocusAreas).toBe(true);
   });
 
-  it("canManageShiftCodes implies canViewShiftCodes", () => {
-    const perms = { ...ALL_FALSE_PERMS, canManageShiftCodes: true };
+  it("canManageScheduleDefinitions implies canViewScheduleDefinitions", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageScheduleDefinitions: true };
     const result = applyViewImplications(perms);
-    expect(result.canViewShiftCodes).toBe(true);
+    expect(result.canViewScheduleDefinitions).toBe(true);
   });
 
   it("canManageIndicatorTypes implies canViewIndicatorTypes", () => {
@@ -576,7 +576,7 @@ describe("applyViewImplications", () => {
     const result = applyViewImplications(ALL_FALSE_PERMS);
     expect(result.canViewEmployeeDetails).toBe(false);
     expect(result.canViewFocusAreas).toBe(false);
-    expect(result.canViewShiftCodes).toBe(false);
+    expect(result.canViewScheduleDefinitions).toBe(false);
     expect(result.canViewIndicatorTypes).toBe(false);
     expect(result.canViewCoverageRequirements).toBe(false);
     expect(result.canViewRecurringShifts).toBe(false);
@@ -611,13 +611,13 @@ describe("applyViewImplications", () => {
       ...ALL_FALSE_PERMS,
       canManageEmployees: true,
       canManageFocusAreas: true,
-      canManageShiftCodes: true,
-      // canViewEmployeeDetails, canViewFocusAreas, canViewShiftCodes are false (not in JSONB)
+      canManageScheduleDefinitions: true,
+      // canViewEmployeeDetails, canViewFocusAreas, canViewScheduleDefinitions are false (not in JSONB)
     };
     const result = applyViewImplications(oldStylePerms);
     expect(result.canViewEmployeeDetails).toBe(true);
     expect(result.canViewFocusAreas).toBe(true);
-    expect(result.canViewShiftCodes).toBe(true);
+    expect(result.canViewScheduleDefinitions).toBe(true);
   });
 });
 
@@ -784,12 +784,12 @@ describe("buildPerms — user role per-user permissions", () => {
 describe("unionPermissions with view permissions", () => {
   it("unions canView permissions from multiple departments", () => {
     const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
-    const deptB = { ...ALL_FALSE_PERMS, canViewShiftCodes: true };
+    const deptB = { ...ALL_FALSE_PERMS, canViewScheduleDefinitions: true };
     const result = unionPermissions([deptA, deptB]);
     expect(result.canViewFocusAreas).toBe(true);
-    expect(result.canViewShiftCodes).toBe(true);
+    expect(result.canViewScheduleDefinitions).toBe(true);
     expect(result.canManageFocusAreas).toBe(false);
-    expect(result.canManageShiftCodes).toBe(false);
+    expect(result.canManageScheduleDefinitions).toBe(false);
   });
 
   it("preserves view permissions alongside manage permissions", () => {

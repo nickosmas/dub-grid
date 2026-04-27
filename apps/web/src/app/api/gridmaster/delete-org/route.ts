@@ -67,7 +67,6 @@ export async function POST(req: NextRequest) {
       "recurring_shifts",
       "shift_series",
       "coverage_requirements",
-      "shift_codes",
       "shift_categories",
       "absence_types",
       "focus_areas",

@@ -1,3 +1,9 @@
+import type {
+  ResolvedSchedulePresentation as ContractResolvedSchedulePresentation,
+  ScheduleCellSegment as ContractScheduleCellSegment,
+  ScheduleCellState as ContractScheduleCellState,
+} from "@dubgrid/contracts";
+
 // ── App Domain Types ──────────────────────────────────────────────────────────
 
 /** Controls how shifts are displayed on the schedule grid. */
@@ -9,6 +15,8 @@ export interface NamedItem {
   orgId: string;
   name: string;
   abbr: string;
+  /** When true, jobs may use this role for eligibility gating. */
+  isScheduleRole?: boolean;
   sortOrder: number;
   /** FK to departments.id. Null = org-wide (not scoped to any department). */
   departmentId?: number | null;
@@ -36,12 +44,14 @@ export interface Organization {
   certificationLabel: string;
   /** Custom display label for roles (e.g. "Responsibilities"). Defaults to "Roles". */
   roleLabel: string;
-  /** Custom display label for departments (e.g. "Teams"). Defaults to "Departments". */
+  /** Custom display label for scheduled departments (e.g. "Teams"). Defaults to "Scheduled Departments". */
   departmentLabel: string;
   /** Controls grid display: 'code' shows short labels (D, EVE), 'name' shows full names (Day Shift, Evening). */
   shiftDisplayMode: ShiftDisplayMode;
   /** IANA timezone for this organization, e.g. "America/New_York". Null = not set. */
   timezone: string | null;
+  /** Optional biweekly pay-period anchor date in YYYY-MM-DD format. Null keeps 2-week views aligned to calendar weeks. */
+  payPeriodStartDate: string | null;
   /** Non-null when the organization has been archived (soft-deleted). */
   archivedAt?: string | null;
   /** Non-null when the organization is suspended. Members are blocked from the app. */
@@ -87,6 +97,8 @@ export interface FocusArea {
   /** Parent scheduled department. Null if not yet assigned. */
   departmentId: number | null;
   name: string;
+  /** Legacy focus-area color retained for existing records. */
+  color?: string | null;
   sortOrder: number;
   /** Non-null when the focus area has been archived (soft-deleted). */
   archivedAt?: string | null;
@@ -96,12 +108,14 @@ export interface ShiftCategory {
   id: number;
   orgId: string;
   name: string;
-  /** Tally row accent color */
-  color: string;
+  /** Short label used when the grid is in code mode, e.g. "D" or "N". */
+  abbr?: string | null;
   /** Optional time window start, e.g. "07:00" */
   startTime?: string | null;
   /** Optional time window end, e.g. "15:30" */
   endTime?: string | null;
+  /** Preset color inherited by scheduled jobs unless they override this shift. */
+  color?: string | null;
   sortOrder: number;
   /** FK to focus_areas.id. NULL = global category (for general/off-day codes). */
   focusAreaId?: number | null;
@@ -112,14 +126,18 @@ export interface ShiftCategory {
 }
 
 /**
- * Minimum staffing requirement for a focus area + shift code + day of week.
+ * Minimum staffing requirement for a focus area + assignment pair + day of week.
  * When dayOfWeek is null, the requirement applies to all 7 days ("every day" mode).
  */
 export interface CoverageRequirement {
   id: number;
   orgId: string;
   focusAreaId: number;
-  shiftCodeId: number;
+  jobId?: number | null;
+  /** Preferred shift for this requirement. Null for shiftless jobs like Office/Admin work. */
+  preferredShiftId?: number | null;
+  /** Legacy compatibility field while older helpers/tests still refer to requirement assignments. */
+  assignmentId?: number | null;
   /** 0=Sun..6=Sat. Null = applies to every day. */
   dayOfWeek: number | null;
   /** Minimum headcount required. */
@@ -127,37 +145,7 @@ export interface CoverageRequirement {
 }
 
 /**
- * Optional config layer on top of a coverage requirement. When absent, the
- * requirement behaves in legacy exact-code mode.
- */
-export interface CoverageRuleConfig {
-  id: number;
-  orgId: string;
-  focusAreaId: number;
-  requirementShiftCodeId: number;
-  /** Eligible shift codes that can satisfy this requirement. */
-  eligibleShiftCodeIds: number[];
-  /** Exact shift code offered by default when volunteering for this rule. */
-  preferredOpenShiftCodeId: number;
-}
-
-/**
- * A normalized, validated rule assembled from coverage requirements,
- * optional rule configs, and active shift-code metadata.
- */
-export interface ResolvedCoverageRule {
-  id: string;
-  orgId: string;
-  focusAreaId: number;
-  requirementShiftCodeId: number;
-  eligibleShiftCodeIds: number[];
-  preferredOpenShiftCodeId: number;
-  ruleLabel: string;
-  shiftCategoryId: number | null;
-}
-
-/**
- * Computed coverage status for a single (focus_area, shift_code, date) cell.
+ * Computed coverage status for a single (focus_area, assignment, date) cell.
  */
 export interface CoverageStatus {
   /** Actual headcount assigned on this date in this section. */
@@ -171,8 +159,8 @@ export interface CoverageStatus {
 }
 
 export interface CoverageShortageDetail {
-  shiftCodeId: number;
-  shiftCodeLabel: string;
+  assignmentId: number;
+  assignmentLabel: string;
   required: number;
   actual: number;
   shortage: number;
@@ -185,12 +173,12 @@ export interface CoverageShortageDetail {
 export interface CoverageGap {
   focusAreaId: number;
   focusAreaName: string;
-  requirementShiftCodeId: number;
-  shiftCodeId: number;
+  requirementAssignmentDefinitionId: number;
+  assignmentId: number;
   ruleLabel: string;
-  shiftCodeLabel: string;
-  eligibleShiftCodeIds: number[];
-  preferredOpenShiftCodeId: number;
+  assignmentLabel: string;
+  eligibleAssignmentDefinitionIds: number[];
+  preferredOpenAssignmentDefinitionId: number;
   shiftCategoryId: number;
   shiftCategoryName: string;
   date: Date;
@@ -198,11 +186,8 @@ export interface CoverageGap {
   shortageDetails: CoverageShortageDetail[];
 }
 
-/**
- * A shift code: the atomic grid-cell entry (e.g. "D", "EVE", "N", "OFF").
- * The `label` field is what is displayed in the schedule grid.
- */
-export interface ShiftCode {
+/** In-memory schedule option projected from canonical shift + job definitions. */
+export interface AssignmentDefinition {
   id: number;
   orgId: string;
   label: string;
@@ -210,8 +195,12 @@ export interface ShiftCode {
   color: string;
   border: string;   // mapped from border_color
   text: string;     // mapped from text_color
-  /** FK to shift_categories.id — determines which tally bucket this shift counts toward */
+  /** FK to shift_categories.id — determines which tally bucket this option counts toward. */
   categoryId?: number | null;
+  /** Canonical worked shift for this option. */
+  shiftId?: number | null;
+  /** Canonical worked job for this option. */
+  jobId?: number | null;
   isGeneral?: boolean;
   /** Focus area this code belongs to. null = global (no focus area association). */
   focusAreaId?: number | null;
@@ -230,9 +219,136 @@ export interface ShiftCode {
   archivedAt?: string | null;
 }
 
+export type JobAssignmentMode = "with_shift" | "shiftless" | "both";
+export type JobEligibilityMode = "and" | "or";
+
+export interface JobShiftTimeOverride {
+  startTime: string | null;
+  endTime: string | null;
+}
+
+export interface JobDefinition {
+  id: number;
+  orgId: string;
+  name: string;
+  abbr: string;
+  /** Legacy visibility flag retained for compatibility with existing data. */
+  showOnGrid: boolean;
+  assignmentMode?: JobAssignmentMode;
+  eligibilityMode?: JobEligibilityMode;
+  /** Legacy convenience field derived from the first saved focus area, when present. */
+  focusAreaId?: number | null;
+  /** Direct focus areas where this scheduled job may be used. */
+  focusAreaIds?: number[];
+  /** Scheduled departments whose focus areas this job may be used in. */
+  departmentIds?: number[];
+  /** Subset of shifts inside the job's effective placement scope. Empty = all shifts in scope. */
+  applicableShiftIds?: number[];
+  eligibleRoleIds: number[];
+  requiredCertificationIds: number[];
+  color: string;
+  border: string;
+  text: string;
+  /** Optional per-shift time overrides for scheduled jobs, keyed by shift id. */
+  shiftTimeOverrides?: Record<string, JobShiftTimeOverride>;
+  /** Optional per-shift color preset overrides for scheduled jobs, keyed by shift id. */
+  shiftColorOverrides?: Record<string, string>;
+  defaultStartTime?: string | null;
+  defaultEndTime?: string | null;
+  defaultDurationHours?: number | null;
+  defaultDurationMinutes?: number | null;
+  sortOrder: number;
+  systemKey?: string | null;
+  archivedAt?: string | null;
+}
+
+export interface AssignableShiftOption {
+  /** Stable UI id for the option. */
+  id: string;
+  /** Stable numeric UI id retained for older picker/coverage components. */
+  assignmentId: number;
+  shiftId: number | null;
+  jobId: number;
+  focusAreaId: number | null;
+  focusAreaName: string | null;
+  shiftName: string | null;
+  shiftAbbr: string | null;
+  jobName: string;
+  jobAbbr: string;
+  showJobOnGrid: boolean;
+  isShiftless: boolean;
+  primaryLabel: string;
+  secondaryLabel: string | null;
+  groupLabel: string;
+  groupSortOrder: number;
+  sortOrder: number;
+  qualificationRank: number | null;
+  color: string;
+  border: string;
+  text: string;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+export interface ShiftDisplayParts {
+  primaryLabel: string;
+  secondaryLabel: string | null;
+  showJobOnGrid: boolean;
+  isShiftless: boolean;
+}
+
+export interface ShiftJobSegment {
+  shiftId: number | null;
+  jobId: number;
+  position?: number;
+  /**
+   * UI metadata for label/time helpers. Never authoritative schedule identity.
+   */
+  assignmentId?: number | null;
+  label: string;
+  shiftName?: string | null;
+  shiftAbbr?: string | null;
+  jobName?: string | null;
+  jobAbbr?: string | null;
+  focusAreaId?: number | null;
+  showJobOnGrid?: boolean;
+  isShiftless?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+}
+
+export type ScheduleCellKind = "worked" | "absence" | "deleted";
+
+export type ScheduleCellSegmentInput = ContractScheduleCellSegment;
+
+export type ScheduleCellState = ContractScheduleCellState;
+
+export interface ScheduleCellSegmentSnapshot extends ShiftJobSegment {
+  position: number;
+}
+
+export type ScheduleCellInput = ScheduleCellState;
+
+export type ResolvedSchedulePresentation = ContractResolvedSchedulePresentation;
+
+export interface ScheduleCellSnapshot extends ScheduleCellInput {
+  label: string;
+  /**
+   * UI option IDs for helpers that still need numeric schedule-option metadata.
+   * Never persisted as authoritative schedule state.
+   */
+  assignmentIds: number[];
+  segments: ScheduleCellSegmentSnapshot[];
+}
+
+export type RecurringScheduleDraft = Record<
+  string,
+  Record<number, ScheduleCellInput | null>
+>;
+
 /**
  * An absence type: off-day definitions (Off, Sick, Vacation, etc.).
- * Separate from shift codes — an absence is the absence of a shift, not a type of shift.
+ * Separate from worked assignments — an absence is the absence of a shift, not a type of shift.
  */
 export interface AbsenceType {
   id: number;
@@ -282,8 +398,12 @@ export interface PublishChange {
   empId: string;
   date: string;
   kind: 'new' | 'modified' | 'deleted';
-  from: number[];
-  to: number[];
+  from?: number[];
+  to?: number[];
+  fromState?: ScheduleCellState | null;
+  toState?: ScheduleCellState | null;
+  fromSegments?: ShiftJobSegment[];
+  toSegments?: ShiftJobSegment[];
   fromAbsenceTypeId?: number | null;
   toAbsenceTypeId?: number | null;
   updatedBy?: string | null;
@@ -307,15 +427,20 @@ export interface PublishHistoryEntryWithName extends PublishHistoryEntry {
   publishedByName: string;
 }
 
-export type ShiftMap = Record<string, {
+export interface ScheduleCellStateEntry {
+  draft?: ScheduleCellSnapshot | null;
+  published?: ScheduleCellSnapshot | null;
+  effective?: ScheduleCellSnapshot | null;
   label: string;
-  shiftCodeIds: number[];
+  segments?: ShiftJobSegment[];
+  assignmentIds: number[];
   isDraft: boolean;
   isDelete?: boolean;
   /** Classification of the draft change type. null = no draft. */
   draftKind: DraftKind;
   /** Published shift code IDs (empty array if never published). */
-  publishedShiftCodeIds: number[];
+  publishedAssignmentDefinitionIds: number[];
+  publishedSegments?: ShiftJobSegment[];
   /** Resolved label of published version (empty if never published). */
   publishedLabel: string;
   seriesId?: string | null;
@@ -328,7 +453,7 @@ export type ShiftMap = Record<string, {
   publishedCustomStartTime?: string | null;
   /** Published custom end time (used for diff display). */
   publishedCustomEndTime?: string | null;
-  /** Draft absence type ID (mutually exclusive with shiftCodeIds). */
+  /** Draft absence type ID (mutually exclusive with assignmentIds). */
   absenceTypeId?: number | null;
   /** Published absence type ID. */
   publishedAbsenceTypeId?: number | null;
@@ -342,7 +467,9 @@ export type ShiftMap = Record<string, {
   createdAt?: string | null;
   /** Timestamp when the shift was last updated. */
   updatedAt?: string | null;
-}>;
+}
+
+export type ShiftMap = Record<string, ScheduleCellStateEntry>;
 
 export type SeriesFrequency = 'daily' | 'weekly' | 'biweekly';
 export type SeriesScope = 'this' | 'all';
@@ -353,11 +480,12 @@ export interface RecurringShift {
   orgId: string;
   /** 0 = Sunday, 1 = Monday … 6 = Saturday */
   dayOfWeek: number;
-  /** FK to shift_codes. Null when this is an absence-type recurring shift. */
-  shiftCodeId: number | null;
-  /** FK to absence_types. Null when this is a shift-code recurring shift. */
+  state?: ScheduleCellState;
+  presentation?: ResolvedSchedulePresentation | null;
+  input: ScheduleCellInput;
+  /** FK to absence_types. Null when this is a worked recurring template. */
   absenceTypeId: number | null;
-  /** Resolved display label from either shiftCodeId or absenceTypeId. */
+  /** Resolved display label from canonical state. */
   shiftLabel: string;
   effectiveFrom: string;
   effectiveUntil: string | null;
@@ -371,8 +499,10 @@ export interface ShiftSeries {
   id: string;
   empId: string;
   orgId: string;
-  shiftCodeId: number | null;
-  /** FK to absence_types. Null when this is a shift-code series. */
+  state?: ScheduleCellState;
+  presentation?: ResolvedSchedulePresentation | null;
+  input: ScheduleCellInput;
+  /** FK to absence_types. Null when this is a worked series. */
   absenceTypeId: number | null;
   shiftLabel: string;
   frequency: SeriesFrequency;
@@ -393,10 +523,25 @@ export interface EditModalState {
   date: Date;
   empFocusAreaIds: number[];
   empCertificationId: number | null;
+  empRoleIds: number[];
   /** The focus area section the cell was clicked in */
   activeFocusAreaId?: number | null;
   /** When set, panel opens directly into the selected shift-request flow. */
   requestMode?: "coverage" | "swap";
+}
+
+export interface GridCellId {
+  empId: string;
+  dateKey: string;
+  sectionId: number;
+}
+
+export interface GridColumnMeta {
+  columnIndex: number;
+  date: Date;
+  dateKey: string;
+  isToday: boolean;
+  isWeekSplitStart: boolean;
 }
 
 export interface IndicatorType {
@@ -414,7 +559,7 @@ export interface ScheduleNote {
   orgId: string;
   empId: string;
   date: string;
-  /** FK to indicator_types.id — consistent with how shifts reference shift_codes by ID */
+  /** FK to indicator_types.id — consistent with how schedule cells reference related config by ID */
   indicatorTypeId: number;
   focusAreaId: number | null;
   status: 'published' | 'draft' | 'draft_deleted';
@@ -472,10 +617,10 @@ export interface AdminPermissions {
   canViewFocusAreas: boolean;
   /** Add / edit / delete focus areas (departments) */
   canManageFocusAreas: boolean;
-  /** View shift code definitions (read-only). Implied by canManageShiftCodes. */
-  canViewShiftCodes: boolean;
-  /** Add / edit / delete shift code definitions */
-  canManageShiftCodes: boolean;
+  /** View schedule definitions like shifts, jobs, and absence types (read-only). Implied by canManageScheduleDefinitions. */
+  canViewScheduleDefinitions: boolean;
+  /** Add / edit / delete schedule definitions like shifts, jobs, and absence types. */
+  canManageScheduleDefinitions: boolean;
   /** View indicator type configuration (read-only). Implied by canManageIndicatorTypes. */
   canViewIndicatorTypes: boolean;
   /** Add / edit / delete indicator / note type definitions */
@@ -710,9 +855,9 @@ export interface WeeklyHoursSummary {
   isOvertime: boolean;
 }
 
-/** Distribution of shift codes for a single employee. */
+/** Distribution of worked assignments for a single employee. */
 export interface ShiftDistributionEntry {
-  shiftCodeId: number;
+  assignmentId: number;
   label: string;
   name: string;
   count: number;
@@ -841,7 +986,13 @@ export interface ShiftRequest {
   requesterEmpId: string;
   requesterName: string;
   requesterShiftDate: string;
-  requesterShiftCodeIds: number[];
+  requesterState: ScheduleCellState;
+  requesterPresentation?: ResolvedSchedulePresentation | null;
+  requesterShiftIds?: Array<number | null>;
+  requesterJobIds?: number[];
+  requesterSegments?: ShiftJobSegment[];
+  /** UI option metadata for display/time helpers only. */
+  requesterAssignmentDefinitionIds: number[];
   requesterShiftLabel: string;
   requesterFocusAreaId: number | null;
   requesterCustomStartTime: string | null;
@@ -849,7 +1000,13 @@ export interface ShiftRequest {
   targetEmpId: string | null;
   targetName: string | null;
   targetShiftDate: string | null;
-  targetShiftCodeIds: number[] | null;
+  targetState?: ScheduleCellState | null;
+  targetPresentation?: ResolvedSchedulePresentation | null;
+  targetShiftIds?: Array<number | null> | null;
+  targetJobIds?: number[] | null;
+  targetSegments?: ShiftJobSegment[] | null;
+  /** UI option metadata for display/time helpers only. */
+  targetAssignmentDefinitionIds: number[] | null;
   targetShiftLabel: string | null;
   targetFocusAreaId: number | null;
   targetCustomStartTime: string | null;
@@ -871,12 +1028,15 @@ export interface GridOpenShift {
   source: 'calloff' | 'coverage_gap';
   date: string;
   focusAreaId: number;
-  requirementShiftCodeId?: number;
-  shiftCodeIds: number[];
-  eligibleShiftCodeIds?: number[];
-  preferredOpenShiftCodeId?: number;
+  requirementAssignmentDefinitionId?: number;
+  shiftIds?: Array<number | null>;
+  jobIds?: number[];
+  segments?: ShiftJobSegment[];
+  assignmentIds: number[];
+  eligibleAssignmentDefinitionIds?: number[];
+  preferredOpenAssignmentDefinitionId?: number;
   ruleLabel?: string;
-  shiftCodeLabel: string;
+  assignmentLabel: string;
   customStartTime: string | null;
   customEndTime: string | null;
   calledOffBy?: string;

@@ -15,9 +15,9 @@ import OrgDetailsStep from "./steps/OrgDetailsStep";
 import DepartmentsStep from "./steps/DepartmentsStep";
 import RolesStep from "./steps/RolesStep";
 import CertificationsStep from "./steps/CertificationsStep";
-import ShiftCodesStep from "./steps/ShiftCodesStep";
+import ShiftsStep from "./steps/ShiftsStep";
 import DisplayModeStep from "./steps/DisplayModeStep";
-import ShiftCodesDetailStep from "./steps/ShiftCodesDetailStep";
+import JobsStep from "./steps/JobsStep";
 import AdminOrientationStep from "./steps/AdminOrientationStep";
 import SuperAdminOrientationStep from "./steps/SuperAdminOrientationStep";
 import CustomLabelsStep from "./steps/CustomLabelsStep";
@@ -32,8 +32,8 @@ interface OnboardingWizardProps {
   isOrgSetup: boolean;
 }
 
-function buildSuperAdminSteps(displayMode: ShiftDisplayMode): StepConfig[] {
-  const shiftsLabel = displayMode === "name" ? "Names" : "Codes";
+function buildSuperAdminSteps(_displayMode: ShiftDisplayMode): StepConfig[] {
+  const shiftsLabel = "Shifts";
   return [
     { id: "welcome", label: "Welcome" },
     { id: "org-details", label: "Details" },
@@ -42,8 +42,8 @@ function buildSuperAdminSteps(displayMode: ShiftDisplayMode): StepConfig[] {
     { id: "roles", label: "Roles" },
     { id: "certifications", label: "Certs" },
     { id: "display-mode", label: "Display" },
-    { id: "shift-categories", label: "Categories" },
-    { id: "shift-codes", label: shiftsLabel },
+    { id: "shift-categories", label: shiftsLabel },
+    { id: "shift-codes", label: "Jobs" },
     { id: "completion", label: "Done" },
   ];
 }
@@ -125,9 +125,9 @@ export default function OnboardingWizard({
       case "certifications":
         return <CertificationsStep onNext={goNext} onBack={goBack} />;
       case "shift-categories":
-        return <ShiftCodesStep onNext={goNext} onBack={goBack} />;
+        return <ShiftsStep onNext={goNext} onBack={goBack} />;
       case "shift-codes":
-        return <ShiftCodesDetailStep onNext={goNext} onBack={goBack} />;
+        return <JobsStep onNext={goNext} onBack={goBack} />;
       case "orientation":
         return <AdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "sa-orientation":

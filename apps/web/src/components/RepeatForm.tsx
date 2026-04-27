@@ -10,7 +10,17 @@ import {
   useState,
 } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
-import { SeriesFrequency, ShiftCode, AbsenceType } from "@/types";
+import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import {
+  SeriesFrequency,
+  ScheduleCellInput,
+  AssignmentDefinition,
+  AbsenceType,
+  ShiftCategory,
+  JobDefinition,
+  ShiftJobSegment,
+  ShiftDisplayMode,
+} from "@/types";
 import { supabase } from "@/lib/supabase";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import * as Sentry from "@/lib/sentry";
@@ -27,9 +37,13 @@ const DAY_ARIA_FORMATTER = new Intl.DateTimeFormat("en-US", { weekday: "long", m
 interface RepeatFormProps {
   empId: string;
   shiftLabel: string;
-  shiftCodeId: number;
+  selectionInput: ScheduleCellInput | null;
+  selectionSegments?: ShiftJobSegment[];
   startDate: Date;
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
+  shiftDisplayMode?: ShiftDisplayMode;
   onConfirm: (
     frequency: SeriesFrequency,
     daysOfWeek: number[] | null,
@@ -292,13 +306,17 @@ function countOccurrences(
 const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function RepeatForm({
   empId,
   shiftLabel,
-  shiftCodeId,
+  selectionInput,
+  selectionSegments = [],
   startDate,
-  shiftCodes,
+  assignments,
+  shiftCategories = [],
+  jobs = [],
+  shiftDisplayMode = "code",
   onConfirm,
   absenceType,
 }: RepeatFormProps, ref) {
-  const isAbsence = absenceType != null;
+  const isAbsence = absenceType != null || selectionInput?.kind === "absence";
   const [frequency, setFrequency] = useState<SeriesFrequency>('weekly');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([startDate.getDay()]);
   const todayStr = formatLocalDate(new Date());
@@ -309,7 +327,59 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const [overwrites, setOverwrites] = useState(0);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const shiftCode = shiftCodes.find(st => st.id === shiftCodeId);
+  const primarySegment = selectionSegments[0] ?? null;
+  const assignment = assignments.find(
+    (shift) => shift.id === (primarySegment?.assignmentId ?? -1),
+  );
+  const shiftCategoryId =
+    primarySegment?.shiftId ??
+    assignment?.shiftId ??
+    assignment?.categoryId ??
+    null;
+  const shiftCategory = shiftCategoryId != null
+    ? shiftCategories.find((category) => category.id === shiftCategoryId) ?? null
+    : null;
+  const shiftJob = (primarySegment?.jobId ?? assignment?.jobId ?? null) != null
+    ? jobs.find((job) => job.id === (primarySegment?.jobId ?? assignment?.jobId ?? -1)) ?? null
+    : null;
+  const previewDisplayParts = useMemo(() => {
+    if (absenceType) {
+      return {
+        primaryLabel:
+          shiftDisplayMode === "name"
+            ? (absenceType.name || absenceType.label)
+            : absenceType.label,
+        secondaryLabel: null,
+      };
+    }
+
+    if (assignment) {
+      return buildShiftDisplayParts({
+        shift: shiftCategory,
+        job: shiftJob,
+        assignment,
+        shiftDisplayMode,
+      });
+    }
+
+    return {
+      primaryLabel: shiftLabel,
+      secondaryLabel: null,
+    };
+  }, [
+    absenceType,
+    shiftCategory,
+    assignment,
+    shiftDisplayMode,
+    shiftJob,
+    shiftLabel,
+  ]);
+  const previewBackground =
+    absenceType?.color ?? assignment?.color ?? "var(--color-bg-secondary)";
+  const previewText =
+    absenceType?.text ?? assignment?.text ?? "var(--color-text-secondary)";
+  const previewBorder =
+    absenceType?.border ?? assignment?.border ?? "var(--color-border)";
 
   function toggleDay(day: number) {
     setDaysOfWeek(prev =>
@@ -341,7 +411,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
 
     (async () => {
       const { data, error } = await supabase
-        .from("shifts")
+        .from("schedule_cells")
         .select("date")
         .eq("emp_id", empId)
         .gte("date", minDate)
@@ -396,20 +466,42 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       {/* Badge */}
       <div style={badgeRowStyle}>
         <span style={badgeLabelStyle}>{isAbsence ? "Repeating Off Day" : "Repeating Shift"}</span>
-        {(isAbsence ? absenceType : shiftCode) && (
+        {(isAbsence ? absenceType : assignment || shiftLabel) && (
           <span
+            data-repeat-shift-preview="true"
             style={{
-              background: isAbsence ? absenceType!.color : shiftCode!.color,
-              color: isAbsence ? absenceType!.text : shiftCode!.text,
-              border: `1px solid ${isAbsence ? absenceType!.border : shiftCode!.border}`,
-              borderRadius: 12,
-              padding: "6px 12px",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 800,
+              background: previewBackground,
+              color: previewText,
+              border: `1px solid ${previewBorder}`,
+              borderRadius: "var(--dg-radius-md)",
+              padding: previewDisplayParts.secondaryLabel ? "6px 12px 7px" : "6px 12px",
+              display: "inline-flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: previewDisplayParts.secondaryLabel ? 2 : 0,
               lineHeight: 1,
+              textAlign: "center",
             }}
           >
-            {shiftLabel}
+            <span
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 800,
+              }}
+            >
+              {previewDisplayParts.primaryLabel}
+            </span>
+            {previewDisplayParts.secondaryLabel ? (
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  opacity: 0.78,
+                }}
+              >
+                {previewDisplayParts.secondaryLabel}
+              </span>
+            ) : null}
           </span>
         )}
       </div>

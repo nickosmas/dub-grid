@@ -16,6 +16,19 @@ import type {
   PlatformUser,
 } from "@/types";
 
+async function countScheduleCellsCreatedSince(
+  orgId: string,
+  since: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("schedule_cells")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .gte("created_at", since);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function fetchAllOrganizations(
   options?: { limit?: number; offset?: number },
 ): Promise<Organization[]> {
@@ -58,6 +71,7 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
       department_label: data.departmentLabel || null,
       shift_display_mode: data.shiftDisplayMode || 'code',
       timezone: data.timezone || null,
+      pay_period_start_date: data.payPeriodStartDate || null,
       enforce_conflict_prevention: data.enforceConflictPrevention ?? false,
       data_retention_days: data.dataRetentionDays ?? 365,
       feature_overrides: data.featureOverrides ?? {},
@@ -338,12 +352,8 @@ export async function fetchOrgActivityMetrics(orgId: string): Promise<OrgActivit
         )
         .gte("last_sign_in_at", thirtyDaysAgo),
 
-      // Shifts created in last 30 days
-      supabase
-        .from("shifts")
-        .select("id", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .gte("created_at", thirtyDaysAgo),
+      // Schedule cells created in last 30 days
+      countScheduleCellsCreatedSince(orgId, thirtyDaysAgo),
 
       // Pending invitations (not accepted, not revoked, not expired)
       supabase
@@ -368,7 +378,7 @@ export async function fetchOrgActivityMetrics(orgId: string): Promise<OrgActivit
     orgId,
     lastLoginAt: lastLoginRow?.last_sign_in_at ?? null,
     activeUsers30d: activeUsersResult.count ?? 0,
-    shiftsCreated30d: shiftsResult.count ?? 0,
+    shiftsCreated30d: shiftsResult ?? 0,
     invitationsPending: pendingInvResult.count ?? 0,
     invitationsAccepted30d: acceptedInvResult.count ?? 0,
   };
@@ -387,7 +397,6 @@ export async function deleteOrganizationPermanently(orgId: string): Promise<void
       "recurring_shifts",
       "shift_series",
       "coverage_requirements",
-      "shift_codes",
       "shift_categories",
       "absence_types",
       "focus_areas",
@@ -423,7 +432,7 @@ export async function deleteOrganizationPermanently(orgId: string): Promise<void
       CacheKey.orgUsers(orgId),
       CacheKey.invitations(orgId),
       CacheKey.focusAreas(orgId),
-      CacheKey.shiftCodes(orgId),
+      CacheKey.assignments(orgId),
       CacheKey.shiftCategories(orgId),
       CacheKey.indicatorTypes(orgId),
       CacheKey.certifications(orgId),

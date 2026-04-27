@@ -24,7 +24,7 @@ export default function RolesStep({ onNext, onBack }: RolesStepProps) {
   return (
     <StepLayout
       title={label}
-      description={`Define the job positions in your facility (e.g., RN, LPN, CNA, Charge Nurse). These are assigned to employees and help organize your schedule.`}
+      description={`Define the roles people can carry in your facility. Mark the roles that should affect scheduling as schedule-eligible, and leave cosmetic titles like Director visible without letting them gate jobs.`}
       onNext={onNext}
       onBack={onBack}
       nextDisabled={!hasRoles}
@@ -42,6 +42,7 @@ export default function RolesStep({ onNext, onBack }: RolesStepProps) {
         canEdit={true}
         initialEditing
         departments={departments}
+        showScheduleRoleToggle
         onCheckDependencies={(id) => checkRoleDependencies(id, org.id)}
       />
       {!hasRoles && (

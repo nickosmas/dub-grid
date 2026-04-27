@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
-  PUBLISHED_SHIFT_COLS,
+  fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
@@ -102,37 +102,20 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
   if (empErr) throw empErr;
 
   // Fetch shifts in date range
-  const { data: shifts, error: shiftErr } = await supabase
-    .from("shifts")
-    .select(PUBLISHED_SHIFT_COLS)
-    .eq("org_id", orgId)
-    .gte("date", start)
-    .lte("date", end);
-  if (shiftErr) throw shiftErr;
+  const shifts = await fetchPublishedShiftRows(supabase, {
+    orgId,
+    startDate: start,
+    endDate: end,
+  });
 
-  // Fetch shift codes and absence types in parallel
-  const [{ data: shiftCodes }, { data: absenceTypes }] = await Promise.all([
-    supabase
-      .from("shift_codes")
-      .select("id, label, default_start_time, default_end_time")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
+  // Fetch absence types for published absence labels.
+  const [{ data: absenceTypes }] = await Promise.all([
     supabase
       .from("absence_types")
       .select("id, label")
       .eq("org_id", orgId)
       .is("archived_at", null),
   ]);
-  const shiftCodeById = new Map(
-    (shiftCodes ?? []).map((code: Record<string, unknown>) => [
-      code.id as number,
-      {
-        label: code.label as string,
-        defaultStartTime: code.default_start_time as string | null,
-        defaultEndTime: code.default_end_time as string | null,
-      },
-    ]),
-  );
   const absenceTypeById = new Map(
     (absenceTypes ?? []).map((row: Record<string, unknown>) => [
       row.id as number,
@@ -151,10 +134,10 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
 
   // Index shifts by emp_id:date
   const shiftIndex = new Map<string, string>();
-  for (const row of (shifts ?? []) as unknown as PublishedShiftRow[]) {
+  for (const row of shifts as PublishedShiftRow[]) {
     const entry = resolvePublishedScheduleEntry(
       row,
-      shiftCodeById,
+      new Map(),
       absenceTypeById,
     );
     if (!entry) continue;

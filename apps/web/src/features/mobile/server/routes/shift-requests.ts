@@ -7,6 +7,7 @@ import {
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import {
   fetchLinkedEmployeeForUser,
+  fetchMobileOpenShifts,
   fetchMobileShiftRequests,
   requireMobileAuth,
 } from "@/features/mobile/server";
@@ -31,13 +32,38 @@ export async function GET(req: NextRequest) {
     auth.user.id,
   );
 
-  const requests = await fetchMobileShiftRequests(auth.serviceClient, {
-    orgId: auth.currentOrg.id,
-    employeeId: auth.permissions.canApproveShiftRequests ? undefined : linkedEmployee?.id,
-  });
+  if (!auth.permissions.canApproveShiftRequests && !linkedEmployee) {
+    return NextResponse.json(
+      mobileShiftRequestsResponseSchema.parse({ requests: [], openShifts: [] }),
+    );
+  }
+
+  const employeeId = auth.permissions.canApproveShiftRequests
+    ? undefined
+    : linkedEmployee?.id;
+  const startDate = req.nextUrl.searchParams.get("startDate") ?? undefined;
+  const endDate = req.nextUrl.searchParams.get("endDate") ?? undefined;
+
+  const [requests, openShifts] = await Promise.all([
+    fetchMobileShiftRequests(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      employeeId,
+      includeOpenPickupRequests: !auth.permissions.canApproveShiftRequests,
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+    }),
+    linkedEmployee
+      ? fetchMobileOpenShifts(auth.serviceClient, {
+          orgId: auth.currentOrg.id,
+          employee: linkedEmployee,
+          ...(startDate ? { startDate } : {}),
+          ...(endDate ? { endDate } : {}),
+        })
+      : Promise.resolve([]),
+  ]);
 
   return NextResponse.json(
-    mobileShiftRequestsResponseSchema.parse({ requests }),
+    mobileShiftRequestsResponseSchema.parse({ requests, openShifts }),
   );
 }
 
@@ -49,7 +75,10 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   const parsed = mobileCreateShiftRequestBodySchema.safeParse(body);
@@ -94,9 +123,6 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (err) {
-    return NextResponse.json(
-      { error: errorMessage(err) },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: errorMessage(err) }, { status: 400 });
   }
 }

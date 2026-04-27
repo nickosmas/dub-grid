@@ -90,7 +90,9 @@ function OnboardingCheck({
     staleTime: 30_000,
   });
 
-  const { setupStatus, loading: orgLoading } = useOrganizationData();
+  const { setupStatus, loading: orgLoading } = useOrganizationData({
+    includeAssignmentDefinitionCompatibility: false,
+  });
   const { employees, loading: empLoading } = useEmployees(orgId);
 
   // Still loading — render children to avoid flash

@@ -19,7 +19,6 @@ const shiftCategories: ShiftCategory[] = [
     id: 1,
     orgId: "org-1",
     name: "Day",
-    color: "#E5F3E8",
     sortOrder: 1,
   },
 ];

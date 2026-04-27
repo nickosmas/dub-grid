@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { ShiftCategory, FocusArea, ShiftCode } from "@/types";
-import { upsertShiftCategory, deleteShiftCategory, upsertShiftCode, checkShiftCategoryDependencies } from "@/lib/db";
+import { ShiftCategory, FocusArea } from "@/types";
+import { upsertShiftCategory, deleteShiftCategory, checkShiftCategoryDependencies } from "@/lib/db";
 import type { DependencyInfo } from "@/lib/db";
 import { fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { toast } from "sonner";
@@ -11,8 +11,14 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import { labelStyle, inputStyle, normalizeTimeCompare, TimeInput12h } from "./shared";
+import { labelStyle, inputStyle, PresetColorPicker, TimeInput12h } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
+import {
+  DEFAULT_PREDEFINED_COLOR_BG,
+  PREDEFINED_COLORS,
+  borderColor,
+  getPresetByBg,
+} from "@/lib/colors";
 
 // ── Shift Categories Settings ──────────────────────────────────────────────────
 function ShiftCategoriesSettings({
@@ -20,17 +26,13 @@ function ShiftCategoriesSettings({
   focusAreas,
   orgId,
   onChange,
-  canManageShiftCodes,
-  shiftCodes,
-  onShiftCodesChange,
+  canManageScheduleDefinitions,
 }: {
   shiftCategories: ShiftCategory[];
   focusAreas: FocusArea[];
   orgId: string;
   onChange: (categories: ShiftCategory[]) => void;
-  canManageShiftCodes: boolean;
-  shiftCodes: ShiftCode[];
-  onShiftCodesChange: (codes: ShiftCode[]) => void;
+  canManageScheduleDefinitions: boolean;
 }) {
   const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
   const [saving, setSaving] = useState<number | null>(null);
@@ -64,14 +66,16 @@ function ShiftCategoriesSettings({
 
   const createDraftCategory = (focusAreaId: number | null) => {
     const tmpId = nextTmpId.current--;
+    const siblingCount = local.filter((c) => c.focusAreaId === focusAreaId).length;
+    const defaultColor = PREDEFINED_COLORS[siblingCount % PREDEFINED_COLORS.length]?.bg ?? DEFAULT_PREDEFINED_COLOR_BG;
     const tmp: ShiftCategory & { isNew: boolean } = {
       id: tmpId,
       orgId: orgId,
       name: "",
-      color: "var(--color-bg-secondary)",
       startTime: null,
       endTime: null,
-      sortOrder: local.filter((c) => c.focusAreaId === focusAreaId).length,
+      color: defaultColor,
+      sortOrder: siblingCount,
       focusAreaId,
       isNew: true,
     };
@@ -88,9 +92,9 @@ function ShiftCategoriesSettings({
     const orig = originalRef.current.get(cat.id);
     return cat.isNew || !orig ||
       cat.name !== orig.name ||
-      (cat.color ?? null) !== (orig.color ?? null) ||
       (cat.startTime ?? null) !== (orig.startTime ?? null) ||
       (cat.endTime ?? null) !== (orig.endTime ?? null) ||
+      (cat.color ?? DEFAULT_PREDEFINED_COLOR_BG) !== (orig.color ?? DEFAULT_PREDEFINED_COLOR_BG) ||
       (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null);
   };
 
@@ -180,16 +184,13 @@ function ShiftCategoriesSettings({
     if (!cat.name.trim()) return;
     setSaving(cat.id);
     try {
-      // Capture old category times before saving, to cascade-clear child shift codes
-      const oldCat = originalRef.current.get(cat.id);
-
       const saved = await upsertShiftCategory({
         id: cat.isNew ? undefined : cat.id,
         orgId: orgId,
         name: cat.name.trim(),
-        color: cat.color,
         startTime: cat.startTime || null,
         endTime: cat.endTime || null,
+        color: cat.color ?? DEFAULT_PREDEFINED_COLOR_BG,
         sortOrder: cat.sortOrder,
         focusAreaId: cat.focusAreaId ?? null,
         breakMinutes: cat.breakMinutes ?? null,
@@ -201,31 +202,6 @@ function ShiftCategoriesSettings({
       const updated = local.map((c) => (c.id === cat.id ? saved : c));
       setLocal(updated);
       onChange(updated);
-
-      // If category times changed, cascade-clear child shift codes that were
-      // inheriting (had times matching the old category values)
-      if (oldCat && (
-        normalizeTimeCompare(oldCat.startTime) !== normalizeTimeCompare(saved.startTime) ||
-        normalizeTimeCompare(oldCat.endTime) !== normalizeTimeCompare(saved.endTime)
-      )) {
-        const childCodes = shiftCodes.filter(sc =>
-          sc.categoryId === saved.id
-          && sc.defaultStartTime != null
-          && sc.defaultEndTime != null
-          && normalizeTimeCompare(sc.defaultStartTime) === normalizeTimeCompare(oldCat.startTime)
-          && normalizeTimeCompare(sc.defaultEndTime) === normalizeTimeCompare(oldCat.endTime)
-        );
-        if (childCodes.length > 0) {
-          const updatedCodes = [...shiftCodes];
-          for (const sc of childCodes) {
-            // Clear DB times to null (inherit from new category)
-            await upsertShiftCode({ ...sc, defaultStartTime: null, defaultEndTime: null });
-            const idx = updatedCodes.findIndex(c => c.id === sc.id);
-            if (idx >= 0) updatedCodes[idx] = { ...updatedCodes[idx], defaultStartTime: null, defaultEndTime: null };
-          }
-          onShiftCodesChange(updatedCodes);
-        }
-      }
 
       setEditingId(null);
       toast.success("Category saved");
@@ -269,6 +245,10 @@ function ShiftCategoriesSettings({
     const isSavingThis = saving === cat.id;
     const isDeletingThis = deleting === cat.id;
     const isDirty = isCategoryDirty(cat);
+    const previewColor = cat.color ?? DEFAULT_PREDEFINED_COLOR_BG;
+    const previewPreset = getPresetByBg(previewColor);
+    const rawPreviewLabel = (cat.abbr ?? cat.name.slice(0, 2)).trim();
+    const previewLabel = (rawPreviewLabel || "S").toUpperCase();
 
     if (!isEditing) {
       return (
@@ -283,33 +263,56 @@ function ShiftCategoriesSettings({
             padding: "10px 8px",
             borderRadius: "var(--dg-radius-md)",
             transition: "background 0.15s",
-            cursor: canManageShiftCodes ? "pointer" : undefined,
+            cursor: canManageScheduleDefinitions ? "pointer" : undefined,
           }}
-          onClick={canManageShiftCodes ? () => attemptOpenCategory(cat.id) : undefined}
+          onClick={canManageScheduleDefinitions ? () => attemptOpenCategory(cat.id) : undefined}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Untitled</span>}
-              </span>
-              {(cat.startTime || cat.endTime) && (
-                <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                  {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
-                  {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
-                    <span style={{ marginLeft: 8, fontWeight: 700, color: "var(--color-text-secondary)" }}>
-                      ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
-                    </span>
-                  )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <span
+              aria-hidden="true"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: "0 0 auto",
+                minWidth: 34,
+                height: 30,
+                padding: "0 8px",
+                borderRadius: "var(--dg-radius-sm)",
+                background: previewPreset.bg,
+                border: `1px solid ${borderColor(previewPreset.text)}`,
+                color: previewPreset.text,
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 800,
+                lineHeight: 1,
+              }}
+            >
+              {previewLabel}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                  {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Untitled</span>}
                 </span>
+                {(cat.startTime || cat.endTime) && (
+                  <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                    {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
+                    {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
+                      <span style={{ marginLeft: 8, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                        ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+              {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
+                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", marginTop: 2 }}>
+                  incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
+                </div>
               )}
             </div>
-            {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", marginTop: 2 }}>
-                incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
-              </div>
-            )}
           </div>
-          {canManageShiftCodes && (
+          {canManageScheduleDefinitions && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -345,8 +348,37 @@ function ShiftCategoriesSettings({
             maxLength={50}
             style={{ ...inputStyle }}
             autoFocus
-            disabled={!canManageShiftCodes}
+            disabled={!canManageScheduleDefinitions}
           />
+        </div>
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>COLOR</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <PresetColorPicker
+              valueBg={previewColor}
+              onChange={(color) => handleChange(cat.id, "color", color.bg)}
+              disabled={!canManageScheduleDefinitions}
+            />
+            <span
+              aria-hidden="true"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 48,
+                height: 34,
+                padding: "0 12px",
+                borderRadius: "var(--dg-radius-sm)",
+                background: previewPreset.bg,
+                border: `1px solid ${borderColor(previewPreset.text)}`,
+                color: previewPreset.text,
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 800,
+              }}
+            >
+              {previewLabel}
+            </span>
+          </div>
         </div>
         {/* START / END / BREAK — single row */}
         <div
@@ -363,7 +395,7 @@ function ShiftCategoriesSettings({
             <TimeInput12h
               value={cat.startTime}
               onChange={(v) => handleChange(cat.id, "startTime", v)}
-              disabled={!canManageShiftCodes}
+              disabled={!canManageScheduleDefinitions}
             />
           </div>
           <div>
@@ -371,7 +403,7 @@ function ShiftCategoriesSettings({
             <TimeInput12h
               value={cat.endTime}
               onChange={(v) => handleChange(cat.id, "endTime", v)}
-              disabled={!canManageShiftCodes}
+              disabled={!canManageScheduleDefinitions}
             />
           </div>
           <div>
@@ -387,7 +419,7 @@ function ShiftCategoriesSettings({
               }}
               placeholder="None"
               style={{ ...inputStyle, width: 100 }}
-              disabled={!canManageShiftCodes}
+              disabled={!canManageScheduleDefinitions}
             />
           </div>
         </div>
@@ -420,7 +452,7 @@ function ShiftCategoriesSettings({
         )}
         {/* Actions */}
         <EditorActionRow
-          destructiveAction={canManageShiftCodes ? (
+          destructiveAction={canManageScheduleDefinitions ? (
             <button
               onClick={() => cat.isNew ? handleDelete(cat) : handleDeleteClick(cat.id)}
               disabled={isDeletingThis}
@@ -441,7 +473,7 @@ function ShiftCategoriesSettings({
           primaryAction={(
             <button
               onClick={() => handleSave(cat)}
-              disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageShiftCodes}
+              disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageScheduleDefinitions}
               className="dg-btn dg-btn-primary dg-btn-sm"
             >
               {getEditorSaveLabel(isSavingThis)}
@@ -455,14 +487,14 @@ function ShiftCategoriesSettings({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <p style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", margin: 0 }}>
-        Define the tally categories for each focus area (e.g. Day, Evening, Night).
+        Define the primary shift blocks for each focus area (for example Day, Evening, and Night).
       </p>
 
       {focusAreas.length === 0 && (
         <EmptyState
           compact
           title="No focus areas yet"
-          description="Create focus areas first, then add shift categories to each one."
+          description="Create focus areas first, then add shifts to each one."
         />
       )}
 
@@ -506,19 +538,19 @@ function ShiftCategoriesSettings({
             ) : (
               <EmptyState
                 compact
-                title="No categories yet"
-                action={canManageShiftCodes ? (
+                title="No shifts yet"
+                action={canManageScheduleDefinitions ? (
                   <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">
-                    + Add Category
+                    + Add Shift
                   </button>
                 ) : undefined}
                 style={{ margin: "12px 16px" }}
               />
             )}
-            {areaCats.length > 0 && canManageShiftCodes && (
+            {areaCats.length > 0 && canManageScheduleDefinitions && (
               <div style={{ padding: "8px 16px 12px" }}>
                 <button onClick={() => handleAdd(focusArea.id)} className={addBtnClass} style={{ width: "100%" }}>
-                  + Add Category
+                  + Add Shift
                 </button>
               </div>
             )}
@@ -538,7 +570,7 @@ function ShiftCategoriesSettings({
             message={<>
               <strong>{cat.name}</strong> is currently {catDepInfo.summary.toLowerCase()}.
               <br /><br />
-              Archiving will preserve historical records. Shift codes in this category will become uncategorized.
+              Archiving will preserve historical records. Any derived compatibility labels tied to this shift will become uncategorized.
             </>}
             confirmLabel="Archive"
             variant="warning"

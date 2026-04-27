@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import {
-  PUBLISHED_SHIFT_COLS,
+  fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
@@ -21,7 +21,7 @@ export interface EmployeeUtilization {
 interface ShiftWithEmployee {
   emp_id: string;
   date: string;
-  published_shift_code_ids: number[] | null;
+  resolvedAssignmentIds: number[] | null;
   published_absence_type_id: number | null;
   published_custom_start_time: string | null;
   published_custom_end_time: string | null;
@@ -39,41 +39,17 @@ export async function fetchWeeklyShiftHours(
   const start = new Date();
   start.setDate(start.getDate() - weeks * 7);
 
-  const { data, error } = await supabase
-    .from("shifts")
-    .select(`${PUBLISHED_SHIFT_COLS}, employees!inner(org_id)`)
-    .eq("employees.org_id", orgId)
-    .gte("date", start.toISOString().slice(0, 10))
-    .lte("date", end.toISOString().slice(0, 10));
-
-  if (error) throw error;
-
-  const { data: shiftCodes, error: shiftCodeError } = await supabase
-    .from("shift_codes")
-    .select("id, label, default_start_time, default_end_time")
-    .eq("org_id", orgId)
-    .is("archived_at", null);
-  if (shiftCodeError) throw shiftCodeError;
-
-  const shiftCodeById = new Map<
-    number,
-    { label: string; defaultStartTime: string | null; defaultEndTime: string | null }
-  >(
-    (shiftCodes ?? []).map((row: Record<string, unknown>) => [
-      row.id as number,
-      {
-        label: row.label as string,
-        defaultStartTime: row.default_start_time as string | null,
-        defaultEndTime: row.default_end_time as string | null,
-      },
-    ]),
-  );
+  const data = await fetchPublishedShiftRows(supabase, {
+    orgId,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+  });
 
   // Group by week (Monday start)
   const weekMap = new Map<string, { totalHours: number; shiftCount: number }>();
 
-  for (const row of (data ?? []) as unknown as PublishedShiftRow[]) {
-    const publishedEntry = resolvePublishedScheduleEntry(row, shiftCodeById);
+  for (const row of data as PublishedShiftRow[]) {
+    const publishedEntry = resolvePublishedScheduleEntry(row, new Map());
     if (!publishedEntry || publishedEntry.kind !== "shift") continue;
 
     const d = new Date(publishedEntry.date);
@@ -107,43 +83,20 @@ export async function fetchEmployeeUtilization(
   const start = new Date();
   start.setDate(start.getDate() - weeks * 7);
 
-  const { data, error } = await supabase
-    .from("shifts")
-    .select(`${PUBLISHED_SHIFT_COLS}, employees!inner(org_id, first_name, last_name)`)
-    .eq("employees.org_id", orgId)
-    .gte("date", start.toISOString().slice(0, 10))
-    .lte("date", end.toISOString().slice(0, 10));
-
-  if (error) throw error;
-
-  const { data: shiftCodes, error: shiftCodeError } = await supabase
-    .from("shift_codes")
-    .select("id, label, default_start_time, default_end_time")
-    .eq("org_id", orgId)
-    .is("archived_at", null);
-  if (shiftCodeError) throw shiftCodeError;
-
-  const shiftCodeById = new Map<
-    number,
-    { label: string; defaultStartTime: string | null; defaultEndTime: string | null }
-  >(
-    (shiftCodes ?? []).map((row: Record<string, unknown>) => [
-      row.id as number,
-      {
-        label: row.label as string,
-        defaultStartTime: row.default_start_time as string | null,
-        defaultEndTime: row.default_end_time as string | null,
-      },
-    ]),
-  );
+  const data = await fetchPublishedShiftRows(supabase, {
+    orgId,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: end.toISOString().slice(0, 10),
+    extraSelects: ["employees!inner(org_id, first_name, last_name)"],
+  });
 
   const empMap = new Map<string, { name: string; totalHours: number; shiftCount: number }>();
-  const rows = (data ?? []) as unknown as ShiftWithEmployee[];
+  const rows = data as unknown as ShiftWithEmployee[];
 
   for (const row of rows) {
     const publishedEntry = resolvePublishedScheduleEntry(
       row as unknown as PublishedShiftRow,
-      shiftCodeById,
+      new Map(),
     );
     if (!publishedEntry || publishedEntry.kind !== "shift") continue;
 

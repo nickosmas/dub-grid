@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from "react";
 import ExpandButton from "./ExpandButton";
+import {
+  chartTooltipContentStyle,
+  chartTooltipWrapperStyle,
+} from "./chartTooltipStyles";
 
 interface TrendsCardProps {
   periodStats: Array<{
@@ -213,12 +217,8 @@ export default function TrendsCard({
                     formatter={(value) => [
                       `${Number(value ?? 0).toFixed(1)}%`,
                     ]}
-                    contentStyle={{
-                      backgroundColor: "var(--color-bg-primary)",
-                      border: "1px solid var(--color-border-light)",
-                      borderRadius: "var(--dg-radius-sm)",
-                      fontSize: 12,
-                    }}
+                    contentStyle={chartTooltipContentStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
                   />
                   <Line
                     type="monotone"
@@ -263,12 +263,8 @@ export default function TrendsCard({
                       Number(value ?? 0),
                       name === "staffed" ? "Staffed" : "Required",
                     ]}
-                    contentStyle={{
-                      backgroundColor: "var(--color-bg-primary)",
-                      border: "1px solid var(--color-border-light)",
-                      borderRadius: "var(--dg-radius-sm)",
-                      fontSize: 12,
-                    }}
+                    contentStyle={chartTooltipContentStyle}
+                    wrapperStyle={chartTooltipWrapperStyle}
                   />
                   <Bar
                     dataKey="slots"

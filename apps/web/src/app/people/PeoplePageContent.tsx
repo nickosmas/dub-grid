@@ -23,7 +23,7 @@ function PeopleContent() {
     orgId,
   } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, certifications, orgRoles, departments, shiftCodeMap, absenceTypes,
+    org, focusAreas, assignments, shiftCategories, jobs, certifications, orgRoles, departments, assignmentLabelMap, absenceTypes,
     loading: refLoading, loadError, setupStatus,
   } = useOrganizationData();
   const {
@@ -83,8 +83,10 @@ function PeopleContent() {
             onActivate={handleActivateEmployee}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}
-            shiftCodes={shiftCodes}
-            shiftCodeMap={shiftCodeMap}
+            assignments={assignments}
+            shiftCategories={shiftCategories}
+            jobs={jobs}
+            assignmentLabelMap={assignmentLabelMap}
             absenceTypes={absenceTypes}
             departments={departments}
             departmentLabel={org?.departmentLabel}

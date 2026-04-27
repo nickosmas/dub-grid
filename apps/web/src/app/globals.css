@@ -235,7 +235,6 @@
   /* Grid layout */
   --dg-grid-name-col: 220px;
   --dg-grid-cell-height: 52px;
-  --dg-grid-cell-height-audit: 66px;
   --dg-grid-col-min: 72px;
 
   /* Drag elevation */
@@ -246,7 +245,7 @@
   ---------------------------------------------------------- */
   --tooltip-font-size: var(--dg-fs-label);
   --tooltip-border-radius: var(--dg-radius-sm);
-  --tooltip-shadow: var(--shadow-float);
+  --tooltip-shadow: 0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1);
 
   /* ----------------------------------------------------------
      Animation durations
@@ -904,6 +903,153 @@ textarea {
   animation: dg-enter 200ms ease-out both;
 }
 
+.dg-staff-directory-header,
+.dg-staff-directory-row {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr) 40px;
+  align-items: stretch;
+}
+
+@media (min-width: 768px) {
+  .dg-staff-directory-header,
+  .dg-staff-directory-row {
+    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) 40px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .dg-staff-directory-header,
+  .dg-staff-directory-row {
+    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.8fr) 40px;
+  }
+}
+
+.dg-staff-directory-header {
+  min-height: 40px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.dg-staff-directory-head-cell {
+  align-items: center;
+  min-width: 0;
+  padding-block: 10px;
+  color: var(--color-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dg-staff-directory-row {
+  background: var(--color-surface);
+  position: relative;
+  z-index: 1;
+  transform: translate3d(0, 0, 0);
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+  border-bottom: 1px solid var(--color-border-light);
+  will-change: transform;
+}
+
+.dg-staff-directory-row:last-child {
+  border-bottom: 0;
+}
+
+.dg-staff-directory-row {
+  touch-action: none;
+  user-select: none;
+}
+
+.dg-staff-directory-row[data-dragging="true"] {
+  z-index: 5;
+  cursor: grabbing;
+  box-shadow: var(--shadow-drag);
+}
+
+.dg-staff-directory-row[data-dragging="true"][data-drag-phase="dragging"] {
+  transition: none;
+}
+
+.dg-staff-directory-row[data-dragging="true"][data-drag-phase="settling"] {
+  transition: transform 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.dg-staff-directory-row[data-moving="true"] {
+  z-index: 3;
+}
+
+.dg-staff-directory-cell {
+  align-items: center;
+  min-width: 0;
+}
+
+.dg-staff-directory-cell--rank {
+  width: 60px;
+}
+
+.dg-staff-directory-cell--name {
+  min-width: 0;
+}
+
+.dg-staff-directory-cell--chevron {
+  justify-content: flex-end;
+}
+
+.dg-settings-reorder-item,
+.dg-settings-reorder-group,
+.dg-settings-reorder-subitem {
+  position: relative;
+  z-index: 1;
+  transform: translate3d(0, var(--dg-settings-reorder-offset, 0px), 0);
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background 150ms ease;
+  will-change: transform;
+}
+
+.dg-settings-reorder-item,
+.dg-settings-reorder-subitem {
+  align-items: center;
+}
+
+.dg-settings-reorder-item[data-dragging="true"],
+.dg-settings-reorder-group[data-dragging="true"],
+.dg-settings-reorder-subitem[data-dragging="true"] {
+  z-index: 5;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-drag);
+  cursor: grabbing;
+}
+
+.dg-settings-reorder-item[data-dragging="true"][data-drag-phase="dragging"],
+.dg-settings-reorder-group[data-dragging="true"][data-drag-phase="dragging"],
+.dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="dragging"] {
+  transition: none;
+}
+
+.dg-settings-reorder-item[data-dragging="true"][data-drag-phase="settling"],
+.dg-settings-reorder-group[data-dragging="true"][data-drag-phase="settling"],
+.dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="settling"] {
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background 150ms ease;
+}
+
+.dg-settings-reorder-item[data-moving="true"],
+.dg-settings-reorder-group[data-moving="true"],
+.dg-settings-reorder-subitem[data-moving="true"] {
+  z-index: 3;
+}
+
+.dg-settings-reorder-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.dg-settings-reorder-handle:active {
+  cursor: grabbing;
+}
+
 /* ── Dropdown Menu ─────────────────────────────────────── */
 .dg-menu {
   background: var(--color-surface);
@@ -1510,12 +1656,172 @@ textarea {
 }
 
 /* ── Grid Cell Styles ──────────────────────────────────── */
+.dg-grid-slot,
+.dg-grid-cell {
+  position: relative;
+  transition: background 100ms ease, box-shadow 100ms ease;
+}
+
+.dg-grid-slot[data-today="true"],
+.dg-grid-cell[data-today="true"] {
+  background: var(--color-today-bg);
+}
+
 .dg-grid-cell {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.dg-grid-cell__content {
   position: relative;
-  transition: background 100ms ease;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.dg-grid-slot > :not(.dg-grid-slot__chrome),
+.dg-grid-cell > :not(.dg-grid-cell__chrome) {
+  position: relative;
+  z-index: 1;
+}
+
+.dg-grid-slot__chrome,
+.dg-grid-cell__chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.dg-grid-slot[data-leading-divider="light"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="light"] .dg-grid-cell__chrome::before,
+.dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+}
+
+.dg-grid-slot[data-leading-divider="light"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="light"] .dg-grid-cell__chrome::before {
+  border-left: 1px solid var(--color-border-light);
+}
+
+.dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
+.dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
+  border-left: 1px solid var(--color-dark);
+}
+
+.dg-grid-cell[data-top-divider]::before,
+.dg-grid-slot[data-bottom-divider]::after {
+  content: none;
+}
+
+.dg-grid-cell[data-top-divider] .dg-grid-cell__chrome,
+.dg-grid-slot[data-bottom-divider] .dg-grid-slot__chrome {
+  --dg-grid-divider-inset: 0px;
+}
+
+.dg-grid-cell[data-week-split-start="true"][data-top-divider] .dg-grid-cell__chrome,
+.dg-grid-slot[data-week-split-start="true"][data-bottom-divider] .dg-grid-slot__chrome {
+  --dg-grid-divider-inset: 1px;
+}
+
+.dg-grid-cell[data-top-divider="light"] .dg-grid-cell__chrome {
+  background-image: linear-gradient(
+    to right,
+    var(--color-border-light),
+    var(--color-border-light)
+  );
+  background-position: var(--dg-grid-divider-inset) 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
+}
+
+.dg-grid-cell[data-top-divider="dark"] .dg-grid-cell__chrome {
+  background-image: linear-gradient(
+    to right,
+    var(--color-dark),
+    var(--color-dark)
+  );
+  background-position: var(--dg-grid-divider-inset) 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
+}
+
+.dg-grid-cell[data-top-divider="warning"] .dg-grid-cell__chrome {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-warning-border, #F59E0B) 0 6px,
+    transparent 6px 10px
+  );
+  background-position: var(--dg-grid-divider-inset) 0;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 2px;
+}
+
+.dg-grid-slot[data-bottom-divider="light"] .dg-grid-slot__chrome {
+  background-image: linear-gradient(
+    to right,
+    var(--color-border-light),
+    var(--color-border-light)
+  );
+  background-position: var(--dg-grid-divider-inset) 100%;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
+}
+
+.dg-grid-slot[data-bottom-divider="warning"] .dg-grid-slot__chrome {
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--color-warning-border, #F59E0B) 0 6px,
+    transparent 6px 10px
+  );
+  background-position: var(--dg-grid-divider-inset) 100%;
+  background-repeat: no-repeat;
+  background-size: calc(100% - var(--dg-grid-divider-inset)) 2px;
+}
+
+.dg-grid-cell[data-locked="true"] {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.dg-grid-cell[data-drop-target="true"] {
+  z-index: 4;
+  background: var(--color-bg-secondary) !important;
+}
+
+.dg-grid-cell[data-active="true"] {
+  background: var(--color-bg-secondary) !important;
+}
+
+.dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 0;
+}
+
+.dg-grid-cell[data-week-split-start="true"]:focus-visible .dg-grid-cell__chrome::after {
+  left: 1px;
+}
+
+.dg-grid-active-outline {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--color-primary);
+  pointer-events: none;
+  z-index: 6;
 }
 
 .dg-grid-cell[data-interactive="true"]:not([data-locked="true"]):hover {
@@ -1541,9 +1847,15 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 .dg-grid-cell:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
+  outline: none;
   z-index: 5;
+}
+
+.dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
+  box-shadow:
+    inset 0 0 0 1px var(--color-border-focus),
+    1px 0 0 0 var(--color-border-focus),
+    0 1px 0 0 var(--color-border-focus);
 }
 
 /* ── Notification Badge ────────────────────────────────── */
@@ -1591,11 +1903,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   transition: transform 150ms ease, opacity 150ms ease;
 }
 
-/* ── Drag Grip Affordance ─────────────────────────────── */
-.dg-draggable-shift:hover .dg-drag-grip {
-  opacity: 1 !important;
-}
-
 /* ── Snap-back Animation (when drag is cancelled) ─────── */
 @keyframes dg-snap-back {
   0% { transform: scale(0.95); opacity: 0.5; }
@@ -1610,8 +1917,8 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .dg-grid-cell[data-interactive="true"][data-empty="true"]:not([data-locked="true"]):hover::after {
   content: "+";
   position: absolute;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 25px;
+  font-weight: 400;
   color: var(--color-text-faint);
   opacity: 0.6;
   pointer-events: none;
@@ -1621,6 +1928,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .dg-draft-banner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 8px 16px;
   margin: 8px 16px;

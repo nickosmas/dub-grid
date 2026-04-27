@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
-import { resolveScheduleSpan } from "@/lib/schedule-view";
+import {
+  getContainingPayPeriodStart,
+  getScheduleStartForSpan,
+  resolveScheduleSpan,
+} from "@/lib/schedule-view";
 import { AUTO_ONE_WEEK } from "@/hooks";
+import { formatDateKey } from "@/lib/utils";
 
 describe("schedule view fallback", () => {
   it("widens the auto one-week breakpoint", () => {
@@ -14,6 +19,26 @@ describe("schedule view fallback", () => {
     expect(resolveScheduleSpan(1, true)).toBe(1);
     expect(resolveScheduleSpan("month", true)).toBe("month");
     expect(resolveScheduleSpan(2, false)).toBe(2);
+  });
+
+  it("finds the containing pay period from a configured biweekly anchor date", () => {
+    const start = getContainingPayPeriodStart(
+      new Date(2026, 4, 1),
+      "2026-04-20",
+    );
+
+    expect(start).not.toBeNull();
+    expect(formatDateKey(start!)).toBe("2026-04-20");
+  });
+
+  it("falls back to calendar weeks when no pay-period anchor is configured", () => {
+    const start = getScheduleStartForSpan({
+      date: new Date(2026, 4, 1),
+      span: 2,
+      payPeriodStartDate: null,
+    });
+
+    expect(formatDateKey(start)).toBe("2026-04-26");
   });
 });
 

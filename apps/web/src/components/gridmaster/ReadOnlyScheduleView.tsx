@@ -2,14 +2,20 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchAssignmentDefinitions } from "@/lib/db/config";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
+import { addDays, formatDateKey } from "@/lib/utils";
+import { getScheduleStartForSpan } from "@/lib/schedule-view";
+import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
+import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
+import type { DbScheduleCell } from "@/lib/db/types";
 
 interface ShiftRow {
   empId: string;
   empName: string;
   date: string;
-  shiftCodes: string[];
+  assignments: string[];
   absenceLabel: string | null;
   focusAreaName: string | null;
   isDraft: boolean;
@@ -19,24 +25,31 @@ function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
-export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
+export default function ReadOnlyScheduleView({
+  orgId,
+  payPeriodStartDate,
+}: {
+  orgId: string;
+  payPeriodStartDate: string | null;
+}) {
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [periodOffset, setPeriodOffset] = useState(0);
 
   const { startDate, endDate } = useMemo(() => {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const start = new Date(now);
-    start.setDate(now.getDate() - dayOfWeek + weekOffset * 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 13); // 2 weeks
+    const baseStart = getScheduleStartForSpan({
+      date: new Date(),
+      span: 2,
+      payPeriodStartDate,
+    });
+    const start = addDays(baseStart, periodOffset * 14);
+    const end = addDays(start, 13);
     return {
-      startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
+      startDate: formatDateKey(start),
+      endDate: formatDateKey(end),
     };
-  }, [weekOffset]);
+  }, [payPeriodStartDate, periodOffset]);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,18 +58,64 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
 
     (async () => {
       try {
-        // Fetch shifts with employee and shift code names
-        const { data: shiftData, error: shiftErr } = await supabase
-          .from("shifts")
+        // Fetch schedule option labels for this org.
+        const codes = await fetchAssignmentDefinitions(orgId, true);
+        const codeMap = new Map<number, string>(
+          codes.map((code) => [code.id, code.label]),
+        );
+        const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
+          codes,
+        );
+
+        // Fetch absence type labels
+        const { data: absences } = await supabase
+          .from("absence_types")
+          .select("id, label")
+          .eq("org_id", orgId);
+        const absMap = new Map<number, string>(
+          ((absences ?? []) as Array<{ id: number; label: string }>).map((a) => [
+            a.id,
+            a.label,
+          ]),
+        );
+
+        const { data: scheduleCellData, error: scheduleCellError } = await supabase
+          .from("schedule_cells")
           .select(`
+            id,
             emp_id,
             date,
-            draft_shift_code_ids,
-            published_shift_code_ids,
-            draft_absence_type_id,
-            published_absence_type_id,
-            draft_is_delete,
+            org_id,
             focus_area_id,
+            version,
+            series_id,
+            from_recurring,
+            created_by,
+            updated_by,
+            created_at,
+            updated_at,
+            snapshots:schedule_cell_snapshots(
+              id,
+              cell_id,
+              org_id,
+              snapshot_kind,
+              state_kind,
+              absence_type_id,
+              custom_start_time,
+              custom_end_time,
+              created_at,
+              updated_at,
+              segments:schedule_cell_segments(
+                id,
+                snapshot_id,
+                org_id,
+                position,
+                shift_id,
+                job_id,
+                created_at,
+                updated_at
+              )
+            ),
             employees(first_name, last_name),
             focus_areas(name)
           `)
@@ -66,45 +125,37 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
           .order("date")
           .order("emp_id");
 
-        if (shiftErr) throw shiftErr;
+        if (scheduleCellError) throw scheduleCellError;
         if (cancelled) return;
 
-        // Fetch shift code labels for this org
-        const { data: codes } = await supabase
-          .from("shift_codes")
-          .select("id, label")
-          .eq("org_id", orgId);
-        const codeMap = new Map((codes ?? []).map((c: { id: number; label: string }) => [c.id, c.label]));
+        const rows = ((scheduleCellData ?? []) as Array<DbScheduleCell & Record<string, unknown>>)
+          .map((row) => {
+            const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
+              isScheduler: true,
+              assignmentLabelMap: codeMap,
+              assignmentIdByPair,
+              absenceTypeMap: absMap,
+            });
+            if (!entry) return null;
 
-        // Fetch absence type labels
-        const { data: absences } = await supabase
-          .from("absence_types")
-          .select("id, label")
-          .eq("org_id", orgId);
-        const absMap = new Map((absences ?? []).map((a: { id: number; label: string }) => [a.id, a.label]));
+            const emp = row.employees as { first_name: string; last_name: string } | null;
+            const fa = row.focus_areas as { name?: unknown } | null;
+            const focusAreaName = typeof fa?.name === "string" ? fa.name : null;
 
-        const rows: ShiftRow[] = (shiftData ?? []).map((s: Record<string, unknown>) => {
-          const emp = s.employees as { first_name: string; last_name: string } | null;
-          const fa = s.focus_areas as { name: string } | null;
-          const publishedCodes = (s.published_shift_code_ids as number[] | null) ?? [];
-          const draftCodes = (s.draft_shift_code_ids as number[] | null) ?? [];
-          const isDraft = draftCodes.length > 0 && JSON.stringify(draftCodes) !== JSON.stringify(publishedCodes);
-          const activeCodes = draftCodes.length > 0 ? draftCodes : publishedCodes;
-
-          const pubAbsence = s.published_absence_type_id as number | null;
-          const draftAbsence = s.draft_absence_type_id as number | null;
-          const activeAbsence = draftAbsence ?? pubAbsence;
-
-          return {
-            empId: s.emp_id as string,
-            empName: emp ? `${emp.first_name} ${emp.last_name}` : (s.emp_id as string).slice(0, 8),
-            date: s.date as string,
-            shiftCodes: activeCodes.map((id) => codeMap.get(id) ?? `?${id}`),
-            absenceLabel: activeAbsence ? (absMap.get(activeAbsence) ?? null) : null,
-            focusAreaName: fa?.name ?? null,
-            isDraft,
-          };
-        }); // draft_is_delete filtered at DB level
+            return {
+              empId: row.emp_id,
+              empName: emp ? `${emp.first_name} ${emp.last_name}` : row.emp_id.slice(0, 8),
+              date: row.date,
+              assignments: entry.assignmentIds.map((id) => codeMap.get(id) ?? `?${id}`),
+              absenceLabel:
+                entry.absenceTypeId != null
+                  ? (absMap.get(entry.absenceTypeId) ?? null)
+                  : null,
+              focusAreaName,
+              isDraft: entry.draftKind != null,
+            } satisfies ShiftRow;
+          })
+          .filter((row): row is ShiftRow => row != null);
 
         setShifts(rows);
       } catch (err: unknown) {
@@ -135,21 +186,21 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
           <button
             className="dg-btn dg-btn-secondary"
             style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px" }}
-            onClick={() => setWeekOffset((w) => w - 2)}
+            onClick={() => setPeriodOffset((current) => current - 1)}
           >
             ← Prev
           </button>
           <button
             className="dg-btn dg-btn-secondary"
             style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px" }}
-            onClick={() => setWeekOffset(0)}
+            onClick={() => setPeriodOffset(0)}
           >
-            This Week
+            Current Period
           </button>
           <button
             className="dg-btn dg-btn-secondary"
             style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px" }}
-            onClick={() => setWeekOffset((w) => w + 2)}
+            onClick={() => setPeriodOffset((current) => current + 1)}
           >
             Next →
           </button>
@@ -199,9 +250,9 @@ export default function ReadOnlyScheduleView({ orgId }: { orgId: string }) {
                     <tr key={`${r.empId}-${i}`}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{r.empName}</td>
                       <td style={tdStyle}>
-                        {r.shiftCodes.length > 0 ? (
+                        {r.assignments.length > 0 ? (
                           <span style={{ display: "inline-flex", gap: 4 }}>
-                            {r.shiftCodes.map((c, j) => (
+                            {r.assignments.map((c, j) => (
                               <span key={j} style={{
                                 display: "inline-block", padding: "1px 6px", borderRadius: 4,
                                 fontSize: "var(--dg-fs-caption)", fontWeight: 700,

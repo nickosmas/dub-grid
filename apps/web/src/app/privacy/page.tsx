@@ -120,7 +120,7 @@ export default function PrivacyPolicyPage() {
             </li>
             <li style={{ marginBottom: "8px" }}>
               <strong>Schedule and shift data.</strong> We store shift
-              assignments (which employee is assigned which shift code on which
+              assignments (which employee is assigned which shift and job on which
               date), draft and published schedule states, and any schedule or
               shift notes (e.g., readings, shower notes) that authorized users
               add.

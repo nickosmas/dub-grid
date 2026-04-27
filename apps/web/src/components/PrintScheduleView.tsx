@@ -1,13 +1,19 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { Employee, ShiftCategory, ShiftCode, FocusArea, NamedItem, ShiftDisplayMode } from "@/types";
+import { Employee, ShiftCategory, AssignmentDefinition, FocusArea, JobDefinition, NamedItem, ShiftDisplayMode } from "@/types";
 import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
+import {
+  borderColor,
+  DESIGNATION_COLORS,
+  DEFAULT_DESIG_COLOR,
+  getReadableTextOnSurface,
+} from "@/lib/colors";
+import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { MaybeHint } from "@/components/ui/hint";
 
 const MONTH_NAMES = [
@@ -18,10 +24,19 @@ const MONTH_NAMES = [
 function getFocusAreaInitials(name: string): string {
   return name
     .split(/\s+/)
-    .map((w) => w[0])
+    .map((word) => word[0])
     .join("")
     .toUpperCase()
     .slice(0, 3);
+}
+
+function getCrossFocusBadgePalette(
+  style?: Pick<AssignmentDefinition, "color" | "text"> | null,
+) {
+  return {
+    background: style?.color ?? "#FFFFFF",
+    color: style?.text ?? "#334155",
+  };
 }
 
 function pillText(label: string, max: number): string {
@@ -43,10 +58,11 @@ interface PrintSectionProps {
   employees: Employee[];
   dates: Date[];
   shiftForKey: (empId: string, date: Date) => string | null;
-  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
-  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
-  shiftCodes: ShiftCode[];
+  assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
+  assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   focusAreas: FocusArea[];
@@ -62,10 +78,11 @@ function PrintSection({
   employees,
   dates,
   shiftForKey,
-  shiftCodeIdsForKey,
+  assignmentIdsForKey,
   getShiftStyle,
-  shiftCodes,
+  assignments,
   shiftCategories,
+  jobs,
   certifications,
   orgRoles,
   focusAreas,
@@ -81,42 +98,71 @@ function PrintSection({
     [getShiftStyle, sectionName],
   );
 
-  // Look up shift codes by ID so cross-focus-area shifts render in their own color
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, ShiftCode>();
-    for (const sc of shiftCodes) map.set(sc.id, sc);
+  // Look up assignments by ID so cross-focus-area shifts render in their own color
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const sc of assignments) map.set(sc.id, sc);
     return map;
-  }, [shiftCodes]);
+  }, [assignments]);
 
   const getStyleByIdOrLabel = useMemo(
-    () => (label: string, codeId?: number): ShiftCode => {
+    () => (label: string, codeId?: number): AssignmentDefinition => {
       if (codeId != null) {
-        const byId = shiftCodeById.get(codeId);
+        const byId = assignmentById.get(codeId);
         if (byId) return byId;
       }
       return contextualGetShiftStyle(label);
     },
-    [shiftCodeById, contextualGetShiftStyle],
+    [assignmentById, contextualGetShiftStyle],
+  );
+  const categoryById = useMemo(() => {
+    const map = new Map<number, ShiftCategory>();
+    for (const category of shiftCategories) map.set(category.id, category);
+    return map;
+  }, [shiftCategories]);
+  const jobById = useMemo(() => {
+    const map = new Map<number, JobDefinition>();
+    for (const job of jobs) map.set(job.id, job);
+    return map;
+  }, [jobs]);
+  const getDisplayPartsByIdOrLabel = useMemo(
+    () => (label: string, codeId?: number) => {
+      const assignment = getStyleByIdOrLabel(label, codeId);
+      const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
+      const shift =
+        shiftId != null
+          ? (categoryById.get(shiftId) ?? null)
+          : null;
+      const job =
+        assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
+      return buildShiftDisplayParts({
+        shift,
+        job,
+        assignment,
+        shiftDisplayMode,
+      });
+    },
+    [categoryById, getStyleByIdOrLabel, jobById, shiftDisplayMode],
   );
 
   // Set of shift code IDs that belong to this section's focus area
   const sectionCodeIds = useMemo(() => {
     return new Set(
-      shiftCodes.filter((sc) => sc.focusAreaId === focusAreaId).map((sc) => sc.id),
+      assignments.filter((sc) => sc.focusAreaId === focusAreaId).map((sc) => sc.id),
     );
-  }, [shiftCodes, focusAreaId]);
+  }, [assignments, focusAreaId]);
 
   const tallyLabelResolver = useMemo(
-    () => isNameMode ? (code: ShiftCode) => code.name || code.label : undefined,
+    () => isNameMode ? (code: AssignmentDefinition) => code.name || code.label : undefined,
     [isNameMode],
   );
 
   const dailyTallies = useMemo(
     () => {
-      const fn = shiftCodeIdsForKey ?? (() => []);
-      return dates.map((date) => computeDailyTallies(employees, date, fn, shiftCodeById, sectionCodeIds, tallyLabelResolver));
+      const fn = assignmentIdsForKey ?? (() => []);
+      return dates.map((date) => computeDailyTallies(employees, date, fn, assignmentById, sectionCodeIds, tallyLabelResolver));
     },
-    [dates, employees, shiftCodeIdsForKey, shiftCodeById, sectionCodeIds, tallyLabelResolver],
+    [dates, employees, assignmentIdsForKey, assignmentById, sectionCodeIds, tallyLabelResolver],
   );
 
   // Derive tally rows from actual data so tallies always show when categorized shifts exist
@@ -274,8 +320,8 @@ function PrintSection({
               {/* Shift cells */}
               {dates.map((date, di) => {
                 const isSplit = splitAtIndex !== undefined && di === splitAtIndex;
-                const shiftCode = shiftForKey(emp.id, date);
-                const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+                const assignment = shiftForKey(emp.id, date);
+                const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                 const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
 
                 return (
@@ -292,18 +338,29 @@ function PrintSection({
                       borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
                     }}
                   >
-                    {shiftCode && shiftCode !== "OFF" ? (
+                    {assignment && assignment !== "OFF" ? (
                       (() => {
-                        const labels = shiftCode.split("/");
+                        const labels = assignment.split("/");
                         if (labels.length === 1) {
                           const label = labels[0];
                           const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
-                          const codeEntry0 = cellCodeIds[0] != null ? shiftCodeById.get(cellCodeIds[0]) : undefined;
+                          const codeEntry0 = cellCodeIds[0] != null ? assignmentById.get(cellCodeIds[0]) : undefined;
+                          const displayParts = getDisplayPartsByIdOrLabel(label, cellCodeIds[0]);
                           const isCross = label !== "X" && codeEntry0?.focusAreaId != null
                             && codeEntry0.focusAreaId !== focusAreaId;
                           const crossHomeFa = isCross
                             ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
                             : undefined;
+                          const singleCrossFocusPill =
+                            isCross && crossHomeFa ? crossHomeFa : null;
+                          const singleCrossFocusPalette =
+                            getCrossFocusBadgePalette(style);
+                          const singleForegroundColor = isCross
+                            ? getReadableTextOnSurface(style.color, style.text)
+                            : style.text;
+                          const showSingleSecondaryLine =
+                            !!displayParts.secondaryLabel;
+                          const singleDisplayLabel = displayParts.primaryLabel;
                           return (
                             <div
                               style={{
@@ -313,18 +370,23 @@ function PrintSection({
                                 bottom: customTimes ? "0.25em" : "0.5em",
                                 left: "0.5em",
                                 background: isCross ? "#ffffff" : style.color,
-                                border: `1px solid ${borderColor(style.text)}`,
+                                border: `1px solid ${borderColor(singleForegroundColor)}`,
                                 borderRadius: 4,
-                                color: style.text,
+                                color: singleForegroundColor,
                                 display: "flex",
                                 flexDirection: "column",
                                 alignItems: "center",
                                 justifyContent: "center",
                                 overflow: "hidden",
                                 padding: isNameMode ? "2px 4px" : "2px 3px",
+                                paddingLeft: singleCrossFocusPill
+                                  ? isNameMode
+                                    ? "1.75em"
+                                    : "1.45em"
+                                  : undefined,
                               }}
                             >
-                              {isCross && crossHomeFa && (
+                              {singleCrossFocusPill && (
                                 <span
                                   style={{
                                     position: "absolute",
@@ -336,18 +398,55 @@ function PrintSection({
                                     fontSize: "1em",
                                     fontWeight: 800,
                                     lineHeight: 1,
-                                    background: "var(--color-bg-secondary)",
-                                    color: "var(--color-text-secondary)",
+                                    background: singleCrossFocusPalette.background,
+                                    color: singleCrossFocusPalette.color,
                                     borderRadius: "3px 0 0 3px",
                                     padding: "0 0.3em",
                                     letterSpacing: "0.02em",
                                   }}
                                 >
-                                  {getFocusAreaInitials(crossHomeFa.name)}
+                                  {getFocusAreaInitials(singleCrossFocusPill.name)}
                                 </span>
                               )}
                               <MaybeHint content={isNameMode ? label : undefined} side="top">
-                                <span style={{ fontWeight: 800, lineHeight: 1, ...(isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : {}) }}>{isNameMode ? pillText(label, 14) : label}</span>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    gap: showSingleSecondaryLine ? "0.12em" : 0,
+                                    maxWidth: "100%",
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontWeight: 800,
+                                      lineHeight: 1,
+                                      ...(isNameMode
+                                        ? { textAlign: "center" as const, fontSize: "0.85em" }
+                                        : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }),
+                                    }}
+                                  >
+                                    {isNameMode ? pillText(singleDisplayLabel, 14) : singleDisplayLabel}
+                                  </span>
+                                  {showSingleSecondaryLine ? (
+                                    <span
+                                      style={{
+                                        fontSize: "0.7em",
+                                        fontWeight: 700,
+                                        lineHeight: 1,
+                                        opacity: 0.78,
+                                        whiteSpace: "nowrap",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        maxWidth: "100%",
+                                      }}
+                                    >
+                                      {isNameMode ? pillText(displayParts.secondaryLabel ?? "", 14) : displayParts.secondaryLabel}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </MaybeHint>
                               {customTimes && (
                                 <span style={{
@@ -381,13 +480,24 @@ function PrintSection({
                           >
                             {labels.map((label, li) => {
                               const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
-                              const codeEntryLi = cellCodeIds[li] != null ? shiftCodeById.get(cellCodeIds[li]) : undefined;
+                              const codeEntryLi = cellCodeIds[li] != null ? assignmentById.get(cellCodeIds[li]) : undefined;
+                              const displayParts = getDisplayPartsByIdOrLabel(label, cellCodeIds[li]);
                               const isCross = label !== "X"
                                 && codeEntryLi?.focusAreaId != null
                                 && codeEntryLi.focusAreaId !== focusAreaId;
                               const crossHomeFaLi = isCross
                                 ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
                                 : undefined;
+                              const multiCrossFocusPill =
+                                isCross && crossHomeFaLi ? crossHomeFaLi : null;
+                              const multiCrossFocusPalette =
+                                getCrossFocusBadgePalette(style);
+                              const multiForegroundColor = isCross
+                                ? getReadableTextOnSurface(style.color, style.text)
+                                : style.text;
+                              const showMultiSecondaryLine =
+                                !!displayParts.secondaryLabel;
+                              const multiDisplayLabel = displayParts.primaryLabel;
                               const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
                               const hasTime = pillTime && (pillTime.start || pillTime.end);
 
@@ -397,9 +507,9 @@ function PrintSection({
                                   style={{
                                     flex: 1,
                                     background: isCross ? "#ffffff" : style.color,
-                                    border: `1px solid ${borderColor(style.text)}`,
+                                    border: `1px solid ${borderColor(multiForegroundColor)}`,
                                     borderRadius: 4,
-                                    color: style.text,
+                                    color: multiForegroundColor,
                                     display: "flex",
                                     flexDirection: "column",
                                     alignItems: "center",
@@ -410,9 +520,14 @@ function PrintSection({
                                     lineHeight: 1,
                                     overflow: "hidden",
                                     padding: isNameMode ? "1px 3px" : "1px 2px",
+                                    paddingLeft: multiCrossFocusPill
+                                      ? isNameMode
+                                        ? "1.35em"
+                                        : "1.15em"
+                                      : undefined,
                                   }}
                                 >
-                                  {isCross && crossHomeFaLi && (
+                                  {multiCrossFocusPill && (
                                     <span
                                       style={{
                                         position: "absolute",
@@ -424,18 +539,53 @@ function PrintSection({
                                         fontSize: "0.75em",
                                         fontWeight: 800,
                                         lineHeight: 1,
-                                        background: "var(--color-bg-secondary)",
-                                        color: "var(--color-text-secondary)",
+                                        background: multiCrossFocusPalette.background,
+                                        color: multiCrossFocusPalette.color,
                                         borderRadius: "2px 0 0 2px",
                                         padding: "0 0.2em",
                                         letterSpacing: "0.02em",
                                       }}
                                     >
-                                      {getFocusAreaInitials(crossHomeFaLi.name)}
+                                      {getFocusAreaInitials(multiCrossFocusPill.name)}
                                     </span>
                                   )}
                                   <MaybeHint content={isNameMode ? label : undefined} side="top">
-                                    <span style={isNameMode ? { textAlign: "center" as const, fontSize: "0.85em" } : undefined}>{isNameMode ? pillText(label, 8) : label}</span>
+                                    <div
+                                      style={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        gap: showMultiSecondaryLine ? "0.1em" : 0,
+                                        maxWidth: "100%",
+                                        minWidth: 0,
+                                      }}
+                                    >
+                                      <span
+                                        style={
+                                          isNameMode
+                                            ? { textAlign: "center" as const, fontSize: "0.85em" }
+                                            : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }
+                                        }
+                                      >
+                                        {isNameMode ? pillText(multiDisplayLabel, 8) : multiDisplayLabel}
+                                      </span>
+                                      {showMultiSecondaryLine ? (
+                                        <span
+                                          style={{
+                                            fontSize: "0.68em",
+                                            fontWeight: 700,
+                                            lineHeight: 1,
+                                            opacity: 0.78,
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            maxWidth: "100%",
+                                          }}
+                                        >
+                                          {isNameMode ? pillText(displayParts.secondaryLabel ?? "", 8) : displayParts.secondaryLabel}
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </MaybeHint>
                                   {hasTime && (
                                     <span style={{ fontSize: "0.7em", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
@@ -453,7 +603,7 @@ function PrintSection({
                         style={{
                           width: "1.2em",
                           height: "0.18em",
-                          background: shiftCode === "OFF" ? "#9EB4D4" : "#C8D6EC",
+                          background: assignment === "OFF" ? "#9EB4D4" : "#C8D6EC",
                           borderRadius: 2,
                         }}
                       />
@@ -578,13 +728,14 @@ interface PrintScheduleViewProps {
   employees: Employee[];
   allEmployees: Employee[];
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   shiftForKey: (empId: string, date: Date) => string | null;
-  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
-  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   onClose: () => void;
   focusAreaLabel?: string;
@@ -598,12 +749,13 @@ export default function PrintScheduleView({
   employees,
   allEmployees,
   focusAreas,
-  shiftCodes,
+  assignments,
   shiftCategories,
+  jobs,
   certifications,
   orgRoles,
   shiftForKey,
-  shiftCodeIdsForKey,
+  assignmentIdsForKey,
   getShiftStyle,
   getCustomShiftTimes,
   onClose,
@@ -649,10 +801,10 @@ export default function PrintScheduleView({
     return Object.fromEntries(
       printFocusAreas.map((w) => [
         w.name,
-        new Set(shiftCodes.filter((st) => st.focusAreaId === w.id).map((st) => st.id)),
+        new Set(assignments.filter((st) => st.focusAreaId === w.id).map((st) => st.id)),
       ]),
     );
-  }, [printFocusAreas, shiftCodes]);
+  }, [printFocusAreas, assignments]);
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -686,7 +838,7 @@ export default function PrintScheduleView({
     }, 250);
   }
 
-  const legendItems = shiftCodes.filter((s) => !EXCLUDED_LEGEND.has(s.label));
+  const legendItems = assignments.filter((s) => !EXCLUDED_LEGEND.has(s.label));
 
   return (
     <div
@@ -868,7 +1020,7 @@ export default function PrintScheduleView({
                 e.focusAreaIds.length > 0 &&
                 !e.focusAreaIds.includes(focusArea.id) &&
                 dates.some((date) => {
-                  const codeIds = shiftCodeIdsForKey?.(e.id, date) ?? [];
+                  const codeIds = assignmentIdsForKey?.(e.id, date) ?? [];
                   return codeIds.some((id) => exclusiveCodeIds.has(id));
                 }),
             );
@@ -883,10 +1035,11 @@ export default function PrintScheduleView({
                 employees={sectionEmps}
                 dates={dates}
                 shiftForKey={shiftForKey}
-                shiftCodeIdsForKey={shiftCodeIdsForKey}
+                assignmentIdsForKey={assignmentIdsForKey}
                 getShiftStyle={getShiftStyle}
-                shiftCodes={shiftCodes}
+                assignments={assignments}
                 shiftCategories={shiftCategories}
+                jobs={jobs}
                 certifications={certifications}
                 orgRoles={orgRoles}
                 focusAreas={focusAreas}
@@ -915,7 +1068,7 @@ export default function PrintScheduleView({
                   marginBottom: "0.7em",
                 }}
               >
-                {isNameMode ? "Shift Key" : "Shift Code Key"}
+                Shift Key
               </div>
               <div
                 style={{

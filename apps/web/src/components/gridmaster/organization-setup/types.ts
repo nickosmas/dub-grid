@@ -21,12 +21,11 @@ export interface DeptRow {
 export interface ShiftCatRow {
   id: string;
   name: string;
-  color: string;
   startTime: string;
   endTime: string;
 }
 
-export interface ShiftCodeRow {
+export interface JobRow {
   id: string;
   label: string;
   name: string;

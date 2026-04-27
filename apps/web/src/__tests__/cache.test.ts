@@ -38,8 +38,8 @@ describe("cache module", () => {
   describe("CacheKey builders", () => {
     it("builds org-scoped keys correctly", () => {
       expect(CacheKey.focusAreas("org-1")).toBe("dg:org:org-1:focusAreas");
-      expect(CacheKey.shiftCodes("org-1")).toBe("dg:org:org-1:shiftCodes");
-      expect(CacheKey.shiftCodes("org-1", true)).toBe("dg:org:org-1:shiftCodes:all");
+      expect(CacheKey.assignments("org-1")).toBe("dg:org:org-1:assignments");
+      expect(CacheKey.assignments("org-1", true)).toBe("dg:org:org-1:assignments:all");
       expect(CacheKey.absenceTypes("org-1", true)).toBe("dg:org:org-1:absenceTypes:all");
       expect(CacheKey.shiftCategories("org-1")).toBe("dg:org:org-1:shiftCategories");
       expect(CacheKey.indicatorTypes("org-1")).toBe("dg:org:org-1:indicatorTypes");

@@ -59,12 +59,12 @@ export function ProfilePageContent() {
   const {
     org,
     focusAreas,
-    shiftCodes,
+    assignments: assignments,
     shiftCategories,
     absenceTypes,
     certifications,
     orgRoles,
-    shiftCodeMap,
+    assignmentLabelMap,
     absenceTypeMap,
   } = useOrganizationData();
   const {
@@ -79,7 +79,7 @@ export function ProfilePageContent() {
     error: selfProfileError,
     setProfile,
     setEmployee,
-  } = useSelfProfileData({ orgId, shiftCodeMap, absenceTypeMap });
+  } = useSelfProfileData({ orgId, assignmentLabelMap, absenceTypeMap });
 
   type ProfileSection = "account" | "overview" | "schedule";
 
@@ -770,7 +770,7 @@ export function ProfilePageContent() {
                 employee={employee}
                 focusAreas={focusAreas}
                 focusAreaLabel={org?.focusAreaLabel}
-                shiftCodes={shiftCodes}
+                assignments={assignments}
                 shiftCategories={shiftCategories}
                 absenceTypes={absenceTypes}
                 certifications={certifications}
@@ -788,7 +788,7 @@ export function ProfilePageContent() {
                 employee={employee}
                 focusAreas={focusAreas}
                 focusAreaLabel={org?.focusAreaLabel}
-                shiftCodes={shiftCodes}
+                assignments={assignments}
                 shiftCategories={shiftCategories}
                 absenceTypes={absenceTypes}
                 certifications={certifications}

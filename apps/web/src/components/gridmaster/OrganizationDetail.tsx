@@ -22,11 +22,12 @@ import {
   fetchOrganizationUsers,
   fetchEmployees,
   fetchFocusAreas,
-  fetchShiftCodes,
+  fetchShiftCategories,
   fetchCertifications,
   fetchOrganizationRoles,
   fetchIndicatorTypes,
   fetchAbsenceTypes,
+  fetchJobDefinitions,
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
   restoreOrganization,
@@ -47,12 +48,13 @@ import type {
   OrganizationUser,
   Employee,
   FocusArea,
-  ShiftCode,
+  ShiftCategory,
   AbsenceType,
   NamedItem,
   IndicatorType,
   AdminPermissions,
   OrganizationRole,
+  JobDefinition,
 } from "@/types";
 import { buildMembershipAccessChanges } from "@/lib/access-management";
 
@@ -156,7 +158,8 @@ export default function OrganizationDetail({
   const [benchedEmployees, setBenchedEmployees] = useState<Employee[] | null>(null);
   const [terminatedEmployees, setTerminatedEmployees] = useState<Employee[] | null>(null);
   const [focusAreas, setFocusAreas] = useState<FocusArea[] | null>(null);
-  const [shiftCodes, setShiftCodes] = useState<ShiftCode[] | null>(null);
+  const [shiftCategories, setShiftCategories] = useState<ShiftCategory[] | null>(null);
+  const [jobs, setJobs] = useState<JobDefinition[] | null>(null);
   const [certifications, setCertifications] = useState<NamedItem[] | null>(null);
   const [orgRoles, setOrgRoles] = useState<NamedItem[] | null>(null);
   const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[] | null>(null);
@@ -173,7 +176,8 @@ export default function OrganizationDetail({
     setBenchedEmployees(null);
     setTerminatedEmployees(null);
     setFocusAreas(null);
-    setShiftCodes(null);
+    setShiftCategories(null);
+    setJobs(null);
     setCertifications(null);
     setOrgRoles(null);
     setIndicatorTypes(null);
@@ -216,9 +220,10 @@ export default function OrganizationDetail({
           if (!cancelled) setInvitations(data ?? []);
         }
         if (tab === "config" && focusAreas === null) {
-          const [fa, sc, certs, roles, ind, abs] = await Promise.all([
+          const [fa, shifts, jobDefs, certs, roles, ind, abs] = await Promise.all([
             fetchFocusAreas(organization.id, true),
-            fetchShiftCodes(organization.id, true),
+            fetchShiftCategories(organization.id, true),
+            fetchJobDefinitions(organization.id, true),
             fetchCertifications(organization.id, true),
             fetchOrganizationRoles(organization.id, true),
             fetchIndicatorTypes(organization.id, true),
@@ -226,7 +231,8 @@ export default function OrganizationDetail({
           ]);
           if (!cancelled) {
             setFocusAreas(fa);
-            setShiftCodes(sc);
+            setShiftCategories(shifts);
+            setJobs(jobDefs);
             setCertifications(certs);
             setOrgRoles(roles);
             setIndicatorTypes(ind);
@@ -375,10 +381,11 @@ export default function OrganizationDetail({
       {!tabLoading && tab === "employees" && employees && (
         <EmployeesTab active={employees} benched={benchedEmployees ?? []} terminated={terminatedEmployees ?? []} />
       )}
-      {!tabLoading && tab === "config" && focusAreas && (
+      {!tabLoading && tab === "config" && focusAreas && shiftCategories && jobs && (
         <ConfigTab
           focusAreas={focusAreas!}
-          shiftCodes={shiftCodes!}
+          shiftCategories={shiftCategories}
+          jobs={jobs}
           absenceTypes={absenceTypes!}
           certifications={certifications!}
           orgRoles={orgRoles!}
@@ -393,7 +400,10 @@ export default function OrganizationDetail({
         <InvitationsTab invitations={invitations} orgId={organization.id} onRefresh={() => setInvitations(null)} />
       )}
       {!tabLoading && tab === "schedule" && (
-        <ReadOnlyScheduleView orgId={organization.id} />
+        <ReadOnlyScheduleView
+          orgId={organization.id}
+          payPeriodStartDate={organization.payPeriodStartDate}
+        />
       )}
       {!tabLoading && tab === "features" && (
         <FeatureFlagsEditor organization={organization} onUpdated={onOrgUpdated} />
@@ -1411,7 +1421,8 @@ function EmployeesTab({
 
 function ConfigTab({
   focusAreas,
-  shiftCodes,
+  shiftCategories,
+  jobs,
   absenceTypes,
   certifications,
   orgRoles,
@@ -1419,7 +1430,8 @@ function ConfigTab({
   organization,
 }: {
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
+  shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   absenceTypes: AbsenceType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
@@ -1428,8 +1440,10 @@ function ConfigTab({
 }) {
   const activeFocusAreas = focusAreas.filter((fa) => !fa.archivedAt);
   const archivedFocusAreas = focusAreas.filter((fa) => fa.archivedAt);
-  const activeShiftCodes = shiftCodes.filter((sc) => !sc.archivedAt);
-  const archivedShiftCodes = shiftCodes.filter((sc) => sc.archivedAt);
+  const activeShiftCategories = shiftCategories.filter((shift) => !shift.archivedAt);
+  const archivedShiftCategories = shiftCategories.filter((shift) => shift.archivedAt);
+  const activeJobs = jobs.filter((job) => !job.archivedAt);
+  const archivedJobs = jobs.filter((job) => job.archivedAt);
   const activeAbsenceTypes = absenceTypes.filter((at) => !at.archivedAt);
   const archivedAbsenceTypes = absenceTypes.filter((at) => at.archivedAt);
   const activeCerts = certifications.filter((c) => !c.archivedAt);
@@ -1474,24 +1488,24 @@ function ConfigTab({
         </div>
       </div>
 
-      {/* Shift Codes */}
+      {/* Shifts */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          Shift Codes ({activeShiftCodes.length})
-          {archivedShiftCodes.length > 0 && (
+          Shifts ({activeShiftCategories.length})
+          {archivedShiftCategories.length > 0 && (
             <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
-              +{archivedShiftCodes.length} archived
+              +{archivedShiftCategories.length} archived
             </span>
           )}
         </div>
-        <div style={{ ...sectionBodyStyle, padding: activeShiftCodes.length > 0 ? 0 : sectionBodyStyle.padding }}>
-          {activeShiftCodes.length === 0 ? (
+        <div style={{ ...sectionBodyStyle, padding: activeShiftCategories.length > 0 ? 0 : sectionBodyStyle.padding }}>
+          {activeShiftCategories.length === 0 ? (
             <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Code", "Name", "Type", "Times", "Focus Area", "Certifications"].map((h) => (
+                  {["Shift", "Short Code", "Times", "Focus Area"].map((h) => (
                     <th
                       key={h}
                       style={{
@@ -1512,56 +1526,107 @@ function ConfigTab({
                 </tr>
               </thead>
               <tbody>
-                {activeShiftCodes.map((sc) => {
-                  const faName = focusAreas.find((fa) => fa.id === sc.focusAreaId)?.name;
-                  const certNames = (sc.requiredCertificationIds ?? [])
-                    .map((cid) => certifications.find((cert) => cert.id === cid)?.name)
-                    .filter(Boolean);
-                  const hasTime = sc.defaultStartTime || sc.defaultEndTime;
+                {activeShiftCategories.map((shift) => {
+                  const faName = focusAreas.find((fa) => fa.id === shift.focusAreaId)?.name;
+                  const hasTime = shift.startTime || shift.endTime;
                   return (
-                    <tr key={sc.id}>
+                    <tr key={shift.id}>
                       <td style={{ padding: "8px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
                         <span
                           style={{
                             display: "inline-flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            minWidth: 32,
+                            minWidth: 48,
                             height: 26,
                             padding: "0 8px",
                             borderRadius: 8,
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 700,
-                            background: sc.color,
-                            color: sc.text,
-                            border: `1.5px solid ${sc.border}`,
+                            background: "var(--color-bg-secondary)",
+                            color: "var(--color-text-primary)",
+                            border: "1.5px solid var(--color-border-light)",
                           }}
                         >
-                          {sc.label}
+                          {shift.name}
                         </span>
                       </td>
                       <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
-                        {sc.name}
-                      </td>
-                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>
-                        {sc.isGeneral ? (
-                          <span style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>General</span>
-                        ) : (
-                          <span style={{ color: "var(--color-text-subtle)" }}>Shift</span>
-                        )}
+                        {shift.abbr?.trim() || "—"}
                       </td>
                       <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)", whiteSpace: "nowrap" }}>
-                        {hasTime ? `${sc.defaultStartTime ?? "—"} – ${sc.defaultEndTime ?? "—"}` : "—"}
+                        {hasTime ? `${shift.startTime ?? "—"} – ${shift.endTime ?? "—"}` : "—"}
                       </td>
                       <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: faName ? "var(--color-text-secondary)" : "var(--color-text-subtle)", fontWeight: faName ? 600 : 400, borderBottom: "1px solid var(--color-border-light)" }}>
                         {faName ?? "Global"}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>
-                        {certNames.length > 0 ? certNames.join(", ") : "—"}
-                      </td>
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Jobs */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          Jobs ({activeJobs.length})
+          {archivedJobs.length > 0 && (
+            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
+              +{archivedJobs.length} archived
+            </span>
+          )}
+        </div>
+        <div style={{ ...sectionBodyStyle, padding: activeJobs.length > 0 ? 0 : sectionBodyStyle.padding }}>
+          {activeJobs.length === 0 ? (
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+          ) : (
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["Job", "Short Code", "Assignment", "Grid Display"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        color: "var(--color-text-subtle)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        textAlign: "left",
+                        whiteSpace: "nowrap",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {activeJobs.map((job) => (
+                  <tr key={job.id}>
+                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      {job.name}
+                    </td>
+                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      {job.abbr}
+                    </td>
+                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      {job.assignmentMode === "shiftless"
+                        ? "Job-only"
+                        : job.assignmentMode === "both"
+                          ? "Shift + job or job-only"
+                          : "Shift + job"}
+                    </td>
+                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      {job.showOnGrid ? "Shown on grid" : "Hidden on grid"}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

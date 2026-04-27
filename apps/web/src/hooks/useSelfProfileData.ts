@@ -15,7 +15,7 @@ export interface SelfProfileRecord {
 
 interface UseSelfProfileDataOptions {
   orgId: string | null;
-  shiftCodeMap: Map<number, string>;
+  assignmentLabelMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
 }
 
@@ -35,7 +35,7 @@ interface UseSelfProfileDataResult {
 
 export function useSelfProfileData({
   orgId,
-  shiftCodeMap,
+  assignmentLabelMap,
   absenceTypeMap,
 }: UseSelfProfileDataOptions): UseSelfProfileDataResult {
   const { user, isLoading: authLoading } = useAuth();
@@ -124,9 +124,9 @@ export function useSelfProfileData({
     void (async () => {
       try {
         const [nextShifts, nextRecurringShifts, nextShiftRequests] = await Promise.all([
-          fetchEmployeeShifts(employeeId, orgId, shiftCodeMap, absenceTypeMap),
-          fetchRecurringShifts(orgId, employeeId, shiftCodeMap, false, absenceTypeMap),
-          fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
+          fetchEmployeeShifts(employeeId, orgId, assignmentLabelMap, absenceTypeMap),
+          fetchRecurringShifts(orgId, employeeId, assignmentLabelMap, false, absenceTypeMap),
+          fetchShiftRequests(orgId, assignmentLabelMap, { empId: employeeId }),
         ]);
 
         const auditIds = new Set<string>();
@@ -175,7 +175,7 @@ export function useSelfProfileData({
     })();
 
     return () => { cancelled = true; };
-  }, [absenceTypeMap, employee?.id, orgId, shiftCodeMap, user]);
+  }, [absenceTypeMap, employee?.id, orgId, assignmentLabelMap, user]);
 
   return {
     user,

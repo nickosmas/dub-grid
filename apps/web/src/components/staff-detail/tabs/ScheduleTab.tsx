@@ -6,7 +6,7 @@ import { hint } from "@/components/ui/hint.types";
 import type {
   Employee,
   ShiftMap,
-  ShiftCode,
+  AssignmentDefinition,
   FocusArea,
   ShiftCategory,
   ShiftRequest,
@@ -25,7 +25,7 @@ import { CalendarClock, History, Clock } from "lucide-react";
 interface ScheduleTabProps {
   employee: Employee;
   shifts: ShiftMap;
-  shiftCodeById: Map<number, ShiftCode>;
+  assignmentById: Map<number, AssignmentDefinition>;
   focusAreas: FocusArea[];
   categoryById: Map<number, ShiftCategory>;
   focusAreaById: Map<number, FocusArea>;
@@ -46,7 +46,7 @@ function compactName(fullName: string): string {
 export function ScheduleTab({
   employee,
   shifts,
-  shiftCodeById,
+  assignmentById,
   categoryById,
   focusAreaById,
   absenceTypeById,
@@ -63,7 +63,7 @@ export function ScheduleTab({
   const shiftEntries = useMemo(() => {
     return Object.entries(shifts)
       .filter(([key]) => key.startsWith(`${employee.id}_`))
-      .filter(([, entry]) => !entry.isDelete && (entry.shiftCodeIds.length > 0 || entry.absenceTypeId != null))
+      .filter(([, entry]) => !entry.isDelete && (entry.assignmentIds.length > 0 || entry.absenceTypeId != null))
       .map(([key, entry]) => ({
         dateKey: key.substring(key.indexOf("_") + 1),
         ...entry,
@@ -202,21 +202,29 @@ export function ScheduleTab({
                         {group.entries.map((entry) => {
                           const isAbsence = entry.absenceTypeId != null;
                           const absenceType = isAbsence ? absenceTypeById.get(entry.absenceTypeId!) ?? null : null;
-                          const publishedSet = new Set(entry.publishedShiftCodeIds ?? []);
+                          const publishedSet = new Set(entry.publishedAssignmentDefinitionIds ?? []);
                           const codes = !isAbsence
-                            ? entry.shiftCodeIds.map((id) => {
-                                const shiftCode = shiftCodeById.get(id);
-                                const focusArea = shiftCode?.focusAreaId != null ? focusAreaById.get(shiftCode.focusAreaId) : null;
+                            ? entry.assignmentIds.map((id) => {
+                                const assignment =
+                                  assignmentById.get(id);
+                                const focusArea =
+                                  assignment?.focusAreaId != null
+                                    ? focusAreaById.get(assignment.focusAreaId)
+                                    : null;
                                 const isCodeDraft = !publishedSet.has(id);
-                                return { shiftCode: shiftCode ?? null, focusArea, isCodeDraft };
+                                return {
+                                  assignment: assignment ?? null,
+                                  focusArea,
+                                  isCodeDraft,
+                                };
                               })
                             : [];
 
                           const hours = isAbsence
                             ? 0
                             : computeShiftDurationHours(
-                                entry.shiftCodeIds,
-                                shiftCodeById,
+                                entry.assignmentIds,
+                                assignmentById,
                                 entry.customStartTime,
                                 entry.customEndTime,
                                 categoryById,
@@ -252,23 +260,28 @@ export function ScheduleTab({
                                       </Badge>
                                     )
                                   ) : (
-                                    codes.map(({ shiftCode, isCodeDraft }, idx) =>
-                                      shiftCode ? (
-                                        <div key={shiftCode.id} className="flex items-center gap-1.5">
+                                    codes.map(({ assignment, isCodeDraft }, idx) =>
+                                      assignment ? (
+                                        <div key={assignment.id} className="flex items-center gap-1.5">
                                           <Badge
                                             variant="outline"
                                             style={{
-                                              backgroundColor: shiftCode.color,
-                                              color: shiftCode.text,
-                                              borderColor: shiftCode.border,
+                                              backgroundColor: assignment.color,
+                                              color: assignment.text,
+                                              borderColor: assignment.border,
                                             }}
                                             className="h-5 px-1.5 py-0 text-[10px]"
                                           >
-                                            {isNameMode ? (shiftCode.name || shiftCode.label) : shiftCode.label}
+                                            {isNameMode
+                                              ? (assignment.name ||
+                                                  assignment.label)
+                                              : assignment.label}
                                           </Badge>
-                                          {!isNameMode && isSplit && shiftCode.name && (
+                                          {!isNameMode &&
+                                            isSplit &&
+                                            assignment.name && (
                                             <span className="text-[11px] text-[var(--color-text-muted)]">
-                                              {shiftCode.name}
+                                              {assignment.name}
                                             </span>
                                           )}
                                           {isSplit && entry.isDraft && (
@@ -310,11 +323,15 @@ export function ScheduleTab({
                               <TableCell className="text-[13px] text-[var(--color-text-muted)]">
                                 {isAbsence ? "—" : isSplit ? (
                                   <div className="flex flex-col gap-0.5">
-                                    {codes.map(({ shiftCode }, idx) => {
+                                    {codes.map(({ assignment }, idx) => {
                                       const customStarts = entry.customStartTime?.split("|") ?? [];
                                       const customEnds = entry.customEndTime?.split("|") ?? [];
-                                      const start = customStarts[idx] || shiftCode?.defaultStartTime;
-                                      const end = customEnds[idx] || shiftCode?.defaultEndTime;
+                                      const start =
+                                        customStarts[idx] ||
+                                        assignment?.defaultStartTime;
+                                      const end =
+                                        customEnds[idx] ||
+                                        assignment?.defaultEndTime;
                                       return (
                                         <span key={idx}>
                                           {start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—"}
@@ -323,9 +340,14 @@ export function ScheduleTab({
                                     })}
                                   </div>
                                 ) : (() => {
-                                  const shiftCode = codes[0]?.shiftCode;
-                                  const start = entry.customStartTime ?? shiftCode?.defaultStartTime;
-                                  const end = entry.customEndTime ?? shiftCode?.defaultEndTime;
+                                  const assignment =
+                                    codes[0]?.assignment;
+                                  const start =
+                                    entry.customStartTime ??
+                                    assignment?.defaultStartTime;
+                                  const end =
+                                    entry.customEndTime ??
+                                    assignment?.defaultEndTime;
                                   return start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—";
                                 })()}
                               </TableCell>

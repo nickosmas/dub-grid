@@ -1,4 +1,4 @@
-import type { DraftKind, ShiftMap } from '@/types';
+import type { ShiftMap } from '@/types';
 
 export interface DraftBreakdown {
   newShifts: number;
@@ -7,74 +7,6 @@ export interface DraftBreakdown {
   newNotes: number;
   deletedNotes: number;
   totalChanges: number;
-}
-
-export interface PersistedDraftShift {
-  draft_shift_code_ids?: number[] | null;
-  published_shift_code_ids?: number[] | null;
-  draft_absence_type_id?: number | null;
-  published_absence_type_id?: number | null;
-  draft_is_delete?: boolean | null;
-  draft_custom_start_time?: string | null;
-  draft_custom_end_time?: string | null;
-  published_custom_start_time?: string | null;
-  published_custom_end_time?: string | null;
-}
-
-export function hasPublishedShiftContent(shift: PersistedDraftShift): boolean {
-  const publishedIds = shift.published_shift_code_ids ?? [];
-
-  return (
-    publishedIds.length > 0
-    || (shift.published_absence_type_id ?? null) != null
-    || (shift.published_custom_start_time ?? null) != null
-    || (shift.published_custom_end_time ?? null) != null
-  );
-}
-
-export function hasPersistedDraftChange(shift: PersistedDraftShift): boolean {
-  const draftIds = shift.draft_shift_code_ids ?? [];
-  const publishedIds = shift.published_shift_code_ids ?? [];
-  const draftAbsenceTypeId = shift.draft_absence_type_id ?? null;
-  const publishedAbsenceTypeId = shift.published_absence_type_id ?? null;
-  const draftCustomStartTime = shift.draft_custom_start_time ?? null;
-  const draftCustomEndTime = shift.draft_custom_end_time ?? null;
-  const publishedCustomStartTime = shift.published_custom_start_time ?? null;
-  const publishedCustomEndTime = shift.published_custom_end_time ?? null;
-
-  if (shift.draft_is_delete) {
-    return (
-      hasPublishedShiftContent(shift)
-      || draftIds.length > 0
-      || draftAbsenceTypeId != null
-      || draftCustomStartTime != null
-      || draftCustomEndTime != null
-    );
-  }
-
-  return (
-    (draftIds.length > 0
-      && (draftIds.length !== publishedIds.length
-        || draftIds.some((id, index) => id !== publishedIds[index])))
-    || (draftAbsenceTypeId != null
-      && draftAbsenceTypeId !== publishedAbsenceTypeId)
-    || (draftAbsenceTypeId == null
-      && publishedAbsenceTypeId != null
-      && draftIds.length > 0)
-    || (draftCustomStartTime != null
-      && draftCustomStartTime !== publishedCustomStartTime)
-    || (draftCustomEndTime != null
-      && draftCustomEndTime !== publishedCustomEndTime)
-  );
-}
-
-export function classifyPersistedDraftShift(
-  shift: PersistedDraftShift,
-): DraftKind {
-  if (!hasPersistedDraftChange(shift)) return null;
-  if (shift.draft_is_delete && hasPublishedShiftContent(shift)) return 'deleted';
-  if (!hasPublishedShiftContent(shift)) return 'new';
-  return 'modified';
 }
 
 export function computeDraftBreakdown(

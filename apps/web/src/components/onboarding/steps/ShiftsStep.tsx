@@ -4,20 +4,18 @@ import StepLayout from "../StepLayout";
 import ShiftCategoriesSettings from "@/components/settings/ShiftCategories";
 import { useOrganizationData } from "@/hooks";
 
-interface ShiftCodesStepProps {
+interface ShiftsStepProps {
   onNext: () => void;
   onBack: () => void;
 }
 
-export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) {
+export default function ShiftsStep({ onNext, onBack }: ShiftsStepProps) {
   const {
     org,
     shiftCategories,
     focusAreas,
-    shiftCodes,
     setShiftCategories,
-    handleShiftCodesChange,
-  } = useOrganizationData();
+  } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
 
   if (!org) return null;
 
@@ -25,8 +23,8 @@ export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) 
 
   return (
     <StepLayout
-      title="Shift Categories"
-      description="Organize your shifts into categories per focus area. Categories define time windows (e.g., Day, Evening, Night) that shift codes inherit."
+      title="Shifts"
+      description="Define your core shift blocks per focus area. Shifts capture shared timing and visual language like Day, Evening, and Night."
       onNext={onNext}
       onBack={onBack}
       nextDisabled={!hasCategories}
@@ -45,9 +43,7 @@ export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) 
           focusAreas={focusAreas}
           orgId={org.id}
           onChange={setShiftCategories}
-          canManageShiftCodes={true}
-          shiftCodes={shiftCodes}
-          onShiftCodesChange={handleShiftCodesChange}
+          canManageScheduleDefinitions={true}
         />
       </div>
       {!hasCategories && (
@@ -59,7 +55,7 @@ export default function ShiftCodesStep({ onNext, onBack }: ShiftCodesStepProps) 
             textAlign: "center",
           }}
         >
-          Add at least one shift category to continue.
+          Add at least one shift to continue.
         </p>
       )}
     </StepLayout>

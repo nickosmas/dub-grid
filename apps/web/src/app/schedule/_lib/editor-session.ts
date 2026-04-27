@@ -1,3 +1,7 @@
+import {
+  cloneScheduleCellEntry,
+  cloneScheduleCellSnapshot,
+} from "@/lib/schedule-cells";
 import type { ShiftMap } from "@/types";
 
 export type DraftNoteState = {
@@ -20,12 +24,7 @@ export type EditSessionDraft = {
 export function cloneShiftEntry(
   shift: ShiftMap[string] | null | undefined,
 ): ShiftMap[string] | null {
-  if (!shift) return null;
-  return {
-    ...shift,
-    shiftCodeIds: [...shift.shiftCodeIds],
-    publishedShiftCodeIds: [...shift.publishedShiftCodeIds],
-  };
+  return cloneScheduleCellEntry(shift);
 }
 
 export function cloneDraftNotes(
@@ -37,11 +36,16 @@ export function cloneDraftNotes(
 export function serializeShiftSnapshot(shift: ShiftMap[string] | null): string {
   if (!shift) return "null";
   return JSON.stringify({
+    draft: cloneScheduleCellSnapshot(shift.draft),
+    published: cloneScheduleCellSnapshot(shift.published),
+    effective: cloneScheduleCellSnapshot(shift.effective),
     label: shift.label,
-    shiftCodeIds: shift.shiftCodeIds,
+    segments: shift.segments ?? [],
+    assignmentIds: shift.assignmentIds,
     isDelete: shift.isDelete ?? false,
     draftKind: shift.draftKind,
-    publishedShiftCodeIds: shift.publishedShiftCodeIds,
+    publishedSegments: shift.publishedSegments ?? [],
+    publishedAssignmentDefinitionIds: shift.publishedAssignmentDefinitionIds,
     publishedLabel: shift.publishedLabel,
     customStartTime: shift.customStartTime ?? null,
     customEndTime: shift.customEndTime ?? null,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
@@ -50,10 +50,12 @@ import { StaffDetailPanel } from "./StaffDetailPanel";
 import { StaffEmptyState } from "./StaffEmptyState";
 import { StaffFilterPopover } from "./StaffFilterPopover";
 import { StaffPagination } from "./StaffPagination";
-import { StaffTableRow } from "./StaffTableRow";
+import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
 import { useStaffFilters } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
+
+const REORDER_SETTLE_MS = 220;
 
 export interface MembersSectionProps {
   employees: Employee[];
@@ -78,6 +80,7 @@ export interface MembersSectionProps {
   isGridmaster?: boolean;
   departments?: Department[];
   departmentLabel?: string;
+  managementDepartmentLabel?: string;
 }
 
 export function MembersSection({
@@ -102,7 +105,8 @@ export function MembersSection({
   isSuperAdmin,
   isGridmaster,
   departments: departmentItems = [],
-  departmentLabel = "Department",
+  departmentLabel = "Scheduled Departments",
+  managementDepartmentLabel = "Management Departments",
 }: MembersSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
@@ -159,17 +163,220 @@ export function MembersSection({
     draggedIdx,
     dragOverIdx,
     handleDragStart,
-    handleDragOver,
+    handleDragMove,
     handleDrop,
     handleDragEnd,
     displayList,
     baseList,
   } = reorder;
 
+  const isDraggingRows = isReordering && draggedIdx !== null && dragOverIdx !== null;
   const paginatedList = useMemo(
-    () => (isReordering ? displayList : filterPaginatedList),
-    [displayList, filterPaginatedList, isReordering],
+    () => (isReordering ? (isDraggingRows ? baseList : displayList) : filterPaginatedList),
+    [baseList, displayList, filterPaginatedList, isDraggingRows, isReordering],
   );
+  const rowNodesRef = useRef(new Map<string, HTMLDivElement>());
+  const rowRectsRef = useRef(new Map<string, DOMRect>());
+  const [dragDeltaY, setDragDeltaY] = useState(0);
+  const [dragPhase, setDragPhase] = useState<"dragging" | "settling" | null>(null);
+  const settleFrameRef = useRef<number | null>(null);
+  const settleTimeoutRef = useRef<number | null>(null);
+  const dragSessionRef = useRef<{
+    pointerId: number;
+    draggedIdx: number;
+    startY: number;
+    dropIdx: number;
+    centers: number[];
+  } | null>(null);
+
+  const handleRowRef = useCallback((employeeId: string, node: HTMLDivElement | null) => {
+    if (node) {
+      rowNodesRef.current.set(employeeId, node);
+      return;
+    }
+
+    rowNodesRef.current.delete(employeeId);
+  }, []);
+
+  useLayoutEffect(() => {
+    const nextRects = new Map<string, DOMRect>();
+
+    for (const employee of paginatedList) {
+      const node = rowNodesRef.current.get(employee.id);
+      if (node) {
+        nextRects.set(employee.id, node.getBoundingClientRect());
+      }
+    }
+
+    rowRectsRef.current = nextRects;
+  }, [paginatedList]);
+
+  const cancelSettleAnimation = useCallback(() => {
+    if (settleFrameRef.current !== null) {
+      window.cancelAnimationFrame(settleFrameRef.current);
+      settleFrameRef.current = null;
+    }
+    if (settleTimeoutRef.current !== null) {
+      window.clearTimeout(settleTimeoutRef.current);
+      settleTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => cancelSettleAnimation, [cancelSettleAnimation]);
+
+  const getRowHeight = useCallback((index: number) => {
+    const employee = baseList[index];
+    if (!employee) return 56;
+    return rowRectsRef.current.get(employee.id)?.height ?? 56;
+  }, [baseList]);
+
+  const getDraggedTargetDelta = useCallback((sourceIdx: number, dropIdx: number) => {
+    if (sourceIdx === dropIdx) return 0;
+
+    let targetDelta = 0;
+    if (sourceIdx < dropIdx) {
+      for (let index = sourceIdx + 1; index <= dropIdx; index += 1) {
+        targetDelta += getRowHeight(index);
+      }
+      return targetDelta;
+    }
+
+    for (let index = dropIdx; index < sourceIdx; index += 1) {
+      targetDelta -= getRowHeight(index);
+    }
+    return targetDelta;
+  }, [getRowHeight]);
+
+  const handleReorderPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>, index: number) => {
+    if (!isReordering || event.button !== 0) return;
+
+    const centers = baseList.map((employee) => {
+      const rect =
+        rowRectsRef.current.get(employee.id) ??
+        rowNodesRef.current.get(employee.id)?.getBoundingClientRect();
+
+      return rect ? rect.top + rect.height / 2 : null;
+    });
+
+    if (centers.some((center) => center === null)) return;
+
+    if (!baseList[index]) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    dragSessionRef.current = {
+      pointerId: event.pointerId,
+      draggedIdx: index,
+      startY: event.clientY,
+      dropIdx: index,
+      centers: centers as number[],
+    };
+
+    cancelSettleAnimation();
+    setDragDeltaY(0);
+    setDragPhase("dragging");
+    handleDragStart(index);
+  }, [baseList, cancelSettleAnimation, handleDragStart, isReordering]);
+
+  const handleReorderPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+
+    const deltaY = event.clientY - session.startY;
+    const draggedCenter = session.centers[session.draggedIdx] + deltaY;
+    let nextDropIdx = 0;
+
+    for (let index = 0; index < session.centers.length; index += 1) {
+      if (index !== session.draggedIdx && draggedCenter > session.centers[index]) {
+        nextDropIdx += 1;
+      }
+    }
+
+    session.dropIdx = nextDropIdx;
+    setDragDeltaY(deltaY);
+    handleDragMove(nextDropIdx);
+  }, [handleDragMove]);
+
+  const handleReorderPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+
+    event.preventDefault();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragSessionRef.current = null;
+
+    const currentDelta = event.clientY - session.startY;
+    const targetDelta = getDraggedTargetDelta(session.draggedIdx, session.dropIdx);
+    setDragDeltaY(currentDelta);
+
+    settleFrameRef.current = window.requestAnimationFrame(() => {
+      settleFrameRef.current = null;
+      setDragPhase("settling");
+      setDragDeltaY(targetDelta);
+    });
+
+    settleTimeoutRef.current = window.setTimeout(() => {
+      settleTimeoutRef.current = null;
+      setDragPhase(null);
+      setDragDeltaY(0);
+      handleDrop(session.dropIdx, session.draggedIdx);
+    }, REORDER_SETTLE_MS + 10);
+  }, [getDraggedTargetDelta, handleDrop]);
+
+  const handleReorderPointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const session = dragSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    dragSessionRef.current = null;
+    cancelSettleAnimation();
+    setDragPhase(null);
+    setDragDeltaY(0);
+    handleDragEnd();
+  }, [cancelSettleAnimation, handleDragEnd]);
+
+  const rowDragOffsets = useMemo(() => {
+    const offsets = new Map<string, number>();
+    if (
+      !isReordering ||
+      draggedIdx === null ||
+      dragOverIdx === null
+    ) {
+      return offsets;
+    }
+
+    const draggedEmployee = baseList[draggedIdx];
+    if (!draggedEmployee) return offsets;
+
+    const draggedHeight =
+      rowRectsRef.current.get(draggedEmployee.id)?.height ?? 56;
+
+    if (draggedIdx < dragOverIdx) {
+      for (let index = draggedIdx + 1; index <= dragOverIdx; index += 1) {
+        const employee = baseList[index];
+        if (employee) {
+          offsets.set(employee.id, -draggedHeight);
+        }
+      }
+      return offsets;
+    }
+
+    for (let index = dragOverIdx; index < draggedIdx; index += 1) {
+      const employee = baseList[index];
+      if (employee) {
+        offsets.set(employee.id, draggedHeight);
+      }
+    }
+    return offsets;
+  }, [baseList, dragOverIdx, draggedIdx, isReordering]);
 
   useEffect(() => {
     clearSelection();
@@ -822,41 +1029,19 @@ export function MembersSection({
                   data-testid="staff-table"
                   className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]"
                 >
-                  <Table>
-                    <TableHeader>
-                      <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
-                        <TableHead className="w-[60px] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
-                          <div className="flex items-center gap-1.5">
-                            {canManageEmployees && !isReordering && (
-                              <input
-                                type="checkbox"
-                                checked={
-                                  paginatedList.length > 0 &&
-                                  paginatedList.every((employee) =>
-                                    selectedIds.has(employee.id),
-                                  )
-                                }
-                                onChange={() => toggleSelectAll(paginatedList)}
-                                onClick={(event) => event.stopPropagation()}
-                                className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-today-text)]"
-                              />
-                            )}
-                            <span
-                              className="inline-flex cursor-pointer select-none items-center gap-1"
-                              onClick={() => handleSort("seniority")}
-                            >
-                              #{" "}
-                              <SortIcon
-                                active={sortConfig.key === "seniority"}
-                                dir={sortConfig.dir}
-                              />
-                            </span>
-                          </div>
-                        </TableHead>
-                        <TableHead
-                          className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]"
-                          onClick={() => handleSort("name")}
-                        >
+                  {isReordering ? (
+                    <div className="dg-staff-directory-table">
+                      <div className="dg-staff-directory-header bg-[var(--color-bg)]">
+                        <div className="dg-staff-directory-head-cell flex pl-6">
+                          <span className="inline-flex select-none items-center gap-1">
+                            #{" "}
+                            <SortIcon
+                              active={sortConfig.key === "seniority"}
+                              dir={sortConfig.dir}
+                            />
+                          </span>
+                        </div>
+                        <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex items-center gap-1">
                             Name{" "}
                             <SortIcon
@@ -864,67 +1049,148 @@ export function MembersSection({
                               dir={sortConfig.dir}
                             />
                           </span>
-                        </TableHead>
-                        <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell">
+                        </div>
+                        <div className="dg-staff-directory-head-cell hidden md:flex">
                           {focusAreaLabel}
-                        </TableHead>
-                        <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell">
+                        </div>
+                        <div className="dg-staff-directory-head-cell hidden md:flex">
                           {certificationLabel}
-                        </TableHead>
-                        <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                        </div>
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">
                           Roles
-                        </TableHead>
-                        <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                        </div>
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">
                           Account
-                        </TableHead>
-                        <TableHead className="w-[40px] pr-6" />
-                      </UITableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedList.map((employee, index) => {
-                        const globalIndex = (page - 1) * pageSize + index;
-                        const isExpanded =
-                          !isReordering && employee.id === expandedEmpId;
-                        const isDragging =
-                          isReordering &&
-                          draggedIdx !== null &&
-                          baseList[draggedIdx]?.id === employee.id;
-                        const isDropTarget =
-                          isReordering &&
-                          dragOverIdx === globalIndex &&
-                          draggedIdx !== null &&
-                          draggedIdx !== globalIndex;
+                        </div>
+                        <div className="dg-staff-directory-head-cell flex pr-6" />
+                      </div>
+                      <div className="dg-staff-directory-body">
+                        {paginatedList.map((employee, index) => {
+                          const isDragging =
+                            draggedIdx !== null &&
+                            baseList[draggedIdx]?.id === employee.id;
+                          const dragOffsetY = isDragging
+                            ? dragDeltaY
+                            : rowDragOffsets.get(employee.id) ?? 0;
 
-                        return (
-                          <StaffTableRow
-                            key={employee.id}
-                            emp={employee}
-                            globalIndex={globalIndex}
-                            isExpanded={isExpanded}
-                            isReordering={isReordering}
-                            isDragging={isDragging}
-                            isDropTarget={isDropTarget}
-                            canManageEmployees={canManageEmployees}
-                            isSelected={selectedIds.has(employee.id)}
-                            focusAreas={focusAreas}
-                            certifications={certifications}
-                            roles={roles}
-                            pendingInviteByEmployeeId={pendingInviteByEmployeeId}
-                            onToggleSelect={toggleSelect}
-                            onRowClick={(employeeId) =>
-                              setExpandedEmpId(
-                                isExpanded ? null : employeeId,
-                              )
-                            }
-                            onDragStart={handleDragStart}
-                            onDragOver={handleDragOver}
-                            onDrop={handleDrop}
-                            onDragEnd={handleDragEnd}
-                          />
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                          return (
+                            <StaffReorderListRow
+                              key={employee.id}
+                              emp={employee}
+                              globalIndex={index}
+                              isExpanded={false}
+                              isReordering
+                              isDragging={isDragging}
+                              dragPhase={isDragging ? dragPhase ?? undefined : undefined}
+                              canManageEmployees={canManageEmployees}
+                              isSelected={selectedIds.has(employee.id)}
+                              focusAreas={focusAreas}
+                              certifications={certifications}
+                              roles={roles}
+                              pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+                              onToggleSelect={toggleSelect}
+                              onRowClick={() => undefined}
+                              onRowRef={handleRowRef}
+                              dragOffsetY={dragOffsetY}
+                              onReorderPointerDown={handleReorderPointerDown}
+                              onReorderPointerMove={handleReorderPointerMove}
+                              onReorderPointerEnd={handleReorderPointerEnd}
+                              onReorderPointerCancel={handleReorderPointerCancel}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
+                          <TableHead className="w-[60px] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                            <div className="flex items-center gap-1.5">
+                              {canManageEmployees && (
+                                <input
+                                  type="checkbox"
+                                  checked={
+                                    paginatedList.length > 0 &&
+                                    paginatedList.every((employee) =>
+                                      selectedIds.has(employee.id),
+                                    )
+                                  }
+                                  onChange={() => toggleSelectAll(paginatedList)}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-today-text)]"
+                                />
+                              )}
+                              <span
+                                className="inline-flex cursor-pointer select-none items-center gap-1"
+                                onClick={() => handleSort("seniority")}
+                              >
+                                #{" "}
+                                <SortIcon
+                                  active={sortConfig.key === "seniority"}
+                                  dir={sortConfig.dir}
+                                />
+                              </span>
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]"
+                            onClick={() => handleSort("name")}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              Name{" "}
+                              <SortIcon
+                                active={sortConfig.key === "name"}
+                                dir={sortConfig.dir}
+                              />
+                            </span>
+                          </TableHead>
+                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell">
+                            {focusAreaLabel}
+                          </TableHead>
+                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell">
+                            {certificationLabel}
+                          </TableHead>
+                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                            Roles
+                          </TableHead>
+                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                            Account
+                          </TableHead>
+                          <TableHead className="w-[40px] pr-6" />
+                        </UITableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedList.map((employee, index) => {
+                          const globalIndex = (page - 1) * pageSize + index;
+                          const isExpanded = employee.id === expandedEmpId;
+
+                          return (
+                            <StaffTableRow
+                              key={employee.id}
+                              emp={employee}
+                              globalIndex={globalIndex}
+                              isExpanded={isExpanded}
+                              isReordering={false}
+                              isDragging={false}
+                              canManageEmployees={canManageEmployees}
+                              isSelected={selectedIds.has(employee.id)}
+                              focusAreas={focusAreas}
+                              certifications={certifications}
+                              roles={roles}
+                              pendingInviteByEmployeeId={pendingInviteByEmployeeId}
+                              onToggleSelect={toggleSelect}
+                              onRowClick={(employeeId) =>
+                                setExpandedEmpId(
+                                  isExpanded ? null : employeeId,
+                                )
+                              }
+                            />
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
 
                 {!isReordering && (
@@ -963,7 +1229,7 @@ export function MembersSection({
                       </TableHead>
                       {!isMobile && !isTablet && (
                         <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
-                          {departmentLabel}
+                          {managementDepartmentLabel}
                         </TableHead>
                       )}
                       {!isMobile && !isTablet && (
@@ -1272,7 +1538,7 @@ export function MembersSection({
         <ManagementStaffPanel
           person={selectedPerson}
           departments={managementDepts}
-          departmentLabel={departmentLabel}
+          departmentLabel={managementDepartmentLabel}
           canManageScheduleEmployees={canManageEmployees}
           canManageManagementAccess={canManageManagementAccess}
           onClose={() => setExpandedPersonId(null)}

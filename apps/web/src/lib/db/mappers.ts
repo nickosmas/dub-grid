@@ -6,7 +6,8 @@ import type {
   OrganizationUser,
   FocusArea,
   ShiftCategory,
-  ShiftCode,
+  AssignmentDefinition,
+  JobDefinition,
   AbsenceType,
   IndicatorType,
   Invitation,
@@ -14,18 +15,19 @@ import type {
   ShiftRequest,
   NamedItem,
   CoverageRequirement,
-  CoverageRuleConfig,
+  ResolvedSchedulePresentation,
+  ScheduleCellInput,
   SeriesFrequency,
+  ShiftJobSegment,
 } from "@/types";
 import type {
   DbOrganization,
   DbFocusArea,
   DbDepartment,
   DbShiftCategory,
+  DbJobDefinition,
   DbCoverageRequirement,
-  DbCoverageRuleConfig,
-  DbCoverageRuleConfigCode,
-  DbShiftCode,
+  DbAssignmentDefinition,
   DbAbsenceType,
   DbEmployee,
   DbIndicatorType,
@@ -36,7 +38,14 @@ import type {
   DbNamedItem,
 } from "./types";
 import { trimTime, resolveCodeLabels, iterateDateRange, MAX_SERIES_OCCURRENCES } from "./shared";
+import {
+  deriveAssignmentDefinitionIdsFromAssignments,
+  joinShiftJobSegmentLabels,
+  resolveShiftJobSegments,
+} from "@/lib/shift-job-segments";
+import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
+import { normalizePresetBg } from "@/lib/colors";
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
 
@@ -46,6 +55,7 @@ export function rowToNamedItem(row: DbNamedItem): NamedItem {
     orgId: row.org_id,
     name: row.name,
     abbr: row.abbr,
+    isScheduleRole: row.is_schedule_role ?? true,
     departmentId: row.department_id ?? null,
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
@@ -96,9 +106,10 @@ export function rowToOrganization(row: DbOrganization): Organization {
     focusAreaLabel: row.focus_area_label ?? 'Focus Areas',
     certificationLabel: row.certification_label ?? 'Certifications',
     roleLabel: row.role_label ?? 'Roles',
-    departmentLabel: row.department_label ?? 'Departments',
+    departmentLabel: row.department_label ?? 'Scheduled Departments',
     shiftDisplayMode: (row.shift_display_mode as import("@/types").ShiftDisplayMode) ?? 'code',
     timezone: row.timezone ?? null,
+    payPeriodStartDate: row.pay_period_start_date ?? null,
     archivedAt: row.archived_at ?? null,
     suspendedAt: row.suspended_at ?? null,
     suspendedReason: row.suspended_reason ?? null,
@@ -187,6 +198,7 @@ export function rowToFocusArea(row: DbFocusArea): FocusArea {
     orgId: row.org_id,
     departmentId: row.department_id ?? null,
     name: row.name,
+    color: normalizePresetBg(row.color),
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
   };
@@ -197,12 +209,59 @@ export function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
     id: row.id,
     orgId: row.org_id,
     name: row.name,
-    color: row.color,
+    abbr: row.abbr ?? null,
     startTime: trimTime(row.start_time) ?? null,
     endTime: trimTime(row.end_time) ?? null,
+    color: normalizePresetBg(row.color),
     sortOrder: row.sort_order,
     focusAreaId: row.focus_area_id ?? null,
     breakMinutes: row.break_minutes ?? null,
+    archivedAt: row.archived_at ?? null,
+  };
+}
+
+export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
+  const focusAreaIds = row.focus_area_ids ?? [];
+  const shiftTimeOverrides = Object.fromEntries(
+    Object.entries(row.shift_time_overrides ?? {})
+      .filter(([shiftId, value]) => shiftId.trim().length > 0 && value != null)
+      .map(([shiftId, value]) => [
+        shiftId,
+        {
+          startTime: trimTime(value.startTime) ?? null,
+          endTime: trimTime(value.endTime) ?? null,
+        },
+      ]),
+  );
+  const shiftColorOverrides = Object.fromEntries(
+    Object.entries(row.shift_color_overrides ?? {})
+      .filter(([shiftId, value]) => shiftId.trim().length > 0 && typeof value === "string" && value.trim().length > 0),
+  );
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    name: row.name,
+    abbr: row.abbr,
+    showOnGrid: row.show_on_grid,
+    assignmentMode: row.assignment_mode ?? "with_shift",
+    eligibilityMode: row.eligibility_mode ?? "and",
+    focusAreaId: focusAreaIds[0] ?? null,
+    focusAreaIds,
+    departmentIds: row.department_ids ?? [],
+    applicableShiftIds: row.applicable_shift_ids ?? [],
+    eligibleRoleIds: row.eligible_role_ids ?? [],
+    requiredCertificationIds: row.required_certification_ids ?? [],
+    color: row.color,
+    border: row.border_color,
+    text: row.text_color,
+    shiftTimeOverrides,
+    shiftColorOverrides,
+    defaultStartTime: trimTime(row.default_start_time) ?? null,
+    defaultEndTime: trimTime(row.default_end_time) ?? null,
+    defaultDurationHours: row.default_duration_hours ?? null,
+    defaultDurationMinutes: row.default_duration_minutes ?? null,
+    sortOrder: row.sort_order,
+    systemKey: row.system_key ?? null,
     archivedAt: row.archived_at ?? null,
   };
 }
@@ -212,27 +271,14 @@ export function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRe
     id: row.id,
     orgId: row.org_id,
     focusAreaId: row.focus_area_id,
-    shiftCodeId: row.shift_code_id,
+    jobId: row.job_id ?? 0,
+    preferredShiftId: row.preferred_shift_id ?? null,
     dayOfWeek: row.day_of_week,
     minStaff: row.min_staff,
   };
 }
 
-export function rowsToCoverageRuleConfig(
-  row: DbCoverageRuleConfig,
-  codeRows: DbCoverageRuleConfigCode[],
-): CoverageRuleConfig {
-  return {
-    id: row.id,
-    orgId: row.org_id,
-    focusAreaId: row.focus_area_id,
-    requirementShiftCodeId: row.requirement_shift_code_id,
-    eligibleShiftCodeIds: codeRows.map((code) => code.eligible_shift_code_id),
-    preferredOpenShiftCodeId: row.preferred_open_shift_code_id,
-  };
-}
-
-export function rowToShiftCode(row: DbShiftCode): ShiftCode {
+export function rowToAssignmentDefinition(row: DbAssignmentDefinition): AssignmentDefinition {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -242,6 +288,8 @@ export function rowToShiftCode(row: DbShiftCode): ShiftCode {
     border: row.border_color,
     text: row.text_color,
     categoryId: row.category_id ?? null,
+    shiftId: row.shift_id ?? null,
+    jobId: row.job_id ?? null,
     isGeneral: row.is_general ?? undefined,
     focusAreaId: row.focus_area_id ?? null,
     sortOrder: row.sort_order,
@@ -323,27 +371,240 @@ export function rowToIndicatorType(row: DbIndicatorType): IndicatorType {
   };
 }
 
+function normalizeScheduleCellState(
+  state: ScheduleCellInput,
+  overrides?: Partial<Pick<ScheduleCellInput, "seriesId" | "fromRecurring">>,
+): ScheduleCellInput {
+  const seriesId = overrides?.seriesId ?? state.seriesId ?? null;
+  const fromRecurring = overrides?.fromRecurring ?? state.fromRecurring ?? false;
+
+  if (state.kind === "deleted") {
+    return {
+      kind: "deleted",
+      segments: [],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId,
+      fromRecurring,
+    };
+  }
+
+  if (state.kind === "absence") {
+    return {
+      kind: "absence",
+      segments: [],
+      absenceTypeId: state.absenceTypeId ?? null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId,
+      fromRecurring,
+    };
+  }
+
+  return {
+    kind: "worked",
+    segments: [...state.segments]
+      .sort((left, right) => left.position - right.position)
+      .map((segment, index) => ({
+        shiftId: segment.shiftId,
+        jobId: segment.jobId,
+        position: index,
+      })),
+    absenceTypeId: null,
+    customStartTime: state.customStartTime ?? null,
+    customEndTime: state.customEndTime ?? null,
+    seriesId,
+    fromRecurring,
+  };
+}
+
+function getScheduleAssignments(state: ScheduleCellInput): {
+  shiftIds: Array<number | null>;
+  jobIds: number[];
+} {
+  if (state.kind !== "worked") {
+    return {
+      shiftIds: [],
+      jobIds: [],
+    };
+  }
+
+  const orderedSegments = [...state.segments].sort(
+    (left, right) => left.position - right.position,
+  );
+  return {
+    shiftIds: orderedSegments.map((segment) => segment.shiftId),
+    jobIds: orderedSegments.map((segment) => segment.jobId),
+  };
+}
+
+function buildFallbackSegments(
+  state: ScheduleCellInput,
+  assignmentIds: number[],
+): ShiftJobSegment[] {
+  if (state.kind !== "worked") {
+    return [];
+  }
+
+  return [...state.segments]
+    .sort((left, right) => left.position - right.position)
+    .map((segment, index) => ({
+      shiftId: segment.shiftId,
+      jobId: segment.jobId,
+      position: index,
+      assignmentId: assignmentIds[index] ?? null,
+      label: "",
+      shiftName: null,
+      shiftAbbr: null,
+      jobName: null,
+      jobAbbr: null,
+      focusAreaId: null,
+      showJobOnGrid: true,
+      isShiftless: segment.shiftId == null,
+      startTime: null,
+      endTime: null,
+    }));
+}
+
+function resolveSegmentsAndAssignmentDefinitions(
+  state: ScheduleCellInput,
+  segmentCompatibility?: SegmentCompatibilityMaps | null,
+  assignmentIdByPair?: Map<string, number>,
+): {
+  shiftIds: Array<number | null>;
+  jobIds: number[];
+  assignmentIds: number[];
+  segments: ShiftJobSegment[];
+} {
+  const { shiftIds, jobIds } = getScheduleAssignments(state);
+  const derivedAssignmentDefinitionIds = deriveAssignmentDefinitionIdsFromAssignments(
+    { shiftIds, jobIds },
+    assignmentIdByPair ?? new Map(),
+  );
+  const segments =
+    state.kind === "worked"
+      ? segmentCompatibility
+        ? resolveShiftJobSegments(
+            {
+              shiftIds,
+              jobIds,
+              assignmentIds: derivedAssignmentDefinitionIds,
+            },
+            segmentCompatibility,
+          )
+        : buildFallbackSegments(state, derivedAssignmentDefinitionIds)
+      : [];
+
+  return {
+    shiftIds,
+    jobIds,
+    assignmentIds: derivedAssignmentDefinitionIds,
+    segments,
+  };
+}
+
+function buildResolvedPresentation(
+  state: ScheduleCellInput,
+  args: {
+    codeMap: Map<number, string>;
+    absenceTypeMap?: Map<number, string>;
+    segments: ShiftJobSegment[];
+    assignmentIds: number[];
+  },
+): ResolvedSchedulePresentation {
+  if (state.kind === "deleted") {
+    return {
+      label: "",
+      startTime: null,
+      endTime: null,
+      segments: [],
+    };
+  }
+
+  if (state.kind === "absence") {
+    return {
+      label: args.absenceTypeMap?.get(state.absenceTypeId ?? -1) ?? "?",
+      startTime: null,
+      endTime: null,
+      segments: [],
+    };
+  }
+
+  const hasSegmentLabels = args.segments.some(
+    (segment) => segment.label.trim().length > 0,
+  );
+  const segmentLabel =
+    args.segments.length > 0 && hasSegmentLabels
+      ? joinShiftJobSegmentLabels(args.segments).trim()
+      : "";
+  const label =
+    segmentLabel.length > 0
+      ? segmentLabel
+      : resolveCodeLabels(args.assignmentIds, args.codeMap);
+  const firstSegment = args.segments[0] ?? null;
+  const lastSegment = args.segments.at(-1) ?? null;
+
+  return {
+    label,
+    shiftName: firstSegment?.shiftName ?? null,
+    focusAreaId: firstSegment?.focusAreaId ?? null,
+    focusAreaName: null,
+    displayFocusAreaName: null,
+    startTime: state.customStartTime ?? firstSegment?.startTime ?? null,
+    endTime: state.customEndTime ?? lastSegment?.endTime ?? null,
+    segments: args.segments.map((segment, index) => ({
+      shiftId: segment.shiftId,
+      jobId: segment.jobId,
+      label:
+        segment.label ||
+        (args.assignmentIds[index] != null
+          ? (args.codeMap.get(args.assignmentIds[index]) ?? "")
+          : ""),
+      shiftName: segment.shiftName,
+      jobName: segment.jobName,
+      startTime: segment.startTime ?? null,
+      endTime: segment.endTime ?? null,
+      displayFocusAreaName: null,
+    })),
+  };
+}
+
 // ── Recurring Shifts ──────────────────────────────────────────────────────────
 
 export function rowToRecurringShift(
   row: DbRecurringShift,
   codeMap: Map<number, string>,
   absenceTypeMap?: Map<number, string>,
+  segmentCompatibility?: SegmentCompatibilityMaps | null,
+  assignmentIdByPair?: Map<string, number>,
 ): RecurringShift {
-  let label = '?';
-  if (row.shift_code_id != null) {
-    label = codeMap.get(row.shift_code_id) ?? '?';
-  } else if (row.absence_type_id != null) {
-    label = absenceTypeMap?.get(row.absence_type_id) ?? '?';
-  }
+  const input = normalizeScheduleCellState(row.state, { fromRecurring: true });
+  const {
+    assignmentIds,
+    segments,
+  } = resolveSegmentsAndAssignmentDefinitions(
+    input,
+    segmentCompatibility,
+    assignmentIdByPair,
+  );
+  const presentation = buildResolvedPresentation(input, {
+    codeMap,
+    absenceTypeMap,
+    segments,
+    assignmentIds,
+  });
+
   return {
     id: row.id,
     empId: row.emp_id,
     orgId: row.org_id,
     dayOfWeek: row.day_of_week,
-    shiftCodeId: row.shift_code_id,
-    absenceTypeId: row.absence_type_id,
-    shiftLabel: label,
+    state: input,
+    presentation,
+    input,
+    absenceTypeId: input.kind === "absence" ? (input.absenceTypeId ?? null) : null,
+    shiftLabel: presentation.label,
     effectiveFrom: row.effective_from,
     effectiveUntil: row.effective_until,
     createdAt: row.created_at,
@@ -356,14 +617,52 @@ export function rowToRecurringShift(
 
 export function rowToShiftRequest(
   row: DbShiftRequest,
-  shiftCodeMap: Map<number, string>
+  assignmentLabelMap: Map<number, string>,
+  segmentCompatibility?: SegmentCompatibilityMaps | null,
+  assignmentIdByPair?: Map<string, number>,
 ): ShiftRequest {
-  const requesterShiftCodeIds = (row.requester_shift_code_ids ?? [])
-    .map((id) => (typeof id === "number" ? id : Number(id)))
-    .filter((id) => Number.isFinite(id));
-  const targetShiftCodeIds = (row.target_shift_code_ids ?? [])
-    .map((id) => (typeof id === "number" ? id : Number(id)))
-    .filter((id) => Number.isFinite(id));
+  const requesterState = normalizeScheduleCellState(row.requester_state);
+  const targetState =
+    row.target_state != null
+      ? normalizeScheduleCellState(row.target_state)
+      : null;
+  const requesterResolved = resolveSegmentsAndAssignmentDefinitions(
+    requesterState,
+    segmentCompatibility,
+    assignmentIdByPair,
+  );
+  const targetResolved =
+    targetState != null
+      ? resolveSegmentsAndAssignmentDefinitions(
+          targetState,
+          segmentCompatibility,
+          assignmentIdByPair,
+        )
+      : null;
+  const resolvedRequesterAssignmentDefinitionIds = requesterResolved.assignmentIds;
+  const resolvedTargetAssignmentDefinitionIds =
+    targetState != null ? (targetResolved?.assignmentIds ?? []) : [];
+  const requesterSegments = requesterResolved.segments;
+  const targetSegments = targetResolved?.segments ?? null;
+  const requesterFocusAreaId =
+    requesterSegments.find((segment) => segment.focusAreaId != null)
+      ?.focusAreaId ?? null;
+  const targetFocusAreaId =
+    targetSegments?.find((segment) => segment.focusAreaId != null)
+      ?.focusAreaId ?? null;
+  const requesterPresentation = buildResolvedPresentation(requesterState, {
+    codeMap: assignmentLabelMap,
+    segments: requesterSegments,
+    assignmentIds: resolvedRequesterAssignmentDefinitionIds,
+  });
+  const targetPresentation =
+    targetState != null
+      ? buildResolvedPresentation(targetState, {
+          codeMap: assignmentLabelMap,
+          segments: targetSegments ?? [],
+          assignmentIds: resolvedTargetAssignmentDefinitionIds,
+        })
+      : null;
 
   return {
     id: row.id,
@@ -375,14 +674,16 @@ export function rowToShiftRequest(
       .filter(Boolean)
       .join(" ") || "Unknown",
     requesterShiftDate: row.requester_shift_date,
-    requesterShiftCodeIds,
-    requesterShiftLabel: resolveCodeLabels(
-      requesterShiftCodeIds,
-      shiftCodeMap
-    ),
-    requesterFocusAreaId: row.requester_focus_area_id,
-    requesterCustomStartTime: row.requester_custom_start_time,
-    requesterCustomEndTime: row.requester_custom_end_time,
+    requesterState,
+    requesterPresentation,
+    requesterShiftIds: requesterResolved.shiftIds,
+    requesterJobIds: requesterResolved.jobIds,
+    requesterSegments,
+    requesterAssignmentDefinitionIds: resolvedRequesterAssignmentDefinitionIds,
+    requesterShiftLabel: requesterPresentation.label,
+    requesterFocusAreaId,
+    requesterCustomStartTime: requesterState.customStartTime ?? null,
+    requesterCustomEndTime: requesterState.customEndTime ?? null,
     targetEmpId: row.target_emp_id,
     targetName: row.target_first_name
       ? [row.target_first_name, row.target_last_name]
@@ -390,13 +691,18 @@ export function rowToShiftRequest(
           .join(" ")
       : null,
     targetShiftDate: row.target_shift_date,
-    targetShiftCodeIds: row.target_shift_code_ids ? targetShiftCodeIds : null,
-    targetShiftLabel: row.target_shift_code_ids
-      ? resolveCodeLabels(targetShiftCodeIds, shiftCodeMap)
+    targetState,
+    targetPresentation,
+    targetShiftIds: targetResolved?.shiftIds ?? null,
+    targetJobIds: targetResolved?.jobIds ?? null,
+    targetSegments,
+    targetAssignmentDefinitionIds: targetState ? resolvedTargetAssignmentDefinitionIds : null,
+    targetShiftLabel: targetState
+      ? targetPresentation?.label ?? resolveCodeLabels(resolvedTargetAssignmentDefinitionIds, assignmentLabelMap)
       : null,
-    targetFocusAreaId: row.target_focus_area_id,
-    targetCustomStartTime: row.target_custom_start_time,
-    targetCustomEndTime: row.target_custom_end_time,
+    targetFocusAreaId,
+    targetCustomStartTime: targetState?.customStartTime ?? null,
+    targetCustomEndTime: targetState?.customEndTime ?? null,
     absenceTypeId: row.absence_type_id,
     parentRequestId: row.parent_request_id,
     adminUserId: row.admin_user_id,

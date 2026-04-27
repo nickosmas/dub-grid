@@ -12,11 +12,11 @@ function normalizeShiftEntry(entry: ShiftMap[string] | null) {
 
   return {
     label: entry.label,
-    shiftCodeIds: [...entry.shiftCodeIds],
+    assignmentIds: [...entry.assignmentIds],
     isDraft: entry.isDraft,
     isDelete: entry.isDelete ?? false,
     draftKind: entry.draftKind,
-    publishedShiftCodeIds: [...entry.publishedShiftCodeIds],
+    publishedAssignmentDefinitionIds: [...entry.publishedAssignmentDefinitionIds],
     publishedLabel: entry.publishedLabel,
     seriesId: entry.seriesId ?? null,
     fromRecurring: entry.fromRecurring ?? false,

@@ -4,11 +4,10 @@
  */
 import type {
   Employee,
-  ShiftCode,
+  AssignmentDefinition,
   FocusArea,
   ShiftCategory,
   CoverageRequirement,
-  CoverageRuleConfig,
   Department,
   AdminPermissions,
 } from "@/types";
@@ -37,7 +36,7 @@ export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-export function makeShiftCode(overrides: Partial<ShiftCode> = {}): ShiftCode {
+export function makeAssignmentDefinition(overrides: Partial<AssignmentDefinition> = {}): AssignmentDefinition {
   return {
     id: 1,
     orgId: "org1",
@@ -68,7 +67,7 @@ export function makeShiftCategory(overrides: Partial<ShiftCategory> = {}): Shift
     id: 1,
     orgId: "org1",
     name: "Day",
-    color: "#facc15",
+    color: "#E2E8F0",
     sortOrder: 1,
     ...overrides,
   };
@@ -79,21 +78,11 @@ export function makeCoverageRequirement(overrides: Partial<CoverageRequirement> 
     id: 1,
     orgId: "org1",
     focusAreaId: 1,
-    shiftCodeId: 1,
+    jobId: 1,
+    preferredShiftId: 1,
+    assignmentId: 1,
     dayOfWeek: null,
     minStaff: 3,
-    ...overrides,
-  };
-}
-
-export function makeCoverageRuleConfig(overrides: Partial<CoverageRuleConfig> = {}): CoverageRuleConfig {
-  return {
-    id: 1,
-    orgId: "org1",
-    focusAreaId: 1,
-    requirementShiftCodeId: 1,
-    eligibleShiftCodeIds: [1],
-    preferredOpenShiftCodeId: 1,
     ...overrides,
   };
 }
@@ -141,8 +130,8 @@ export const ALL_FALSE_PERMS: AdminPermissions = {
   canManageEmployees: false,
   canViewFocusAreas: false,
   canManageFocusAreas: false,
-  canViewShiftCodes: false,
-  canManageShiftCodes: false,
+  canViewScheduleDefinitions: false,
+  canManageScheduleDefinitions: false,
   canViewIndicatorTypes: false,
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,

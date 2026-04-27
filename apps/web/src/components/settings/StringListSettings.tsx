@@ -11,6 +11,7 @@ import type { ExplainerSectionProps } from "@/components/ui/explainer-section";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { SectionCard } from "./shared";
+import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/lib/db";
 
 export default function StringListSettings({
@@ -25,6 +26,9 @@ export default function StringListSettings({
   onCheckDependencies,
   sectionTitle,
   explainer,
+  showScheduleRoleToggle = false,
+  maxWidth,
+  wideTable = false,
 }: {
   label: string;
   items: NamedItem[];
@@ -41,14 +45,18 @@ export default function StringListSettings({
   sectionTitle?: string;
   /** Optional explainer shown above the editable list. */
   explainer?: ExplainerSectionProps;
+  /** Shows an extra toggle used to mark which roles affect schedule job eligibility. */
+  showScheduleRoleToggle?: boolean;
+  /** Optional max width for the card wrapper when this list is shown as a settings section. */
+  maxWidth?: number;
+  /** Give dense multi-column staff label tables more room per column. */
+  wideTable?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const [isEditing, setIsEditing] = useState(initialEditing ?? false);
   const [local, setLocal] = useState<NamedItem[]>(items);
   const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; item: NamedItem; deps: DependencyInfo | null } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const nextTmpId = useRef(-1);
   const nameRefs = useRef<Map<number, HTMLInputElement>>(new Map());
@@ -64,14 +72,36 @@ export default function StringListSettings({
     [local, items, nonEmpty],
   );
 
-  const displayList = useMemo((): NamedItem[] => {
-    if (!isEditing) return items;
-    if (draggedIdx === null || dragOverIdx === null) return local;
-    const list = [...local];
-    const [item] = list.splice(draggedIdx, 1);
-    list.splice(dragOverIdx, 0, item);
-    return list;
-  }, [isEditing, local, items, draggedIdx, dragOverIdx]);
+  const displayList = isEditing ? local : items;
+
+  const handleReorder = useCallback((sourceIdx: number, dropIdx: number) => {
+    if (sourceIdx === dropIdx) return;
+
+    setLocal((current) => {
+      if (
+        sourceIdx < 0 ||
+        sourceIdx >= current.length ||
+        dropIdx < 0 ||
+        dropIdx > current.length
+      ) {
+        return current;
+      }
+
+      const list = [...current];
+      const [item] = list.splice(sourceIdx, 1);
+      if (!item) return current;
+      list.splice(Math.min(dropIdx, list.length), 0, item);
+      return list;
+    });
+  }, []);
+
+  const reorder = useSmoothReorder({
+    items: local,
+    enabled: isEditing,
+    getId: useCallback((item: NamedItem) => item.id, []),
+    onReorder: handleReorder,
+    fallbackHeight: 54,
+  });
 
   const handleEnterEdit = () => {
     setLocal([...items]);
@@ -81,8 +111,6 @@ export default function StringListSettings({
 
   const resetDraft = useCallback(() => {
     setLocal([...items]);
-    setDraggedIdx(null);
-    setDragOverIdx(null);
     setError(null);
     setDeleteConfirm(null);
   }, [items]);
@@ -101,6 +129,7 @@ export default function StringListSettings({
       ...it,
       name: it.name.trim(),
       abbr: it.abbr.trim() || it.name.trim(),
+      isScheduleRole: showScheduleRoleToggle ? (it.isScheduleRole ?? true) : it.isScheduleRole,
       sortOrder: i,
     }));
 
@@ -132,12 +161,20 @@ export default function StringListSettings({
     const id = nextTmpId.current--;
     setLocal((prev) => [
       ...prev,
-      { id, orgId: "", name: "", abbr: "", sortOrder: prev.length, departmentId: null },
+      {
+        id,
+        orgId: "",
+        name: "",
+        abbr: "",
+        isScheduleRole: showScheduleRoleToggle ? true : undefined,
+        sortOrder: prev.length,
+        departmentId: null,
+      },
     ]);
     requestAnimationFrame(() => {
       nameRefs.current.get(id)?.focus();
     });
-  }, []);
+  }, [showScheduleRoleToggle]);
 
   const handleRemove = (i: number) => {
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
@@ -221,21 +258,6 @@ export default function StringListSettings({
     }
   };
 
-  // ── Drag handlers ──────────────────────────────────────────────────────────
-  const handleDragStart = (idx: number) => { setDraggedIdx(idx); setDragOverIdx(idx); };
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, targetIdx: number) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverIdx(targetIdx); };
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    if (draggedIdx !== null && dragOverIdx !== null && draggedIdx !== dragOverIdx && draggedIdx >= 0 && draggedIdx < local.length && dragOverIdx >= 0 && dragOverIdx <= local.length) {
-      const list = [...local];
-      const [item] = list.splice(draggedIdx, 1);
-      list.splice(dragOverIdx, 0, item);
-      setLocal(list);
-    }
-    setDraggedIdx(null); setDragOverIdx(null);
-  };
-  const handleDragEnd = () => { setDraggedIdx(null); setDragOverIdx(null); };
-
   // ── Input style ────────────────────────────────────────────────────────────
   const fieldStyle: React.CSSProperties = {
     width: "100%",
@@ -252,14 +274,25 @@ export default function StringListSettings({
 
   const addBtnClass = "dg-btn dg-btn-dashed dg-btn-sm";
 
-  const deptCol = showDept ? (isMobile ? " minmax(100px, 1fr)" : " minmax(140px, 1fr)") : "";
+  const deptCol = showDept
+    ? isMobile
+      ? " minmax(100px, 1fr)"
+      : wideTable
+        ? " minmax(180px, 1fr)"
+        : " minmax(140px, 1fr)"
+    : "";
+  const scheduleRoleCol = showScheduleRoleToggle
+    ? wideTable && !isMobile
+      ? " 220px"
+      : " 160px"
+    : "";
   const gridCols = hideAbbr
     ? isEditing
-      ? `24px 2fr${deptCol} auto`
-      : `2fr${deptCol}`
+      ? `24px 2fr${scheduleRoleCol}${deptCol} auto`
+      : `2fr${scheduleRoleCol}${deptCol}`
     : isEditing
-      ? `24px 2fr 1fr${deptCol} auto`
-      : `2fr 1fr${deptCol}`;
+      ? `24px 2fr 1fr${scheduleRoleCol}${deptCol} auto`
+      : `2fr 1fr${scheduleRoleCol}${deptCol}`;
 
   const footerActions = isEditing ? (
     <EditorActionRow
@@ -325,11 +358,11 @@ export default function StringListSettings({
           >
             {(isEditing
               ? hideAbbr
-                ? ["", "Name", ...(showDept ? ["Department"] : []), ""]
-                : ["", "Full Name", "Abbreviation", ...(showDept ? ["Department"] : []), ""]
+                ? ["", "Name", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : []), ""]
+                : ["", "Full Name", "Abbreviation", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : []), ""]
               : hideAbbr
-                ? ["Name", ...(showDept ? ["Department"] : [])]
-                : ["Full Name", "Abbreviation", ...(showDept ? ["Department"] : [])]
+                ? ["Name", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : [])]
+                : ["Full Name", "Abbreviation", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : [])]
             ).map((h, i) => (
               <div key={i} style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                 {h}
@@ -339,32 +372,33 @@ export default function StringListSettings({
 
           {/* Item rows */}
           {displayList.map((item, i) => {
-            const isDragging = isEditing && draggedIdx !== null && local[draggedIdx]?.id === item.id;
-            const isDropTarget = isEditing && dragOverIdx === i && draggedIdx !== null && draggedIdx !== i;
+            const motion = reorder.getItemMotion(item);
             return (
               <div
                 key={item.id}
-                draggable={isEditing}
-                onDragStart={isEditing ? () => handleDragStart(i) : undefined}
-                onDragOver={isEditing ? (e) => handleDragOver(e, i) : undefined}
-                onDrop={isEditing ? handleDrop : undefined}
-                onDragEnd={isEditing ? handleDragEnd : undefined}
+                ref={(node) => reorder.setItemNode(item, node)}
+                className="dg-settings-reorder-item"
+                data-dragging={motion.isDragging ? "true" : undefined}
+                data-drag-phase={motion.dragPhase ?? undefined}
+                data-moving={motion.isMoving ? "true" : undefined}
                 style={{
+                  "--dg-settings-reorder-offset": `${motion.offsetY}px`,
                   display: "grid",
                   gridTemplateColumns: gridCols,
                   padding: isEditing ? "10px 16px" : "11px 16px",
                   gap: 16,
-                  borderTop: isDropTarget ? "2px solid var(--color-control-active-border)" : undefined,
                   borderBottom: i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
-                  alignItems: "center",
                   cursor: isEditing ? "grab" : "default",
-                  transition: "background 150ms ease, opacity 150ms ease",
-                  opacity: isDragging ? 0.5 : 1,
                   userSelect: isEditing ? "none" : undefined,
-                }}
+                } as React.CSSProperties}
               >
                 {isEditing && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-faint)" }}>
+                  <div
+                    {...reorder.getHandleProps(i)}
+                    role="button"
+                    aria-label={`Reorder ${item.name || label}`}
+                    className="dg-settings-reorder-handle"
+                  >
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                       <rect x="3" y="2" width="2" height="2" rx="1" />
                       <rect x="9" y="2" width="2" height="2" rx="1" />
@@ -411,6 +445,69 @@ export default function StringListSettings({
                     {item.abbr}
                   </div>
                 ))}
+
+                {showScheduleRoleToggle && (
+                  isEditing ? (
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: "var(--dg-fs-label)",
+                        color: "var(--color-text-secondary)",
+                        cursor: "pointer",
+                        userSelect: "none",
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={item.isScheduleRole ?? true}
+                        onChange={(event) => {
+                          const checked = event.target.checked;
+                          setLocal((prev) =>
+                            prev.map((candidate, idx) =>
+                              idx === i
+                                ? { ...candidate, isScheduleRole: checked }
+                                : candidate,
+                            ),
+                          );
+                        }}
+                        draggable={false}
+                      />
+                      Use for job eligibility
+                    </label>
+                  ) : (
+                    <div>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          padding: "2px 8px",
+                          borderRadius: 20,
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          background:
+                            item.isScheduleRole === false
+                              ? "var(--color-bg-secondary)"
+                              : "var(--color-brand-bg)",
+                          border:
+                            item.isScheduleRole === false
+                              ? "1px solid var(--color-border-light)"
+                              : "1px solid var(--color-brand-border)",
+                          color:
+                            item.isScheduleRole === false
+                              ? "var(--color-text-muted)"
+                              : "var(--color-brand)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {item.isScheduleRole === false ? "Cosmetic only" : "Schedule eligible"}
+                      </span>
+                    </div>
+                  )
+                )}
 
                 {showDept && (isEditing ? (
                   <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} draggable={false}>
@@ -546,7 +643,7 @@ export default function StringListSettings({
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <ExplainerSection {...explainer} />
-          <SectionCard noPadding>
+          <SectionCard noPadding maxWidth={maxWidth}>
             {content}
           </SectionCard>
         </div>
@@ -554,7 +651,7 @@ export default function StringListSettings({
     }
 
     return (
-      <SectionCard noPadding>
+      <SectionCard noPadding maxWidth={maxWidth}>
         {content}
       </SectionCard>
     );

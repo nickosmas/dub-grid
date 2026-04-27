@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, ShiftCode, IndicatorType, NamedItem, Department, CoverageRequirement, CoverageRuleConfig, AbsenceType } from "@/types";
+import { Organization, FocusArea, ShiftCategory, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType, JobDefinition } from "@/types";
 import { saveCertifications, saveOrganizationRoles, checkCertificationDependencies, checkRoleDependencies } from "@/lib/db";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
@@ -31,7 +31,8 @@ import OrganizationLabels from "./OrganizationLabels";
 import DisplayMode from "./DisplayMode";
 import ScheduleRules from "./ScheduleRules";
 import ShiftCategories from "./ShiftCategories";
-import ShiftCodes from "./ShiftCodes";
+import Jobs from "./Jobs";
+import AbsenceTypes from "./AbsenceTypes";
 import Coverage from "./Coverage";
 import StringListSettings from "./StringListSettings";
 import DepartmentsSettings from "./DepartmentsSettings";
@@ -41,16 +42,16 @@ import Indicators from "./Indicators";
 export interface SettingsPageProps {
   organization: Organization;
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   departments: Department[];
   onOrganizationSave: (organization: Organization) => void;
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
-  onShiftCodesChange: (codes: ShiftCode[]) => void;
   onShiftCategoriesChange: (categories: ShiftCategory[]) => void;
+  onJobsChange: (jobs: JobDefinition[]) => void;
   onIndicatorTypesChange: (types: IndicatorType[]) => void;
   onCertificationsChange: (items: NamedItem[]) => void;
   onOrgRolesChange: (items: NamedItem[]) => void;
@@ -63,15 +64,13 @@ export interface SettingsPageProps {
   canViewOrgLabels: boolean;
   canManageFocusAreas: boolean;
   canViewFocusAreas: boolean;
-  canManageShiftCodes: boolean;
-  canViewShiftCodes: boolean;
+  canManageScheduleDefinitions: boolean;
+  canViewScheduleDefinitions: boolean;
   canManageIndicatorTypes: boolean;
   canViewIndicatorTypes: boolean;
   canManageOrgSettings: boolean;
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
-  coverageRuleConfigs: CoverageRuleConfig[];
-  onCoverageRuleConfigsChange: (configs: CoverageRuleConfig[]) => void;
   canManageCoverageRequirements: boolean;
   canViewCoverageRequirements: boolean;
   absenceTypes: AbsenceType[];
@@ -82,16 +81,16 @@ export interface SettingsPageProps {
 export default function SettingsPage({
   organization,
   focusAreas,
-  shiftCodes,
   shiftCategories,
+  jobs,
   indicatorTypes,
   certifications,
   orgRoles,
   departments,
   onOrganizationSave,
   onFocusAreasChange,
-  onShiftCodesChange,
   onShiftCategoriesChange,
+  onJobsChange,
   onIndicatorTypesChange,
   onCertificationsChange,
   onOrgRolesChange,
@@ -104,15 +103,13 @@ export default function SettingsPage({
   canViewOrgLabels,
   canManageFocusAreas,
   canViewFocusAreas,
-  canManageShiftCodes,
-  canViewShiftCodes,
+  canManageScheduleDefinitions,
+  canViewScheduleDefinitions,
   canManageIndicatorTypes,
   canViewIndicatorTypes,
   canManageOrgSettings,
   coverageRequirements,
   onCoverageRequirementsChange,
-  coverageRuleConfigs,
-  onCoverageRuleConfigsChange,
   canManageCoverageRequirements,
   canViewCoverageRequirements,
   absenceTypes,
@@ -131,19 +128,19 @@ export default function SettingsPage({
     canViewOrgLabels,
     canManageFocusAreas,
     canViewFocusAreas,
-    canManageShiftCodes,
-    canViewShiftCodes,
+    canManageScheduleDefinitions,
+    canViewScheduleDefinitions,
     canManageIndicatorTypes,
     canViewIndicatorTypes,
     canManageOrgSettings,
     canManageCoverageRequirements,
     canViewCoverageRequirements,
-  }), [canManageOrg, canAccessSettings, isSuperAdmin, isGridmaster, canManageOrgLabels, canViewOrgLabels, canManageFocusAreas, canViewFocusAreas, canManageShiftCodes, canViewShiftCodes, canManageIndicatorTypes, canViewIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements, canViewCoverageRequirements]);
+  }), [canManageOrg, canAccessSettings, isSuperAdmin, isGridmaster, canManageOrgLabels, canViewOrgLabels, canManageFocusAreas, canViewFocusAreas, canManageScheduleDefinitions, canViewScheduleDefinitions, canManageIndicatorTypes, canViewIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements, canViewCoverageRequirements]);
 
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
-  const departmentLabel = organization.departmentLabel || "Departments";
+  const departmentLabel = organization.departmentLabel || "Scheduled Departments";
   const certificationsExplainer = {
     title: `How ${certificationLabel.toLowerCase()} work`,
     defaultOpen: true,
@@ -154,7 +151,7 @@ export default function SettingsPage({
         description: `${certificationLabel} help people quickly see qualifications in schedule and staffing views.`,
       },
       {
-        title: "Shift codes can require them",
+        title: "Jobs and shifts can require them",
         description: `When a shift requires a ${certificationLabel.replace(/s$/i, "").toLowerCase()}, only qualified staff can be assigned to that shift.`,
       },
       {
@@ -241,16 +238,16 @@ export default function SettingsPage({
     storageKey: "dg-explainer-roles",
     points: [
       {
-        title: "Roles are visible tags",
-        description: `${roleLabel} help identify responsibilities like director, supervisor, or mentor on the schedule.`,
+        title: "Roles can be cosmetic or schedule-eligible",
+        description: `Mark only the ${roleLabel.toLowerCase()} that should gate jobs on the schedule. Titles like director can stay visible without affecting job eligibility.`,
       },
       {
         title: "Roles do not grant permissions",
         description: `A ${roleLabel.replace(/s$/i, "").toLowerCase()} tag does not make someone an app admin or change what they can access.`,
       },
       {
-        title: "Keep them focused on responsibilities",
-        description: `Use ${roleLabel.toLowerCase()} for what someone is doing during a shift, not for qualifications or login rights.`,
+        title: "Jobs only use schedule-eligible roles",
+        description: `Job eligibility ignores cosmetic ${roleLabel.toLowerCase()}, so your schedule rules stay focused on real staffing responsibilities.`,
       },
     ],
     preview: (
@@ -340,7 +337,6 @@ export default function SettingsPage({
   };
 
   const navGroups = useMemo(() => buildNavGroups(perms, {
-    shiftCodesLabel: organization.shiftDisplayMode === "name" ? "Shifts" : "Schedule Codes",
     focusAreaLabel,
     certificationLabel,
     roleLabel,
@@ -466,7 +462,7 @@ export default function SettingsPage({
             background: "var(--color-info-bg)", borderRadius: "var(--dg-radius-sm)",
             border: "1px solid var(--color-info-border)",
             fontSize: "var(--dg-fs-caption)", color: "var(--color-info-text)",
-            width: "100%", maxWidth: 860,
+            width: "100%", maxWidth,
           }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -502,7 +498,8 @@ export default function SettingsPage({
           <div style={{ width: "100%", maxWidth }}>
             <DisplayMode
               organization={organization}
-              shiftCodes={shiftCodes}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
               onSave={onOrganizationSave}
             />
           </div>
@@ -521,34 +518,44 @@ export default function SettingsPage({
           </div>
         )}
 
-        {activeSection === "schedule-categories" && (canManageShiftCodes || canViewShiftCodes) && (
+        {activeSection === "schedule-shifts" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
           <div style={{ width: "100%", maxWidth }}>
             <ShiftCategories
               shiftCategories={shiftCategories}
               focusAreas={focusAreas}
               orgId={organization.id}
               onChange={onShiftCategoriesChange}
-              canManageShiftCodes={canManageShiftCodes}
-              shiftCodes={shiftCodes}
-              onShiftCodesChange={onShiftCodesChange}
+              canManageScheduleDefinitions={canManageScheduleDefinitions}
             />
           </div>
         )}
 
-        {activeSection === "schedule-codes" && (canManageShiftCodes || canViewShiftCodes) && (
+        {activeSection === "schedule-jobs" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
           <div style={{ width: "100%", maxWidth }}>
-            <ShiftCodes
-              shiftCodes={shiftCodes}
+            <Jobs
+              jobs={jobs}
+              orgId={organization.id}
+              orgRoles={orgRoles}
+              certifications={certifications}
+              departments={departments}
               focusAreas={focusAreas}
               shiftCategories={shiftCategories}
-              orgId={organization.id}
-              certifications={certifications}
+              roleLabel={roleLabel}
               certificationLabel={certificationLabel}
-              focusAreaLabel={focusAreaLabel}
-              onChange={onShiftCodesChange}
-              canManageShiftCodes={canManageShiftCodes}
+              onChange={onJobsChange}
+              canManageScheduleDefinitions={canManageScheduleDefinitions}
+              shiftDisplayMode={organization.shiftDisplayMode}
+            />
+          </div>
+        )}
+
+        {activeSection === "schedule-absence-types" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+          <div style={{ width: "100%", maxWidth }}>
+            <AbsenceTypes
               absenceTypes={absenceTypes}
-              onAbsenceTypesChange={onAbsenceTypesChange}
+              orgId={organization.id}
+              onChange={onAbsenceTypesChange}
+              canManageScheduleDefinitions={canManageScheduleDefinitions}
               shiftDisplayMode={organization.shiftDisplayMode}
             />
           </div>
@@ -560,11 +567,11 @@ export default function SettingsPage({
               orgId={organization.id}
               focusAreas={focusAreas}
               shiftCategories={shiftCategories}
-              shiftCodes={shiftCodes}
+              jobs={jobs}
+              orgRoles={orgRoles}
+              certifications={certifications}
               coverageRequirements={coverageRequirements}
               onCoverageRequirementsChange={onCoverageRequirementsChange}
-              coverageRuleConfigs={coverageRuleConfigs}
-              onCoverageRuleConfigsChange={onCoverageRuleConfigsChange}
               canEdit={canManageCoverageRequirements}
               shiftDisplayMode={organization.shiftDisplayMode}
             />
@@ -581,6 +588,8 @@ export default function SettingsPage({
               label={certificationLabel}
               sectionTitle={certificationLabel}
               explainer={certificationsExplainer}
+              maxWidth={maxWidth}
+              wideTable
               items={certifications}
               placeholder="e.g. RN"
               onSave={async (updated) => {
@@ -606,6 +615,8 @@ export default function SettingsPage({
               label={roleLabel}
               sectionTitle={roleLabel}
               explainer={rolesExplainer}
+              maxWidth={maxWidth}
+              wideTable
               items={orgRoles}
               placeholder="e.g. Charge Nurse"
               onSave={async (updated) => {
@@ -620,6 +631,7 @@ export default function SettingsPage({
               }}
               canEdit={canManageOrgLabels}
               departments={departments}
+              showScheduleRoleToggle
               onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
             />
           </div>

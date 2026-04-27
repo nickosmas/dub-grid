@@ -1,12 +1,11 @@
 import { useMemo } from "react";
 import type {
   ShiftMap,
-  ShiftCode,
+  AssignmentDefinition,
   ShiftCategory,
   FocusArea,
   Employee,
   CoverageRequirement,
-  CoverageRuleConfig,
 } from "@/types";
 import {
   getDatesInRange,
@@ -37,11 +36,10 @@ interface ExpandedStatsProps {
   periodDays: number;
   activeEmployees: Employee[];
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
-  shiftCodeById: Map<number, ShiftCode>;
+  assignments: AssignmentDefinition[];
+  assignmentById: Map<number, AssignmentDefinition>;
   shiftCategories: ShiftCategory[];
   coverageRequirements: CoverageRequirement[];
-  coverageRuleConfigs: CoverageRuleConfig[];
   categoryById: Map<number, ShiftCategory>;
   showOT: boolean;
   hasRequirements: boolean;
@@ -54,10 +52,9 @@ export default function ExpandedStats({
   periodDays,
   activeEmployees,
   focusAreas,
-  shiftCodes,
-  shiftCodeById,
+  assignments,
+  assignmentById,
   coverageRequirements,
-  coverageRuleConfigs,
   categoryById,
   showOT,
   hasRequirements,
@@ -75,17 +72,17 @@ export default function ExpandedStats({
       const dateKeys = pDates.map(formatDateKey);
 
       const periodShifts = filterShiftsByWeek(allShifts, startKey, endKey);
-      const totalShifts = countShifts(periodShifts, shiftCodeById);
-      const staffScheduled = countStaffScheduled(periodShifts, shiftCodeById);
+      const totalShifts = countShifts(periodShifts, assignmentById);
+      const staffScheduled = countStaffScheduled(periodShifts, assignmentById);
 
       const coverage = computeCoveragePctAndSlots(
-        focusAreas, shiftCodes, coverageRequirements, coverageRuleConfigs,
+        focusAreas, assignments, coverageRequirements,
         pDates, activeEmployees, periodShifts,
       );
 
       const hours = computeAllEmployeeHours(
         activeEmployees, dateKeys, periodShifts,
-        shiftCodeById, 40, categoryById,
+        assignmentById, 40, categoryById,
       );
       const otCount = computeOTAlerts(hours, activeEmployees, focusAreas).length;
 
@@ -99,8 +96,8 @@ export default function ExpandedStats({
 
     return rows;
   }, [
-    allShifts, currentWeekStart, periodDays, activeEmployees, focusAreas, shiftCodes,
-    shiftCodeById, coverageRequirements, coverageRuleConfigs, categoryById,
+    allShifts, currentWeekStart, periodDays, activeEmployees, focusAreas, assignments,
+    assignmentById, coverageRequirements, categoryById,
   ]);
 
   const columns = [

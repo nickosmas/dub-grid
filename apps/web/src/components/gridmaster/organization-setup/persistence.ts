@@ -8,8 +8,8 @@ import {
   sendInvitation,
   updateOrganization,
   upsertFocusArea,
+  upsertJobDefinition,
   upsertShiftCategory,
-  upsertShiftCode,
 } from "@/lib/db";
 import { withComposedOrganizationAddress } from "@/lib/organization-profile";
 import * as Sentry from "@/lib/sentry";
@@ -23,10 +23,10 @@ import type {
   EmployeeRow,
   FocusAreaRow,
   InvitationRow,
+  JobRow,
   NamedItemRow,
   PendingInvite,
   ShiftCatRow,
-  ShiftCodeRow,
 } from "./types";
 
 export async function validateOrganizationSlug(slug: string): Promise<boolean> {
@@ -92,9 +92,10 @@ export async function createOrganizationSetup(
     focusAreaLabel: input.focusAreaLabel.trim() || "Focus Areas",
     certificationLabel: input.certificationLabel.trim() || "Certifications",
     roleLabel: input.roleLabel.trim() || "Roles",
-    departmentLabel: "Departments",
+    departmentLabel: "Scheduled Departments",
     shiftDisplayMode: input.shiftDisplayMode,
     timezone: input.timezone || null,
+    payPeriodStartDate: null,
     enforceConflictPrevention: false,
     dataRetentionDays: 365,
     featureOverrides: {},
@@ -199,7 +200,7 @@ type SaveOrganizationConfigInput = {
   certifications: NamedItemRow[];
   orgRoles: NamedItemRow[];
   shiftCategories: ShiftCatRow[];
-  shiftCodes: ShiftCodeRow[];
+  jobs: JobRow[];
 };
 
 export async function saveOrganizationSetupConfig({
@@ -210,7 +211,7 @@ export async function saveOrganizationSetupConfig({
   certifications,
   orgRoles,
   shiftCategories,
-  shiftCodes,
+  jobs,
 }: SaveOrganizationConfigInput): Promise<number> {
   let savedCount = 0;
 
@@ -287,7 +288,6 @@ export async function saveOrganizationSetupConfig({
     await upsertShiftCategory({
       orgId: createdOrg.id,
       name: category.name.trim(),
-      color: category.color,
       startTime: category.startTime || null,
       endTime: category.endTime || null,
       sortOrder: index,
@@ -297,32 +297,32 @@ export async function saveOrganizationSetupConfig({
   }
   savedCount += validCategories.length;
 
-  const validCodes = shiftCodes.filter(
-    (shiftCode) => shiftCode.label.trim() || shiftCode.name.trim(),
+  const validJobs = jobs.filter(
+    (job) => job.label.trim() || job.name.trim(),
   );
-  for (let index = 0; index < validCodes.length; index += 1) {
-    const shiftCode = validCodes[index];
-    await upsertShiftCode({
+  for (let index = 0; index < validJobs.length; index += 1) {
+    const job = validJobs[index];
+    await upsertJobDefinition({
       orgId: createdOrg.id,
-      label:
-        shiftCode.label.trim() ||
-        shiftCode.name.trim().slice(0, 3).toUpperCase(),
-      name: shiftCode.name.trim() || shiftCode.label.trim(),
-      color: shiftCode.color,
-      border: shiftCode.color,
+      name: job.name.trim() || job.label.trim(),
+      abbr:
+        job.label.trim().toUpperCase() ||
+        job.name.trim().slice(0, 4).toUpperCase(),
+      showOnGrid: true,
+      assignmentMode: "with_shift",
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+      color: job.color,
+      border: job.color,
       text: "#FFFFFF",
       sortOrder: index,
-      isGeneral: false,
-      focusAreaId: null,
-      categoryId: null,
-      requiredCertificationIds: [],
       defaultStartTime: null,
       defaultEndTime: null,
       defaultDurationHours: null,
       defaultDurationMinutes: null,
     });
   }
-  savedCount += validCodes.length;
+  savedCount += validJobs.length;
 
   return savedCount;
 }

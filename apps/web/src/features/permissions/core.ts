@@ -21,8 +21,8 @@ const ALL_PERMS: AdminPermissions = {
   canManageEmployees: true,
   canViewFocusAreas: true,
   canManageFocusAreas: true,
-  canViewShiftCodes: true,
-  canManageShiftCodes: true,
+  canViewScheduleDefinitions: true,
+  canManageScheduleDefinitions: true,
   canViewIndicatorTypes: true,
   canManageIndicatorTypes: true,
   canManageOrgSettings: true,
@@ -48,8 +48,8 @@ export const READ_ONLY_PERMS: AdminPermissions = {
   canManageEmployees: false,
   canViewFocusAreas: false,
   canManageFocusAreas: false,
-  canViewShiftCodes: false,
-  canManageShiftCodes: false,
+  canViewScheduleDefinitions: false,
+  canManageScheduleDefinitions: false,
   canViewIndicatorTypes: false,
   canManageIndicatorTypes: false,
   canManageOrgSettings: false,
@@ -69,8 +69,8 @@ export function applyViewImplications(
     result.canViewEmployeeDetails || result.canManageEmployees;
   result.canViewFocusAreas =
     result.canViewFocusAreas || result.canManageFocusAreas;
-  result.canViewShiftCodes =
-    result.canViewShiftCodes || result.canManageShiftCodes;
+  result.canViewScheduleDefinitions =
+    result.canViewScheduleDefinitions || result.canManageScheduleDefinitions;
   result.canViewIndicatorTypes =
     result.canViewIndicatorTypes || result.canManageIndicatorTypes;
   result.canViewCoverageRequirements =
@@ -159,7 +159,7 @@ export function buildPermissionContext(
       canManageOrgSettings: false,
       canManageOrgLabels: false,
       canManageFocusAreas: false,
-      canManageShiftCodes: false,
+      canManageScheduleDefinitions: false,
       canManageIndicatorTypes: false,
       canManageCoverageRequirements: false,
       canApproveShiftRequests: false,
@@ -172,7 +172,7 @@ export function buildPermissionContext(
     isGridmaster ||
     isSuperAdmin ||
     permissions.canManageFocusAreas ||
-    permissions.canManageShiftCodes ||
+    permissions.canManageScheduleDefinitions ||
     permissions.canManageIndicatorTypes ||
     permissions.canManageOrgSettings ||
     permissions.canManageOrgLabels ||
@@ -181,7 +181,7 @@ export function buildPermissionContext(
   const canAccessSettings =
     canManageOrg ||
     permissions.canViewFocusAreas ||
-    permissions.canViewShiftCodes ||
+    permissions.canViewScheduleDefinitions ||
     permissions.canViewIndicatorTypes ||
     permissions.canViewOrgLabels ||
     permissions.canViewCoverageRequirements;

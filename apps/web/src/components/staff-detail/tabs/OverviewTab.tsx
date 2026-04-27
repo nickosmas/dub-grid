@@ -4,7 +4,7 @@ import { type ReactNode, useMemo } from "react";
 import type {
   Employee,
   ShiftMap,
-  ShiftCode,
+  AssignmentDefinition,
   ShiftCategory,
   NamedItem,
   FocusArea,
@@ -24,7 +24,7 @@ const WEEK_COUNT = 12;
 interface OverviewTabProps {
   employee: Employee;
   shifts: ShiftMap;
-  shiftCodeById: Map<number, ShiftCode>;
+  assignmentById: Map<number, AssignmentDefinition>;
   categoryById: Map<number, ShiftCategory>;
   focusAreas: FocusArea[];
   focusAreaLabel?: string;
@@ -38,7 +38,7 @@ interface OverviewTabProps {
 export function OverviewTab({
   employee,
   shifts,
-  shiftCodeById,
+  assignmentById,
   categoryById,
   focusAreas,
   focusAreaLabel = "Focus Areas",
@@ -50,13 +50,13 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const isNameMode = shiftDisplayMode === "name";
   const hoursHistory = useMemo(
-    () => computeEmployeeHoursHistory(employee.id, shifts, shiftCodeById, WEEK_COUNT, 40, categoryById),
-    [employee.id, shifts, shiftCodeById, categoryById]
+    () => computeEmployeeHoursHistory(employee.id, shifts, assignmentById, WEEK_COUNT, 40, categoryById),
+    [employee.id, shifts, assignmentById, categoryById]
   );
 
   const shiftDistribution = useMemo(
-    () => computeShiftDistribution(employee.id, shifts, shiftCodeById),
-    [employee.id, shifts, shiftCodeById]
+    () => computeShiftDistribution(employee.id, shifts, assignmentById),
+    [employee.id, shifts, assignmentById]
   );
 
   const overtimeSummary = useMemo(() => computeOvertimeSummary(hoursHistory), [hoursHistory]);
@@ -222,9 +222,9 @@ export function OverviewTab({
             <div>
               <div className="dg-card-title flex items-center gap-2">
                 <Layers className="h-4 w-4 text-[var(--color-text-muted)]" />
-                {isNameMode ? "Shift Types" : "Shift Codes"}
+                {isNameMode ? "Assignments" : "Assignment Labels"}
               </div>
-              <div className="dg-card-subtitle">Most common assignments across recent shift history.</div>
+              <div className="dg-card-subtitle">Most common shift and job patterns across recent schedule history.</div>
             </div>
           </div>
           <div className="dg-card-body">
@@ -237,7 +237,7 @@ export function OverviewTab({
                 <div className="mb-4 flex h-2.5 overflow-hidden rounded-full bg-muted">
                   {shiftDistribution.map((item, index) => (
                     <div
-                      key={item.shiftCodeId}
+                      key={item.assignmentId}
                       className="h-full transition-all duration-500"
                       style={{
                         width: `${totalDistributionShifts > 0 ? (item.count / totalDistributionShifts) * 100 : 0}%`,
@@ -257,7 +257,7 @@ export function OverviewTab({
 
                 <div className="flex flex-col gap-2.5">
                   {shiftDistribution.map((item) => (
-                    <div key={item.shiftCodeId} className="flex items-center justify-between">
+                    <div key={item.assignmentId} className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-sm"

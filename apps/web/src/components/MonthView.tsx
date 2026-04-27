@@ -4,17 +4,15 @@ import React, {
   useMemo,
   useState,
   useRef,
-  useEffect,
-  useLayoutEffect,
   useCallback,
 } from "react";
-import { createPortal } from "react-dom";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
 import {
   Employee,
   ShiftCategory,
-  ShiftCode,
+  AssignmentDefinition,
   FocusArea,
   DraftKind,
   ShiftDisplayMode,
@@ -30,12 +28,12 @@ interface MonthViewProps {
   monthStart: Date;
   filteredEmployees: Employee[];
   shiftForKey: (empId: string, date: Date) => string | null;
-  shiftCodeIdsForKey?: (empId: string, date: Date) => number[];
+  assignmentIdsForKey?: (empId: string, date: Date) => number[];
   isAbsenceForKey?: (empId: string, date: Date) => boolean;
-  getShiftStyle: (type: string, focusAreaName?: string) => ShiftCode;
+  getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   today: Date;
   focusAreas: FocusArea[];
-  shiftCodes?: ShiftCode[];
+  assignments?: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   activeFocusArea?: number | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
@@ -49,7 +47,7 @@ type DayCellData = {
   categoryCounts: Map<number, number>;
   byFocusArea: Map<
     string,
-    { name: string; shift: string; style: ShiftCode; draftKind: DraftKind }[]
+    { name: string; shift: string; style: AssignmentDefinition; draftKind: DraftKind }[]
   >;
   activeCats: ShiftCategory[];
   focusAreaSections: string[];
@@ -90,202 +88,158 @@ function DayPopover({
   onClose: () => void;
   isNameMode?: boolean;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
-  }, []);
-
-  const updatePosition = useCallback(() => {
-    const rect = anchorEl.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom - 12;
-    const flipUp = spaceBelow < 260;
-    setMenuStyle({
-      position: "absolute",
-      top: flipUp ? undefined : rect.bottom + window.scrollY + 4,
-      bottom: flipUp
-        ? window.innerHeight - rect.top - window.scrollY + 4
-        : undefined,
-      left: Math.max(8, rect.left + window.scrollX),
-      width: 300,
-      maxHeight: Math.min(flipUp ? rect.top - 12 : spaceBelow, 500),
-      zIndex: 9999,
-    });
-  }, [anchorEl]);
-
-  useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    updatePosition();
-  }, [updatePosition]);
-
-  useEffect(() => {
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [updatePosition]);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      const target = e.target as Node;
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(target) &&
-        !anchorEl.contains(target)
-      ) {
-        onClose();
-      }
-    }
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [onClose, anchorEl]);
-
-  if (!mounted) return null;
-
   const { date, focusAreaSections, byFocusArea } = data;
 
-  return createPortal(
-    <div
-      ref={menuRef}
-      style={{
-        ...menuStyle,
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--dg-radius-md)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
+  return (
+    <Popover
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
       }}
     >
-      {/* Header */}
-      <div
+      <PopoverContent
+        anchor={anchorEl}
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        positionMethod="fixed"
+        collisionPadding={8}
+        collisionAvoidance={{
+          side: "flip",
+          align: "shift",
+          fallbackAxisSide: "none",
+        }}
+        initialFocus={false}
+        finalFocus={false}
         style={{
-          padding: "10px 14px",
-          borderBottom: "1px solid var(--color-border-light)",
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--dg-radius-md)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          width: 300,
+          maxHeight: "min(500px, var(--available-height))",
         }}
       >
-        <span
+        {/* Header */}
+        <div
           style={{
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 700,
-            color: "var(--color-text-primary)",
+            padding: "10px 14px",
+            borderBottom: "1px solid var(--color-border-light)",
           }}
         >
-          {date.toLocaleDateString("en-US", {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-      </div>
-
-      {/* Employee breakdown */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}>
-        {focusAreaSections.length === 0 ? (
-          <div
+          <span
             style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
-              textAlign: "center",
-              padding: "8px 0",
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
             }}
           >
-            No shifts scheduled
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {focusAreaSections.map((focusArea) => {
-              const workers = byFocusArea.get(focusArea)!;
-              const wc = NEUTRAL_FA_STYLE;
-              return (
-                <div key={focusArea}>
-                  <div
-                    style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 700,
-                      color: wc.text,
-                      background: wc.bg,
-                      borderRadius: 4,
-                      padding: "3px 8px",
-                      marginBottom: 5,
-                    }}
-                  >
-                    {focusArea}
-                  </div>
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 2 }}
-                  >
-                    {workers.map(
-                      ({ name, shift, style: s, draftKind: dk }, ni) => (
-                        <div
-                          key={`${name}-${shift}-${ni}`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 5,
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: s.color,
-                              border: dk
-                                ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
-                                : `1px solid ${borderColor(s.text)}`,
-                              borderRadius: 4,
-                              padding: isNameMode
-                                ? "3px 6px"
-                                : dk
-                                  ? "1px 5px"
-                                  : "2px 6px",
-                              fontSize: "var(--dg-fs-footnote)",
-                              fontWeight: 600,
-                              color: s.text,
-                              opacity: dk === "deleted" ? 0.5 : 1,
-                              textDecoration:
-                                dk === "deleted" ? "line-through" : "none",
-                              maxWidth: 120,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {isNameMode ? pillText(shift, 14) : shift}
-                          </div>
-                          <span
-                            style={{
-                              fontSize: "var(--dg-fs-footnote)",
-                              color: "var(--color-text-secondary)",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {shortName(name)}
-                          </span>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </div>
-              );
+            {date.toLocaleDateString("en-US", {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
             })}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+          </span>
+        </div>
+
+        {/* Employee breakdown */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 14px" }}>
+          {focusAreaSections.length === 0 ? (
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                textAlign: "center",
+                padding: "8px 0",
+              }}
+            >
+              No shifts scheduled
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {focusAreaSections.map((focusArea) => {
+                const workers = byFocusArea.get(focusArea)!;
+                const wc = NEUTRAL_FA_STYLE;
+                return (
+                  <div key={focusArea}>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 700,
+                        color: wc.text,
+                        background: wc.bg,
+                        borderRadius: 4,
+                        padding: "3px 8px",
+                        marginBottom: 5,
+                      }}
+                    >
+                      {focusArea}
+                    </div>
+                    <div
+                      style={{ display: "flex", flexDirection: "column", gap: 2 }}
+                    >
+                      {workers.map(
+                        ({ name, shift, style: s, draftKind: dk }, ni) => (
+                          <div
+                            key={`${name}-${shift}-${ni}`}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <div
+                              style={{
+                                background: s.color,
+                                border: dk
+                                  ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
+                                  : `1px solid ${borderColor(s.text)}`,
+                                borderRadius: 4,
+                                padding: isNameMode
+                                  ? "3px 6px"
+                                  : dk
+                                    ? "1px 5px"
+                                    : "2px 6px",
+                                fontSize: "var(--dg-fs-footnote)",
+                                fontWeight: 600,
+                                color: s.text,
+                                opacity: dk === "deleted" ? 0.5 : 1,
+                                textDecoration:
+                                  dk === "deleted" ? "line-through" : "none",
+                                maxWidth: 120,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {isNameMode ? pillText(shift, 14) : shift}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "var(--dg-fs-footnote)",
+                                color: "var(--color-text-secondary)",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {shortName(name)}
+                            </span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -293,12 +247,12 @@ export default function MonthView({
   monthStart,
   filteredEmployees,
   shiftForKey,
-  shiftCodeIdsForKey,
+  assignmentIdsForKey,
   isAbsenceForKey,
   getShiftStyle,
   today,
   focusAreas,
-  shiftCodes = [],
+  assignments = [],
   shiftCategories,
   activeFocusArea = null,
   draftKindForKey,
@@ -309,12 +263,12 @@ export default function MonthView({
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
   const focusAreaNames = focusAreas.map((w) => w.name);
 
-  // Look up shift codes by ID so cross-focus-area shifts render in their own color
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, ShiftCode>();
-    for (const sc of shiftCodes) map.set(sc.id, sc);
+  // Look up assignments by ID so cross-focus-area shifts render in their own color
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const sc of assignments) map.set(sc.id, sc);
     return map;
-  }, [shiftCodes]);
+  }, [assignments]);
 
   // Build a map of categoryId → category for fast lookup
   const categoryMap = useMemo(() => {
@@ -325,7 +279,7 @@ export default function MonthView({
 
   // Sort-order for a shift style: use its category's sortOrder, fall back to a high number
   const shiftSortOrder = useCallback(
-    (style: ShiftCode): number => {
+    (style: AssignmentDefinition): number => {
       if (style.categoryId != null) {
         return categoryMap.get(style.categoryId)?.sortOrder ?? 99;
       }
@@ -370,7 +324,7 @@ export default function MonthView({
         {
           name: string;
           shift: string;
-          style: ShiftCode;
+          style: AssignmentDefinition;
           draftKind: DraftKind;
         }[]
       >();
@@ -382,7 +336,7 @@ export default function MonthView({
         // Skip absence entries (off, sick, vacation, etc.) — they don't count in staffing tallies
         if (isAbsenceForKey?.(emp.id, date)) return;
 
-        const cellCodeIds = shiftCodeIdsForKey?.(emp.id, date) ?? [];
+        const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
         const empHomeFas = focusAreas.filter((fa) =>
           emp.focusAreaIds.includes(fa.id),
         );
@@ -390,7 +344,7 @@ export default function MonthView({
         shiftLabels.forEach((label, li) => {
           const codeEntry =
             cellCodeIds[li] != null
-              ? shiftCodeById.get(cellCodeIds[li])
+              ? assignmentById.get(cellCodeIds[li])
               : undefined;
           const style = codeEntry ?? getShiftStyle(label, empHomeFas[0]?.name);
 
@@ -464,11 +418,11 @@ export default function MonthView({
     todayKey,
     filteredEmployees,
     shiftForKey,
-    shiftCodeIdsForKey,
+    assignmentIdsForKey,
     isAbsenceForKey,
     getShiftStyle,
     focusAreas,
-    shiftCodeById,
+    assignmentById,
     shiftCategories,
     focusAreaNames,
     activeFocusArea,

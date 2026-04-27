@@ -19,7 +19,7 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   { value: "shift_request", label: "Shift Requests", prefixes: ["shift_request."] },
   { value: "access", label: "Access & Roles", prefixes: ["role.", "permissions.", "user."] },
   { value: "invitation", label: "Invitations", prefixes: ["invitation."] },
-  { value: "config", label: "Configuration", prefixes: ["focus_area.", "shift_code.", "shift_category.", "absence_type.", "indicator_type.", "certifications.", "org_roles.", "coverage_requirements.", "coverage_rule_config."] },
+  { value: "config", label: "Configuration", prefixes: ["focus_area.", "assignment.", "shift_category.", "job.", "absence_type.", "indicator_type.", "certifications.", "org_roles.", "coverage_requirements.", "coverage_rule_config."] },
   { value: "recurring", label: "Recurring", prefixes: ["recurring_shift.", "recurring_schedule.", "shift_series."] },
   { value: "org", label: "Organization", prefixes: ["org."] },
   { value: "impersonation", label: "Impersonation", prefixes: ["impersonation."] },
@@ -187,15 +187,18 @@ export function describeAction(entry: FullAuditLogEntry): string {
     case "focus_area.upserted": return name ? `Updated focus area "${name}"` : "Updated a focus area";
     case "focus_area.archived": return "Archived a focus area";
     case "focus_area.restored": return "Restored a focus area";
-    case "shift_code.upserted": return name ? `Updated shift code "${name}"` : "Updated a shift code";
-    case "shift_code.archived": return "Archived a shift code";
-    case "shift_code.restored": return "Restored a shift code";
+    case "assignment.upserted": return name ? `Updated schedule option "${name}"` : "Updated a schedule option";
+    case "assignment.archived": return "Archived a schedule option";
+    case "assignment.restored": return "Restored a schedule option";
     case "absence_type.upserted": return name ? `Updated absence type "${name}"` : "Updated an absence type";
     case "absence_type.archived": return "Archived an absence type";
     case "absence_type.restored": return "Restored an absence type";
-    case "shift_category.upserted": return name ? `Updated shift category "${name}"` : "Updated a shift category";
-    case "shift_category.archived": return "Archived a shift category";
-    case "shift_category.restored": return "Restored a shift category";
+    case "shift_category.upserted": return name ? `Updated shift "${name}"` : "Updated a shift";
+    case "shift_category.archived": return "Archived a shift";
+    case "shift_category.restored": return "Restored a shift";
+    case "job.upserted": return name ? `Updated job "${name}"` : "Updated a job";
+    case "job.archived": return "Archived a job";
+    case "job.restored": return "Restored a job";
     case "indicator_type.upserted": return name ? `Updated indicator type "${name}"` : "Updated an indicator type";
     case "indicator_type.archived": return "Archived an indicator type";
     case "indicator_type.restored": return "Restored an indicator type";
@@ -352,7 +355,7 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
     "impersonation.started",    // justification in description
     "shift.moved",              // target date in description
     "focus_area.upserted",      // name in description
-    "shift_code.upserted",      // name in description
+    "assignment.upserted",      // name in description
     "absence_type.upserted",    // name in description
     "shift_category.upserted",  // name in description
     "indicator_type.upserted",  // name in description
@@ -377,7 +380,7 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
     // Skip keys that are raw IDs — not useful to display
     if (isIdKey(key)) continue;
     if (Array.isArray(val)) {
-      // Skip arrays of UUIDs (e.g. shiftCodeIds)
+      // Skip arrays of UUIDs (e.g. assignmentIds)
       if (val.length > 0 && val.every((v) => isUuid(String(v)))) continue;
       items.push({ label: titleCase(key), value: val.map(String).join(", ") });
     } else if (typeof val === "object") {

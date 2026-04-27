@@ -15,7 +15,9 @@ interface DisplayModeStepProps {
 }
 
 export default function DisplayModeStep({ onNext, onBack }: DisplayModeStepProps) {
-  const { org, shiftCodes, setOrg } = useOrganizationData();
+  const { org, shiftCategories, jobs, setOrg } = useOrganizationData({
+    includeAssignmentDefinitionCompatibility: false,
+  });
   const [selected, setSelected] = useState<ShiftDisplayMode>(
     org?.shiftDisplayMode ?? "code",
   );
@@ -46,7 +48,7 @@ export default function DisplayModeStep({ onNext, onBack }: DisplayModeStepProps
   return (
     <StepLayout
       title="Display Mode"
-      description="Choose how shifts appear on the schedule grid. This affects how shift codes are displayed throughout the app."
+      description="Choose how shifts appear on the schedule grid. This affects how shift-first labels are displayed throughout the app."
       onNext={handleNext}
       onBack={onBack}
       nextDisabled={saving}
@@ -127,7 +129,11 @@ export default function DisplayModeStep({ onNext, onBack }: DisplayModeStepProps
               </p>
 
               {/* Sample grid */}
-              <DisplayModeSample mode={mode.id} shiftCodes={shiftCodes} />
+              <DisplayModeSample
+                mode={mode.id}
+                shiftCategories={shiftCategories}
+                jobs={jobs}
+              />
             </button>
           );
         })}

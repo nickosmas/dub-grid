@@ -1,866 +1,634 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { CoverageRequirement, CoverageRuleConfig, FocusArea, ShiftCategory, ShiftCode, ShiftDisplayMode } from "@/types";
-import { saveCoverageRequirements, saveCoverageRuleConfig } from "@/lib/db";
+import React, { useMemo, useState } from "react";
+import type {
+  AssignableShiftOption,
+  CoverageRequirement,
+  FocusArea,
+  JobDefinition,
+  NamedItem,
+  ShiftCategory,
+  ShiftDisplayMode,
+} from "@/types";
+import { saveCoverageRequirements } from "@/lib/db";
+import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
+import { getJobPlacementShiftPool, resolveJobColorsForShift, resolveJobTimesForShift } from "@/lib/job-placement";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
+import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
-import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
-import { EmptyState } from "@/components/EmptyState";
-
-// ── Coverage Requirements Settings ────────────────────────────────────────────
+import { ExplainerSection } from "@/components/ui/explainer-section";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+type CoverageDraft = {
+  everyDay: boolean;
+  values: number[];
+};
+
+type CoverageOptionSection = {
+  key: string;
+  title: string;
+  options: AssignableShiftOption[];
+  sortOrder: number;
+  isShiftless: boolean;
+};
+
+function requirementKey(focusAreaId: number, option: Pick<AssignableShiftOption, "jobId" | "shiftId">): string {
+  return `${focusAreaId}:${option.jobId}:${option.shiftId ?? "null"}`;
+}
+
+function requirementMatchesOption(
+  requirement: CoverageRequirement,
+  option: Pick<AssignableShiftOption, "jobId" | "shiftId">,
+): boolean {
+  return (
+    requirement.jobId === option.jobId &&
+    (requirement.preferredShiftId ?? null) === (option.shiftId ?? null)
+  );
+}
+
+function buildDraft(
+  requirements: CoverageRequirement[],
+  focusAreaId: number,
+  option: Pick<AssignableShiftOption, "jobId" | "shiftId">,
+): CoverageDraft {
+  const matching = requirements.filter(
+    (requirement) =>
+      requirement.focusAreaId === focusAreaId &&
+      requirementMatchesOption(requirement, option),
+  );
+
+  if (matching.length === 0) {
+    return {
+      everyDay: true,
+      values: [0],
+    };
+  }
+
+  const everyDay = matching.find((requirement) => requirement.dayOfWeek == null);
+  if (everyDay) {
+    return {
+      everyDay: true,
+      values: [everyDay.minStaff],
+    };
+  }
+
+  return {
+    everyDay: false,
+    values: Array.from({ length: 7 }, (_, index) => (
+      matching.find((requirement) => requirement.dayOfWeek === index)?.minStaff ?? 0
+    )),
+  };
+}
+
+function serializeDraft(draft: CoverageDraft): string {
+  return JSON.stringify({
+    everyDay: draft.everyDay,
+    values: draft.values,
+  });
+}
+
+function summarizeDraft(draft: CoverageDraft): string {
+  if (draft.everyDay) {
+    return draft.values[0] > 0 ? `Every day: ${draft.values[0]}` : "No requirement";
+  }
+
+  const activeDays = draft.values
+    .map((value, index) => ({ value, index }))
+    .filter((entry) => entry.value > 0)
+    .map((entry) => `${DAY_NAMES[entry.index]} ${entry.value}`);
+
+  return activeDays.length > 0 ? activeDays.join(", ") : "No requirement";
+}
+
+function getCoverageSectionKey(option: AssignableShiftOption): string {
+  return option.shiftId != null ? `shift:${option.shiftId}` : "shiftless";
+}
+
+function getCoverageSectionTitle(option: AssignableShiftOption): string {
+  if (option.shiftId != null) {
+    return option.shiftName ?? option.groupLabel;
+  }
+
+  return "General jobs";
+}
+
+function getCoverageRowTitle(option: AssignableShiftOption): string {
+  return option.jobName;
+}
+
+function buildCoverageOptions(args: {
+  focusAreas: FocusArea[];
+  shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
+  orgRoles: NamedItem[];
+  certifications: NamedItem[];
+  shiftDisplayMode: ShiftDisplayMode;
+}): AssignableShiftOption[] {
+  const { focusAreas, shiftCategories, jobs, orgRoles, certifications, shiftDisplayMode } = args;
+  const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
+  const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
+  const activeJobs = jobs.filter((job) => !job.archivedAt && job.systemKey !== "regular_staff");
+  const focusAreaNameById = new Map(activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]));
+  const options: AssignableShiftOption[] = [];
+
+  for (const job of activeJobs) {
+    const assignmentMode = job.assignmentMode ?? "with_shift";
+
+    if (assignmentMode !== "shiftless") {
+      for (const shift of getJobPlacementShiftPool(job, activeShifts, activeFocusAreas)) {
+        const colors = resolveJobColorsForShift(job, shift);
+        const times = resolveJobTimesForShift(job, shift);
+        const displayParts = buildShiftDisplayParts({
+          shift,
+          job,
+          shiftDisplayMode,
+        });
+
+        options.push({
+          id: `assignment:${shift.id}:${job.id}`,
+          assignmentId: 0,
+          shiftId: shift.id,
+          jobId: job.id,
+          focusAreaId: shift.focusAreaId ?? null,
+          focusAreaName: shift.focusAreaId != null ? (focusAreaNameById.get(shift.focusAreaId) ?? null) : null,
+          shiftName: shift.name,
+          shiftAbbr: shift.abbr ?? null,
+          jobName: job.name,
+          jobAbbr: job.abbr,
+          showJobOnGrid: displayParts.showJobOnGrid,
+          isShiftless: displayParts.isShiftless,
+          primaryLabel: displayParts.primaryLabel,
+          secondaryLabel: displayParts.secondaryLabel,
+          groupLabel: shift.name,
+          groupSortOrder: shift.sortOrder,
+          sortOrder: shift.sortOrder * 1000 + job.sortOrder,
+          qualificationRank: getQualificationSeniorityRank({ job, orgRoles, certifications }),
+          color: colors.color,
+          border: colors.border,
+          text: colors.text,
+          startTime: times.startTime,
+          endTime: times.endTime,
+        });
+      }
+    }
+
+    if (assignmentMode !== "with_shift") {
+      const colors = resolveJobColorsForShift(job, null);
+      const times = resolveJobTimesForShift(job, null);
+      const displayParts = buildShiftDisplayParts({
+        shift: null,
+        job,
+        shiftDisplayMode,
+      });
+
+      options.push({
+        id: `assignment:shiftless:${job.id}`,
+        assignmentId: 0,
+        shiftId: null,
+        jobId: job.id,
+        focusAreaId: null,
+        focusAreaName: null,
+        shiftName: null,
+        shiftAbbr: null,
+        jobName: job.name,
+        jobAbbr: job.abbr,
+        showJobOnGrid: displayParts.showJobOnGrid,
+        isShiftless: displayParts.isShiftless,
+        primaryLabel: displayParts.primaryLabel,
+        secondaryLabel: displayParts.secondaryLabel,
+        groupLabel: "General",
+        groupSortOrder: 1_000_000,
+        sortOrder: 1_000_000 + job.sortOrder,
+        qualificationRank: getQualificationSeniorityRank({ job, orgRoles, certifications }),
+        color: colors.color,
+        border: colors.border,
+        text: colors.text,
+        startTime: times.startTime,
+        endTime: times.endTime,
+      });
+    }
+  }
+
+  return options.sort((left, right) => {
+    const leftFocusArea = left.focusAreaName ?? "";
+    const rightFocusArea = right.focusAreaName ?? "";
+    if (leftFocusArea !== rightFocusArea) {
+      return leftFocusArea.localeCompare(rightFocusArea);
+    }
+    if (left.groupSortOrder !== right.groupSortOrder) {
+      return left.groupSortOrder - right.groupSortOrder;
+    }
+    if (left.groupLabel !== right.groupLabel) {
+      return left.groupLabel.localeCompare(right.groupLabel);
+    }
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+    return left.primaryLabel.localeCompare(right.primaryLabel);
+  });
+}
+
+function compareCoverageOptionsByQualificationSeniority(
+  left: AssignableShiftOption,
+  right: AssignableShiftOption,
+): number {
+  const leftRanked = left.qualificationRank != null;
+  const rightRanked = right.qualificationRank != null;
+
+  if (leftRanked !== rightRanked) {
+    return leftRanked ? -1 : 1;
+  }
+  if (
+    left.qualificationRank != null &&
+    right.qualificationRank != null &&
+    left.qualificationRank !== right.qualificationRank
+  ) {
+    return left.qualificationRank - right.qualificationRank;
+  }
+  if (left.sortOrder !== right.sortOrder) {
+    return left.sortOrder - right.sortOrder;
+  }
+  return left.jobName.localeCompare(right.jobName);
+}
+
+function CoverageOptionRow({
+  orgId,
+  focusAreaId,
+  option,
+  requirements,
+  onSaved,
+  canEdit,
+}: {
+  orgId: string;
+  focusAreaId: number;
+  option: AssignableShiftOption;
+  requirements: CoverageRequirement[];
+  onSaved: (saved: CoverageRequirement[], option: AssignableShiftOption) => void;
+  canEdit: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const panelId = React.useId();
+  const initialDraft = useMemo(
+    () => buildDraft(requirements, focusAreaId, option),
+    [focusAreaId, option, requirements],
+  );
+  const [draft, setDraft] = useState<CoverageDraft>(initialDraft);
+
+  React.useEffect(() => {
+    if (!expanded) {
+      setDraft(buildDraft(requirements, focusAreaId, option));
+    }
+  }, [expanded, focusAreaId, option, requirements]);
+
+  const isDirty = serializeDraft(draft) !== serializeDraft(initialDraft);
+  const handleClose = () => {
+    if (isDirty) {
+      setDraft(initialDraft);
+      return;
+    }
+    setExpanded(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const rows = draft.everyDay
+        ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0 }]
+        : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value }));
+      const saved = await saveCoverageRequirements(
+        orgId,
+        focusAreaId,
+        option.jobId,
+        option.shiftId ?? null,
+        rows,
+      );
+      onSaved(saved, option);
+      setExpanded(false);
+      toast.success("Coverage requirement saved");
+    } catch (error) {
+      Sentry.captureException(error);
+      toast.error("Failed to save coverage requirement");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
+      <button
+        type="button"
+        className="dg-hover-row"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 8px",
+          borderRadius: 8,
+          cursor: "pointer",
+          transition: "background 0.15s",
+          width: "100%",
+          textAlign: "left",
+          background: "transparent",
+          border: "none",
+        }}
+        onClick={() => setExpanded((previous) => !previous)}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+            {getCoverageRowTitle(option)}
+          </div>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 3 }}>
+            {summarizeDraft(initialDraft)}
+          </div>
+        </div>
+        <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+          ▾
+        </span>
+      </button>
+
+      {expanded && (
+        <div
+          id={panelId}
+          style={{
+            background: "var(--color-bg-secondary)",
+            borderRadius: "var(--dg-radius-lg)",
+            border: "1px solid var(--color-border-light)",
+            margin: "0 0 8px",
+            padding: "14px 16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+              <input
+                type="checkbox"
+                checked={draft.everyDay}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    setDraft((previous) => ({
+                      everyDay: true,
+                      values: [previous.everyDay ? previous.values[0] ?? 0 : previous.values[1] ?? previous.values[0] ?? 0],
+                    }));
+                    return;
+                  }
+                  setDraft((previous) => ({
+                    everyDay: false,
+                    values: Array.from({ length: 7 }, () => previous.values[0] ?? 0),
+                  }));
+                }}
+                disabled={!canEdit}
+              />
+              Same every day
+            </label>
+          </div>
+
+          {draft.everyDay ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <label style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Minimum Staff
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={999}
+                value={draft.values[0] ?? 0}
+                onChange={(event) => setDraft({ everyDay: true, values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))] })}
+                style={{ width: 72, padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
+                disabled={!canEdit}
+              />
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+              {DAY_NAMES.map((day, index) => (
+                <label key={`${option.id}-${day}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {day}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={999}
+                    value={draft.values[index] ?? 0}
+                    onChange={(event) => {
+                      const nextValues = [...draft.values];
+                      nextValues[index] = Math.max(0, Math.min(999, Number(event.target.value) || 0));
+                      setDraft({ everyDay: false, values: nextValues });
+                    }}
+                    style={{ width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
+                    disabled={!canEdit}
+                  />
+                </label>
+              ))}
+            </div>
+          )}
+
+          <EditorActionRow
+            secondaryAction={(
+              <button onClick={handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
+                {getEditorDismissLabel(isDirty)}
+              </button>
+            )}
+            primaryAction={(
+              <button onClick={handleSave} disabled={saving || !canEdit || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+                {getEditorSaveLabel(saving)}
+              </button>
+            )}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function CoverageRequirementsSettings({
   orgId,
   focusAreas,
   shiftCategories,
-  shiftCodes,
+  jobs,
+  orgRoles = [],
+  certifications = [],
   coverageRequirements,
   onCoverageRequirementsChange,
-  coverageRuleConfigs = [],
-  onCoverageRuleConfigsChange = () => {},
   canEdit,
   shiftDisplayMode = "code",
 }: {
   orgId: string;
   focusAreas: FocusArea[];
   shiftCategories: ShiftCategory[];
-  shiftCodes: ShiftCode[];
+  jobs: JobDefinition[];
+  orgRoles?: NamedItem[];
+  certifications?: NamedItem[];
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
-  coverageRuleConfigs?: CoverageRuleConfig[];
-  onCoverageRuleConfigsChange?: (configs: CoverageRuleConfig[]) => void;
   canEdit: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
 }) {
-  const isNameMode = shiftDisplayMode === "name";
-  // Which section is currently being edited — "focusAreaId-categoryId"
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [savingKey, setSavingKey] = useState<string | null>(null);
-
-  // Draft edits keyed by "focusAreaId-categoryId"
-  type CodeReq = { shiftCodeId: number; minStaff: number };
-  type DraftRow = { dayOfWeek: number | null; codeRequirements: CodeReq[] };
-  type DraftRuleConfig = {
-    eligibleShiftCodeIds: number[];
-    preferredOpenShiftCodeId: number;
-  };
-  type DraftEntry = {
-    everyDay: boolean;
-    rows: DraftRow[];
-    ruleConfigs: Record<number, DraftRuleConfig>;
-  };
-  const [drafts, setDrafts] = useState<Record<string, DraftEntry>>({});
-
-  // Get the shift codes belonging to a (focusArea, category) group
-  const getCodesForGroup = useCallback(
-    (focusAreaId: number, categoryId: number): ShiftCode[] => {
-      return shiftCodes.filter(
-        (sc) =>
-          !sc.archivedAt &&
-          sc.categoryId === categoryId &&
-          sc.focusAreaId === focusAreaId,
-      );
-    },
-    [shiftCodes],
+  const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
+  const assignableOptions = useMemo(
+    () => buildCoverageOptions({
+      shiftCategories,
+      jobs,
+      focusAreas,
+      orgRoles,
+      certifications,
+      shiftDisplayMode,
+    }),
+    [certifications, focusAreas, jobs, orgRoles, shiftCategories, shiftDisplayMode],
+  );
+  const coverageOptions = useMemo(
+    () => assignableOptions.filter((option) => option.showJobOnGrid && !option.isShiftless),
+    [assignableOptions],
   );
 
-  // Build a draft entry from existing coverage requirements (or empty)
-  const buildDraftFromRequirements = useCallback(
-    (focusAreaId: number, categoryId: number): DraftEntry => {
-      const codes = getCodesForGroup(focusAreaId, categoryId);
-      const buildRuleConfigs = (): Record<number, DraftRuleConfig> =>
-        Object.fromEntries(
-          codes.map((sc) => {
-            const existingConfig = coverageRuleConfigs.find(
-              (config) =>
-                config.focusAreaId === focusAreaId &&
-                config.requirementShiftCodeId === sc.id,
-            );
-
-            return [
-              sc.id,
-              {
-                eligibleShiftCodeIds: existingConfig?.eligibleShiftCodeIds?.length
-                  ? [...existingConfig.eligibleShiftCodeIds].sort((left, right) => left - right)
-                  : [sc.id],
-                preferredOpenShiftCodeId: existingConfig?.preferredOpenShiftCodeId ?? sc.id,
-              },
-            ];
-          }),
+  const optionsByFocusArea = useMemo(() => {
+    return new Map(
+      activeFocusAreas.map((focusArea) => {
+        const localOptions = coverageOptions.filter(
+          (option) => option.focusAreaId === focusArea.id,
         );
-      const makeEmptyCodeReqs = (): CodeReq[] =>
-        codes.map((sc) => ({ shiftCodeId: sc.id, minStaff: 0 }));
+        return [focusArea.id, localOptions];
+      }),
+    );
+  }, [activeFocusAreas, coverageOptions]);
 
-      const codeIds = new Set(codes.map((sc) => sc.id));
-      const existing = coverageRequirements.filter(
-        (r) => r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId),
-      );
-
-      if (existing.length === 0) {
-        return {
-          everyDay: true,
-          rows: [{ dayOfWeek: null, codeRequirements: makeEmptyCodeReqs() }],
-          ruleConfigs: buildRuleConfigs(),
-        };
-      }
-
-      const hasEveryDay = existing.some((r) => r.dayOfWeek === null);
-      if (hasEveryDay) {
-        const codeReqs = codes.map((sc) => {
-          const match = existing.find((r) => r.shiftCodeId === sc.id && r.dayOfWeek === null);
-          return { shiftCodeId: sc.id, minStaff: match?.minStaff ?? 0 };
-        });
-        return {
-          everyDay: true,
-          rows: [{ dayOfWeek: null, codeRequirements: codeReqs }],
-          ruleConfigs: buildRuleConfigs(),
-        };
-      }
-
-      // Per-day mode: fill all 7 days
-      const rows: DraftRow[] = [];
-      for (let d = 0; d < 7; d++) {
-        const codeReqs = codes.map((sc) => {
-          const match = existing.find((r) => r.shiftCodeId === sc.id && r.dayOfWeek === d);
-          return { shiftCodeId: sc.id, minStaff: match?.minStaff ?? 0 };
-        });
-        rows.push({ dayOfWeek: d, codeRequirements: codeReqs });
-      }
-      return { everyDay: false, rows, ruleConfigs: buildRuleConfigs() };
-    },
-    [coverageRequirements, coverageRuleConfigs, getCodesForGroup],
-  );
-
-  // Get the current draft for a section (only exists while editing)
-  const getDraft = useCallback(
-    (focusAreaId: number, categoryId: number): DraftEntry | undefined => {
-      return drafts[`${focusAreaId}-${categoryId}`];
-    },
-    [drafts],
-  );
-
-  // Get the read-only view data (always derived from saved requirements)
-  const getDisplayData = useCallback(
-    (focusAreaId: number, categoryId: number): DraftEntry => {
-      return buildDraftFromRequirements(focusAreaId, categoryId);
-    },
-    [buildDraftFromRequirements],
-  );
-
-  const setDraft = useCallback((focusAreaId: number, categoryId: number, entry: DraftEntry) => {
-    setDrafts((prev) => ({ ...prev, [`${focusAreaId}-${categoryId}`]: entry }));
-  }, []);
-
-  const handleEdit = useCallback(
-    (focusAreaId: number, categoryId: number) => {
-      const key = `${focusAreaId}-${categoryId}`;
-      const entry = buildDraftFromRequirements(focusAreaId, categoryId);
-      setDrafts((prev) => ({ ...prev, [key]: entry }));
-      setEditingKey(key);
-    },
-    [buildDraftFromRequirements],
-  );
-
-  const handleClose = useCallback(
-    (focusAreaId: number, categoryId: number) => {
-      const key = `${focusAreaId}-${categoryId}`;
-      setDrafts((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-      setEditingKey(null);
-    },
-    [],
-  );
-
-  const handleDiscard = useCallback(
-    (focusAreaId: number, categoryId: number) => {
-      setDraft(focusAreaId, categoryId, buildDraftFromRequirements(focusAreaId, categoryId));
-    },
-    [buildDraftFromRequirements, setDraft],
-  );
-
-  const handleToggleEveryDay = useCallback(
-    (focusAreaId: number, categoryId: number) => {
-      const current = getDraft(focusAreaId, categoryId);
-      if (!current) return;
-      if (current.everyDay) {
-        const val = current.rows[0]?.codeRequirements ?? [];
-        const rows: DraftRow[] = [];
-        for (let d = 0; d < 7; d++) {
-          rows.push({ dayOfWeek: d, codeRequirements: val.map((c) => ({ ...c })) });
-        }
-        setDraft(focusAreaId, categoryId, { ...current, everyDay: false, rows });
-      } else {
-        const allValues = current.rows.map((r) => JSON.stringify(r.codeRequirements.map((c) => c.minStaff)));
-        const hasDifferentDays = new Set(allValues).size > 1;
-        if (hasDifferentDays && !window.confirm("Per-day values differ. Switching to 'Same every day' will keep only Monday's values. Continue?")) {
-          return;
-        }
-        const mon = current.rows.find((r) => r.dayOfWeek === 1) ?? current.rows[0];
-        const codeReqs = mon?.codeRequirements.map((c) => ({ ...c })) ?? [];
-        setDraft(focusAreaId, categoryId, {
-          ...current,
-          everyDay: true,
-          rows: [{ dayOfWeek: null, codeRequirements: codeReqs }],
-        });
-      }
-    },
-    [getDraft, setDraft],
-  );
-
-  const handleCodeChange = useCallback(
-    (focusAreaId: number, categoryId: number, rowIndex: number, codeIndex: number, value: number) => {
-      const current = getDraft(focusAreaId, categoryId);
-      if (!current) return;
-      const rows = current.rows.map((r, ri) => {
-        if (ri !== rowIndex) return r;
-        const codeRequirements = r.codeRequirements.map((c, ci) => {
-          if (ci !== codeIndex) return c;
-          return { ...c, minStaff: Math.min(999, Math.max(0, value)) };
-        });
-        return { ...r, codeRequirements };
-      });
-      setDraft(focusAreaId, categoryId, { ...current, rows });
-    },
-    [getDraft, setDraft],
-  );
-
-  const handleSave = useCallback(
-    async (focusAreaId: number, categoryId: number) => {
-      const draft = getDraft(focusAreaId, categoryId);
-      if (!draft) return;
-      const codes = getCodesForGroup(focusAreaId, categoryId);
-      const codeIds = new Set(codes.map((sc) => sc.id));
-      const key = `${focusAreaId}-${categoryId}`;
-      setSavingKey(key);
-      try {
-        const allSaved: CoverageRequirement[] = [];
-        const savedRuleConfigs: CoverageRuleConfig[] = [];
-        for (const code of codes) {
-          const rows = draft.rows.map((r) => {
-            const cr = r.codeRequirements.find((c) => c.shiftCodeId === code.id);
-            return { dayOfWeek: r.dayOfWeek, minStaff: cr?.minStaff ?? 0 };
-          });
-          const saved = await saveCoverageRequirements(orgId, focusAreaId, code.id, rows);
-          allSaved.push(...saved);
-
-          const ruleConfig = draft.ruleConfigs[code.id] ?? {
-            eligibleShiftCodeIds: [code.id],
-            preferredOpenShiftCodeId: code.id,
-          };
-          const savedRuleConfig = await saveCoverageRuleConfig(orgId, focusAreaId, code.id, {
-            eligibleShiftCodeIds: ruleConfig.eligibleShiftCodeIds,
-            preferredOpenShiftCodeId: ruleConfig.preferredOpenShiftCodeId,
-          });
-          if (savedRuleConfig) savedRuleConfigs.push(savedRuleConfig);
-        }
-        const remaining = coverageRequirements.filter(
-          (r) => !(r.focusAreaId === focusAreaId && codeIds.has(r.shiftCodeId)),
-        );
-        const remainingRuleConfigs = coverageRuleConfigs.filter(
-          (config) =>
-            !(config.focusAreaId === focusAreaId && codeIds.has(config.requirementShiftCodeId)),
-        );
-        onCoverageRequirementsChange([...remaining, ...allSaved]);
-        onCoverageRuleConfigsChange([...remainingRuleConfigs, ...savedRuleConfigs]);
-        // Clear draft and exit editing
-        setDrafts((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
-        setEditingKey(null);
-        toast.success("Coverage requirements saved");
-      } catch (e) {
-        Sentry.captureException(e);
-        toast.error("Failed to save coverage requirements");
-      } finally {
-        setSavingKey(null);
-      }
-    },
-    [
-      getDraft,
-      getCodesForGroup,
-      orgId,
-      coverageRequirements,
-      coverageRuleConfigs,
-      onCoverageRequirementsChange,
-      onCoverageRuleConfigsChange,
-    ],
-  );
-
-  const activeCategories = shiftCategories.filter((c) => !c.archivedAt);
-  const activeFocusAreas = focusAreas.filter((fa) => !fa.archivedAt);
-
-  if (activeFocusAreas.length === 0 || activeCategories.length === 0) {
+  if (activeFocusAreas.length === 0 || coverageOptions.length === 0) {
     return (
       <EmptyState
         compact
-        title={activeFocusAreas.length === 0
-          ? "No focus areas yet"
-          : "No shift categories yet"}
+        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No scheduled jobs yet"}
         description={activeFocusAreas.length === 0
-          ? "Create focus areas first to configure coverage requirements."
-          : "Create shift categories first to configure coverage requirements."}
+          ? "Create focus areas first to configure coverage."
+          : "Create scheduled jobs first so coverage can target the jobs you actually want to track."}
       />
     );
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: 48,
-    padding: "4px 4px",
-    fontSize: "var(--dg-fs-caption)",
-    borderRadius: 8,
-    border: "1px solid var(--color-border)",
-    textAlign: "center",
-  };
+  const sectionsByFocusArea = useMemo(() => {
+    return new Map(
+      activeFocusAreas.map((focusArea) => {
+        const localOptions = coverageOptions.filter(
+          (option) => option.focusAreaId === focusArea.id,
+        );
+        const sections = localOptions.reduce<Map<string, CoverageOptionSection>>((accumulator, option) => {
+          const key = getCoverageSectionKey(option);
+          const existing = accumulator.get(key);
+          if (existing) {
+            existing.options.push(option);
+            return accumulator;
+          }
 
-  const codeLabel = (sc: ShiftCode) => isNameMode ? (sc.name || sc.label) : sc.label;
-  const sortCodes = (left: ShiftCode, right: ShiftCode) =>
-    left.sortOrder - right.sortOrder || left.id - right.id;
-  const activeShiftCodes = shiftCodes.filter((code) => !code.archivedAt).sort(sortCodes);
-  const previewCategory = activeCategories.find((category) =>
-    activeShiftCodes.some((code) => code.categoryId === category.id),
-  );
-  const previewCodes = previewCategory
-    ? activeShiftCodes.filter((code) => code.categoryId === previewCategory.id).slice(0, 3)
-    : activeShiftCodes.slice(0, 3);
-  const fallbackLabels = isNameMode
-    ? ["Day Shift", "Day Supervisor", "Day Mentoring"]
-    : ["D", "Ds", "(D)"];
-  const exampleLabels = fallbackLabels.map((fallbackLabel, index) =>
-    previewCodes[index] ? codeLabel(previewCodes[index]) : fallbackLabel,
-  );
-  const previewCategoryLabel = previewCategory?.name ?? "Day";
-  const shortageExample = `${exampleLabels[0]} short 1, ${exampleLabels[1]} short 1`;
-  const infoPoints = [
-    {
-      title: "Enter the minimum by shift line",
-      description: `Set the required count for each shift line in the category, such as ${exampleLabels[0]}, ${exampleLabels[1]}, and ${exampleLabels[2]}. These values describe the staffing mix you want on the schedule.`,
-    },
-    {
-      title: "Coverage is judged by the category total",
-      description: `For each focus area, date, and ${previewCategoryLabel} category, DubGrid adds those shift-line minimums together and compares that total to the number of unique staff scheduled anywhere in the category.`,
-    },
-    {
-      title: "Green means the category total is covered",
-      description: `If the scheduled total is equal to or greater than the category total required, coverage stays green even if one shift line is lighter than planned. A person is counted once toward the category total.`,
-    },
-    {
-      title: "Red shows what mix is still missing",
-      description: `If the scheduled total is below the category total required, coverage turns red and the shortage detail explains which lines are still short, for example ${shortageExample}.`,
-    },
-  ];
+          accumulator.set(key, {
+            key,
+            title: getCoverageSectionTitle(option),
+            options: [option],
+            sortOrder: option.groupSortOrder,
+            isShiftless: option.isShiftless,
+          });
+          return accumulator;
+        }, new Map());
 
-  const renderCoveragePreview = (
-    title: string,
-    tone: "green" | "red",
-    actualTotal: number,
-    requiredTotal: number,
-    rowCounts: number[],
-    detail: string,
-  ) => {
-    const palette = tone === "green"
-      ? {
-          bg: "rgba(16, 185, 129, 0.08)",
-          border: "var(--color-success-border)",
-          text: "var(--color-success-text)",
-          badge: "Covered",
-        }
-      : {
-          bg: "rgba(220, 38, 38, 0.06)",
-          border: "var(--color-danger-border)",
-          text: "var(--color-danger-dark)",
-          badge: "Short",
-        };
-
-    return (
-      <PreviewFrame
-        key={title}
-        title={title}
-        subtitle={`${previewCategoryLabel} category`}
-        badge={(
-          <span
-            style={{
-              padding: "3px 8px",
-              borderRadius: 999,
-              fontSize: 10,
-              fontWeight: 700,
-              background: palette.bg,
-              color: palette.text,
-              border: `1px solid ${palette.border}`,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {palette.badge}
-          </span>
-        )}
-      >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr auto",
-            gap: 8,
-            padding: "10px 12px",
-            borderRadius: "var(--dg-radius-sm)",
-            background: "var(--color-bg)",
-            border: "1px solid var(--color-border-light)",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {exampleLabels.map((label) => (
-              <div key={`${title}-${label}`} style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
-                {label}
-              </div>
-            ))}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, textAlign: "right" }}>
-            {rowCounts.map((count, index) => (
-              <div key={`${title}-count-${exampleLabels[index] ?? index}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
-                {count}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              padding: "10px 12px",
-              borderRadius: "var(--dg-radius-sm)",
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border-light)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Required Total
-            </div>
-            <div style={{ marginTop: 3, fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-              {requiredTotal}
-            </div>
-          </div>
-          <div
-            style={{
-              padding: "10px 12px",
-              borderRadius: "var(--dg-radius-sm)",
-              background: palette.bg,
-              border: `1px solid ${palette.border}`,
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Scheduled
-            </div>
-            <div style={{ marginTop: 3, fontSize: "var(--dg-fs-label)", fontWeight: 700, color: palette.text }}>
-              {actualTotal}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            padding: "10px 12px",
-            borderRadius: "var(--dg-radius-sm)",
-            background: tone === "green" ? "var(--color-bg)" : "rgba(255,255,255,0.6)",
-            border: `1px dashed ${palette.border}`,
-            fontSize: 11,
-            lineHeight: 1.45,
-            color: tone === "green" ? "var(--color-text-muted)" : palette.text,
-          }}
-        >
-          {detail}
-        </div>
-      </PreviewFrame>
+        return [
+          focusArea.id,
+          Array.from(sections.values())
+            .map((section) => ({
+              ...section,
+              options: [...section.options].sort(compareCoverageOptionsByQualificationSeniority),
+            }))
+            .sort((left, right) => {
+              if (left.sortOrder !== right.sortOrder) {
+                return left.sortOrder - right.sortOrder;
+              }
+              return left.title.localeCompare(right.title);
+            }),
+        ];
+      }),
     );
+  }, [activeFocusAreas, coverageOptions]);
+
+  const handleSaved = (saved: CoverageRequirement[], option: AssignableShiftOption, focusAreaId: number) => {
+    const updated = coverageRequirements.filter(
+      (requirement) =>
+        !(
+          requirement.focusAreaId === focusAreaId &&
+          requirementMatchesOption(requirement, option)
+        ),
+    );
+    onCoverageRequirementsChange([...updated, ...saved]);
   };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <ExplainerSection
         title="Coverage logic"
-        points={infoPoints}
         defaultOpen
         storageKey="dg-explainer-coverage-settings"
-        preview={(
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 12,
-            }}
-          >
-            {renderCoveragePreview(
-              "Green example",
-              "green",
-              5,
-              4,
-              [2, 1, 2],
-              `Category total met. Even if one line is lighter than planned, the ${previewCategoryLabel} category stays green because 5 scheduled is at least 4 required.`,
-            )}
-            {renderCoveragePreview(
-              "Red example",
-              "red",
-              3,
-              4,
-              [2, 0, 1],
-              `Category total is short, so coverage turns red and the shortage detail calls out the missing mix: ${shortageExample}.`,
-            )}
-          </div>
-        )}
+        points={[
+          {
+            title: "Each shift section lists only the jobs for that shift",
+            description: "Pick a focus area, open a shift section, and set minimum headcount per job. The shift itself is already implied by the section you are editing.",
+          },
+          {
+            title: "Coverage focuses on explicit jobs",
+            description: "Only the jobs you define are listed here, so coverage stays focused on the roles you intentionally want to staff and measure.",
+          },
+        ]}
       />
-      {activeFocusAreas.map((fa) => (
-        <div
-          key={fa.id}
-          style={{
-            background: "var(--color-surface)",
-            borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border)",
-            overflow: "hidden",
-          }}
-        >
-          {/* Focus Area Header */}
-          <div
-            style={{
-              padding: "10px 16px",
-              color: "var(--color-text-secondary)",
-              fontWeight: 700,
-              fontSize: "var(--dg-fs-label)",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            {fa.name}
-          </div>
 
-          {/* Categories — always visible */}
-          {activeCategories.map((cat) => {
-            if (cat.focusAreaId != null && cat.focusAreaId !== fa.id) return null;
+      {activeFocusAreas.map((focusArea) => {
+        const localOptions = optionsByFocusArea.get(focusArea.id) ?? [];
+        const sections = sectionsByFocusArea.get(focusArea.id) ?? [];
 
-            const codes = getCodesForGroup(fa.id, cat.id);
-            if (codes.length === 0) return null;
+        return (
+          <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+              {focusArea.name}
+            </div>
 
-            const key = `${fa.id}-${cat.id}`;
-            const isEditing = editingKey === key;
-            const isSaving = savingKey === key;
-            const draft = getDraft(fa.id, cat.id);
-            const display = getDisplayData(fa.id, cat.id);
-            const data = isEditing && draft ? draft : display;
-            const hasValues = display.rows.some((r) =>
-              r.codeRequirements.some((c) => c.minStaff > 0),
-            );
-            // Compare draft to saved state to determine if changes were made
-            const hasChanges = isEditing && draft != null && (
-              draft.everyDay !== display.everyDay ||
-              JSON.stringify(draft.rows.map((r) => r.codeRequirements.map((c) => c.minStaff)))
-                !== JSON.stringify(display.rows.map((r) => r.codeRequirements.map((c) => c.minStaff)))
-            );
-
-            return (
-              <div key={cat.id} style={{ borderTop: "1px solid var(--color-border)" }}>
-                {/* Category header with Edit button */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    padding: "10px 16px",
-                  }}
-                >
-                  <span style={{
-                    fontSize: "var(--dg-fs-label)",
-                    fontWeight: 600,
-                    color: "var(--color-text-secondary)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}>
-                    {cat.name}
-                    {!hasValues && !isEditing && (
-                      <span style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        padding: "1px 7px",
-                        borderRadius: 20,
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 500,
-                        background: "var(--color-border-light)",
-                        color: "var(--color-text-muted)",
-                        letterSpacing: "0.01em",
-                      }}>
-                        not configured
-                      </span>
-                    )}
-                    {isEditing && (
-                      <span style={{
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 600,
-                        color: "var(--color-brand)",
-                      }}>
-                        editing
-                      </span>
-                    )}
-                  </span>
-
-                  {/* Action buttons */}
-                  {canEdit && !isEditing && (
-                    <button
-                      onClick={() => handleEdit(fa.id, cat.id)}
-                      disabled={editingKey !== null}
-                      className="dg-btn dg-btn-secondary dg-btn-sm"
-                    >
-                      Edit
-                    </button>
-                  )}
-                </div>
-
-                {/* Content — always visible */}
-                <div style={{ padding: "0 16px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-                  {/* Every day toggle — only in edit mode, compact inline */}
-                  {isEditing && draft && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <button
-                        onClick={() => handleToggleEveryDay(fa.id, cat.id)}
-                        style={{
-                          width: 34,
-                          height: 20,
-                          borderRadius: 10,
-                          background: draft.everyDay ? "var(--color-brand)" : "var(--color-border)",
-                          border: "none",
-                          cursor: "pointer",
-                          position: "relative",
-                          padding: 0,
-                          flexShrink: 0,
-                          transition: "background 150ms ease",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 16,
-                            height: 16,
-                            borderRadius: "50%",
-                            background: "#fff",
-                            position: "absolute",
-                            top: 2,
-                            left: draft.everyDay ? 16 : 2,
-                            transition: "left 150ms ease",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-                          }}
+            {localOptions.length === 0 ? (
+              <EmptyState
+                compact
+                title="No scheduled jobs yet"
+                description="Create scheduled jobs that apply to this focus area before adding coverage."
+                style={{ margin: "12px 16px" }}
+              />
+            ) : (
+              <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+                {sections.map((section) => (
+                  <div key={`${focusArea.id}-${section.key}`} style={{ border: "1px solid var(--color-border-light)", borderRadius: "var(--dg-radius-lg)", overflow: "hidden" }}>
+                    <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        {section.title}
+                      </div>
+                    </div>
+                    <div style={{ padding: "0 12px" }}>
+                      {section.options.map((option) => (
+                        <CoverageOptionRow
+                          key={`${focusArea.id}-${requirementKey(focusArea.id, option)}`}
+                          orgId={orgId}
+                          focusAreaId={focusArea.id}
+                          option={option}
+                          requirements={coverageRequirements}
+                          onSaved={(saved, savedOption) => handleSaved(saved, savedOption, focusArea.id)}
+                          canEdit={canEdit}
                         />
-                      </button>
-                      <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>Same every day</span>
-                    </div>
-                  )}
-
-                  {data.everyDay ? (
-                    /* ── Every-day: one row per code ── */
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {codes.map((sc, ci) => {
-                        const val = data.rows[0]?.codeRequirements[ci]?.minStaff ?? 0;
-                        return (
-                          <div
-                            key={sc.id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "6px 10px",
-                              borderRadius: "var(--dg-radius-md)",
-                              background: "var(--color-bg)",
-                            }}
-                          >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                padding: "2px 8px",
-                                borderRadius: 6,
-                                fontSize: "var(--dg-fs-caption)",
-                                fontWeight: 700,
-                                color: sc.text || "var(--color-text-secondary)",
-                                background: sc.color || "#EEEFEC",
-                              }}
-                            >
-                              {codeLabel(sc)}
-                            </span>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                min={0}
-                                max={999}
-                                value={val}
-                                onChange={(e) => handleCodeChange(fa.id, cat.id, 0, ci, parseInt(e.target.value) || 0)}
-                                style={inputStyle}
-                              />
-                            ) : (
-                              <span style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                minWidth: 32,
-                                padding: "2px 10px",
-                                borderRadius: 6,
-                                fontSize: "var(--dg-fs-caption)",
-                                fontWeight: 700,
-                                background: val > 0 ? "var(--color-brand-bg)" : "var(--color-border-light)",
-                                color: val > 0 ? "var(--color-brand)" : "var(--color-text-muted)",
-                              }}>
-                                {val}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    /* ── Per-day: data grid with day columns ── */
-                    <div style={{
-                      display: "grid",
-                      gridTemplateColumns: `auto repeat(7, 1fr)`,
-                      gap: 0,
-                      borderRadius: "var(--dg-radius-md)",
-                      overflow: "hidden",
-                      border: "1px solid var(--color-border-light)",
-                    }}>
-                      {/* Header row: empty corner + day names */}
-                      <div style={{
-                        padding: "5px 10px",
-                        background: "var(--color-bg)",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }} />
-                      {DAY_NAMES.map((day) => (
-                        <div
-                          key={day}
-                          style={{
-                            padding: "5px 0",
-                            textAlign: "center",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: "var(--color-text-muted)",
-                            background: "var(--color-bg)",
-                            borderBottom: "1px solid var(--color-border-light)",
-                            borderLeft: "1px solid var(--color-border-light)",
-                          }}
-                        >
-                          {day}
-                        </div>
-                      ))}
-
-                      {/* Data rows: code badge + 7 day cells */}
-                      {codes.map((sc, ci) => (
-                        <React.Fragment key={sc.id}>
-                          <div style={{
-                            padding: "6px 10px",
-                            display: "flex",
-                            alignItems: "center",
-                            background: "var(--color-bg)",
-                            borderBottom: ci < codes.length - 1 ? "1px solid var(--color-border-light)" : "none",
-                          }}>
-                            <span style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              padding: "2px 8px",
-                              borderRadius: 6,
-                              fontSize: "var(--dg-fs-footnote)",
-                              fontWeight: 700,
-                              color: sc.text || "var(--color-text-secondary)",
-                              background: sc.color || "#EEEFEC",
-                              whiteSpace: "nowrap",
-                            }}>
-                              {codeLabel(sc)}
-                            </span>
-                          </div>
-                          {data.rows.map((row, ri) => {
-                            const val = row.codeRequirements[ci]?.minStaff ?? 0;
-                            return (
-                              <div
-                                key={ri}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  padding: "4px 2px",
-                                  borderLeft: "1px solid var(--color-border-light)",
-                                  borderBottom: ci < codes.length - 1 ? "1px solid var(--color-border-light)" : "none",
-                                }}
-                              >
-                                {isEditing ? (
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={999}
-                                    value={val}
-                                    onChange={(e) => handleCodeChange(fa.id, cat.id, ri, ci, parseInt(e.target.value) || 0)}
-                                    style={{ ...inputStyle, width: "100%", maxWidth: 40 }}
-                                  />
-                                ) : (
-                                  <span style={{
-                                    fontSize: "var(--dg-fs-caption)",
-                                    fontWeight: 600,
-                                    color: val > 0 ? "var(--color-text-secondary)" : "var(--color-text-muted)",
-                                  }}>
-                                    {val}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </React.Fragment>
                       ))}
                     </div>
-                  )}
-
-                  {/* Mode label — read-only indicator */}
-                  {!isEditing && (
-                    <span style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-muted)",
-                      fontStyle: "italic",
-                    }}>
-                      {data.everyDay ? "Same every day" : "Per-day schedule"}
-                    </span>
-                  )}
-                  {isEditing && (
-                    <EditorActionRow
-                      gap={6}
-                      secondaryAction={(
-                        <button
-                          onClick={() => hasChanges ? handleDiscard(fa.id, cat.id) : handleClose(fa.id, cat.id)}
-                          disabled={isSaving}
-                          className="dg-btn dg-btn-secondary dg-btn-sm"
-                        >
-                          {getEditorDismissLabel(hasChanges)}
-                        </button>
-                      )}
-                      primaryAction={(
-                        <button
-                          onClick={() => handleSave(fa.id, cat.id)}
-                          disabled={isSaving || !hasChanges}
-                          className="dg-btn dg-btn-primary dg-btn-sm"
-                        >
-                          {getEditorSaveLabel(isSaving)}
-                        </button>
-                      )}
-                    />
-                  )}
-                </div>
+                  </div>
+                ))}
               </div>
-            );
-          })}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

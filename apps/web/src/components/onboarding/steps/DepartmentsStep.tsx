@@ -19,8 +19,8 @@ export default function DepartmentsStep({ onNext, onBack }: DepartmentsStepProps
 
   return (
     <StepLayout
-      title={`${org.departmentLabel || "Departments"} & ${org.focusAreaLabel || "Focus Areas"}`}
-      description={`Create your organizational structure. Scheduled ${(org.departmentLabel || "departments").toLowerCase()} appear on the schedule grid and contain ${(org.focusAreaLabel || "focus areas").toLowerCase()}. Management ${(org.departmentLabel || "departments").toLowerCase()} are for non-schedule staff like HR or admin.`}
+      title={`${org.departmentLabel || "Scheduled Departments"} & ${org.focusAreaLabel || "Focus Areas"}`}
+      description={`Create your organizational structure. ${(org.departmentLabel || "scheduled departments").toLowerCase()} appear on the schedule grid and contain ${(org.focusAreaLabel || "focus areas").toLowerCase()}. Management departments are for non-schedule staff like HR or admin.`}
       onNext={onNext}
       onBack={onBack}
       nextDisabled={!hasDepartments}
@@ -31,7 +31,7 @@ export default function DepartmentsStep({ onNext, onBack }: DepartmentsStepProps
         focusAreas={focusAreas}
         orgId={org.id}
         focusAreaLabel={org.focusAreaLabel || "Focus Areas"}
-        departmentLabel={org.departmentLabel || "Departments"}
+        departmentLabel={org.departmentLabel || "Scheduled Departments"}
         canManageFocusAreas={true}
         canManageOrgLabels={true}
         onDepartmentsChange={setDepartments}
@@ -46,7 +46,7 @@ export default function DepartmentsStep({ onNext, onBack }: DepartmentsStepProps
             textAlign: "center",
           }}
         >
-          Add at least one department to continue.
+          Add at least one scheduled department to continue.
         </p>
       )}
     </StepLayout>

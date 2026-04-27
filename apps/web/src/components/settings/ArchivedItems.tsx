@@ -7,12 +7,12 @@ import {
   fetchCertifications, restoreCertification,
   fetchDepartments, restoreDepartment,
   fetchFocusAreas, restoreFocusArea,
+  fetchJobDefinitions, restoreJobDefinition,
   fetchShiftCategories, restoreShiftCategory,
-  fetchShiftCodes, restoreShiftCode,
   fetchAbsenceTypes, restoreAbsenceType,
   fetchIndicatorTypes, restoreIndicatorType,
 } from "@/lib/db";
-import type { NamedItem, FocusArea, ShiftCode, ShiftCategory, Department, AbsenceType, IndicatorType } from "@/types";
+import type { NamedItem, FocusArea, JobDefinition, ShiftCategory, Department, AbsenceType, IndicatorType } from "@/types";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -35,23 +35,23 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [roles, certs, depts, focusAreas, shiftCats, shiftCodes, absenceTypes, indicatorTypes] = await Promise.all([
+      const [roles, certs, depts, focusAreas, shiftCats, jobs, absenceTypes, indicatorTypes] = await Promise.all([
         fetchOrganizationRoles(orgId, true),
         fetchCertifications(orgId, true),
         fetchDepartments(orgId, true),
         fetchFocusAreas(orgId, true),
         fetchShiftCategories(orgId, true),
-        fetchShiftCodes(orgId, true),
+        fetchJobDefinitions(orgId, true),
         fetchAbsenceTypes(orgId, true),
         fetchIndicatorTypes(orgId, true),
       ]);
 
-      const toArchived = (items: (NamedItem | FocusArea | ShiftCode | ShiftCategory | Department | AbsenceType | IndicatorType)[]) =>
+      const toArchived = (items: (NamedItem | FocusArea | JobDefinition | ShiftCategory | Department | AbsenceType | IndicatorType)[]) =>
         items
           .filter((i) => "archivedAt" in i && i.archivedAt)
           .map((i) => ({
             id: i.id as number,
-            name: "label" in i ? (i as ShiftCode | AbsenceType).label : (i as NamedItem).name,
+            name: "label" in i ? (i as AbsenceType).label : (i as NamedItem).name,
             archivedAt: (i as { archivedAt: string }).archivedAt,
           }))
           .sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
@@ -61,8 +61,8 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
         { label: "Certifications", items: toArchived(certs), restore: (id: number) => restoreCertification(id, orgId) },
         { label: "Departments", items: toArchived(depts), restore: (id: number) => restoreDepartment(id, orgId) },
         { label: "Focus Areas", items: toArchived(focusAreas), restore: (id: number) => restoreFocusArea(id, orgId) },
-        { label: "Shift Categories", items: toArchived(shiftCats), restore: (id: number) => restoreShiftCategory(id, orgId) },
-        { label: "Shift Codes", items: toArchived(shiftCodes), restore: (id: number) => restoreShiftCode(id, orgId) },
+        { label: "Shifts", items: toArchived(shiftCats), restore: (id: number) => restoreShiftCategory(id, orgId) },
+        { label: "Jobs", items: toArchived(jobs), restore: (id: number) => restoreJobDefinition(id, orgId) },
         { label: "Absence Types", items: toArchived(absenceTypes), restore: (id: number) => restoreAbsenceType(id, orgId) },
         { label: "Indicator Types", items: toArchived(indicatorTypes), restore: (id: number) => restoreIndicatorType(id, orgId) },
       ].filter((g) => g.items.length > 0);

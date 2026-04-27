@@ -62,13 +62,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const {
     org,
     focusAreas,
-    shiftCodes,
+    assignments: assignments,
     absenceTypes,
     shiftCategories,
     certifications,
     orgRoles,
     departments,
-    shiftCodeMap,
+    assignmentLabelMap,
     absenceTypeMap,
     loading: orgLoading,
   } = useOrganizationData();
@@ -97,11 +97,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     router.replace("/people");
   }, [perms.canViewEmployeeDetails, perms.isLoading, router]);
 
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, (typeof shiftCodes)[number]>();
-    for (const sc of shiftCodes) map.set(sc.id, sc);
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, (typeof assignments)[number]>();
+    for (const preset of assignments) map.set(preset.id, preset);
     return map;
-  }, [shiftCodes]);
+  }, [assignments]);
 
   const categoryById = useMemo(() => {
     const map = new Map<number, (typeof shiftCategories)[number]>();
@@ -143,12 +143,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
         // Fetch the rest in parallel
         const [empShifts, recShifts, empInvitations, empRequests] = await Promise.all([
-          fetchEmployeeShifts(employeeId, orgId, shiftCodeMap, absenceTypeMap),
+          fetchEmployeeShifts(employeeId, orgId, assignmentLabelMap, absenceTypeMap),
           perms.canViewRecurringShifts
-            ? fetchRecurringShifts(orgId, employeeId, shiftCodeMap, false, absenceTypeMap)
+            ? fetchRecurringShifts(orgId, employeeId, assignmentLabelMap, false, absenceTypeMap)
             : Promise.resolve([]),
           fetchEmployeeInvitations(orgId, employeeId),
-          fetchShiftRequests(orgId, shiftCodeMap, { empId: employeeId }),
+          fetchShiftRequests(orgId, assignmentLabelMap, { empId: employeeId }),
         ]);
 
         if (cancelled) return;
@@ -179,7 +179,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     employeeId,
     orgId,
     orgLoading,
-    shiftCodeMap,
+    assignmentLabelMap,
     absenceTypeMap,
     perms.canViewEmployeeDetails,
     perms.canViewRecurringShifts,
@@ -324,11 +324,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       employee.id,
       weekDateKeys,
       shifts,
-      shiftCodeById,
+      assignmentById,
       40,
       categoryById,
     );
-  }, [employee, shifts, shiftCodeById, categoryById]);
+  }, [assignmentById, categoryById, employee, shifts]);
 
   // Batch-fetch profile names for shift audit display (who created/edited each shift)
   const [auditNames, setAuditNames] = useState<Map<string, string>>(new Map());
@@ -584,7 +584,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 <OverviewTab
                   employee={employee}
                   shifts={shifts}
-                  shiftCodeById={shiftCodeById}
+                  assignmentById={assignmentById}
                   categoryById={categoryById}
                   focusAreas={focusAreas}
                   focusAreaLabel={org?.focusAreaLabel}
@@ -600,7 +600,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 <ScheduleTab
                   employee={employee}
                   shifts={shifts}
-                  shiftCodeById={shiftCodeById}
+                  assignmentById={assignmentById}
                   focusAreas={focusAreas}
                   categoryById={categoryById}
                   focusAreaById={focusAreaById}

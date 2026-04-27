@@ -30,10 +30,10 @@ import {
   type EmployeeRow,
   type FocusAreaRow,
   type InvitationRow,
+  type JobRow,
   type NamedItemRow,
   type PendingInvite,
   type ShiftCatRow,
-  type ShiftCodeRow,
 } from "./organization-setup/types";
 import { WizardStepper } from "./organization-setup/WizardStepper";
 
@@ -98,12 +98,11 @@ export default function OrganizationSetupWizard({
     {
       id: crypto.randomUUID(),
       name: "",
-      color: COLOR_PRESETS[0],
       startTime: "",
       endTime: "",
     },
   ]);
-  const [shiftCodes, setShiftCodes] = useState<ShiftCodeRow[]>([
+  const [jobs, setJobs] = useState<JobRow[]>([
     { id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[0] },
   ]);
 
@@ -238,7 +237,7 @@ export default function OrganizationSetupWizard({
         certifications,
         orgRoles,
         shiftCategories,
-        shiftCodes,
+        jobs,
       });
 
       if (savedCount > 0) {
@@ -260,7 +259,7 @@ export default function OrganizationSetupWizard({
     certifications,
     orgRoles,
     shiftCategories,
-    shiftCodes,
+    jobs,
   ]);
 
   // ── Step 4: Save employees ────────────────────────────────────────────────
@@ -951,7 +950,7 @@ export default function OrganizationSetupWizard({
                 color: "var(--color-text-muted)",
               }}
             >
-              How shift codes appear on the schedule grid.
+              How shifts appear on the schedule grid.
             </p>
             <div style={{ display: "flex", gap: 16 }}>
               {(
@@ -1344,9 +1343,9 @@ export default function OrganizationSetupWizard({
           </div>
         </div>
 
-        {/* Shift Categories */}
+        {/* Shifts */}
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
-          <div style={sectionHeaderStyle}>Shift Categories</div>
+          <div style={sectionHeaderStyle}>Shifts</div>
           <div style={sectionBodyStyle}>
             <p
               style={{
@@ -1355,8 +1354,7 @@ export default function OrganizationSetupWizard({
                 color: "var(--color-text-muted)",
               }}
             >
-              Time-window categories that group shift codes (e.g. Day, Evening,
-              Night).
+              Primary shift blocks like Day, Evening, and Night. These set the timing backbone that jobs can sit on top of.
             </p>
             {shiftCategories.map((cat, idx) => (
               <div
@@ -1368,25 +1366,6 @@ export default function OrganizationSetupWizard({
                   marginBottom: 8,
                 }}
               >
-                <input
-                  type="color"
-                  value={cat.color}
-                  onChange={(e) =>
-                    setShiftCategories((prev) =>
-                      prev.map((c, i) =>
-                        i === idx ? { ...c, color: e.target.value } : c,
-                      ),
-                    )
-                  }
-                  style={{
-                    width: 36,
-                    height: 36,
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    padding: 2,
-                  }}
-                />
                 <input
                   className="dg-input"
                   value={cat.name}
@@ -1465,7 +1444,6 @@ export default function OrganizationSetupWizard({
                   {
                     id: crypto.randomUUID(),
                     name: "",
-                    color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length],
                     startTime: "",
                     endTime: "",
                   },
@@ -1473,14 +1451,14 @@ export default function OrganizationSetupWizard({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add category
+              + Add shift
             </button>
           </div>
         </div>
 
-        {/* Shift Codes */}
+        {/* Jobs */}
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
-          <div style={sectionHeaderStyle}>Shift Codes</div>
+          <div style={sectionHeaderStyle}>Jobs</div>
           <div style={sectionBodyStyle}>
             <p
               style={{
@@ -1489,12 +1467,11 @@ export default function OrganizationSetupWizard({
                 color: "var(--color-text-muted)",
               }}
             >
-              Individual shift codes that appear on the schedule (e.g.
-              &quot;D&quot; for Day, &quot;N&quot; for Night).
+              Responsibilities that can sit on a shift or stand alone, like Supervisor, Mentor, Nurse, or Office.
             </p>
-            {shiftCodes.map((code, idx) => (
+            {jobs.map((job, idx) => (
               <div
-                key={code.id}
+                key={job.id}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -1504,11 +1481,11 @@ export default function OrganizationSetupWizard({
               >
                 <input
                   type="color"
-                  value={code.color}
+                  value={job.color}
                   onChange={(e) =>
-                    setShiftCodes((prev) =>
-                      prev.map((c, i) =>
-                        i === idx ? { ...c, color: e.target.value } : c,
+                    setJobs((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, color: e.target.value } : item,
                       ),
                     )
                   }
@@ -1523,37 +1500,35 @@ export default function OrganizationSetupWizard({
                 />
                 <input
                   className="dg-input"
-                  value={code.label}
+                  value={job.label}
                   onChange={(e) =>
-                    setShiftCodes((prev) =>
-                      prev.map((c, i) =>
-                        i === idx ? { ...c, label: e.target.value } : c,
+                    setJobs((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, label: e.target.value } : item,
                       ),
                     )
                   }
-                  placeholder="e.g. D"
+                  placeholder="e.g. SUP"
                   style={{ flex: 1, maxWidth: 80 }}
                 />
                 <input
                   className="dg-input"
-                  value={code.name}
+                  value={job.name}
                   onChange={(e) =>
-                    setShiftCodes((prev) =>
-                      prev.map((c, i) =>
-                        i === idx ? { ...c, name: e.target.value } : c,
+                    setJobs((prev) =>
+                      prev.map((item, i) =>
+                        i === idx ? { ...item, name: e.target.value } : item,
                       ),
                     )
                   }
-                  placeholder="e.g. Day Shift"
+                  placeholder="e.g. Supervisor"
                   style={{ flex: 2 }}
                 />
-                {shiftCodes.length > 1 && (
+                {jobs.length > 1 && (
                   <button
                     type="button"
                     className="dg-btn dg-btn-ghost"
-                    onClick={() =>
-                      setShiftCodes((prev) => prev.filter((_, i) => i !== idx))
-                    }
+                    onClick={() => setJobs((prev) => prev.filter((_, i) => i !== idx))}
                     style={{ padding: "6px 8px" }}
                   >
                     <svg
@@ -1577,7 +1552,7 @@ export default function OrganizationSetupWizard({
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() =>
-                setShiftCodes((prev) => [
+                setJobs((prev) => [
                   ...prev,
                   {
                     id: crypto.randomUUID(),
@@ -1589,7 +1564,7 @@ export default function OrganizationSetupWizard({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
-              + Add shift code
+              + Add job
             </button>
           </div>
         </div>

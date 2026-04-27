@@ -4,7 +4,7 @@ import {
   fetchMobileAbsenceTypes,
   fetchMobileFocusAreas,
   fetchLinkedEmployeeForUser,
-  fetchMobileNotifications,
+  fetchMobileUnreadNotificationCount,
   mapOrganizationToMobileConfig,
   requireMobileAuth,
 } from "@/features/mobile/server";
@@ -22,17 +22,14 @@ export async function GET(req: NextRequest) {
   if ("response" in auth)
     return withMobileCors(req, auth.response, CORS_METHODS);
 
-  const [linkedEmployee, notificationData, absenceTypes, focusAreas] =
+  const [linkedEmployee, unreadNotificationCount, absenceTypes, focusAreas] =
     await Promise.all([
       fetchLinkedEmployeeForUser(
         auth.serviceClient,
         auth.currentOrg.id,
         auth.user.id,
       ),
-      fetchMobileNotifications(auth.userClient, {
-        limit: 1,
-        offset: 0,
-      }),
+      fetchMobileUnreadNotificationCount(auth.userClient),
       fetchMobileAbsenceTypes(auth.serviceClient, auth.currentOrg.id),
       fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
     ]);
@@ -75,7 +72,7 @@ export async function GET(req: NextRequest) {
       : null,
     absenceTypes,
     focusAreas,
-    unreadNotificationCount: notificationData.unreadCount,
+    unreadNotificationCount,
   });
 
   return json(payload);

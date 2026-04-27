@@ -13,45 +13,51 @@ function createRedis() {
 
 const redis = createRedis();
 
+function createSlidingWindowLimiter(
+  limit: number,
+  window: `${number} ${"s" | "m" | "h"}`,
+) {
+  return redis
+    ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) })
+    : null;
+}
+
 /**
  * Public API rate limiter — 10 requests per 10 seconds per key (IP).
  * Returns `{ success: true }` if Redis is not configured (local dev).
  */
-export const apiLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, "10 s") })
-  : null;
+export const apiLimiter = createSlidingWindowLimiter(10, "10 s");
+
+/**
+ * Schedule review limiter — 60 requests per 10 seconds per user.
+ * Publish/discard review dialogs may refresh repeatedly across tabs, so they
+ * need more headroom than the generic protected-route limiter.
+ */
+export const scheduleReviewLimiter = createSlidingWindowLimiter(60, "10 s");
 
 /**
  * Invite email rate limiter — 100 requests per hour per key (user ID).
  * Returns `{ success: true }` if Redis is not configured (local dev).
  */
-export const inviteLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, "1 h") })
-  : null;
+export const inviteLimiter = createSlidingWindowLimiter(100, "1 h");
 
 /**
  * Demo request rate limiter — 3 requests per hour per key (IP).
  * Returns `{ success: true }` if Redis is not configured (local dev).
  */
-export const demoLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(3, "1 h") })
-  : null;
+export const demoLimiter = createSlidingWindowLimiter(3, "1 h");
 
 /**
  * Password reset rate limiter — 5 requests per 15 minutes per key (email hash).
  * Returns `{ success: true }` if Redis is not configured (local dev).
  */
-export const passwordResetLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, "15 m") })
-  : null;
+export const passwordResetLimiter = createSlidingWindowLimiter(5, "15 m");
 
 /**
  * Login rate limiter — 15 attempts per 15 minutes per key (email hash).
  * Provides brute-force protection at the application level.
  */
-export const loginLimiter = redis
-  ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(15, "15 m") })
-  : null;
+export const loginLimiter = createSlidingWindowLimiter(15, "15 m");
 
 export function getRateLimitConfigStatus(): {
   configured: boolean;

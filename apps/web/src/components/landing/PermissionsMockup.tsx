@@ -32,7 +32,7 @@ const PERMISSION_GROUPS = [
     label: "Configuration",
     items: [
       { name: "Manage Focus Areas", on: true },
-      { name: "Manage Shift Codes", on: true },
+      { name: "Manage Shifts & Jobs", on: true },
       { name: "Manage Indicator Types", on: false },
       { name: "Manage Custom Labels", on: false },
       { name: "Manage Coverage Requirements", on: false },

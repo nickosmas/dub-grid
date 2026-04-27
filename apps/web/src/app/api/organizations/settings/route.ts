@@ -34,6 +34,11 @@ const bodySchema = z.object({
   departmentLabel: z.string().trim().max(50).optional(),
   shiftDisplayMode: z.enum(["code", "name"]).optional(),
   timezone: z.string().trim().optional(),
+  payPeriodStartDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable()
+    .optional(),
   enforceConflictPrevention: z.boolean().optional(),
   dataRetentionDays: z.number().int().min(1).max(3650).optional(),
   featureOverrides: z.record(z.string(), z.boolean()).optional(),
@@ -178,6 +183,10 @@ export async function PUT(req: NextRequest) {
         fields.timezone !== undefined
           ? fields.timezone || null
           : currentOrg.timezone,
+      payPeriodStartDate:
+        fields.payPeriodStartDate !== undefined
+          ? fields.payPeriodStartDate
+          : currentOrg.payPeriodStartDate,
       enforceConflictPrevention:
         fields.enforceConflictPrevention ??
         currentOrg.enforceConflictPrevention,
@@ -234,6 +243,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("timezone")) {
       update.timezone = nextOrg.timezone;
+    }
+    if (changeKeys.has("payPeriodStartDate")) {
+      update.pay_period_start_date = nextOrg.payPeriodStartDate;
     }
     if (changeKeys.has("enforceConflictPrevention")) {
       update.enforce_conflict_prevention = nextOrg.enforceConflictPrevention;

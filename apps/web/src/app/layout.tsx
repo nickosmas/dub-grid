@@ -58,6 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn(
         dmSans.variable,
         dmMono.variable,
@@ -65,7 +66,7 @@ export default function RootLayout({
         geist.variable,
       )}
     >
-      <body>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <PostHogProvider>
             <QueryProvider>

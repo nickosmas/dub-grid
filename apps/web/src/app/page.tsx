@@ -79,7 +79,7 @@ const FEATURES: Feature[] = [
     icon: Settings,
     title: "Customizable Terminology",
     description:
-      "Rename focus areas, certifications, roles, and shift codes to match your facility.",
+      "Rename focus areas, certifications, roles, shifts, and jobs to match your facility.",
   },
   {
     icon: Mail,

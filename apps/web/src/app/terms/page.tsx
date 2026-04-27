@@ -82,7 +82,8 @@ export default function TermsOfServicePage() {
             care facilities. The Service allows organizations to manage
             employee rosters, create and edit shift schedules (including
             draft and published states), organize staff by focus areas,
-            assign shift codes (e.g., day, evening, night, PTO), and view
+            configure shifts, jobs, and absence types (for example day,
+            evening, night, PTO), and view
             shift counts and printed schedules. Access to features and data
             is determined by role (e.g., platform administrator, organization
             admin, scheduler, supervisor, or staff). Each organization uses

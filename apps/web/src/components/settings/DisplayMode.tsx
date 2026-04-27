@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { Organization, ShiftCode, ShiftDisplayMode } from "@/types";
+import {
+  JobDefinition,
+  Organization,
+  ShiftCategory,
+  ShiftDisplayMode,
+} from "@/types";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
@@ -10,72 +15,317 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { ExplainerSection } from "@/components/ui/explainer-section";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import { resolveJobColorsForShift } from "@/lib/job-placement";
+import { borderColor } from "@/lib/colors";
 
-const SAMPLE_SHIFTS = [
-  { label: "D", name: "Day Shift", color: "#DBEAFE", text: "#1E40AF", border: "#93C5FD" },
-  { label: "EVE", name: "Evening", color: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
-  { label: "N", name: "Night Shift", color: "#EDE9FE", text: "#5B21B6", border: "#C4B5FD" },
+const PREVIEW_DAYS = [
+  { shortLabel: "Mon", dateNumber: "21" },
+  { shortLabel: "Tue", dateNumber: "22" },
+  { shortLabel: "Wed", dateNumber: "23" },
 ];
 
-function getPreviewShifts(shiftCodes: ShiftCode[]) {
-  return shiftCodes.length >= 3
-    ? shiftCodes.slice(0, 3).map((sc) => ({
-        label: sc.label,
-        name: sc.name,
-        color: sc.color,
-        text: sc.text,
-        border: sc.border,
-      }))
-    : SAMPLE_SHIFTS;
+const SAMPLE_SHIFT_CATEGORIES: ShiftCategory[] = [
+  {
+    id: -1,
+    orgId: "sample",
+    name: "Day Shift",
+    abbr: "D",
+    color: "#BFDBFE",
+    sortOrder: 0,
+  },
+  {
+    id: -2,
+    orgId: "sample",
+    name: "Evening",
+    abbr: "EVE",
+    color: "#FDE68A",
+    sortOrder: 1,
+  },
+  {
+    id: -3,
+    orgId: "sample",
+    name: "Night Shift",
+    abbr: "N",
+    color: "#DDD6FE",
+    sortOrder: 2,
+  },
+];
+
+const SAMPLE_JOBS: JobDefinition[] = [
+  {
+    id: -101,
+    orgId: "sample",
+    name: "Staff",
+    abbr: "STA",
+    showOnGrid: true,
+    eligibleRoleIds: [],
+    requiredCertificationIds: [],
+    color: "#DBEAFE",
+    border: "#93C5FD",
+    text: "#1E3A8A",
+    sortOrder: 0,
+  },
+];
+
+type PreviewShift = {
+  id: string;
+  color: string;
+  border: string;
+  text: string;
+  primaryLabel: string;
+  secondaryLabel: string | null;
+};
+
+function getPreviewShifts(args: {
+  mode: ShiftDisplayMode;
+  shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
+}): PreviewShift[] {
+  const { mode, shiftCategories, jobs } = args;
+  const activeShifts = shiftCategories
+    .filter((shiftCategory) => !shiftCategory.archivedAt)
+    .sort((left, right) => left.sortOrder - right.sortOrder);
+  const previewShifts = [...activeShifts, ...SAMPLE_SHIFT_CATEGORIES].slice(0, 3);
+  const previewJob =
+    jobs.find((job) => !job.archivedAt && job.systemKey !== "regular_staff") ??
+    SAMPLE_JOBS[0]!;
+
+  return previewShifts.map((shift) => {
+    const displayParts = buildShiftDisplayParts({
+      shift,
+      job: previewJob,
+      shiftDisplayMode: mode,
+    });
+    const colors = resolveJobColorsForShift(previewJob, shift);
+
+    return {
+      id: `${shift.id}:${previewJob.id}`,
+      color: colors.color,
+      border: colors.border,
+      text: colors.text,
+      primaryLabel: displayParts.primaryLabel,
+      secondaryLabel: displayParts.secondaryLabel,
+    };
+  });
 }
 
-export function DisplayModeSample({ mode, shiftCodes }: { mode: ShiftDisplayMode; shiftCodes: ShiftCode[] }) {
-  const samples = getPreviewShifts(shiftCodes);
+function DisplayModePreviewPill({
+  mode,
+  sample,
+}: {
+  mode: ShiftDisplayMode;
+  sample: PreviewShift;
+}) {
+  const showSecondaryLine = !!sample.secondaryLabel;
 
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: `80px repeat(3, 1fr)`,
-      gap: 1,
-      background: "var(--color-border)",
-      borderRadius: 8,
-      overflow: "hidden",
-      fontSize: 11,
-    }}>
-      {/* Header row */}
-      <div style={{ background: "var(--color-bg-secondary)", padding: "6px 8px", fontWeight: 600, color: "var(--color-text-faint)", fontSize: 10 }}>
-        Staff
-      </div>
-      {["Mon", "Tue", "Wed"].map(day => (
-        <div key={day} style={{ background: "var(--color-bg-secondary)", padding: "6px 4px", fontWeight: 600, color: "var(--color-text-faint)", fontSize: 10, textAlign: "center" }}>
-          {day}
-        </div>
-      ))}
-
-      {/* Employee row */}
-      <div style={{ background: "var(--color-surface)", padding: "8px 8px", fontWeight: 600, color: "var(--color-text-primary)", fontSize: 11, display: "flex", alignItems: "center" }}>
-        J. Smith
-      </div>
-      {samples.map((s, i) => (
-        <div key={i} style={{ background: "var(--color-surface)", padding: 3, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{
-            background: s.color,
-            color: s.text,
-            border: `1px solid ${s.border}`,
-            borderRadius: 6,
-            padding: "4px 6px",
-            fontWeight: 800,
-            fontSize: mode === "name" ? 9 : 11,
-            textAlign: "center",
-            width: "100%",
-            whiteSpace: "nowrap",
+    <div
+      data-shift-pill="single"
+      style={{
+        background: sample.color,
+        border: `1px solid ${borderColor(sample.text)}`,
+        borderRadius: 8,
+        color: sample.text,
+        display: "flex",
+        flex: 1,
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: showSecondaryLine ? 1 : 0,
+        minWidth: 0,
+        overflow: "hidden",
+        padding: mode === "name" ? "2px 6px" : "2px 3px",
+        textAlign: "center",
+      }}
+    >
+      <span
+        style={
+          mode === "name"
+            ? {
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 800,
+                lineHeight: 1.2,
+                maxWidth: "100%",
+                overflow: "hidden",
+                overflowWrap: "break-word" as const,
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical" as const,
+                WebkitLineClamp: showSecondaryLine ? 1 : 2,
+              }
+            : {
+                fontSize: "var(--dg-fs-title)",
+                fontWeight: 800,
+                lineHeight: 1,
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }
+        }
+      >
+        {sample.primaryLabel}
+      </span>
+      {showSecondaryLine ? (
+        <span
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            fontWeight: 700,
+            lineHeight: 1,
+            maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
-          }}>
-            {mode === "name" ? s.name : s.label}
-          </div>
+            whiteSpace: "nowrap",
+            opacity: 0.78,
+          }}
+        >
+          {sample.secondaryLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+export function DisplayModeSample({
+  mode,
+  shiftCategories = [],
+  jobs = [],
+}: {
+  mode: ShiftDisplayMode;
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
+}) {
+  const samples = getPreviewShifts({
+    mode,
+    shiftCategories,
+    jobs,
+  });
+
+  return (
+    <div
+      data-display-mode-sample={mode}
+      aria-hidden="true"
+      style={{
+        width: "100%",
+        borderRadius: "var(--dg-radius-lg)",
+        border: "1px solid var(--color-border)",
+        background: "var(--color-surface)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(96px, 1.05fr) repeat(3, minmax(0, 1fr))",
+          minWidth: 0,
+        }}
+      >
+        <div
+          data-display-mode-sample-staff-header="true"
+          style={{
+            position: "relative",
+            zIndex: 2,
+            background: "var(--color-bg)",
+            padding: "10px var(--dg-space-md)",
+            fontSize: "var(--dg-fs-footnote)",
+            fontWeight: 600,
+            color: "var(--color-text-subtle)",
+            letterSpacing: "0.04em",
+            boxShadow:
+              "1px 0 0 0 var(--color-border-light), 0 1px 0 0 var(--color-dark), 2px 0 4px rgba(0,0,0,0.02)",
+          }}
+        >
+          Staff
         </div>
-      ))}
+        {PREVIEW_DAYS.map((day, index) => (
+          <div
+            key={day.shortLabel}
+            className="dg-grid-slot dg-grid-slot--header"
+            data-leading-divider={index === 0 ? "split" : "light"}
+            style={{
+              position: "relative",
+              textAlign: "center",
+              padding: "8px 0",
+              boxShadow: "0 1px 0 0 var(--color-dark)",
+            }}
+          >
+            <div className="dg-grid-slot__chrome" aria-hidden="true" />
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                color: "var(--color-text-subtle)",
+                letterSpacing: "0.04em",
+              }}
+            >
+              {day.shortLabel}
+            </div>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-title)",
+                fontWeight: 700,
+                color: "var(--color-text-secondary)",
+                lineHeight: "var(--dg-lh-tight)",
+                marginTop: 1,
+              }}
+            >
+              {day.dateNumber}
+            </div>
+          </div>
+        ))}
+
+        <div
+          style={{
+            background: "var(--color-surface)",
+            padding: "7px var(--dg-space-md)",
+            display: "flex",
+            alignItems: "center",
+            minWidth: 0,
+            boxShadow:
+              "1px 0 0 0 var(--color-border-light), 2px 0 4px rgba(0,0,0,0.02)",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              lineHeight: "var(--dg-lh-tight)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            J. Smith
+          </span>
+        </div>
+        {samples.map((sample, index) => (
+          <div
+            key={sample.id}
+            className="dg-grid-cell"
+            data-leading-divider={index === 0 ? "split" : "light"}
+            data-top-divider="dark"
+            data-interactive="false"
+            style={{
+              height: "var(--dg-grid-cell-height)",
+              background: "var(--color-surface)",
+            }}
+          >
+            <div className="dg-grid-cell__chrome" aria-hidden="true" />
+            <div
+              className="dg-grid-cell__content"
+              style={{
+                paddingTop: 4,
+                paddingRight: 4,
+                paddingBottom: 4,
+                paddingLeft: index === 0 ? 4 : 5,
+              }}
+            >
+              <DisplayModePreviewPill mode={mode} sample={sample} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -84,7 +334,7 @@ export const DISPLAY_MODES: { id: ShiftDisplayMode; title: string; description: 
   {
     id: "code",
     title: "Short Codes",
-    description: "Display abbreviations like D, EVE, N on the grid. Best for organizations that use standardized shift codes.",
+    description: "Display abbreviations like D, EVE, N on the grid. Best when your team scans the schedule by compact shift labels.",
     details: [
       "The schedule grid shows short codes in each cell",
       "Both the code and full name are visible when creating shifts",
@@ -105,11 +355,13 @@ export const DISPLAY_MODES: { id: ShiftDisplayMode; title: string; description: 
 
 export default function DisplayMode({
   organization,
-  shiftCodes,
+  shiftCategories = [],
+  jobs = [],
   onSave,
 }: {
   organization: Organization;
-  shiftCodes: ShiftCode[];
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
   onSave: (org: Organization) => void;
 }) {
   const [selected, setSelected] = useState<ShiftDisplayMode>(organization.shiftDisplayMode);
@@ -260,7 +512,11 @@ export default function DisplayMode({
                   </p>
 
                   {/* Sample grid */}
-                  <DisplayModeSample mode={mode.id} shiftCodes={shiftCodes} />
+                  <DisplayModeSample
+                    mode={mode.id}
+                    shiftCategories={shiftCategories}
+                    jobs={jobs}
+                  />
                 </button>
               );
             })}

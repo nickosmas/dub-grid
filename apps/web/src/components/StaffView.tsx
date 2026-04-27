@@ -26,8 +26,10 @@ import type {
   Department,
   Employee,
   FocusArea,
+  JobDefinition,
   NamedItem,
-  ShiftCode,
+  ShiftCategory,
+  AssignmentDefinition,
   ShiftDisplayMode,
 } from "@/types";
 import OrgActivityLog from "@/components/settings/ActivityLog";
@@ -120,8 +122,10 @@ interface StaffViewProps {
   onActivate: (empId: string) => void;
   onAdd: () => void;
   orgId?: string;
-  shiftCodes?: ShiftCode[];
-  shiftCodeMap?: Map<number, string>;
+  assignments?: AssignmentDefinition[];
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
+  assignmentLabelMap?: Map<number, string>;
   absenceTypes?: AbsenceType[];
   departments?: Department[];
   departmentLabel?: string;
@@ -153,11 +157,13 @@ export default function StaffView({
   onActivate,
   onAdd,
   orgId,
-  shiftCodes,
-  shiftCodeMap,
+  assignments,
+  shiftCategories,
+  jobs,
+  assignmentLabelMap,
   absenceTypes,
   departments: departmentsProp = [],
-  departmentLabel: departmentLabelProp = "Department",
+  departmentLabel: departmentLabelProp = "Scheduled Departments",
   canViewRecurringShifts,
   canManageRecurringShifts,
   canViewEmployeeDetails,
@@ -173,6 +179,8 @@ export default function StaffView({
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
   const { user } = useAuth();
+  const scheduledDepartmentLabel = departmentLabelProp || "Scheduled Departments";
+  const managementDepartmentLabel = "Management Departments";
 
   const allowedSections: StaffSection[] = [
     "directory",
@@ -350,7 +358,8 @@ export default function StaffView({
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
             departments={departmentsProp}
-            departmentLabel={departmentLabelProp}
+            departmentLabel={scheduledDepartmentLabel}
+            managementDepartmentLabel={managementDepartmentLabel}
           />
         )}
 
@@ -381,8 +390,11 @@ export default function StaffView({
                   employees={employees}
                   orgId={orgId}
                   currentUserId={user?.id ?? null}
-                  shiftCodes={shiftCodes ?? []}
-                  shiftCodeMap={shiftCodeMap ?? EMPTY_CODE_MAP}
+                  assignments={assignments ?? []}
+                  shiftCategories={shiftCategories ?? []}
+                  jobs={jobs ?? []}
+                  orgRoles={roles}
+                  assignmentMap={assignmentLabelMap ?? EMPTY_CODE_MAP}
                   canManage={canManageRecurringShifts ?? false}
                   focusAreas={focusAreas}
                   certifications={certifications}

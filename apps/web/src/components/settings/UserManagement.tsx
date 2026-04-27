@@ -45,7 +45,7 @@ const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
   { label: "Notes", keys: ["canEditNotes"] },
   { label: "Recurring", keys: ["canViewRecurringShifts", "canManageRecurringShifts", "canManageShiftSeries"] },
   { label: "Staff", keys: ["canViewEmployeeDetails", "canManageEmployees"] },
-  { label: "Configuration", keys: ["canViewFocusAreas", "canManageFocusAreas", "canViewShiftCodes", "canManageShiftCodes", "canViewIndicatorTypes", "canManageIndicatorTypes", "canManageOrgSettings", "canViewOrgLabels", "canManageOrgLabels", "canViewCoverageRequirements", "canManageCoverageRequirements"] },
+  { label: "Configuration", keys: ["canViewFocusAreas", "canManageFocusAreas", "canViewScheduleDefinitions", "canManageScheduleDefinitions", "canViewIndicatorTypes", "canManageIndicatorTypes", "canManageOrgSettings", "canViewOrgLabels", "canManageOrgLabels", "canViewCoverageRequirements", "canManageCoverageRequirements"] },
   { label: "Dashboard", keys: ["canViewDashboardAnalytics"] },
 ];
 
@@ -66,8 +66,8 @@ function emptyAdminPerms(): AdminPermissions {
     canManageEmployees: false,
     canViewFocusAreas: false,
     canManageFocusAreas: false,
-    canViewShiftCodes: false,
-    canManageShiftCodes: false,
+    canViewScheduleDefinitions: false,
+    canManageScheduleDefinitions: false,
     canViewIndicatorTypes: false,
     canManageIndicatorTypes: false,
     canManageOrgSettings: false,

@@ -17,11 +17,10 @@ function DashboardContent() {
   const {
     org,
     focusAreas,
-    shiftCodes,
+    assignments: assignments,
     shiftCategories,
     coverageRequirements,
-    coverageRuleConfigs,
-    shiftCodeMap,
+    assignmentLabelMap: assignmentLabelMap,
     absenceTypeMap,
     absenceTypes,
     certifications,
@@ -37,11 +36,11 @@ function DashboardContent() {
 
   const isLoading = refLoading || empLoading || perms.isLoading;
 
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, (typeof shiftCodes)[number]>();
-    for (const sc of shiftCodes) map.set(sc.id, sc);
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, (typeof assignments)[number]>();
+    for (const preset of assignments) map.set(preset.id, preset);
     return map;
-  }, [shiftCodes]);
+  }, [assignments]);
 
   if (loadError && !org) {
     return (
@@ -66,12 +65,11 @@ function DashboardContent() {
         <DashboardView
           org={org}
           focusAreas={focusAreas}
-          shiftCodes={shiftCodes}
+          assignments={assignments}
           shiftCategories={shiftCategories}
           coverageRequirements={coverageRequirements}
-          coverageRuleConfigs={coverageRuleConfigs}
-          shiftCodeMap={shiftCodeMap}
-          shiftCodeById={shiftCodeById}
+          assignmentLabelMap={assignmentLabelMap}
+          assignmentById={assignmentById}
           absenceTypeMap={absenceTypeMap}
           absenceTypes={absenceTypes}
           certifications={certifications}

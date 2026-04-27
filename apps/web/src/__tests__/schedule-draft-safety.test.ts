@@ -1,84 +1,154 @@
 import { describe, expect, it } from "vitest";
-import type { DbShift } from "@/lib/db/types";
-import {
-  classifyDraftShift,
-  hasResidualDraftState,
-} from "@/lib/server/schedule-draft-safety";
 
-function makeShift(overrides: Partial<DbShift> = {}): DbShift {
+import type { DbScheduleCell } from "@/lib/db/types";
+import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
+
+function makeCell(overrides: Partial<DbScheduleCell> = {}): DbScheduleCell {
   return {
+    id: "cell-1",
     emp_id: "emp-1",
     date: "2026-04-15",
-    draft_shift_code_ids: [],
-    published_shift_code_ids: [],
-    draft_absence_type_id: null,
-    published_absence_type_id: null,
-    draft_is_delete: false,
+    org_id: "org-1",
     version: 1,
-    draft_custom_start_time: null,
-    draft_custom_end_time: null,
-    published_custom_start_time: null,
-    published_custom_end_time: null,
+    series_id: null,
+    from_recurring: false,
+    created_by: "creator-1",
+    updated_by: "editor-1",
+    created_at: "2026-04-01T00:00:00.000Z",
+    updated_at: "2026-04-02T00:00:00.000Z",
+    snapshots: [],
     ...overrides,
   };
 }
 
 describe("schedule draft safety helpers", () => {
   it("ignores cleanup-only deleted draft rows in the reviewed summary", () => {
-    const shift = makeShift({
-      draft_is_delete: true,
-    });
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(
+      makeCell({
+        snapshots: [
+          {
+            id: "snap-draft",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "draft",
+            state_kind: "deleted",
+            absence_type_id: null,
+            custom_start_time: null,
+            custom_end_time: null,
+            segments: [],
+          },
+        ],
+      }),
+      {
+        isScheduler: true,
+        assignmentLabelMap: new Map<number, string>(),
+        absenceTypeMap: new Map<number, string>(),
+      },
+    );
 
-    expect(classifyDraftShift(shift)).toBeNull();
-    expect(hasResidualDraftState(shift)).toBe(true);
+    expect(entry?.draftKind ?? null).toBeNull();
   });
 
   it("still counts a published shift marked for deletion as a real deleted change", () => {
-    const shift = makeShift({
-      draft_is_delete: true,
-      published_shift_code_ids: [3],
-    });
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(
+      makeCell({
+        snapshots: [
+          {
+            id: "snap-draft",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "draft",
+            state_kind: "deleted",
+            absence_type_id: null,
+            custom_start_time: null,
+            custom_end_time: null,
+            segments: [],
+          },
+          {
+            id: "snap-published",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "published",
+            state_kind: "worked",
+            absence_type_id: null,
+            custom_start_time: "07:00",
+            custom_end_time: "15:00",
+            segments: [
+              {
+                id: "seg-published",
+                snapshot_id: "snap-published",
+                org_id: "org-1",
+                position: 0,
+                shift_id: 10,
+                job_id: 100,
+              },
+            ],
+          },
+        ],
+      }),
+      {
+        isScheduler: true,
+        assignmentLabelMap: new Map([[3, "DST"]]),
+        absenceTypeMap: new Map<number, string>(),
+      },
+    );
 
-    expect(classifyDraftShift(shift)).toBe("deleted");
+    expect(entry?.draftKind).toBe("deleted");
   });
 
   it("counts custom-time-only edits as modified changes", () => {
-    const shift = makeShift({
-      published_shift_code_ids: [3],
-      draft_shift_code_ids: [3],
-      published_custom_start_time: "07:00",
-      published_custom_end_time: "15:00",
-      draft_custom_start_time: "08:00",
-      draft_custom_end_time: "16:00",
-    });
+    const entry = mapNormalizedScheduleCellRowToScheduleEntry(
+      makeCell({
+        snapshots: [
+          {
+            id: "snap-draft",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "draft",
+            state_kind: "worked",
+            absence_type_id: null,
+            custom_start_time: "08:00",
+            custom_end_time: "16:00",
+            segments: [
+              {
+                id: "seg-draft",
+                snapshot_id: "snap-draft",
+                org_id: "org-1",
+                position: 0,
+                shift_id: 10,
+                job_id: 100,
+              },
+            ],
+          },
+          {
+            id: "snap-published",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "published",
+            state_kind: "worked",
+            absence_type_id: null,
+            custom_start_time: "07:00",
+            custom_end_time: "15:00",
+            segments: [
+              {
+                id: "seg-published",
+                snapshot_id: "snap-published",
+                org_id: "org-1",
+                position: 0,
+                shift_id: 10,
+                job_id: 100,
+              },
+            ],
+          },
+        ],
+      }),
+      {
+        isScheduler: true,
+        assignmentLabelMap: new Map([[3, "DST"]]),
+        absenceTypeMap: new Map<number, string>(),
+      },
+    );
 
-    expect(classifyDraftShift(shift)).toBe("modified");
-  });
-
-  it("ignores persisted fallback rows that only rely on published custom times", () => {
-    const shift = makeShift({
-      published_shift_code_ids: [3],
-      draft_shift_code_ids: [3],
-      published_custom_start_time: "07:00",
-      published_custom_end_time: "15:00",
-      draft_custom_start_time: null,
-      draft_custom_end_time: null,
-    });
-
-    expect(classifyDraftShift(shift)).toBeNull();
-  });
-
-  it("still counts absence-to-shift changes when draft custom times fall back to published", () => {
-    const shift = makeShift({
-      published_absence_type_id: 9,
-      draft_shift_code_ids: [3],
-      draft_absence_type_id: null,
-      published_custom_start_time: "07:00",
-      published_custom_end_time: "15:00",
-      draft_custom_start_time: null,
-      draft_custom_end_time: null,
-    });
-
-    expect(classifyDraftShift(shift)).toBe("modified");
+    expect(entry?.draftKind).toBe("modified");
   });
 });

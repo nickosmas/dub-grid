@@ -8,6 +8,10 @@ import {
   type WeeklyShiftHours,
   type EmployeeUtilization,
 } from "@/lib/analytics";
+import {
+  chartTooltipContentStyle,
+  chartTooltipWrapperStyle,
+} from "./chartTooltipStyles";
 
 type RechartsModule = typeof import("./RechartsComponents");
 
@@ -131,7 +135,10 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
                       <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={chartTooltipContentStyle}
+                        wrapperStyle={chartTooltipWrapperStyle}
+                      />
                       <Line
                         type="monotone"
                         dataKey="hours"
@@ -170,7 +177,10 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={95} />
-                      <Tooltip />
+                      <Tooltip
+                        contentStyle={chartTooltipContentStyle}
+                        wrapperStyle={chartTooltipWrapperStyle}
+                      />
                       <Bar dataKey="hours" fill="var(--color-brand)" radius={[0, 4, 4, 0]} name="Hours" />
                     </BarChart>
                   </ResponsiveContainer>

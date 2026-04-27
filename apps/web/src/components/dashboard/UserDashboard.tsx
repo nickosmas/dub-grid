@@ -14,7 +14,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     currentEmployee,
     periodDates,
     currentPeriodShifts,
-    shiftCodeById,
+    assignmentById,
     absenceTypeById,
     publishHistory,
   } = props;
@@ -60,7 +60,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         employee={currentEmployee}
         periodDates={periodDates}
         shifts={currentPeriodShifts}
-        shiftCodeById={shiftCodeById}
+        assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
       />
 

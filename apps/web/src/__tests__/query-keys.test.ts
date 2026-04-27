@@ -85,8 +85,8 @@ describe("queryKeys factory", () => {
       expect(key).toContain(orgId);
     });
 
-    it("org.shiftCodes includes orgId", () => {
-      const key = queryKeys.org.shiftCodes(orgId);
+    it("org.assignments includes orgId", () => {
+      const key = queryKeys.org.assignments(orgId);
       expect(key).toContain(orgId);
     });
 
@@ -138,8 +138,8 @@ describe("queryKeys factory", () => {
       expect(queryKeys.org.focusAreas("org-1")).toEqual(["org", "org-1", "focusAreas"]);
     });
 
-    it("org.shiftCodes produces correct key", () => {
-      expect(queryKeys.org.shiftCodes("org-1")).toEqual(["org", "org-1", "shiftCodes"]);
+    it("org.assignments produces correct key", () => {
+      expect(queryKeys.org.assignments("org-1")).toEqual(["org", "org-1", "assignments"]);
     });
 
     it("org.shiftCategories produces correct key", () => {
@@ -198,7 +198,7 @@ describe("queryKeys factory", () => {
         queryKeys.org.all(orgId),
         queryKeys.org.detail(orgId),
         queryKeys.org.focusAreas(orgId),
-        queryKeys.org.shiftCodes(orgId),
+        queryKeys.org.assignments(orgId),
         queryKeys.org.absenceTypes(orgId),
         queryKeys.org.shiftCategories(orgId),
         queryKeys.org.indicatorTypes(orgId),

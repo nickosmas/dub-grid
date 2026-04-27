@@ -2,22 +2,39 @@
 
 import { useState, Fragment } from "react";
 import { Check } from "lucide-react";
-import { ShiftCode, AbsenceType, FocusArea, ShiftDisplayMode } from "@/types";
-import { isEmployeeQualified } from "@/lib/schedule-logic";
+import {
+  AssignableShiftOption,
+  AssignmentDefinition,
+  AbsenceType,
+  FocusArea,
+  ScheduleCellSegmentInput,
+  ShiftDisplayMode,
+  ShiftCategory,
+  JobDefinition,
+  NamedItem,
+} from "@/types";
+import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
 import { borderColor } from "@/lib/colors";
+import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { MaybeHint } from "@/components/ui/hint";
 
 interface ShiftPickerProps {
-  shiftCodes: ShiftCode[];
+  assignments?: AssignmentDefinition[];
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
+  orgRoles?: NamedItem[];
+  certifications?: NamedItem[];
   absenceTypes?: AbsenceType[];
   focusAreas: FocusArea[];
-  currentShiftCodeIds?: number[];
+  currentAssignmentDefinitionIds?: number[];
+  currentSegments?: ScheduleCellSegmentInput[];
   currentAbsenceTypeId?: number | null;
-  onSelect: (label: string, shiftCodeIds: number[]) => void;
+  onSelect: (segments: ScheduleCellSegmentInput[]) => void;
   onAbsenceSelect?: (absenceType: AbsenceType) => void;
   empFocusAreaIds?: number[];
   empCertificationId?: number | null;
+  empRoleIds?: number[];
   initialTab?: number | null;
   /** If true, allows multiple shifts to be selected. */
   multiSelect?: boolean;
@@ -28,15 +45,21 @@ interface ShiftPickerProps {
 }
 
 export default function ShiftPicker({
-  shiftCodes,
+  assignments = [],
+  shiftCategories = [],
+  jobs = [],
+  orgRoles = [],
+  certifications = [],
   absenceTypes = [],
   focusAreas,
-  currentShiftCodeIds = [],
+  currentAssignmentDefinitionIds = [],
+  currentSegments = [],
   currentAbsenceTypeId,
   onSelect,
   onAbsenceSelect,
   empFocusAreaIds = [],
   empCertificationId = null,
+  empRoleIds = [],
   initialTab = null,
   multiSelect = false,
   closeOnSelect = true,
@@ -44,42 +67,116 @@ export default function ShiftPicker({
   shiftDisplayMode = "code",
 }: ShiftPickerProps) {
   const isNameMode = shiftDisplayMode === "name";
-  const [pickerTab, setPickerTab] = useState<number>(() => {
-    if (initialTab != null) return initialTab;
-    if (currentShiftCodeIds.length > 0) {
-      const firstCode = shiftCodes.find((s) => s.id === currentShiftCodeIds[0]);
-      if (firstCode?.focusAreaId != null) return firstCode.focusAreaId;
-    }
-    return empFocusAreaIds[0] ?? 0;
+  const assignableOptions = buildAssignableShiftOptions({
+    assignments,
+    shiftCategories,
+    jobs,
+    focusAreas,
+    orgRoles,
+    certifications,
+    employee: {
+      certificationId: empCertificationId,
+      focusAreaIds: empFocusAreaIds,
+      roleIds: empRoleIds,
+    },
+    shiftDisplayMode,
   });
-
-  function isQualified(s: ShiftCode) {
-    return isEmployeeQualified(
-      { certificationId: empCertificationId, focusAreaIds: empFocusAreaIds },
-      s,
-    );
-  }
-
-  function getShiftsForFocusArea(faId: number): ShiftCode[] {
-    return shiftCodes.filter(
-      (st) => !st.isGeneral && st.focusAreaId === faId && isQualified(st),
-    );
-  }
+  const visibleAssignableOptions = assignableOptions.filter(
+    (option) => option.showJobOnGrid || option.isShiftless,
+  );
 
   const allPickerAreas = [
     ...focusAreas.filter(
       (fa) =>
         empFocusAreaIds.includes(fa.id) &&
-        shiftCodes.some((st) => !st.isGeneral && st.focusAreaId === fa.id && isQualified(st)),
+        visibleAssignableOptions.some((option) => option.focusAreaId === fa.id),
     ),
     ...focusAreas.filter(
       (fa) =>
         !empFocusAreaIds.includes(fa.id) &&
-        shiftCodes.some((st) => !st.isGeneral && st.focusAreaId === fa.id && isQualified(st)),
+        visibleAssignableOptions.some((option) => option.focusAreaId === fa.id),
     ),
   ];
 
-  const generalNonOffShifts = shiftCodes.filter((st) => st.isGeneral && isQualified(st));
+  const [pickerTab, setPickerTab] = useState<number>(() => {
+    if (initialTab != null) return initialTab;
+    if (currentSegments.length > 0) {
+      const firstSegment = currentSegments[0];
+      if (firstSegment) {
+        const firstOption = assignableOptions.find(
+          (option) =>
+            buildShiftJobPairKey(option.shiftId, option.jobId) ===
+            buildShiftJobPairKey(firstSegment.shiftId, firstSegment.jobId),
+        );
+        if (firstOption?.focusAreaId != null) return firstOption.focusAreaId;
+      }
+    }
+    if (currentAssignmentDefinitionIds.length > 0) {
+      const firstOption = assignableOptions.find(
+        (option) => option.assignmentId === currentAssignmentDefinitionIds[0],
+      );
+      if (firstOption?.focusAreaId != null) return firstOption.focusAreaId;
+    }
+    return allPickerAreas[0]?.id ?? empFocusAreaIds[0] ?? 0;
+  });
+
+  const areaOptions = assignableOptions.filter(
+    (option) =>
+      (option.showJobOnGrid || option.isShiftless) &&
+      option.focusAreaId === pickerTab,
+  );
+  const generalOptions = visibleAssignableOptions.filter(
+    (option) => option.isShiftless || option.focusAreaId == null,
+  );
+  const optionByPairKey = new Map(
+    assignableOptions.map((option) => [
+      buildShiftJobPairKey(option.shiftId, option.jobId),
+      option,
+    ]),
+  );
+  const selectedOptions =
+    currentSegments.length > 0
+      ? currentSegments
+          .map((segment) =>
+            optionByPairKey.get(
+              buildShiftJobPairKey(segment.shiftId, segment.jobId),
+            ) ?? null,
+          )
+          .filter((option): option is AssignableShiftOption => option != null)
+      : currentAssignmentDefinitionIds
+          .map((assignmentId) =>
+            assignableOptions.find((option) => option.assignmentId === assignmentId) ?? null,
+          )
+          .filter((option): option is AssignableShiftOption => option != null);
+
+  function compareOptionsWithinGroup(
+    left: AssignableShiftOption,
+    right: AssignableShiftOption,
+  ): number {
+    const leftRanked = left.qualificationRank != null;
+    const rightRanked = right.qualificationRank != null;
+    if (leftRanked !== rightRanked) {
+      return leftRanked ? -1 : 1;
+    }
+    if (
+      left.qualificationRank != null &&
+      right.qualificationRank != null &&
+      left.qualificationRank !== right.qualificationRank
+    ) {
+      return left.qualificationRank - right.qualificationRank;
+    }
+    if (left.sortOrder !== right.sortOrder) {
+      return left.sortOrder - right.sortOrder;
+    }
+
+    const leftLabel = left.secondaryLabel
+      ? `${left.primaryLabel} · ${left.secondaryLabel}`
+      : left.primaryLabel;
+    const rightLabel = right.secondaryLabel
+      ? `${right.primaryLabel} · ${right.secondaryLabel}`
+      : right.primaryLabel;
+    return leftLabel.localeCompare(rightLabel);
+  }
 
   function getOptionButtonStyle(
     color: string,
@@ -106,33 +203,40 @@ export default function ShiftPicker({
     };
   }
 
-  function renderShiftButton(s: ShiftCode) {
-    const isActive = currentShiftCodeIds.includes(s.id);
+  function renderShiftButton(option: AssignableShiftOption) {
+    const optionKey = buildShiftJobPairKey(option.shiftId, option.jobId);
+    const isActive = selectedOptions.some(
+      (selected) =>
+        buildShiftJobPairKey(selected.shiftId, selected.jobId) === optionKey,
+    );
 
     const handleToggle = () => {
-      let newIds: number[];
+      let nextOptions: AssignableShiftOption[];
       if (multiSelect) {
         if (isActive) {
-          newIds = currentShiftCodeIds.filter((id) => id !== s.id);
-        } else if (currentShiftCodeIds.length >= 2) {
+          nextOptions = selectedOptions.filter(
+            (selected) =>
+              buildShiftJobPairKey(selected.shiftId, selected.jobId) !== optionKey,
+          );
+        } else if (selectedOptions.length >= 2) {
           return; // Max 2 shifts per cell
         } else {
-          newIds = [...currentShiftCodeIds, s.id];
+          nextOptions = [...selectedOptions, option];
         }
       } else {
-        newIds = [s.id];
+        nextOptions = [option];
       }
 
-      const newLabels = newIds
-        .map((id) => {
-          const sc = shiftCodes.find((c) => c.id === id);
-          return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : null;
-        })
-        .filter((l): l is string => l != null && l !== "OFF");
+      onSelect(
+        nextOptions.map(
+          (selected, index): ScheduleCellSegmentInput => ({
+            shiftId: selected.shiftId,
+            jobId: selected.jobId,
+            position: index,
+          }),
+        ),
+      );
 
-      const newShift = newLabels.length > 0 ? newLabels.join("/") : "OFF";
-      onSelect(newShift, newIds);
-      
       if (closeOnSelect && !multiSelect) {
         onClose?.();
       }
@@ -140,11 +244,11 @@ export default function ShiftPicker({
 
     return (
       <button
-        key={s.id}
+        key={option.id}
         onClick={handleToggle}
         aria-pressed={isActive}
-        aria-label={`${s.label} - ${s.name}`}
-        style={getOptionButtonStyle(s.color, s.text, s.border, isActive)}
+        aria-label={`${option.primaryLabel}${option.secondaryLabel ? ` - ${option.secondaryLabel}` : ""}`}
+        style={getOptionButtonStyle(option.color, option.text, option.border, isActive)}
         onMouseEnter={(e) => {
           if (!isActive) {
             e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";
@@ -169,7 +273,7 @@ export default function ShiftPicker({
               width: 18,
               height: 18,
               borderRadius: "50%",
-              background: s.text,
+              background: option.text,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -180,11 +284,18 @@ export default function ShiftPicker({
         )}
 
         {isNameMode ? (
-          <MaybeHint content={s.name || s.label} side="left">
+          <MaybeHint
+            content={
+              option.secondaryLabel
+                ? `${option.primaryLabel} · ${option.secondaryLabel}`
+                : option.primaryLabel
+            }
+            side="left"
+          >
             <div
               style={{
                 ...primaryTextStyle,
-                color: s.text,
+                color: option.text,
                 lineHeight: 1.25,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -192,7 +303,7 @@ export default function ShiftPicker({
                 paddingRight: isActive ? 20 : 0,
               }}
             >
-              {s.name || s.label}
+              {option.primaryLabel}
             </div>
           </MaybeHint>
         ) : (
@@ -200,41 +311,38 @@ export default function ShiftPicker({
             <div
               style={{
                 ...primaryTextStyle,
-                color: s.text,
+                color: option.text,
                 display: "flex",
                 alignItems: "center",
                 gap: 3,
                 paddingRight: isActive ? 20 : 0,
               }}
             >
-              {s.label}
+              {option.primaryLabel}
             </div>
-            <MaybeHint content={s.name} side="left">
-              <div
-                style={{
-                  ...secondaryTextStyle,
-                  color: s.text,
-                  opacity: 0.82,
-                  marginTop: 3,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  paddingRight: isActive ? 20 : 0,
-                }}
-              >
-                {s.name}
-              </div>
-            </MaybeHint>
+            {option.secondaryLabel ? (
+              <MaybeHint content={option.secondaryLabel} side="left">
+                <div
+                  style={{
+                    ...secondaryTextStyle,
+                    color: option.text,
+                    opacity: 0.82,
+                    marginTop: 3,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    paddingRight: isActive ? 20 : 0,
+                  }}
+                >
+                  {option.secondaryLabel}
+                </div>
+              </MaybeHint>
+            ) : null}
           </>
         )}
-
       </button>
     );
   }
-
-  const activeArea = allPickerAreas.find((fa) => fa.id === pickerTab);
-  const areaName = activeArea?.name ?? allPickerAreas[0]?.name ?? "";
-  const areaShifts = getShiftsForFocusArea(pickerTab);
 
   const primaryTextStyle: React.CSSProperties = {
     fontWeight: 900,
@@ -276,6 +384,45 @@ export default function ShiftPicker({
     background: "var(--color-border-light)",
   };
 
+  function renderGroupedOptions(options: typeof assignableOptions) {
+    const grouped = new Map<string, typeof assignableOptions>();
+    for (const option of options) {
+      const group = grouped.get(option.groupLabel) ?? [];
+      group.push(option);
+      grouped.set(option.groupLabel, group);
+    }
+
+    return Array.from(grouped.entries())
+      .sort((left, right) => {
+        const leftSort = left[1][0]?.groupSortOrder ?? Number.MAX_SAFE_INTEGER;
+        const rightSort = right[1][0]?.groupSortOrder ?? Number.MAX_SAFE_INTEGER;
+        if (leftSort !== rightSort) return leftSort - rightSort;
+        return left[0].localeCompare(right[0]);
+      })
+      .map(([groupLabel, groupOptions]) => (
+        <div key={groupLabel} style={{ marginBottom: 24 }}>
+          <div style={sectionHeading}>
+            {groupLabel}
+            <span style={countPill}>{groupOptions.length}</span>
+            <div style={headingLine} />
+          </div>
+          <div
+            role="group"
+            aria-label={`${groupLabel} shift options`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 10,
+            }}
+          >
+            {[...groupOptions]
+              .sort(compareOptionsWithinGroup)
+              .map((option) => renderShiftButton(option))}
+          </div>
+        </div>
+      ));
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Tabs — stretch to fill when few, horizontal scroll when many */}
@@ -305,30 +452,19 @@ export default function ShiftPicker({
 
       {/* Shifts */}
       <div>
-        {areaShifts.length > 0 && (
-          <div style={{ marginBottom: 24 }}>
-            {allPickerAreas.length <= 1 && (
-              <div style={sectionHeading}>
-                {areaName}
-                <span style={countPill}>{areaShifts.length}</span>
-                <div style={headingLine} />
-              </div>
-            )}
-            <div role="group" aria-label="Shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              {areaShifts.map((s) => renderShiftButton(s))}
-            </div>
-          </div>
-        )}
+        {renderGroupedOptions(areaOptions)}
 
-        {generalNonOffShifts.length > 0 && (
+        {generalOptions.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             <div style={sectionHeading}>
               General
-              <span style={countPill}>{generalNonOffShifts.length}</span>
+              <span style={countPill}>{generalOptions.length}</span>
               <div style={headingLine} />
             </div>
             <div role="group" aria-label="General shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              {generalNonOffShifts.map((s) => renderShiftButton(s))}
+              {[...generalOptions]
+                .sort(compareOptionsWithinGroup)
+                .map((option) => renderShiftButton(option))}
             </div>
           </div>
         )}
@@ -436,7 +572,7 @@ export default function ShiftPicker({
           </div>
         )}
 
-        {areaShifts.length === 0 && generalNonOffShifts.length === 0 && absenceTypes.length === 0 && (
+        {areaOptions.length === 0 && generalOptions.length === 0 && absenceTypes.length === 0 && (
           <div
             style={{
               padding: "24px 16px",

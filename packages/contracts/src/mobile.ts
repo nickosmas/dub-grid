@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  resolvedSchedulePresentationSchema,
+  resolvedSchedulePresentationSegmentSchema,
+  scheduleCellStateSchema,
+} from "./schedule";
 
 export const mobilePlatformSchema = z.enum(["ios", "android"]);
 export const mobileRoleSchema = z.enum(["super_admin", "admin", "user"]);
@@ -80,8 +85,8 @@ export const mobilePermissionsSchema = z.object({
   canManageEmployees: z.boolean(),
   canViewFocusAreas: z.boolean(),
   canManageFocusAreas: z.boolean(),
-  canViewShiftCodes: z.boolean(),
-  canManageShiftCodes: z.boolean(),
+  canViewScheduleDefinitions: z.boolean(),
+  canManageScheduleDefinitions: z.boolean(),
   canViewIndicatorTypes: z.boolean(),
   canManageIndicatorTypes: z.boolean(),
   canManageOrgSettings: z.boolean(),
@@ -145,33 +150,16 @@ export const mobileScheduleQuerySchema = z.object({
   endDate: z.string().date().optional(),
 });
 
-export const mobileScheduleEntrySegmentSchema = z.object({
-  shiftName: z.string(),
-  startTime: z.string().nullable(),
-  endTime: z.string().nullable(),
-  displayFocusAreaName: z.string().nullable(),
-});
+export const mobileScheduleEntrySegmentSchema =
+  resolvedSchedulePresentationSegmentSchema;
 
 export const mobileScheduleEntrySchema = z.object({
   employeeId: z.string().uuid(),
   employeeName: z.string(),
+  employeeSeniority: z.number().int().nullable().optional(),
   date: z.string().date(),
-  shiftCodeIds: z.array(z.number().int()),
-  shiftLabel: z.string(),
-  shiftCodeLabel: z.string().nullable(),
-  shiftName: z.string(),
-  absenceTypeId: z.number().int().nullable(),
-  focusAreaId: z.number().int().nullable(),
-  focusAreaName: z.string().nullable(),
-  displayFocusAreaName: z.string().nullable().optional(),
-  startTime: z.string().nullable(),
-  endTime: z.string().nullable(),
-  customStartTime: z.string().nullable(),
-  customEndTime: z.string().nullable(),
-  segments: z.array(mobileScheduleEntrySegmentSchema).optional(),
-  shiftColor: z.string().nullable().optional(),
-  shiftBorderColor: z.string().nullable().optional(),
-  shiftTextColor: z.string().nullable().optional(),
+  state: scheduleCellStateSchema,
+  presentation: resolvedSchedulePresentationSchema,
   publishedAt: z.string().nullable(),
   publishedByName: z.string().nullable(),
 });
@@ -201,19 +189,13 @@ export const mobileShiftRequestSchema = z.object({
   requesterEmpId: z.string().uuid(),
   requesterName: z.string(),
   requesterShiftDate: z.string().date(),
-  requesterShiftCodeIds: z.array(z.number().int()),
-  requesterShiftLabel: z.string(),
-  requesterFocusAreaId: z.number().int().nullable(),
-  requesterCustomStartTime: z.string().nullable(),
-  requesterCustomEndTime: z.string().nullable(),
+  requesterState: scheduleCellStateSchema,
+  requesterPresentation: resolvedSchedulePresentationSchema,
   targetEmpId: z.string().uuid().nullable(),
   targetName: z.string().nullable(),
   targetShiftDate: z.string().date().nullable(),
-  targetShiftCodeIds: z.array(z.number().int()).nullable(),
-  targetShiftLabel: z.string().nullable(),
-  targetFocusAreaId: z.number().int().nullable(),
-  targetCustomStartTime: z.string().nullable(),
-  targetCustomEndTime: z.string().nullable(),
+  targetState: scheduleCellStateSchema.nullable().optional(),
+  targetPresentation: resolvedSchedulePresentationSchema.nullable().optional(),
   absenceTypeId: z.number().int().nullable(),
   parentRequestId: z.string().uuid().nullable(),
   adminUserId: z.string().uuid().nullable(),
@@ -224,8 +206,19 @@ export const mobileShiftRequestSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const mobileOpenShiftSchema = z.object({
+  id: z.string(),
+  date: z.string().date(),
+  focusAreaId: z.number().int(),
+  focusAreaName: z.string().nullable(),
+  needed: z.number().int().positive(),
+  state: scheduleCellStateSchema,
+  presentation: resolvedSchedulePresentationSchema,
+});
+
 export const mobileShiftRequestsResponseSchema = z.object({
   requests: z.array(mobileShiftRequestSchema),
+  openShifts: z.array(mobileOpenShiftSchema).default([]),
 });
 
 export const mobileCreateShiftRequestBodySchema = z.object({
@@ -262,6 +255,13 @@ export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion(
       action: z.literal("cancel"),
       empId: z.string().uuid(),
     }),
+    z.object({
+      action: z.literal("volunteer_open_shift"),
+      empId: z.string().uuid(),
+      shiftDate: z.string().date(),
+      focusAreaId: z.number().int(),
+      state: scheduleCellStateSchema,
+    }),
   ],
 );
 
@@ -277,10 +277,25 @@ export const mobilePersonSchema = z.object({
   email: z.string(),
   status: z.enum(["active", "benched", "terminated"]),
   focusAreaIds: z.array(z.number().int()),
+  contactNotes: z.string().default(""),
+  statusChangedAt: z.string().nullable().default(null),
+  statusNote: z.string().default(""),
+  version: z.number().int().nonnegative().default(0),
 });
 
 export const mobilePeopleResponseSchema = z.object({
   people: z.array(mobilePersonSchema),
+});
+
+export const mobilePersonStatusUpdateBodySchema = z.object({
+  action: z.enum(["bench", "activate"]),
+  expectedVersion: z.number().int().nonnegative(),
+  note: z.string().trim().max(500).optional(),
+});
+
+export const mobilePersonStatusUpdateResponseSchema = z.object({
+  success: z.literal(true),
+  person: mobilePersonSchema,
 });
 
 export const mobileNotificationSchema = z.object({
@@ -345,10 +360,15 @@ export type MobileScheduleEntrySegment = z.infer<
 >;
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
+export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
+export type MobilePerson = z.infer<typeof mobilePersonSchema>;
 export type MobileCreateShiftRequestBody = z.infer<
   typeof mobileCreateShiftRequestBodySchema
 >;
 export type MobileUpdateShiftRequestBody = z.infer<
   typeof mobileUpdateShiftRequestBodySchema
+>;
+export type MobilePersonStatusUpdateBody = z.infer<
+  typeof mobilePersonStatusUpdateBodySchema
 >;

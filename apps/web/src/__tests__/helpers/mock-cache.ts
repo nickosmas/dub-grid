@@ -47,8 +47,10 @@ export function mockCacheModule() {
     TTL: { STABLE: 300, MODERATE: 120, MIDDLEWARE: 30 },
     CacheKey: {
       focusAreas: (orgId: string) => `dg:org:${orgId}:focusAreas`,
-      shiftCodes: (orgId: string, all = false) =>
-        `dg:org:${orgId}:shiftCodes${all ? ":all" : ""}`,
+      assignments: (orgId: string, all = false) =>
+        `dg:org:${orgId}:assignments${all ? ":all" : ""}`,
+      jobs: (orgId: string, all = false) =>
+        `dg:org:${orgId}:jobs${all ? ":all" : ""}`,
       absenceTypes: (orgId: string, all = false) =>
         `dg:org:${orgId}:absenceTypes${all ? ":all" : ""}`,
       shiftCategories: (orgId: string) => `dg:org:${orgId}:shiftCategories`,

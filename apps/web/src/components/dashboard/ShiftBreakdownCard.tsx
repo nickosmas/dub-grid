@@ -59,10 +59,10 @@ export default function ShiftBreakdownCard({
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
                   {fa.codes.map((c) => (
-                    <div key={c.shiftCodeId} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <div key={c.assignmentId} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                       <span style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--color-text-subtle)", flexShrink: 0, opacity: 0.5 }} />
                       <span style={{ fontSize: 10, color: "var(--color-text-subtle)" }}>
-                        {c.shiftCodeLabel}
+                        {c.assignmentLabel}
                       </span>
                       <span style={{ fontSize: 10, fontWeight: 600, color: "var(--color-text-secondary)", fontFamily: "var(--font-dm-mono), 'DM Mono', monospace" }}>
                         {c.count}

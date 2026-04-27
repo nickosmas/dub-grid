@@ -16,7 +16,7 @@ export function resolveGridAuditLabel(args: {
   shifts: ShiftMap;
   publishChangesMap?: ReadonlyMap<
     string,
-    Pick<PublishChange, "updatedBy">
+    Pick<PublishChange, "updatedBy"> & { publishedBy?: string | null }
   > | null;
   auditNames: Map<string, string>;
   currentUserId?: string | null;
@@ -29,7 +29,8 @@ export function resolveGridAuditLabel(args: {
   if (entry) {
     userId = entry.updatedBy || entry.createdBy || null;
   } else if (publishChangesMap) {
-    userId = publishChangesMap.get(cellKey)?.updatedBy ?? null;
+    const publishChange = publishChangesMap.get(cellKey);
+    userId = publishChange?.updatedBy || publishChange?.publishedBy || null;
   }
 
   if (!userId) return null;

@@ -33,7 +33,7 @@ function ArrowIcon() {
 function SetupContent() {
   const router = useRouter();
   const perms = usePermissions();
-  const { setupStatus, loading: orgLoading, org } = useOrganizationData();
+  const { setupStatus, loading: orgLoading, org } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
   const redirected = useRef(false);
 
@@ -69,12 +69,12 @@ function SetupContent() {
       href: "/settings",
     },
     {
-      label: "Shift Codes",
-      description: setupStatus.missing.shiftCodes
-        ? "No shift codes yet"
-        : "Shift codes configured",
-      done: !setupStatus.missing.shiftCodes,
-      href: "/settings/shift-codes",
+      label: "Shifts & Jobs",
+      description: setupStatus.missing.scheduleDefinitions
+        ? "No shifts or jobs yet"
+        : "Shifts and jobs configured",
+      done: !setupStatus.missing.scheduleDefinitions,
+      href: "/settings?section=schedule-shifts",
     },
     {
       label: org?.certificationLabel || "Certifications",

@@ -23,7 +23,7 @@ function formatDate(date: Date): string {
 
 function formatShortageDetails(gap: CoverageGap): string {
   return gap.shortageDetails
-    .map((detail) => `${detail.shiftCodeLabel} short ${detail.shortage}`)
+    .map((detail) => `${detail.assignmentLabel} short ${detail.shortage}`)
     .join(", ");
 }
 

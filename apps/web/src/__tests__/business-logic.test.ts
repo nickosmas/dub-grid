@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies, filterAndSortEmployees } from "@/lib/schedule-logic";
-import { Employee, ShiftCode } from "@/types";
+import { Employee, AssignmentDefinition } from "@/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-function makeShiftCode(overrides: Partial<ShiftCode> = {}): ShiftCode {
+function makeAssignmentDefinition(overrides: Partial<AssignmentDefinition> = {}): AssignmentDefinition {
   return {
     id: 1,
     orgId: "org1",
@@ -102,8 +102,8 @@ describe("Property 10: ShiftMap key format validity", () => {
 describe("computeDailyTallies", () => {
   const date = new Date(2024, 0, 15);
 
-  // Helper: build a Map<number, ShiftCode> from an array of shift codes
-  function buildCodeMap(...codes: ShiftCode[]): Map<number, ShiftCode> {
+  // Helper: build a Map<number, AssignmentDefinition> from an array of assignments
+  function buildCodeMap(...codes: AssignmentDefinition[]): Map<number, AssignmentDefinition> {
     return new Map(codes.map((c) => [c.id, c]));
   }
 
@@ -115,7 +115,7 @@ describe("computeDailyTallies", () => {
   it("counts day FTE correctly", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
-    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const dayCode = makeAssignmentDefinition({ id: 10, label: "D", categoryId: CAT_DAY });
     const codeMap = buildCodeMap(dayCode);
     const sectionIds = new Set([10]);
 
@@ -128,7 +128,7 @@ describe("computeDailyTallies", () => {
 
   it("counts eve FTE correctly", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const eveCode = makeShiftCode({ id: 20, label: "E", categoryId: CAT_EVE });
+    const eveCode = makeAssignmentDefinition({ id: 20, label: "E", categoryId: CAT_EVE });
     const codeMap = buildCodeMap(eveCode);
     const sectionIds = new Set([20]);
 
@@ -140,7 +140,7 @@ describe("computeDailyTallies", () => {
 
   it("counts night FTE correctly", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const nightCode = makeShiftCode({ id: 30, label: "N", categoryId: CAT_NIGHT });
+    const nightCode = makeAssignmentDefinition({ id: 30, label: "N", categoryId: CAT_NIGHT });
     const codeMap = buildCodeMap(nightCode);
     const sectionIds = new Set([30]);
 
@@ -152,7 +152,7 @@ describe("computeDailyTallies", () => {
 
   it("each employee contributes 1 to headcount", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const dayCode = makeAssignmentDefinition({ id: 10, label: "D", categoryId: CAT_DAY });
     const codeMap = buildCodeMap(dayCode);
     const sectionIds = new Set([10]);
 
@@ -163,7 +163,7 @@ describe("computeDailyTallies", () => {
   it("sums headcount across multiple employees", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
-    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const dayCode = makeAssignmentDefinition({ id: 10, label: "D", categoryId: CAT_DAY });
     const codeMap = buildCodeMap(dayCode);
     const sectionIds = new Set([10]);
 
@@ -173,7 +173,7 @@ describe("computeDailyTallies", () => {
 
   it("employees with no shift assigned do not contribute to counts", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
+    const dayCode = makeAssignmentDefinition({ id: 10, label: "D", categoryId: CAT_DAY });
     const codeMap = buildCodeMap(dayCode);
     const sectionIds = new Set([10]);
 
@@ -183,7 +183,7 @@ describe("computeDailyTallies", () => {
 
   it("shifts with no categoryId do not appear in tallies", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const uncategorized = makeShiftCode({ id: 10, label: "D", categoryId: null });
+    const uncategorized = makeAssignmentDefinition({ id: 10, label: "D", categoryId: null });
     const codeMap = buildCodeMap(uncategorized);
     const sectionIds = new Set([10]);
 
@@ -191,9 +191,9 @@ describe("computeDailyTallies", () => {
     expect(result).toEqual({});
   });
 
-  it("shift codes not in sectionCodeIds are excluded from tallies", () => {
+  it("assignments not in sectionCodeIds are excluded from tallies", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const otherAreaCode = makeShiftCode({ id: 99, label: "D", categoryId: CAT_DAY });
+    const otherAreaCode = makeAssignmentDefinition({ id: 99, label: "D", categoryId: CAT_DAY });
     const codeMap = buildCodeMap(otherAreaCode);
     const sectionIds = new Set([10]); // 99 is NOT in this set
 
@@ -203,8 +203,8 @@ describe("computeDailyTallies", () => {
 
   it("counts multiple shifts for a single employee (D/E)", () => {
     const emp = makeEmployee({ id: "emp-1" });
-    const dayCode = makeShiftCode({ id: 10, label: "D", categoryId: CAT_DAY });
-    const eveCode = makeShiftCode({ id: 20, label: "E", categoryId: CAT_EVE });
+    const dayCode = makeAssignmentDefinition({ id: 10, label: "D", categoryId: CAT_DAY });
+    const eveCode = makeAssignmentDefinition({ id: 20, label: "E", categoryId: CAT_EVE });
     const codeMap = buildCodeMap(dayCode, eveCode);
     const sectionIds = new Set([10, 20]);
 
@@ -243,14 +243,14 @@ describe("Property 11: headcount aggregation correctness across all count types"
           );
 
           // Each entry gets a unique shift code ID (starting at 100)
-          const codes: ShiftCode[] = entries.map((e, i) =>
-            makeShiftCode({ id: 100 + i, label: `SHIFT_${i}`, categoryId: e.categoryId }),
+          const codes: AssignmentDefinition[] = entries.map((e, i) =>
+            makeAssignmentDefinition({ id: 100 + i, label: `SHIFT_${i}`, categoryId: e.categoryId }),
           );
 
           const codeMap = new Map(codes.map((c) => [c.id, c]));
           const sectionIds = new Set(codes.map((c) => c.id));
 
-          const shiftCodeIdsForKey = (empId: string): number[] => {
+          const assignmentIdsForKey = (empId: string): number[] => {
             const match = empId.match(/^emp-(\d+)$/);
             if (!match) return [];
             const idx = parseInt(match[1], 10) - 1;
@@ -261,7 +261,7 @@ describe("Property 11: headcount aggregation correctness across all count types"
           const result = computeDailyTallies(
             employees,
             date,
-            shiftCodeIdsForKey,
+            assignmentIdsForKey,
             codeMap,
             sectionIds,
           );

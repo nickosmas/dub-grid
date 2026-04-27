@@ -1,10 +1,4 @@
-export type ScheduleEntryPayload = {
-  label: string;
-  shiftCodeIds: number[];
-  absenceTypeId: number | null;
-  customStartTime: string | null;
-  customEndTime: string | null;
-};
+export type { ScheduleCellInput } from "@/types";
 
 export type ScheduleOperation = {
   kind: "autofill" | "import_previous" | "repeat_series";

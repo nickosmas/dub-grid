@@ -1,19 +1,10 @@
 /**
  * dashboard-hero-metrics.test.ts — Verify hero metrics display accurate data
  * 
- * REGRESSION TEST: Draft Deletion Bug (Fixed)
- * 
- * Issue: Draft shifts marked for deletion that were never published
- * were not being flagged as isDraft in fetchShifts, causing them to
- * not be counted in the dashboard draft shift total.
- * 
- * Root Cause: The isDraft check didn't include draft_is_delete, so:
- *   - draft_is_delete = true
- *   - published_shift_code_ids = [] (never published)
- *   - All other fields matched → isDraft = false (WRONG!)
- * 
- * Fix: Added row.draft_is_delete to the isDraft condition in fetchShifts.
- * Now such shifts are correctly flagged as draft and counted.
+ * REGRESSION TEST: Draft deletion counts must stay visible in dashboard totals.
+ *
+ * The dashboard should count new, modified, and deleted draft cells consistently
+ * regardless of how the underlying schedule state is normalized.
  */
 
 import { describe, it, expect } from "vitest";
@@ -38,7 +29,7 @@ describe("Dashboard Hero Metrics", () => {
         date: new Date(),
         dayOfWeek: "MON",
         dayOfMonth: 8,
-        shiftCodeLabel: "DAY",
+        assignmentLabel: "DAY",
         focusAreaName: "Support",
         timeRange: "09:00–17:00",
         needed: 2,
@@ -49,7 +40,7 @@ describe("Dashboard Hero Metrics", () => {
         date: new Date(),
         dayOfWeek: "TUE",
         dayOfMonth: 9,
-        shiftCodeLabel: "NIGHT",
+        assignmentLabel: "NIGHT",
         focusAreaName: "Support",
         timeRange: "22:00–06:00",
         needed: 1,
@@ -223,7 +214,7 @@ describe("Dashboard Hero Metrics", () => {
       { done: true, label: "Configure focus areas" },
       { done: true, label: "Add departments" },
       { done: false, label: "Add roles" },
-      { done: false, label: "Add shift codes" },
+      { done: false, label: "Add jobs" },
       { done: false, label: "Add employees" },
       { done: false, label: "Create schedule" },
     ];
@@ -240,7 +231,7 @@ describe("Dashboard Hero Metrics", () => {
       { done: true, label: "Configure focus areas" },
       { done: true, label: "Add departments" },
       { done: true, label: "Add roles" },
-      { done: true, label: "Add shift codes" },
+      { done: true, label: "Add jobs" },
       { done: true, label: "Add employees" },
       { done: true, label: "Create schedule" },
     ];

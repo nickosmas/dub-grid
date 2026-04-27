@@ -1,4 +1,5 @@
 import { getServiceClient } from "@/lib/supabase-service";
+import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 
@@ -69,15 +70,13 @@ async function getAffectedEmployeeUserIds(
 ): Promise<string[]> {
   const db = getServiceClient();
 
-  const { data: shifts } = await db
-    .from("shifts")
-    .select("emp_id")
-    .eq("org_id", orgId)
-    .gte("date", startDate)
-    .lte("date", endDate)
-    .not("published_shift_code_ids", "is", null);
+  const shifts = await fetchPublishedShiftRows(db, {
+    orgId,
+    startDate,
+    endDate,
+  });
 
-  if (!shifts?.length) return [];
+  if (!shifts.length) return [];
 
   const empIds = [...new Set(shifts.map((shift) => shift.emp_id))];
   const { data: employees } = await db

@@ -13,7 +13,7 @@ import type {
   NamedItem,
   RecurringShift,
   ShiftCategory,
-  ShiftCode,
+  AssignmentDefinition,
   ShiftDisplayMode,
   ShiftMap,
   ShiftRequest,
@@ -23,7 +23,7 @@ interface SharedSelfWorkProps {
   employee: Employee;
   focusAreas: FocusArea[];
   focusAreaLabel?: string;
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
   absenceTypes: AbsenceType[];
   certifications: NamedItem[];
@@ -37,15 +37,20 @@ interface SharedSelfWorkProps {
 
 function useSelfWorkMaps({
   focusAreas,
-  shiftCodes,
+  assignments,
   shiftCategories,
   absenceTypes,
-}: Pick<SharedSelfWorkProps, "focusAreas" | "shiftCodes" | "shiftCategories" | "absenceTypes">) {
-  const shiftCodeById = useMemo(() => {
-    const map = new Map<number, ShiftCode>();
-    for (const shiftCode of shiftCodes) map.set(shiftCode.id, shiftCode);
+}: Pick<
+  SharedSelfWorkProps,
+  "focusAreas" | "assignments" | "shiftCategories" | "absenceTypes"
+>) {
+  const assignmentById = useMemo(() => {
+    const map = new Map<number, AssignmentDefinition>();
+    for (const assignment of assignments) {
+      map.set(assignment.id, assignment);
+    }
     return map;
-  }, [shiftCodes]);
+  }, [assignments]);
 
   const categoryById = useMemo(() => {
     const map = new Map<number, ShiftCategory>();
@@ -66,7 +71,7 @@ function useSelfWorkMaps({
   }, [absenceTypes]);
 
   return {
-    shiftCodeById,
+    assignmentById,
     categoryById,
     focusAreaById,
     absenceTypeById,
@@ -81,7 +86,7 @@ export function SelfWorkOverview({
   shiftDisplayMode,
   ...rest
 }: SharedSelfWorkProps) {
-  const { shiftCodeById, categoryById } = useSelfWorkMaps(rest);
+  const { assignmentById, categoryById } = useSelfWorkMaps(rest);
 
   const thisWeekHours = useMemo(() => {
     const weekStart = getWeekStart(new Date());
@@ -90,17 +95,17 @@ export function SelfWorkOverview({
       employee.id,
       weekDateKeys,
       shifts,
-      shiftCodeById,
+      assignmentById,
       40,
       categoryById,
     );
-  }, [categoryById, employee.id, shiftCodeById, shifts]);
+  }, [assignmentById, categoryById, employee.id, shifts]);
 
   return (
     <OverviewTab
       employee={employee}
       shifts={shifts}
-      shiftCodeById={shiftCodeById}
+      assignmentById={assignmentById}
       categoryById={categoryById}
       focusAreas={rest.focusAreas}
       focusAreaLabel={rest.focusAreaLabel}
@@ -123,9 +128,14 @@ export function SelfWorkSchedule({
   shiftDisplayMode,
   ...rest
 }: SharedSelfWorkProps) {
-  const { shiftCodeById, categoryById, focusAreaById, absenceTypeById } = useSelfWorkMaps({
+  const {
+    assignmentById,
+    categoryById,
+    focusAreaById,
+    absenceTypeById,
+  } = useSelfWorkMaps({
     focusAreas,
-    shiftCodes: rest.shiftCodes,
+    assignments: rest.assignments,
     shiftCategories: rest.shiftCategories,
     absenceTypes: rest.absenceTypes,
   });
@@ -171,10 +181,10 @@ export function SelfWorkSchedule({
         </div>
       </div>
 
-      <ScheduleTab
-        employee={employee}
-        shifts={shifts}
-        shiftCodeById={shiftCodeById}
+        <ScheduleTab
+          employee={employee}
+          shifts={shifts}
+          assignmentById={assignmentById}
         focusAreas={focusAreas}
         categoryById={categoryById}
         focusAreaById={focusAreaById}

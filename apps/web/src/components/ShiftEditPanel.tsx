@@ -5,24 +5,37 @@ import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
-import { EditModalState, ShiftCode, ShiftCategory, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode, Employee } from "@/types";
+import { EditModalState, AssignmentDefinition, ShiftCategory, JobDefinition, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode, Employee, ScheduleCellInput, ShiftJobSegment } from "@/types";
 import ShiftPicker from "./ShiftPicker";
+import {
+  buildAssignableShiftDisplayMap,
+  buildShiftDisplayParts,
+} from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import {
+  buildShiftDiffDescriptors,
+  expandDelimitedTimeRanges,
+  type ShiftDiffBadgeDescriptor,
+  type ShiftDiffBorderKind,
+} from "@/lib/shift-diff-badges";
 
 interface ShiftEditPanelProps {
   modal: EditModalState;
   currentShift: string | null;
-  currentShiftCodeIds?: number[];
-  shiftCodes: ShiftCode[];
+  currentAssignmentIds?: number[];
+  currentSegments?: ShiftJobSegment[];
+  assignments: AssignmentDefinition[];
   /** Shift categories — used to compute time bounds for custom time validation. */
   shiftCategories?: ShiftCategory[];
+  /** Jobs available for combined shift picker resolution. */
+  jobs?: JobDefinition[];
   indicatorTypes?: IndicatorType[];
-  onSelect: (label: string, shiftCodeIds: number[], seriesScope?: SeriesScope) => void;
+  onSelect: (input: ScheduleCellInput | null, seriesScope?: SeriesScope) => void;
   onClose: () => void;
   allowShiftEdits?: boolean;
   canEditNotes?: boolean;
@@ -30,6 +43,7 @@ interface ShiftEditPanelProps {
   onNoteToggle?: (indicatorTypeId: number, active: boolean, focusAreaId: number) => void;
   /** Series ID if the current shift belongs to a repeating series */
   seriesId?: string | null;
+  fromRecurring?: boolean;
   /** Called when the user confirms creating a repeating shift */
   onRepeatConfirm?: (
     frequency: SeriesFrequency,
@@ -50,7 +64,13 @@ interface ShiftEditPanelProps {
   /** Called when user changes the custom time override */
   onCustomTimeChange?: (start: string | null, end: string | null) => void;
   /** Published shift code IDs — used to identify newly added shifts in split-shift view */
-  publishedShiftCodeIds?: number[];
+  publishedAssignmentIds?: number[];
+  /** Published absence type ID — used to compare current content against live schedule state. */
+  publishedAbsenceTypeId?: number | null;
+  /** Published custom start time override — used for published-vs-current diff badges. */
+  publishedCustomStartTime?: string | null;
+  /** Published custom end time override — used for published-vs-current diff badges. */
+  publishedCustomEndTime?: string | null;
   /** Draft classification for this cell — used to show NEW badge on single-shift pills */
   draftKind?: DraftKind;
   /** Commits the current local draft to the server. */
@@ -61,6 +81,8 @@ interface ShiftEditPanelProps {
   focusAreas?: FocusArea[];
   /** All certifications — used to resolve certificationId to names */
   certifications?: NamedItem[];
+  /** Organization roles — used to restrict job eligibility to schedule roles. */
+  orgRoles?: NamedItem[];
   /** Audit metadata — only populated for admin+ users. */
   auditInfo?: {
     createdByName: string | null;
@@ -88,8 +110,6 @@ interface ShiftEditPanelProps {
   onSubmitSwap?: (targetEmpId: string, targetShiftDate: string) => void;
   /** Available absence types for off-day selection. */
   absenceTypes?: AbsenceType[];
-  /** Called when user selects an absence type (off day). */
-  onAbsenceSelect?: (absenceType: AbsenceType) => void;
   /** Currently active absence type ID on this cell. */
   currentAbsenceTypeId?: number | null;
   /** Cross-date overlap warnings to display (non-blocking). */
@@ -174,6 +194,31 @@ function parseMultiTimes(time: string | null | undefined, count: number): (strin
   if (!time) return Array(count).fill(null);
   const parts = time.split('|');
   return Array.from({ length: count }, (_, i) => parts[i] || null);
+}
+
+function getPanelDiffBadgeBackground(
+  kind: ShiftDiffBadgeDescriptor['kind'],
+): string {
+  switch (kind) {
+    case 'new':
+      return 'var(--color-success-text)';
+    default:
+      return 'var(--color-warning)';
+  }
+}
+
+function getPanelDiffBorder(args: {
+  diffKind: ShiftDiffBorderKind;
+  fallback: string;
+}): string {
+  const { diffKind, fallback } = args;
+  if (diffKind === 'new') {
+    return `2px dashed var(--color-success-text)`;
+  }
+  if (diffKind === 'modified') {
+    return `2px dashed var(--color-warning)`;
+  }
+  return fallback;
 }
 
 function joinMultiTimes(times: (string | null)[]): string | null {
@@ -557,9 +602,11 @@ function PillTimeEditor({
 export default function ShiftEditPanel({
   modal,
   currentShift,
-  currentShiftCodeIds = [],
-  shiftCodes,
+  currentAssignmentIds = [],
+  currentSegments = [],
+  assignments,
   shiftCategories = [],
+  jobs = [],
   indicatorTypes = [],
   onSelect,
   onClose,
@@ -568,18 +615,23 @@ export default function ShiftEditPanel({
   getActiveIndicatorIds,
   onNoteToggle,
   seriesId,
+  fromRecurring = false,
   onRepeatConfirm,
   isCreatingRepeatSeries = false,
   empId,
   customStartTime,
   customEndTime,
   onCustomTimeChange,
-  publishedShiftCodeIds = [],
+  publishedAssignmentIds = [],
+  publishedAbsenceTypeId = null,
+  publishedCustomStartTime = null,
+  publishedCustomEndTime = null,
   draftKind = null,
   onConfirmDraft,
   isStale = false,
   focusAreas = [],
   certifications = [],
+  orgRoles = [],
   auditInfo,
   isOwnShift = false,
   hasActiveRequest = false,
@@ -591,13 +643,23 @@ export default function ShiftEditPanel({
   getShiftTimeRanges,
   onSubmitSwap,
   absenceTypes = [],
-  onAbsenceSelect,
   currentAbsenceTypeId,
   overlapWarnings = [],
   enforceConflicts = false,
   shiftDisplayMode = "code",
 }: ShiftEditPanelProps) {
   const isNameMode = shiftDisplayMode === "name";
+  const assignableShiftDisplayMap = useMemo(
+    () =>
+      buildAssignableShiftDisplayMap({
+        assignments: assignments,
+        shiftCategories,
+        jobs,
+        focusAreas: focusAreas ?? [],
+        shiftDisplayMode,
+      }),
+    [focusAreas, jobs, shiftCategories, assignments, shiftDisplayMode],
+  );
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
   const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
@@ -645,14 +707,15 @@ export default function ShiftEditPanel({
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
-  const [initialShiftCodeIds] = useState(() => [...currentShiftCodeIds]);
+  const [initialAssignmentIds] = useState(() => [...currentAssignmentIds]);
+  const [initialSegments] = useState(() => currentSegments.map((segment) => ({ ...segment })));
   const [initialAbsenceTypeId] = useState(() => currentAbsenceTypeId ?? null);
   const [initialCustomStartTime] = useState(() => customStartTime ?? null);
   const [initialCustomEndTime] = useState(() => customEndTime ?? null);
   const [initialNotesByFocusArea] = useState<Record<number, number[]>>(() => {
     if (!getActiveIndicatorIds) return {};
     const focusAreaIds = new Set<number>(modal.empFocusAreaIds);
-    for (const st of shiftCodes) {
+    for (const st of assignments) {
       if (st.focusAreaId != null) focusAreaIds.add(st.focusAreaId);
     }
     const record: Record<number, number[]> = {};
@@ -661,6 +724,73 @@ export default function ShiftEditPanel({
     }
     return record;
   });
+  const hasPublishedBaseline =
+    publishedAssignmentIds.length > 0 || publishedAbsenceTypeId != null;
+  const panelDiff = useMemo(
+    () =>
+      buildShiftDiffDescriptors({
+        before: {
+          assignmentIds: hasPublishedBaseline
+            ? publishedAssignmentIds
+            : initialAssignmentIds,
+          absenceTypeId: hasPublishedBaseline
+            ? publishedAbsenceTypeId
+            : initialAbsenceTypeId,
+          timeRanges: hasPublishedBaseline
+            ? expandDelimitedTimeRanges(
+                publishedCustomStartTime,
+                publishedCustomEndTime,
+                publishedAssignmentIds.length,
+              )
+            : expandDelimitedTimeRanges(
+                initialCustomStartTime,
+                initialCustomEndTime,
+                initialAssignmentIds.length,
+              ),
+        },
+        after: {
+          assignmentIds: currentAssignmentIds,
+          absenceTypeId: currentAbsenceTypeId ?? null,
+          timeRanges: expandDelimitedTimeRanges(
+            customStartTime,
+            customEndTime,
+            currentAssignmentIds.length,
+          ),
+        },
+        beforeShiftLabels: (
+          hasPublishedBaseline ? publishedAssignmentIds : initialAssignmentIds
+        ).map((assignmentId) => assignableShiftDisplayMap.get(assignmentId) ?? "?"),
+        afterShiftLabels: currentAssignmentIds.map(
+          (assignmentId) => assignableShiftDisplayMap.get(assignmentId) ?? "?",
+        ),
+        resolveAssignmentDefinitionLabel: (assignmentId) => {
+          return assignableShiftDisplayMap.get(assignmentId) ?? "?";
+        },
+        resolveAbsenceLabel: (absenceTypeId) => {
+          const absenceType = absenceTypes.find((item) => item.id === absenceTypeId);
+          if (!absenceType) return "?";
+          return isNameMode ? (absenceType.name || absenceType.label) : absenceType.label;
+        },
+      }),
+    [
+      hasPublishedBaseline,
+      publishedAssignmentIds,
+      publishedAbsenceTypeId,
+      publishedCustomStartTime,
+      publishedCustomEndTime,
+      initialAssignmentIds,
+      initialAbsenceTypeId,
+      initialCustomStartTime,
+      initialCustomEndTime,
+      currentAssignmentIds,
+      currentAbsenceTypeId,
+      customStartTime,
+      customEndTime,
+      assignableShiftDisplayMap,
+      absenceTypes,
+      isNameMode,
+    ],
+  );
 
   // Derive whether any edits have been made since panel opened
   const hasShiftEdit = currentShift !== initialShift || (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId;
@@ -700,12 +830,11 @@ export default function ShiftEditPanel({
     }
 
     const codeLabel = (id: number): string => {
-      const sc = shiftCodes.find(s => s.id === id);
-      return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?';
+      return assignableShiftDisplayMap.get(id) ?? "?";
     };
 
-    const initIds = initialShiftCodeIds;
-    const curIds = currentShiftCodeIds;
+    const initIds = initialAssignmentIds;
+    const curIds = currentAssignmentIds;
 
     // Single pill
     if (initIds.length <= 1 && curIds.length <= 1) {
@@ -736,10 +865,9 @@ export default function ShiftEditPanel({
   function describeTimeChange(): string | null {
     if (!hasTimeEdit) return null;
 
-    const pillCount = currentShiftCodeIds.length;
+    const pillCount = currentAssignmentIds.length;
     const codeLabel = (id: number): string => {
-      const sc = shiftCodes.find(s => s.id === id);
-      return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : '?';
+      return assignableShiftDisplayMap.get(id) ?? "?";
     };
 
     // Single pill
@@ -754,7 +882,7 @@ export default function ShiftEditPanel({
     }
 
     // Multi-pill: per-pill detail
-    const maxPills = Math.max(initialShiftCodeIds.length, pillCount);
+    const maxPills = Math.max(initialAssignmentIds.length, pillCount);
     const initStarts = parseMultiTimes(initialCustomStartTime, maxPills);
     const initEnds = parseMultiTimes(initialCustomEndTime, maxPills);
     const curStarts = parseMultiTimes(customStartTime, maxPills);
@@ -763,7 +891,7 @@ export default function ShiftEditPanel({
     const parts: string[] = [];
     for (let i = 0; i < pillCount; i++) {
       if (initStarts[i] === curStarts[i] && initEnds[i] === curEnds[i]) continue;
-      const label = currentShiftCodeIds[i] != null ? codeLabel(currentShiftCodeIds[i]) : '?';
+      const label = currentAssignmentIds[i] != null ? codeLabel(currentAssignmentIds[i]) : '?';
       const hadPillTime = initStarts[i] != null || initEnds[i] != null;
       const hasPillTime = curStarts[i] != null || curEnds[i] != null;
       if (!hadPillTime && hasPillTime) {
@@ -803,19 +931,57 @@ export default function ShiftEditPanel({
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
   const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
+  function buildPanelInput(args: {
+    segments: Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position">>;
+    absenceTypeId: number | null;
+    customStartTime: string | null;
+    customEndTime: string | null;
+  }): ScheduleCellInput | null {
+    if (args.absenceTypeId != null) {
+      return {
+        kind: "absence",
+        segments: [],
+        absenceTypeId: args.absenceTypeId,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: seriesId ?? null,
+        fromRecurring,
+      };
+    }
+
+    if (args.segments.length === 0) {
+      return null;
+    }
+
+    return {
+      kind: "worked",
+      segments: args.segments.map((segment, index) => ({
+        shiftId: segment.shiftId,
+        jobId: segment.jobId,
+        position: segment.position ?? index,
+      })),
+      absenceTypeId: null,
+      customStartTime: args.customStartTime,
+      customEndTime: args.customEndTime,
+      seriesId: seriesId ?? null,
+      fromRecurring,
+    };
+  }
+
   function handleUndo() {
     // Revert absence type if it changed
-    if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId) {
-      if (initialAbsenceTypeId != null) {
-        const at = absenceTypes.find(a => a.id === initialAbsenceTypeId);
-        if (at) onAbsenceSelect?.(at);
-      } else {
-        // Was a shift code before, revert to it
-        onSelect(initialShift ?? "OFF", initialShiftCodeIds);
-      }
-    } else if (currentShift !== initialShift) {
-      // Revert shift if it changed (non-absence case)
-      onSelect(initialShift ?? "OFF", initialShiftCodeIds);
+    if (
+      (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
+      currentShift !== initialShift
+    ) {
+      onSelect(
+        buildPanelInput({
+          segments: initialSegments,
+          absenceTypeId: initialAbsenceTypeId,
+          customStartTime: initialCustomStartTime,
+          customEndTime: initialCustomEndTime,
+        }),
+      );
     }
     // Revert custom times if changed
     if (hasTimeEdit && onCustomTimeChange) {
@@ -838,12 +1004,12 @@ export default function ShiftEditPanel({
   }
 
   // Resolve effective default times: shift code custom times → category times
-  function resolveDefaultTimes(shiftCode: ShiftCode | undefined): { start: string | null; end: string | null } {
-    if (shiftCode?.defaultStartTime && shiftCode?.defaultEndTime) {
-      return { start: shiftCode.defaultStartTime, end: shiftCode.defaultEndTime };
+  function resolveDefaultTimes(assignment: AssignmentDefinition | undefined): { start: string | null; end: string | null } {
+    if (assignment?.defaultStartTime && assignment?.defaultEndTime) {
+      return { start: assignment.defaultStartTime, end: assignment.defaultEndTime };
     }
-    if (shiftCode?.categoryId && shiftCategories.length > 0) {
-      const cat = shiftCategories.find(c => c.id === shiftCode.categoryId);
+    if (assignment?.categoryId && shiftCategories.length > 0) {
+      const cat = shiftCategories.find(c => c.id === assignment.categoryId);
       if (cat?.startTime && cat?.endTime) {
         return { start: cat.startTime, end: cat.endTime };
       }
@@ -852,18 +1018,18 @@ export default function ShiftEditPanel({
   }
 
   // Compute custom-time bounds from the shift code's category (±1hr buffer)
-  function getTimeBounds(shiftCode: ShiftCode | undefined): { minTime: string | null; maxTime: string | null } {
+  function getTimeBounds(assignment: AssignmentDefinition | undefined): { minTime: string | null; maxTime: string | null } {
     let windowStart: string | null = null;
     let windowEnd: string | null = null;
 
-    if (shiftCode?.categoryId && shiftCategories.length > 0) {
-      const cat = shiftCategories.find(c => c.id === shiftCode.categoryId);
+    if (assignment?.categoryId && shiftCategories.length > 0) {
+      const cat = shiftCategories.find(c => c.id === assignment.categoryId);
       windowStart = cat?.startTime ?? null;
       windowEnd = cat?.endTime ?? null;
     }
     // Fallback to code defaults if category has no times
-    if (!windowStart) windowStart = shiftCode?.defaultStartTime ?? null;
-    if (!windowEnd) windowEnd = shiftCode?.defaultEndTime ?? null;
+    if (!windowStart) windowStart = assignment?.defaultStartTime ?? null;
+    if (!windowEnd) windowEnd = assignment?.defaultEndTime ?? null;
 
     return {
       minTime: windowStart ? subtractOneHour(windowStart) : null,
@@ -872,17 +1038,17 @@ export default function ShiftEditPanel({
   }
 
   // ── Double-shift time-sequential filtering ──────────────────────────────
-  const isAddingSecondShift = showPicker && currentShiftCodeIds.length === 1;
-  const firstShiftId = isAddingSecondShift ? currentShiftCodeIds[0] : null;
+  const isAddingSecondShift = showPicker && currentAssignmentIds.length === 1;
+  const firstShiftId = isAddingSecondShift ? currentAssignmentIds[0] : null;
 
   const firstShiftEndTime: string | null = (() => {
     if (!isAddingSecondShift) return null;
-    const firstCode = shiftCodes.find(sc => sc.id === firstShiftId);
+    const firstCode = assignments.find(sc => sc.id === firstShiftId);
     return resolveDefaultTimes(firstCode).end;
   })();
 
-  const pickerShiftCodes = isAddingSecondShift && firstShiftEndTime
-    ? shiftCodes.filter(sc => {
+  const pickerAssignmentDefinitions = isAddingSecondShift && firstShiftEndTime
+    ? assignments.filter(sc => {
         // Never show the already-selected first shift
         if (sc.id === firstShiftId) return false;
         if (sc.isGeneral) return false;
@@ -891,13 +1057,13 @@ export default function ShiftEditPanel({
         // Candidate must start at or after first shift ends (prevents overlap + same-time)
         return timeToMinutes(start) >= timeToMinutes(firstShiftEndTime);
       })
-    : shiftCodes;
+    : assignments;
 
   const pickerAbsenceTypes = isAddingSecondShift ? [] : absenceTypes;
 
   // When shift is cleared externally, return to picker
   useEffect(() => {
-    if (!currentShift || currentShift === "OFF") {
+    if (typeof currentShift !== "string" || !currentShift || currentShift === "OFF") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowPicker(true);
     }
@@ -907,17 +1073,72 @@ export default function ShiftEditPanel({
   const primaryFocusAreaId = modal.empFocusAreaIds[0] ?? 0;
   const [activeTab] = useState<number>(primaryFocusAreaId);
 
-  const currentLabels = currentShift
+  const currentLabels = typeof currentShift === "string" && currentShift
     ? currentShift.split("/").filter((l) => l !== "OFF")
     : [];
 
-  function getShiftCodeStyle(label: string, codeId?: number) {
+  function resolveShiftPreview(
+    codeId?: number | null,
+    fallbackLabel?: string | null,
+  ) {
+    const assignment =
+      (codeId != null
+        ? assignments.find((candidate) => candidate.id === codeId)
+        : undefined) ??
+      assignments.find(
+        (candidate) =>
+          candidate.label === fallbackLabel || candidate.name === fallbackLabel,
+      ) ??
+      null;
+
+    if (!assignment) {
+      return {
+        assignment: null,
+        displayParts: {
+          primaryLabel: fallbackLabel ?? "",
+          secondaryLabel: null,
+        },
+      };
+    }
+
+    const shiftCategoryId = assignment.shiftId ?? assignment.categoryId ?? null;
+    const shiftCategory =
+      shiftCategoryId != null
+        ? shiftCategories.find((category) => category.id === shiftCategoryId) ??
+          null
+        : null;
+    const job =
+      assignment.jobId != null
+        ? jobs.find((candidate) => candidate.id === assignment.jobId) ?? null
+        : null;
+
+    return {
+      assignment,
+      displayParts: buildShiftDisplayParts({
+        shift: shiftCategory,
+        job,
+        assignment,
+        shiftDisplayMode,
+      }),
+    };
+  }
+
+  function formatPreviewLabel(input: {
+    primaryLabel: string;
+    secondaryLabel: string | null;
+  }): string {
+    return input.secondaryLabel
+      ? `${input.primaryLabel} · ${input.secondaryLabel}`
+      : input.primaryLabel;
+  }
+
+  function getAssignmentDefinitionStyle(label: string, codeId?: number) {
     if (codeId != null) {
-      const byId = shiftCodes.find((st) => st.id === codeId);
+      const byId = assignments.find((st) => st.id === codeId);
       if (byId) return byId;
     }
     return (
-      shiftCodes.find((st) => st.label === label) ?? {
+      assignments.find((st) => st.label === label) ?? {
         color: "var(--color-bg)",
         border: "var(--color-border)",
         text: "var(--color-text-muted)",
@@ -1760,24 +1981,64 @@ export default function ShiftEditPanel({
     );
   }
 
+  function renderShiftDiffBadge(
+    badge: ShiftDiffBadgeDescriptor | null,
+    index?: number,
+  ) {
+    if (!badge || (badge.kind === "new" && badge.text === "New")) return null;
+    return (
+      <span
+        data-shift-diff-badge={badge.kind}
+        data-shift-diff-index={index != null ? String(index) : undefined}
+        style={{
+          position: "absolute",
+          top: -10,
+          left: 12,
+          fontSize: "var(--dg-fs-badge)",
+          fontWeight: 800,
+          letterSpacing: "0.05em",
+          background: getPanelDiffBadgeBackground(badge.kind),
+          color: "var(--color-text-inverse)",
+          borderRadius: 3,
+          padding: "3px 8px",
+          lineHeight: 1,
+          pointerEvents: "none",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+          zIndex: 2,
+        }}
+      >
+        {badge.text}
+      </span>
+    );
+  }
+
   function renderCurrentShiftPill() {
     if (!hasActiveShift || currentLabels.length === 0) return null;
     const noteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab) : [];
+    const cellDiffBadge = panelDiff.cellBadge;
+    const cellBorderKind: ShiftDiffBorderKind =
+      cellDiffBadge?.kind === 'new'
+        ? 'new'
+        : cellDiffBadge
+          ? 'modified'
+          : null;
 
     // Absence type pill — use absence type colors directly
     if (isAbsence) {
       const at = absenceTypes.find(a => a.id === currentAbsenceTypeId);
       if (!at) return null;
-      const isCellNew = draftKind === 'new';
-      const isCellModified = draftKind === 'modified';
       const absenceLabel = isNameMode ? (at.name || at.label) : at.label;
       return (
         <div
           style={{
             background: at.color,
-            border: isCellNew
-              ? `2px dashed ${darkenColor(at.color, 0.35)}`
-              : `1.5px solid ${at.border === 'transparent' ? darkenColor(at.color, 0.25) : at.border}`,
+            border: getPanelDiffBorder({
+              diffKind: cellBorderKind,
+              fallback:
+                at.border === 'transparent'
+                  ? `1.5px solid ${darkenColor(at.color, 0.25)}`
+                  : `1.5px solid ${at.border}`,
+            }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
             padding: "12px 16px",
@@ -1790,27 +2051,7 @@ export default function ShiftEditPanel({
             gap: 2,
           }}
         >
-          {(isCellNew || isCellModified) && (
-            <span
-              style={{
-                position: "absolute",
-                top: -10,
-                left: 12,
-                fontSize: "var(--dg-fs-badge)",
-                fontWeight: 800,
-                letterSpacing: "0.05em",
-                background: isCellNew ? "var(--color-success-text)" : "var(--color-warning)",
-                color: "var(--color-text-inverse)",
-                borderRadius: 4,
-                padding: "3px 8px",
-                lineHeight: 1,
-                pointerEvents: "none",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-              }}
-            >
-              {isCellNew ? "NEW" : "EDITED"}
-            </span>
-          )}
+          {renderShiftDiffBadge(cellDiffBadge)}
           <MaybeHint content={absenceLabel} side="top">
             <span style={{
             fontWeight: 800,
@@ -1838,21 +2079,19 @@ export default function ShiftEditPanel({
     }
 
     if (currentLabels.length === 1) {
-      const label = currentLabels[0];
-      const s = getShiftCodeStyle(label, currentShiftCodeIds[0]);
-      const fullName = (s as ShiftCode).name && (s as ShiftCode).name !== label ? (s as ShiftCode).name : null;
-      const faName = (s as ShiftCode).focusAreaId != null
-        ? focusAreas.find(fa => fa.id === (s as ShiftCode).focusAreaId)?.name
-        : undefined;
-      const isCellNew = draftKind === 'new';
-      const isCellModified = draftKind === 'modified';
+      const preview = resolveShiftPreview(currentAssignmentIds[0], currentLabels[0]);
+      const s =
+        preview.assignment ??
+        getAssignmentDefinitionStyle(currentLabels[0], currentAssignmentIds[0]);
+      const previewLabel = formatPreviewLabel(preview.displayParts);
       return (
         <div
           style={{
             background: s.color,
-            border: isCellNew
-              ? `2px dashed ${darkenColor(s.color, 0.35)}`
-              : `1.5px solid ${darkenColor(s.color, 0.25)}`,
+            border: getPanelDiffBorder({
+              diffKind: cellBorderKind,
+              fallback: `1.5px solid ${darkenColor(s.color, 0.25)}`,
+            }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
             padding: isNameMode ? "12px 16px" : "10px 16px",
@@ -1865,28 +2104,8 @@ export default function ShiftEditPanel({
             gap: 4,
           }}
         >
-          {(isCellNew || isCellModified) && (
-            <span
-              style={{
-                position: "absolute",
-                top: -10,
-                left: 12,
-                fontSize: "var(--dg-fs-badge)",
-                fontWeight: 800,
-                letterSpacing: "0.05em",
-                background: isCellNew ? "var(--color-success-text)" : "var(--color-warning)",
-                color: "var(--color-text-inverse)",
-                borderRadius: 4,
-                padding: "3px 8px",
-                lineHeight: 1,
-                pointerEvents: "none",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-              }}
-            >
-              {isCellNew ? "NEW" : "EDITED"}
-            </span>
-          )}
-          <MaybeHint content={label} side="top">
+          {renderShiftDiffBadge(cellDiffBadge)}
+          <MaybeHint content={previewLabel} side="top">
             <span style={{
             fontWeight: 800,
             fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
@@ -1900,19 +2119,19 @@ export default function ShiftEditPanel({
               ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
               : { whiteSpace: "nowrap" }),
             }}>
-              {label}
+              {preview.displayParts.primaryLabel}
             </span>
           </MaybeHint>
-          {(fullName || faName) && (
+          {preview.displayParts.secondaryLabel ? (
             <MaybeHint
-              content={[fullName, faName].filter(Boolean).join(" · ")}
+              content={previewLabel}
               side="top"
             >
               <span style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {fullName}{fullName && faName ? " · " : ""}{faName}
+                {preview.displayParts.secondaryLabel}
               </span>
             </MaybeHint>
-          )}
+          ) : null}
           {renderNoteDots(noteTypes)}
         </div>
       );
@@ -1922,57 +2141,37 @@ export default function ShiftEditPanel({
     return (
       <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {currentLabels.map((label, i) => {
-          const s = getShiftCodeStyle(label, currentShiftCodeIds[i]);
-          const fullName = (s as ShiftCode).name && (s as ShiftCode).name !== label ? (s as ShiftCode).name : null;
-          const shiftCode = currentShiftCodeIds[i] != null
-            ? shiftCodes.find((st) => st.id === currentShiftCodeIds[i])
-            : shiftCodes.find((st) => st.label === label);
-          const shiftFaId = shiftCode?.focusAreaId;
+          const preview = resolveShiftPreview(currentAssignmentIds[i], label);
+          const s =
+            preview.assignment ?? getAssignmentDefinitionStyle(label, currentAssignmentIds[i]);
+          const previewLabel = formatPreviewLabel(preview.displayParts);
+          const assignment =
+            preview.assignment ??
+            (currentAssignmentIds[i] != null
+              ? assignments.find((st) => st.id === currentAssignmentIds[i])
+              : assignments.find((st) => st.label === label));
+          const shiftFaId = assignment?.focusAreaId;
           const shiftWingId = shiftFaId ?? activeTab;
           const pillNoteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(shiftWingId) : [];
-          const isNewPill = (draftKind === 'new' && !initialShiftCodeIds.includes(currentShiftCodeIds[i]))
-            || (draftKind !== 'new' && publishedShiftCodeIds.length > 0 && !publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
-          const isModifiedPill = draftKind === 'modified' && !isNewPill
-            && !(publishedShiftCodeIds.length > 0 && publishedShiftCodeIds.includes(currentShiftCodeIds[i]));
-          const faName = shiftCode?.focusAreaId != null
-            ? focusAreas.find(fa => fa.id === shiftCode.focusAreaId)?.name
-            : undefined;
-          const { start: defaultStart, end: defaultEnd } = resolveDefaultTimes(shiftCode);
+          const pillDiff = panelDiff.pillDiffs[i] ?? {
+            borderKind: null,
+            badge: null,
+          };
+          const { start: defaultStart, end: defaultEnd } = resolveDefaultTimes(assignment);
           return (
             <div
               key={label + i}
               style={{
-                border: isNewPill
-                  ? `2px dashed ${darkenColor(s.color, 0.35)}`
-                  : `1.5px solid ${darkenColor(s.color, 0.25)}`,
+                border: getPanelDiffBorder({
+                  diffKind: pillDiff.borderKind,
+                  fallback: `1.5px solid ${darkenColor(s.color, 0.25)}`,
+                }),
                 borderRadius: "var(--dg-radius-md)",
                 overflow: "visible",
                 position: "relative",
               }}
             >
-              {/* NEW / EDITED badge */}
-              {(isNewPill || isModifiedPill) && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -10,
-                    left: 12,
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 800,
-                    letterSpacing: "0.05em",
-                    background: isNewPill ? "var(--color-success-text)" : "var(--color-warning)",
-                    color: "var(--color-text-inverse)",
-                    borderRadius: 4,
-                    padding: "3px 8px",
-                    lineHeight: 1,
-                    pointerEvents: "none",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-                    zIndex: 2,
-                  }}
-                >
-                  {isNewPill ? "NEW" : "EDITED"}
-                </span>
-              )}
+              {renderShiftDiffBadge(pillDiff.badge, i)}
               {/* Pill header */}
               <div
                 style={{
@@ -1989,7 +2188,7 @@ export default function ShiftEditPanel({
                 }}
               >
                 <div style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}>
-                  <MaybeHint content={label} side="top">
+                  <MaybeHint content={previewLabel} side="top">
                     <span style={{
                     fontWeight: 800,
                     fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
@@ -2002,25 +2201,25 @@ export default function ShiftEditPanel({
                       ? { WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
                       : { whiteSpace: "nowrap" }),
                     }}>
-                      {label}
+                      {preview.displayParts.primaryLabel}
                     </span>
                   </MaybeHint>
-                  {(fullName || faName) && (
+                  {preview.displayParts.secondaryLabel ? (
                     <MaybeHint
-                      content={[fullName, faName].filter(Boolean).join(" · ")}
+                      content={previewLabel}
                       side="top"
                     >
                       <div style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {fullName}{fullName && faName ? " · " : ""}{faName}
+                        {preview.displayParts.secondaryLabel}
                       </div>
                     </MaybeHint>
-                  )}
+                  ) : null}
                 </div>
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
                   <button
                     onClick={() => setPendingDelete({ type: "pill", index: i })}
-                    aria-label={`Remove ${label}`}
+                    aria-label={`Remove ${previewLabel}`}
                     style={{
                       position: "absolute",
                       top: 8,
@@ -2080,8 +2279,8 @@ export default function ShiftEditPanel({
                       customEnd={pillEnds[i]}
                       defaultStart={defaultStart}
                       defaultEnd={defaultEnd}
-                      minTime={getTimeBounds(shiftCode).minTime}
-                      maxTime={getTimeBounds(shiftCode).maxTime}
+                      minTime={getTimeBounds(assignment).minTime}
+                      maxTime={getTimeBounds(assignment).maxTime}
                       onSave={(start, end) => {
                         const newStarts = [...pillStarts];
                         const newEnds = [...pillEnds];
@@ -2372,9 +2571,18 @@ export default function ShiftEditPanel({
               ref={repeatFormRef}
               empId={empId}
               shiftLabel={currentLabels[0] ?? ""}
-              shiftCodeId={currentShiftCodeIds[0] ?? 0}
+              selectionInput={buildPanelInput({
+                segments: currentSegments,
+                absenceTypeId: currentAbsenceTypeId ?? null,
+                customStartTime: customStartTime ?? null,
+                customEndTime: customEndTime ?? null,
+              })}
+              selectionSegments={currentSegments}
               startDate={modal.date}
-              shiftCodes={shiftCodes}
+              assignments={assignments}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
+              shiftDisplayMode={shiftDisplayMode}
               onConfirm={onRepeatConfirm}
               absenceType={isAbsence ? absenceTypes?.find(at => at.id === currentAbsenceTypeId) : undefined}
             />
@@ -2386,9 +2594,9 @@ export default function ShiftEditPanel({
 
               {/* Custom time override — single-shift only (multi-shift has per-pill editors); hidden for absence types */}
               {hasActiveShift && !currentAbsenceTypeId && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
-                const matchedCode = currentShiftCodeIds[0] != null
-                  ? shiftCodes.find(st => st.id === currentShiftCodeIds[0])
-                  : shiftCodes.find(st => st.label === currentLabels[0]);
+                const matchedCode = currentAssignmentIds[0] != null
+                  ? assignments.find(st => st.id === currentAssignmentIds[0])
+                  : assignments.find(st => st.label === currentLabels[0]);
                 const defaults = resolveDefaultTimes(matchedCode);
                 return (
                   <div style={{ marginBottom: 16 }}>
@@ -2577,7 +2785,7 @@ export default function ShiftEditPanel({
 
               {/* Add another shift — hidden when at max (2), absence type, or first shift has no resolvable end time */}
               {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (() => {
-                const firstCode = shiftCodes.find(sc => sc.id === currentShiftCodeIds[0]);
+                const firstCode = assignments.find(sc => sc.id === currentAssignmentIds[0]);
                 return firstCode ? resolveDefaultTimes(firstCode).end != null : true;
               })() && (
                 <div style={{ marginTop: 8 }}>
@@ -2740,7 +2948,7 @@ export default function ShiftEditPanel({
               )}
 
               {/* Shift Picker Component */}
-              {isAddingSecondShift && pickerShiftCodes.length === 0 ? (
+              {isAddingSecondShift && pickerAssignmentDefinitions.length === 0 ? (
                 <div
                   style={{
                     padding: "24px 16px",
@@ -2754,31 +2962,47 @@ export default function ShiftEditPanel({
               ) : (
                 <div data-tour="shift-picker">
                 <ShiftPicker
-                  shiftCodes={pickerShiftCodes}
+                  assignments={pickerAssignmentDefinitions}
+                  shiftCategories={shiftCategories}
+                  jobs={jobs}
+                  orgRoles={orgRoles}
+                  certifications={certifications}
                   absenceTypes={pickerAbsenceTypes}
                   focusAreas={focusAreas}
-                  currentShiftCodeIds={currentShiftCodeIds}
+                  currentAssignmentDefinitionIds={currentAssignmentIds}
+                  currentSegments={currentSegments.map((segment, index) => ({
+                    shiftId: segment.shiftId,
+                    jobId: segment.jobId,
+                    position: segment.position ?? index,
+                  }))}
                   currentAbsenceTypeId={currentAbsenceTypeId}
-                  onSelect={(_label, ids) => {
-                    // Reconstruct label from full shiftCodes — the picker may have
-                    // a filtered list that can't resolve the first shift's label.
-                    const isNameMode = shiftDisplayMode === "name";
-                    const fullLabel = ids
-                      .map(id => {
-                        const sc = shiftCodes.find(c => c.id === id);
-                        return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : null;
-                      })
-                      .filter((l): l is string => l != null && l !== "OFF")
-                      .join("/") || _label;
-                    onSelect(fullLabel, ids, seriesId ? seriesScope : undefined);
-                    if (fullLabel !== "OFF") setShowPicker(false);
+                  onSelect={(segments) => {
+                    onSelect(
+                      buildPanelInput({
+                        segments,
+                        absenceTypeId: null,
+                        customStartTime: customStartTime ?? null,
+                        customEndTime: customEndTime ?? null,
+                      }),
+                      seriesId ? seriesScope : undefined,
+                    );
+                    if (segments.length > 0) setShowPicker(false);
                   }}
                   onAbsenceSelect={(at) => {
-                    onAbsenceSelect?.(at);
+                    onSelect(
+                      buildPanelInput({
+                        segments: [],
+                        absenceTypeId: at.id,
+                        customStartTime: null,
+                        customEndTime: null,
+                      }),
+                      seriesId ? seriesScope : undefined,
+                    );
                     setShowPicker(false);
                   }}
                   empFocusAreaIds={modal.empFocusAreaIds}
                   empCertificationId={modal.empCertificationId}
+                  empRoleIds={modal.empRoleIds}
                   initialTab={modal.activeFocusAreaId}
                   multiSelect={true}
                   closeOnSelect={false}
@@ -2900,26 +3124,24 @@ export default function ShiftEditPanel({
           variant="danger"
           onConfirm={() => {
             if (pendingDelete.type === "all") {
-              onSelect("OFF", [], seriesId ? seriesScope : undefined);
+              onSelect(null, seriesId ? seriesScope : undefined);
               if (onCustomTimeChange) onCustomTimeChange(null, null);
             } else {
               const removedIdx = pendingDelete.index;
-              const remainingIds = currentShiftCodeIds.filter((_, j) => j !== removedIdx);
-              const remainingLabels = remainingIds
-                .map(id => {
-                  const sc = shiftCodes.find(s => s.id === id);
-                  return sc ? (isNameMode ? (sc.name || sc.label) : sc.label) : null;
-                })
-                .filter((l): l is string => l != null);
+              const remainingSegments = currentSegments.filter((_, j) => j !== removedIdx);
               onSelect(
-                remainingLabels.length > 0 ? remainingLabels.join("/") : "OFF",
-                remainingIds,
+                buildPanelInput({
+                  segments: remainingSegments,
+                  absenceTypeId: null,
+                  customStartTime: customStartTime ?? null,
+                  customEndTime: customEndTime ?? null,
+                }),
                 seriesId ? seriesScope : undefined,
               );
               // Realign pipe-delimited custom times by removing the deleted pill's entry
               if (onCustomTimeChange) {
-                const pillStarts = parseMultiTimes(customStartTime, currentShiftCodeIds.length);
-                const pillEnds = parseMultiTimes(customEndTime, currentShiftCodeIds.length);
+                const pillStarts = parseMultiTimes(customStartTime, currentAssignmentIds.length);
+                const pillEnds = parseMultiTimes(customEndTime, currentAssignmentIds.length);
                 pillStarts.splice(removedIdx, 1);
                 pillEnds.splice(removedIdx, 1);
                 onCustomTimeChange(joinMultiTimes(pillStarts), joinMultiTimes(pillEnds));

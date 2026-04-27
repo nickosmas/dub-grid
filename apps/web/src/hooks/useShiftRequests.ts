@@ -5,6 +5,7 @@ import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import type {
+  ScheduleCellInput,
   ShiftRequest,
   ShiftRequestType,
   ShiftRequestStatus,
@@ -60,10 +61,8 @@ export interface ShiftRequestsData {
   volunteer: (
     empId: string,
     shiftDate: string,
-    shiftCodeIds: number[],
+    input: ScheduleCellInput,
     focusAreaId: number,
-    customStartTime: string | null,
-    customEndTime: string | null
   ) => Promise<boolean>;
   /** Cancel your own request. */
   cancel: (requestId: string, empId: string) => Promise<boolean>;
@@ -71,7 +70,7 @@ export interface ShiftRequestsData {
 
 export function useShiftRequests(
   orgId: string | null,
-  shiftCodeMap: Map<number, string>,
+  assignmentLabelMap: Map<number, string>,
   currentEmpId: string | null,
   canApprove: boolean
 ): ShiftRequestsData {
@@ -86,12 +85,12 @@ export function useShiftRequests(
 
   // Stabilize the Map reference: serialize to a string key so useCallback
   // doesn't get a new identity every render (Map is compared by reference).
-  const shiftCodeMapKey = useMemo(
-    () => JSON.stringify([...shiftCodeMap.entries()].sort((a, b) => a[0] - b[0])),
-    [shiftCodeMap],
+  const assignmentLabelMapKey = useMemo(
+    () => JSON.stringify([...assignmentLabelMap.entries()].sort((a, b) => a[0] - b[0])),
+    [assignmentLabelMap],
   );
-  const shiftCodeMapRef = useRef(shiftCodeMap);
-  shiftCodeMapRef.current = shiftCodeMap;
+  const assignmentLabelMapRef = useRef(assignmentLabelMap);
+  assignmentLabelMapRef.current = assignmentLabelMap;
 
   const fetchRequests = useCallback(async () => {
     if (!orgId) {
@@ -101,7 +100,7 @@ export function useShiftRequests(
     }
     try {
       setError(null);
-      const data = await fetchShiftRequests(orgId, shiftCodeMapRef.current, {
+      const data = await fetchShiftRequests(orgId, assignmentLabelMapRef.current, {
         status: [
           "open",
           "pending_approval",
@@ -119,9 +118,9 @@ export function useShiftRequests(
     } finally {
       setLoading(false);
     }
-  // shiftCodeMapKey is intentional: stabilization proxy for Map reference (read via shiftCodeMapRef.current)
+  // assignmentLabelMapKey is intentional: stabilization proxy for Map reference (read via assignmentLabelMapRef.current)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, shiftCodeMapKey]);
+  }, [orgId, assignmentLabelMapKey]);
 
   // Initial fetch
   useEffect(() => {
@@ -130,7 +129,7 @@ export function useShiftRequests(
 
   // Realtime subscription — keyed on orgId only. Uses fetchRequestsRef
   // so the channel callback always has the latest fetch function without
-  // causing channel teardown/recreate on every shiftCodeMap change.
+  // causing channel teardown/recreate on every assignmentLabelMap change.
   const fetchRequestsRef = useRef(fetchRequests);
   fetchRequestsRef.current = fetchRequests;
 
@@ -311,10 +310,8 @@ export function useShiftRequests(
     async (
       empId: string,
       shiftDate: string,
-      shiftCodeIds: number[],
+      input: ScheduleCellInput,
       focusAreaId: number,
-      customStartTime: string | null,
-      customEndTime: string | null
     ): Promise<boolean> => {
       if (!orgId) return false;
       try {
@@ -322,10 +319,8 @@ export function useShiftRequests(
           orgId,
           empId,
           shiftDate,
-          shiftCodeIds,
+          input,
           focusAreaId,
-          customStartTime,
-          customEndTime
         );
         toast.success("Volunteered for shift — awaiting admin approval");
         if (id) {

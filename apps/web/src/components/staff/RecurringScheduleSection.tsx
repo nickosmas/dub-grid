@@ -1,17 +1,14 @@
 "use client";
 
 import {
-  type CSSProperties,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { MaybeHint } from "@/components/ui/hint";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ShiftPicker from "@/components/ShiftPicker";
@@ -19,6 +16,7 @@ import {
   BOX_SHADOW_CARD,
   DAY_LABELS,
 } from "@/lib/constants";
+import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import {
   deleteRecurringDraft,
@@ -31,24 +29,38 @@ import {
 import * as Sentry from "@/lib/sentry";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import {
+  useCloseOnWindowResize,
+  usePopupCornerAlign,
+} from "@/hooks/useAnchoredPopup";
 import type {
   AbsenceType,
   Employee,
   FocusArea,
+  JobDefinition,
   NamedItem,
-  ShiftCode,
+  RecurringScheduleDraft,
+  ScheduleCellInput,
+  ShiftCategory,
+  AssignmentDefinition,
   ShiftDisplayMode,
+  ShiftJobSegment,
 } from "@/types";
 
 type ShiftCellPopoverProps = {
   anchorRef: HTMLElement | null;
-  shiftCodes: ShiftCode[];
+  assignments: AssignmentDefinition[];
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
+  orgRoles?: NamedItem[];
+  certifications?: NamedItem[];
   focusAreas: FocusArea[];
-  currentLabel: string;
-  onSelect: (label: string, shiftCodeIds: number[]) => void;
+  currentSegments?: ShiftJobSegment[];
+  onSelect: (input: ScheduleCellInput | null) => void;
   onClose: () => void;
   empFocusAreaIds: number[];
   empCertificationId?: number | null;
+  empRoleIds?: number[];
   absenceTypes?: AbsenceType[];
   onAbsenceSelect?: (absenceType: AbsenceType) => void;
   currentAbsenceTypeId?: number | null;
@@ -57,315 +69,438 @@ type ShiftCellPopoverProps = {
 
 function ShiftCellPopover({
   anchorRef,
-  shiftCodes,
+  assignments,
+  shiftCategories = [],
+  jobs = [],
+  orgRoles = [],
+  certifications = [],
   focusAreas,
-  currentLabel,
+  currentSegments = [],
   onSelect,
   onClose,
   empFocusAreaIds,
   empCertificationId,
+  empRoleIds,
   absenceTypes,
   onAbsenceSelect,
   currentAbsenceTypeId,
   shiftDisplayMode,
 }: ShiftCellPopoverProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
-  const [arrowLeft, setArrowLeft] = useState(0);
-  const [flippedUp, setFlippedUp] = useState(false);
-  const onCloseRef = useRef(onClose);
+  const isMobileView = useMediaQuery(MOBILE);
+  const {
+    align: desktopAlign,
+    alignOffset,
+    sideOffset: desktopSideOffset,
+    popupRef,
+  } = usePopupCornerAlign(anchorRef, 560);
+  const align = isMobileView ? "center" : desktopAlign;
+  const sideOffset = isMobileView ? 6 : desktopSideOffset;
 
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  useCloseOnWindowResize(onClose);
 
-  const updatePosition = useCallback(() => {
-    if (!anchorRef) return;
+  if (!anchorRef) return null;
 
-    const rect = anchorRef.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom - 12;
-    const shouldFlipUp = spaceBelow < 260;
-    const isMobileView = window.innerWidth < 768;
-    const gap = 8;
-    const maxWidth = window.innerWidth - 16;
-    const naturalWidth = menuRef.current
-      ? Math.min(menuRef.current.scrollWidth, maxWidth)
-      : Math.min(440, maxWidth);
-    const popoverLeft = isMobileView
-      ? 8
-      : Math.max(
-          8,
-          Math.min(
-            rect.left + window.scrollX - 40,
-            window.innerWidth - naturalWidth - 8,
-          ),
-        );
-
-    setFlippedUp(shouldFlipUp);
-    setMenuStyle({
-      position: "absolute",
-      top: shouldFlipUp ? undefined : rect.bottom + window.scrollY + gap,
-      bottom: shouldFlipUp
-        ? window.innerHeight - rect.top - window.scrollY + gap
-        : undefined,
-      left: isMobileView ? 8 : popoverLeft,
-      width: isMobileView ? undefined : "auto",
-      minWidth: isMobileView ? undefined : 320,
-      maxWidth,
-      right: isMobileView ? 8 : undefined,
-      maxHeight: shouldFlipUp ? rect.top - 12 : spaceBelow,
-      zIndex: 9999,
-    });
-
-    const anchorCenterX = rect.left + window.scrollX + rect.width / 2;
-    setArrowLeft(
-      isMobileView
-        ? anchorCenterX - 8
-        : Math.max(
-            16,
-            Math.min(anchorCenterX - popoverLeft, naturalWidth - 16),
-          ),
-    );
-  }, [anchorRef]);
-
-  useLayoutEffect(() => {
-    const frame = requestAnimationFrame(updatePosition);
-    return () => cancelAnimationFrame(frame);
-  }, [updatePosition]);
-
-  useEffect(() => {
-    if (!anchorRef) return;
-
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-
-    return () => {
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [anchorRef, updatePosition]);
-
-  useEffect(() => {
-    function handleClick(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(target) &&
-        anchorRef &&
-        !anchorRef.contains(target)
-      ) {
-        onCloseRef.current();
-      }
-    }
-
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [anchorRef]);
-
-  const currentShiftCodeIds = useMemo(() => {
-    if (!currentLabel || currentLabel === "OFF") return [];
-    return currentLabel
-      .split("/")
-      .map(
-        (label) =>
-          shiftCodes.find(
-            (shiftCode) =>
-              shiftCode.label === label || shiftCode.name === label,
-          )?.id,
-      )
-      .filter((id): id is number => id != null);
-  }, [currentLabel, shiftCodes]);
-
-  if (typeof document === "undefined" || !anchorRef) return null;
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      style={{
-        ...menuStyle,
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        boxShadow: "var(--shadow-menu)",
-        overflow: "visible",
-        display: "flex",
-        flexDirection: "column",
+  return (
+    <Popover
+      open
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          left: arrowLeft - 1,
-          width: 0,
-          height: 0,
-          borderLeft: "9px solid transparent",
-          borderRight: "9px solid transparent",
-          ...(flippedUp
-            ? { bottom: -8, borderTop: "8px solid var(--color-border)" }
-            : { top: -8, borderBottom: "8px solid var(--color-border)" }),
+      <PopoverContent
+        ref={popupRef}
+        anchor={anchorRef}
+        side="bottom"
+        align={align}
+        alignOffset={isMobileView ? 0 : alignOffset}
+        sideOffset={sideOffset}
+        collisionPadding={8}
+        collisionAvoidance={{
+          side: "flip",
+          align: isMobileView ? "shift" : "none",
+          fallbackAxisSide: "none",
         }}
-      />
-      <div
+        positionMethod="fixed"
+        initialFocus={false}
+        finalFocus={false}
         style={{
-          position: "absolute",
-          left: arrowLeft,
-          width: 0,
-          height: 0,
-          borderLeft: "8px solid transparent",
-          borderRight: "8px solid transparent",
-          ...(flippedUp
-            ? { bottom: -7, borderTop: "7px solid var(--color-surface)" }
-            : { top: -7, borderBottom: "7px solid var(--color-surface)" }),
-        }}
-      />
-      <div
-        style={{
-          overflow: "hidden",
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
           borderRadius: "var(--dg-radius-lg)",
+          boxShadow: "var(--shadow-menu)",
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          maxHeight: "inherit",
+          width: isMobileView ? "calc(100vw - 16px)" : "max-content",
+          minWidth: isMobileView ? undefined : 320,
+          maxWidth: "calc(100vw - 16px)",
+          maxHeight: "var(--available-height)",
         }}
       >
         <div
           style={{
-            padding: "12px 16px 8px",
+            overflow: "hidden",
+            borderRadius: "var(--dg-radius-lg)",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            borderBottom: "1px solid var(--color-border-light)",
+            flexDirection: "column",
+            maxHeight: "inherit",
           }}
         >
-          <span
+          <div
             style={{
-              fontSize: "var(--dg-fs-footnote)",
-              fontWeight: 700,
-              color: "var(--color-text-subtle)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
+              padding: "12px 16px 8px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              borderBottom: "1px solid var(--color-border-light)",
             }}
           >
-            Select Shift
-          </span>
-          <button
-            onClick={onClose}
-            className="dg-btn dg-btn-ghost"
-            style={{ padding: 4, lineHeight: 0 }}
-            aria-label="Close"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-subtle)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
             >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
-          <ShiftPicker
-            shiftCodes={shiftCodes}
-            focusAreas={focusAreas}
-            absenceTypes={absenceTypes}
-            currentShiftCodeIds={currentShiftCodeIds}
-            currentAbsenceTypeId={currentAbsenceTypeId}
-            onSelect={(label, shiftCodeIds) => {
-              onSelect(label, shiftCodeIds);
-              onClose();
-            }}
-            onAbsenceSelect={
-              onAbsenceSelect
-                ? (absenceType) => {
-                    onAbsenceSelect(absenceType);
-                    onClose();
-                  }
-                : undefined
-            }
-            empFocusAreaIds={empFocusAreaIds}
-            empCertificationId={empCertificationId}
-            multiSelect={false}
-            closeOnSelect={true}
-            shiftDisplayMode={shiftDisplayMode}
-          />
-          {(currentLabel || currentAbsenceTypeId) && (
+              Select Shift
+            </span>
             <button
-              onClick={() => {
-                onSelect("", []);
+              onClick={onClose}
+              className="dg-btn dg-btn-ghost"
+              style={{ padding: 4, lineHeight: 0 }}
+              aria-label="Close"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+            <ShiftPicker
+              assignments={assignments}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
+              orgRoles={orgRoles}
+              certifications={certifications}
+              focusAreas={focusAreas}
+              absenceTypes={absenceTypes}
+              currentAssignmentDefinitionIds={currentSegments
+                .map((segment) => segment.assignmentId ?? null)
+                .filter((id): id is number => id != null)}
+              currentSegments={currentSegments.map((segment, index) => ({
+                shiftId: segment.shiftId,
+                jobId: segment.jobId,
+                position: segment.position ?? index,
+              }))}
+              currentAbsenceTypeId={currentAbsenceTypeId}
+              onSelect={(segments) => {
+                onSelect(
+                  segments.length > 0
+                    ? {
+                        kind: "worked",
+                        segments,
+                        absenceTypeId: null,
+                        customStartTime: null,
+                        customEndTime: null,
+                        seriesId: null,
+                        fromRecurring: true,
+                      }
+                    : null,
+                );
                 onClose();
               }}
-              className="dg-btn dg-btn-ghost"
-              style={{
-                marginTop: 12,
-                width: "100%",
-                color: "var(--color-danger)",
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-              }}
-            >
-              Clear Shift
-            </button>
-          )}
+              onAbsenceSelect={
+                onAbsenceSelect
+                  ? (absenceType) => {
+                      onAbsenceSelect(absenceType);
+                      onClose();
+                    }
+                  : undefined
+              }
+              empFocusAreaIds={empFocusAreaIds}
+              empCertificationId={empCertificationId}
+              empRoleIds={empRoleIds}
+              multiSelect={false}
+              closeOnSelect={true}
+              shiftDisplayMode={shiftDisplayMode}
+            />
+            {(currentSegments.length > 0 || currentAbsenceTypeId) && (
+              <button
+                onClick={() => {
+                  onSelect(null);
+                  onClose();
+                }}
+                className="dg-btn dg-btn-ghost"
+                style={{
+                  marginTop: 12,
+                  width: "100%",
+                  color: "var(--color-danger)",
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 600,
+                }}
+              >
+                Clear Shift
+              </button>
+            )}
+          </div>
         </div>
-      </div>
-    </div>,
-    document.body,
+      </PopoverContent>
+    </Popover>
   );
 }
 
-function encodeShift(id: number): string {
-  return `s:${id}`;
-}
-
-function encodeAbsence(id: number): string {
-  return `a:${id}`;
-}
-
-function parseRecurringValue(
-  value: string,
-): { type: "shift"; id: number } | { type: "absence"; id: number } | null {
-  if (value.startsWith("s:")) {
-    const id = Number(value.slice(2));
-    return Number.isFinite(id) ? { type: "shift", id } : null;
+function migrateLegacyDraftValue(
+  value: unknown,
+  assignments: AssignmentDefinition[],
+  absenceTypes: AbsenceType[],
+): ScheduleCellInput | null {
+  if (!value) return null;
+  if (typeof value === "object" && value !== null && "kind" in value) {
+    return value as ScheduleCellInput;
   }
+  if (typeof value !== "string") return null;
+
   if (value.startsWith("a:")) {
     const id = Number(value.slice(2));
-    return Number.isFinite(id) ? { type: "absence", id } : null;
+    return Number.isFinite(id)
+      ? {
+          kind: "absence",
+          segments: [],
+          absenceTypeId: id,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: true,
+        }
+      : null;
   }
-  return null;
-}
 
-function migrateLegacyDraftValue(
-  value: string,
-  shiftCodes: ShiftCode[],
-  absenceTypes: AbsenceType[],
-): string {
-  if (!value) return value;
-  if (value.startsWith("s:") || value.startsWith("a:")) return value;
+  if (value.startsWith("s:")) {
+    const id = Number(value.slice(2));
+    const assignment = Number.isFinite(id)
+      ? assignments.find((candidate) => candidate.id === id)
+      : null;
+    if (!assignment?.jobId) return null;
+    return {
+      kind: "worked",
+      segments: [
+        {
+          shiftId: assignment.shiftId ?? assignment.categoryId ?? null,
+          jobId: assignment.jobId,
+          position: 0,
+        },
+      ],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: true,
+    };
+  }
 
   if (value.startsWith("abs:")) {
     const absenceLabel = value.slice(4);
     const absenceType = absenceTypes.find(
       (candidate) => candidate.label === absenceLabel,
     );
-    return absenceType ? encodeAbsence(absenceType.id) : "";
+    return absenceType
+      ? {
+          kind: "absence",
+          segments: [],
+          absenceTypeId: absenceType.id,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: true,
+        }
+      : null;
   }
 
-  const shiftCode = shiftCodes.find((candidate) => candidate.label === value);
-  return shiftCode ? encodeShift(shiftCode.id) : "";
+  const assignment = assignments.find((candidate) => candidate.label === value);
+  if (!assignment?.jobId) return null;
+  return {
+    kind: "worked",
+    segments: [
+      {
+        shiftId: assignment.shiftId ?? assignment.categoryId ?? null,
+        jobId: assignment.jobId,
+        position: 0,
+      },
+    ],
+    absenceTypeId: null,
+    customStartTime: null,
+    customEndTime: null,
+    seriesId: null,
+    fromRecurring: true,
+  };
+}
+
+type RecurringShiftPillProps = {
+  assignment: AssignmentDefinition | null;
+  shiftCategory: ShiftCategory | null;
+  job: JobDefinition | null;
+  absenceType: AbsenceType | null;
+  isDirty: boolean;
+  shiftDisplayMode: ShiftDisplayMode;
+};
+
+function RecurringShiftPill({
+  assignment,
+  shiftCategory,
+  job,
+  absenceType,
+  isDirty,
+  shiftDisplayMode,
+}: RecurringShiftPillProps) {
+  if (!assignment && !absenceType) {
+    return (
+      <div
+        style={{
+          position: "absolute",
+          top: 4,
+          right: 4,
+          bottom: 4,
+          left: 4,
+          background: "transparent",
+          border: isDirty
+            ? "2px dashed var(--color-text-subtle)"
+            : "1px dashed var(--color-border-light)",
+          borderRadius: 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--color-text-faint)",
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 500,
+        }}
+      >
+        --
+      </div>
+    );
+  }
+
+  const isNameMode = shiftDisplayMode === "name";
+  const pillBackground = assignment?.color ?? absenceType!.color;
+  const pillText = assignment?.text ?? absenceType!.text;
+  const fallbackBorder = absenceType
+    ? `1px solid ${absenceType.border}`
+    : `1px solid ${borderColor(pillText)}`;
+  const displayParts = assignment
+    ? buildShiftDisplayParts({
+        shift: shiftCategory,
+        job,
+        assignment,
+        shiftDisplayMode,
+      })
+    : {
+        primaryLabel: isNameMode
+          ? absenceType!.name || absenceType!.label
+          : absenceType!.label,
+        secondaryLabel: null,
+      };
+
+  return (
+    <div
+      data-shift-pill="single"
+      style={{
+        position: "absolute",
+        top: 4,
+        right: 4,
+        bottom: 4,
+        left: 4,
+        background: pillBackground,
+        border: isDirty ? `2px dashed ${pillText}` : fallbackBorder,
+        borderRadius: 8,
+        color: pillText,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: isNameMode ? "2px 6px" : "2px 3px",
+        paddingTop: 2,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: displayParts.secondaryLabel ? 1 : 0,
+          maxWidth: "100%",
+          minWidth: 0,
+        }}
+      >
+        <span
+          style={
+            isNameMode
+              ? {
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 800,
+                  lineHeight: 1.2,
+                  textAlign: "center" as const,
+                  maxWidth: "100%",
+                  overflowWrap: "break-word" as const,
+                  display: "-webkit-box",
+                  WebkitBoxOrient: "vertical" as const,
+                  WebkitLineClamp: displayParts.secondaryLabel ? 1 : 2,
+                  overflow: "hidden",
+                }
+              : {
+                  fontSize: "var(--dg-fs-title)",
+                  fontWeight: 800,
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
+                }
+          }
+        >
+          {displayParts.primaryLabel}
+        </span>
+        {displayParts.secondaryLabel ? (
+          <span
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 700,
+              lineHeight: 1,
+              opacity: 0.78,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "100%",
+            }}
+          >
+            {displayParts.secondaryLabel}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export interface RecurringScheduleSectionProps {
   employees: Employee[];
   orgId: string;
   currentUserId: string | null;
-  shiftCodes: ShiftCode[];
-  shiftCodeMap: Map<number, string>;
+  assignments: AssignmentDefinition[];
+  shiftCategories?: ShiftCategory[];
+  jobs?: JobDefinition[];
+  orgRoles?: NamedItem[];
+  assignmentMap: Map<number, string>;
   canManage: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
@@ -377,8 +512,11 @@ export function RecurringScheduleSection({
   employees,
   orgId,
   currentUserId,
-  shiftCodes,
-  shiftCodeMap,
+  assignments,
+  shiftCategories = [],
+  jobs = [],
+  orgRoles = [],
+  assignmentMap,
   canManage,
   focusAreas,
   certifications,
@@ -401,17 +539,29 @@ export function RecurringScheduleSection({
     () => new Map(absenceTypes.map((absenceType) => [absenceType.id, absenceType])),
     [absenceTypes],
   );
-  const shiftCodeIdMap = useMemo(
-    () => new Map(shiftCodes.map((shiftCode) => [shiftCode.id, shiftCode])),
-    [shiftCodes],
+  const shiftCategoryById = useMemo(
+    () => new Map(shiftCategories.map((shiftCategory) => [shiftCategory.id, shiftCategory])),
+    [shiftCategories],
   );
-  const [allSchedules, setAllSchedules] = useState<
-    Record<string, Record<number, string>>
-  >({});
+  const assignmentBySegmentKey = useMemo(
+    () =>
+      new Map(
+        assignments
+          .filter((assignment) => !assignment.archivedAt && assignment.jobId != null)
+          .map((assignment) => [
+            `${assignment.shiftId ?? assignment.categoryId ?? "null"}:${assignment.jobId}`,
+            assignment,
+          ]),
+      ),
+    [assignments],
+  );
+  const jobById = useMemo(
+    () => new Map(jobs.map((job) => [job.id, job])),
+    [jobs],
+  );
+  const [allSchedules, setAllSchedules] = useState<RecurringScheduleDraft>({});
   const [loading, setLoading] = useState(true);
-  const [dirtySchedules, setDirtySchedules] = useState<
-    Record<string, Record<number, string>>
-  >({});
+  const [dirtySchedules, setDirtySchedules] = useState<RecurringScheduleDraft>({});
   const [activeCell, setActiveCell] = useState<{
     empId: string;
     dayIndex: number;
@@ -434,25 +584,19 @@ export function RecurringScheduleSection({
         const rows = await fetchRecurringShifts(
           orgId,
           undefined,
-          shiftCodeMap,
+          assignmentMap,
           false,
           absenceTypeMap,
         );
         if (cancelled) return;
 
-        const schedules: Record<string, Record<number, string>> = {};
+        const schedules: RecurringScheduleDraft = {};
         for (const recurringShift of rows) {
           if (!schedules[recurringShift.empId]) {
             schedules[recurringShift.empId] = {};
           }
           if (!(recurringShift.dayOfWeek in schedules[recurringShift.empId])) {
-            let encoded = "";
-            if (recurringShift.shiftCodeId != null) {
-              encoded = encodeShift(recurringShift.shiftCodeId);
-            } else if (recurringShift.absenceTypeId != null) {
-              encoded = encodeAbsence(recurringShift.absenceTypeId);
-            }
-            schedules[recurringShift.empId][recurringShift.dayOfWeek] = encoded;
+            schedules[recurringShift.empId][recurringShift.dayOfWeek] = recurringShift.input;
           }
         }
         setAllSchedules(schedules);
@@ -465,17 +609,17 @@ export function RecurringScheduleSection({
             draft?.draftData &&
             Object.keys(draft.draftData).length > 0
           ) {
-            const migrated: Record<string, Record<number, string>> = {};
+            const migrated: RecurringScheduleDraft = {};
             for (const [employeeId, employeeDirty] of Object.entries(
               draft.draftData,
             )) {
               for (const [dayKey, value] of Object.entries(employeeDirty)) {
                 const migratedValue = migrateLegacyDraftValue(
-                  value as string,
-                  shiftCodes,
+                  value,
+                  assignments,
                   absenceTypes,
                 );
-                if (migratedValue !== undefined) {
+                if (migratedValue !== null) {
                   if (!migrated[employeeId]) {
                     migrated[employeeId] = {};
                   }
@@ -512,8 +656,8 @@ export function RecurringScheduleSection({
     canManage,
     currentUserId,
     orgId,
-    shiftCodeMap,
-    shiftCodes,
+    assignmentMap,
+    assignments,
   ]);
 
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
@@ -522,25 +666,131 @@ export function RecurringScheduleSection({
     0,
   );
 
-  function getEffectiveLabel(empId: string, dayIndex: number): string {
+  function getEffectiveInput(
+    empId: string,
+    dayIndex: number,
+  ): ScheduleCellInput | null {
     if (dirtySchedules[empId] && dayIndex in dirtySchedules[empId]) {
       return dirtySchedules[empId][dayIndex];
     }
-    return allSchedules[empId]?.[dayIndex] ?? "";
+    return allSchedules[empId]?.[dayIndex] ?? null;
+  }
+
+  function resolveRecurringDisplay(input: ScheduleCellInput | null): {
+    assignment: AssignmentDefinition | null;
+    shiftCategory: ShiftCategory | null;
+    job: JobDefinition | null;
+    absenceType: AbsenceType | null;
+    label: string | null;
+    segments: ShiftJobSegment[];
+  } {
+    if (!input) {
+      return {
+        assignment: null,
+        shiftCategory: null,
+        job: null,
+        absenceType: null,
+        label: null,
+        segments: [],
+      };
+    }
+
+    if (input.kind === "absence") {
+      const absenceType =
+        input.absenceTypeId != null
+          ? (absenceTypeIdMap.get(input.absenceTypeId) ?? null)
+          : null;
+      return {
+        assignment: null,
+        shiftCategory: null,
+        job: null,
+        absenceType,
+        label: absenceType
+          ? (isNameMode ? absenceType.name || absenceType.label : absenceType.label)
+          : null,
+        segments: [],
+      };
+    }
+
+    const segment = input.segments[0];
+    if (!segment) {
+      return {
+        assignment: null,
+        shiftCategory: null,
+        job: null,
+        absenceType: null,
+        label: null,
+        segments: [],
+      };
+    }
+
+    const assignment =
+      assignmentBySegmentKey.get(
+        `${segment.shiftId ?? "null"}:${segment.jobId}`,
+      ) ?? null;
+    const shiftCategoryId =
+      segment.shiftId ??
+      assignment?.shiftId ??
+      assignment?.categoryId ??
+      null;
+    const shiftCategory =
+      shiftCategoryId != null
+        ? (shiftCategoryById.get(shiftCategoryId) ?? null)
+        : null;
+    const job = jobById.get(segment.jobId) ?? null;
+    const displayParts = assignment
+      ? buildShiftDisplayParts({
+          shift: shiftCategory,
+          job,
+          assignment,
+          shiftDisplayMode,
+        })
+      : {
+          primaryLabel: isNameMode ? (job?.name ?? "?") : (job?.abbr ?? "?"),
+          secondaryLabel: null,
+        };
+
+    return {
+      assignment,
+      shiftCategory,
+      job,
+      absenceType: null,
+      label: displayParts.secondaryLabel
+        ? `${displayParts.primaryLabel} / ${displayParts.secondaryLabel}`
+        : displayParts.primaryLabel,
+      segments: [
+        {
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: segment.position ?? 0,
+          assignmentId: assignment?.id ?? null,
+          label: assignment?.label ?? displayParts.primaryLabel,
+          shiftName: shiftCategory?.name ?? null,
+          shiftAbbr: shiftCategory?.abbr ?? null,
+          jobName: job?.name ?? null,
+          jobAbbr: job?.abbr ?? null,
+          focusAreaId: shiftCategory?.focusAreaId ?? assignment?.focusAreaId ?? null,
+          showJobOnGrid: job?.showOnGrid ?? true,
+          isShiftless: segment.shiftId == null,
+          startTime: assignment?.defaultStartTime ?? null,
+          endTime: assignment?.defaultEndTime ?? null,
+        },
+      ],
+    };
   }
 
   function handleCellChange(
     empId: string,
     dayIndex: number,
-    newLabel: string,
+    newValue: ScheduleCellInput | null,
   ) {
-    const original = allSchedules[empId]?.[dayIndex] ?? "";
+    const original = allSchedules[empId]?.[dayIndex] ?? null;
     setDirtySchedules((current) => {
       const employeeDirty = { ...(current[empId] ?? {}) };
-      if (newLabel === original) {
+      if (JSON.stringify(newValue) === JSON.stringify(original)) {
         delete employeeDirty[dayIndex];
       } else {
-        employeeDirty[dayIndex] = newLabel;
+        employeeDirty[dayIndex] = newValue;
       }
 
       const next = { ...current };
@@ -581,30 +831,13 @@ export function RecurringScheduleSection({
     const todayKey = getTodayKey();
     const snapshot = dirtySchedules;
     const savedKeys = new Set<string>();
-    const skippedLabels: string[] = [];
 
     try {
       for (const [employeeId, employeeDirty] of Object.entries(snapshot)) {
         for (const [dayKey, newValue] of Object.entries(employeeDirty)) {
           const day = Number(dayKey);
           if (newValue) {
-            const parsed = parseRecurringValue(newValue);
-            if (!parsed) {
-              skippedLabels.push(newValue);
-              continue;
-            }
-            if (parsed.type === "absence") {
-              await upsertRecurringShift(
-                employeeId,
-                orgId,
-                day,
-                null,
-                todayKey,
-                parsed.id,
-              );
-            } else {
-              await upsertRecurringShift(employeeId, orgId, day, parsed.id, todayKey);
-            }
+            await upsertRecurringShift(employeeId, orgId, day, newValue, todayKey);
           } else {
             await deleteRecurringShift(employeeId, day, orgId);
           }
@@ -612,46 +845,34 @@ export function RecurringScheduleSection({
         }
       }
 
-      if (skippedLabels.length > 0) {
-        const unique = [...new Set(skippedLabels)];
-        toast.error(
-          `Could not resolve ${unique.length} change${unique.length > 1 ? "s" : ""}`,
-        );
-      }
-
       const freshRows = await fetchRecurringShifts(
         orgId,
         undefined,
-        shiftCodeMap,
+        assignmentMap,
         false,
         absenceTypeMap,
       );
-      const freshSchedules: Record<string, Record<number, string>> = {};
+      const freshSchedules: RecurringScheduleDraft = {};
       for (const recurringShift of freshRows) {
         if (!freshSchedules[recurringShift.empId]) {
           freshSchedules[recurringShift.empId] = {};
         }
         if (!(recurringShift.dayOfWeek in freshSchedules[recurringShift.empId])) {
-          let encoded = "";
-          if (recurringShift.shiftCodeId != null) {
-            encoded = encodeShift(recurringShift.shiftCodeId);
-          } else if (recurringShift.absenceTypeId != null) {
-            encoded = encodeAbsence(recurringShift.absenceTypeId);
-          }
-          freshSchedules[recurringShift.empId][recurringShift.dayOfWeek] = encoded;
+          freshSchedules[recurringShift.empId][recurringShift.dayOfWeek] =
+            recurringShift.input;
         }
       }
       setAllSchedules(freshSchedules);
 
       setDirtySchedules((current) => {
-        const next: Record<string, Record<number, string>> = {};
+        const next: RecurringScheduleDraft = {};
         for (const [employeeId, employeeDirty] of Object.entries(current)) {
-          for (const [dayKey, label] of Object.entries(employeeDirty)) {
+          for (const [dayKey, value] of Object.entries(employeeDirty)) {
             if (!savedKeys.has(`${employeeId}:${dayKey}`)) {
               if (!next[employeeId]) {
                 next[employeeId] = {};
               }
-              next[employeeId][Number(dayKey)] = label;
+              next[employeeId][Number(dayKey)] = value;
             }
           }
         }
@@ -1112,38 +1333,16 @@ export function RecurringScheduleSection({
                 </div>
 
                 {DAY_LABELS.map((_, dayIdx) => {
-                  const rawValue = getEffectiveLabel(employee.id, dayIdx);
-                  const parsed = rawValue ? parseRecurringValue(rawValue) : null;
-                  const shiftCode =
-                    parsed?.type === "shift"
-                      ? shiftCodeIdMap.get(parsed.id) ?? null
-                      : null;
-                  const absenceType =
-                    parsed?.type === "absence"
-                      ? absenceTypeIdMap.get(parsed.id) ?? null
-                      : null;
+                  const cellInput = getEffectiveInput(employee.id, dayIdx);
+                  const {
+                    assignment,
+                    shiftCategory,
+                    job,
+                    absenceType,
+                    label: cellLabel,
+                  } = resolveRecurringDisplay(cellInput);
                   const isDirty =
                     !!(dirtySchedules[employee.id] && dayIdx in dirtySchedules[employee.id]);
-                  const isActive =
-                    activeCell?.empId === employee.id &&
-                    activeCell?.dayIndex === dayIdx;
-                  const shiftDisplay = shiftCode
-                    ? isNameMode
-                      ? shiftCode.name || shiftCode.label
-                      : shiftCode.label
-                    : null;
-                  const absenceDisplay = absenceType
-                    ? isNameMode
-                      ? absenceType.name || absenceType.label
-                      : absenceType.label
-                    : null;
-                  const cellLabel = shiftDisplay ?? absenceDisplay ?? null;
-                  const nameModeFontSize = isMobile
-                    ? "var(--dg-fs-micro)"
-                    : "var(--dg-fs-caption)";
-                  const codeModeFontSize = isMobile
-                    ? "var(--dg-fs-label)"
-                    : "var(--dg-fs-title)";
 
                   return (
                     <div
@@ -1176,106 +1375,18 @@ export function RecurringScheduleSection({
                       style={{
                         height: "var(--dg-grid-cell-height)",
                         borderLeft: "1px solid var(--color-border-light)",
-                        background: isActive ? "rgba(100,116,139,0.08)" : undefined,
                       }}
                     >
-                      {shiftCode ? (
-                        <MaybeHint content={isNameMode ? shiftDisplay ?? undefined : undefined} side="top">
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: 4,
-                              right: 4,
-                              bottom: 4,
-                              left: 4,
-                              background: shiftCode.color,
-                              border: isDirty
-                                ? `2px dashed ${shiftCode.text}`
-                                : `1px solid ${borderColor(shiftCode.text)}`,
-                              borderRadius: 8,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: shiftCode.text,
-                              fontSize: isNameMode ? nameModeFontSize : codeModeFontSize,
-                              fontWeight: 800,
-                              padding: "2px 4px",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              transition: "box-shadow 150ms ease",
-                              boxShadow: isActive
-                                ? "0 0 0 2px rgba(100,116,139,0.3)"
-                                : "none",
-                            }}
-                          >
-                            {shiftDisplay}
-                          </div>
-                        </MaybeHint>
-                      ) : absenceType ? (
-                        <MaybeHint
-                          content={isNameMode ? absenceDisplay ?? undefined : undefined}
-                          side="top"
-                        >
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: 4,
-                              right: 4,
-                              bottom: 4,
-                              left: 4,
-                              background: absenceType.color,
-                              border: isDirty
-                                ? `2px dashed ${absenceType.text}`
-                                : `1px solid ${borderColor(absenceType.text)}`,
-                              borderRadius: 8,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: absenceType.text,
-                              fontSize: isNameMode ? nameModeFontSize : codeModeFontSize,
-                              fontWeight: 800,
-                              padding: "2px 4px",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              transition: "box-shadow 150ms ease",
-                              boxShadow: isActive
-                                ? "0 0 0 2px rgba(100,116,139,0.3)"
-                                : "none",
-                            }}
-                          >
-                            {absenceDisplay}
-                          </div>
-                        </MaybeHint>
-                      ) : (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 4,
-                            right: 4,
-                            bottom: 4,
-                            left: 4,
-                            background: "transparent",
-                            border: isDirty
-                              ? "2px dashed var(--color-text-subtle)"
-                              : "1px dashed var(--color-border-light)",
-                            borderRadius: 8,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "var(--color-text-faint)",
-                            fontSize: "var(--dg-fs-caption)",
-                            fontWeight: 500,
-                            transition: "box-shadow 150ms ease, background 80ms ease",
-                            boxShadow: isActive
-                              ? "0 0 0 2px rgba(100,116,139,0.3)"
-                              : "none",
-                          }}
-                        >
-                          --
-                        </div>
-                      )}
+                      <div className="dg-grid-cell__content">
+                        <RecurringShiftPill
+                          assignment={assignment}
+                          shiftCategory={shiftCategory}
+                          job={job}
+                          absenceType={absenceType}
+                          isDirty={isDirty}
+                          shiftDisplayMode={shiftDisplayMode}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -1300,36 +1411,39 @@ export function RecurringScheduleSection({
       )}
 
       {activeCell && activeCellEmp && (() => {
-        const rawValue = getEffectiveLabel(activeCell.empId, activeCell.dayIndex);
-        const parsed = rawValue ? parseRecurringValue(rawValue) : null;
-        const shiftCode =
-          parsed?.type === "shift" ? shiftCodeIdMap.get(parsed.id) : undefined;
-        const currentShiftLabel = shiftCode
-          ? isNameMode
-            ? shiftCode.name || shiftCode.label
-            : shiftCode.label
-          : "";
+        const activeInput = getEffectiveInput(activeCell.empId, activeCell.dayIndex);
+        const activeDisplay = resolveRecurringDisplay(activeInput);
         const currentAbsenceTypeId =
-          parsed?.type === "absence" ? parsed.id : null;
+          activeInput?.kind === "absence" ? (activeInput.absenceTypeId ?? null) : null;
 
         return (
           <ShiftCellPopover
             anchorRef={activeCellEl}
-            shiftCodes={shiftCodes}
+            assignments={assignments}
+            shiftCategories={shiftCategories}
+            jobs={jobs}
+            orgRoles={orgRoles}
+            certifications={certifications}
             focusAreas={focusAreas}
             absenceTypes={absenceTypes}
-            currentLabel={currentShiftLabel}
+            currentSegments={activeDisplay.segments}
             currentAbsenceTypeId={currentAbsenceTypeId}
-            onSelect={(_label, shiftCodeIds) => {
-              const encoded =
-                shiftCodeIds.length > 0 ? encodeShift(shiftCodeIds[0]) : "";
-              handleCellChange(activeCell.empId, activeCell.dayIndex, encoded);
-            }}
+            onSelect={(input) =>
+              handleCellChange(activeCell.empId, activeCell.dayIndex, input)
+            }
             onAbsenceSelect={(absenceType) =>
               handleCellChange(
                 activeCell.empId,
                 activeCell.dayIndex,
-                encodeAbsence(absenceType.id),
+                {
+                  kind: "absence",
+                  segments: [],
+                  absenceTypeId: absenceType.id,
+                  customStartTime: null,
+                  customEndTime: null,
+                  seriesId: null,
+                  fromRecurring: true,
+                },
               )
             }
             onClose={() => {
@@ -1338,6 +1452,7 @@ export function RecurringScheduleSection({
             }}
             empFocusAreaIds={activeCellEmp.focusAreaIds}
             empCertificationId={activeCellEmp.certificationId}
+            empRoleIds={activeCellEmp.roleIds}
             shiftDisplayMode={shiftDisplayMode}
           />
         );

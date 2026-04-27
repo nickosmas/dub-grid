@@ -3,22 +3,23 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchShiftCodes, fetchAbsenceTypes, fetchShiftCategories, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements, fetchCoverageRuleConfigs, autoMigrateOrphanedFocusAreas } from "@/lib/db";
+import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchAssignmentDefinitions as fetchAssignmentDefinitions, fetchAbsenceTypes, fetchShiftCategories, fetchJobDefinitions, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements, autoMigrateOrphanedFocusAreas } from "@/lib/db";
 import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
+import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
 import type {
   Organization,
   FocusArea,
-  ShiftCode,
+  AssignmentDefinition,
   AbsenceType,
   ShiftCategory,
+  JobDefinition,
   IndicatorType,
   NamedItem,
   Department,
   CoverageRequirement,
-  CoverageRuleConfig,
 } from "@/types";
 
 // ── Types ────────────────────────��───────────────────────────────────────────
@@ -27,7 +28,7 @@ export interface SetupStatus {
   isComplete: boolean;
   missing: {
     focusAreas: boolean;
-    shiftCodes: boolean;
+    scheduleDefinitions: boolean;
     certifications: boolean;
     orgRoles: boolean;
   };
@@ -36,35 +37,35 @@ export interface SetupStatus {
 export interface OrganizationData {
   org: Organization | null;
   focusAreas: FocusArea[];
-  shiftCodes: ShiftCode[];
-  allShiftCodes: ShiftCode[];
-  allShiftCodesRef: React.RefObject<ShiftCode[]>;
+  assignments: AssignmentDefinition[];
+  allAssignmentDefinitions: AssignmentDefinition[];
+  allAssignmentDefinitionsRef: React.RefObject<AssignmentDefinition[]>;
   absenceTypes: AbsenceType[];
   allAbsenceTypes: AbsenceType[];
   allAbsenceTypesRef: React.RefObject<AbsenceType[]>;
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   indicatorTypes: IndicatorType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   departments: Department[];
-  shiftCodeMap: Map<number, string>;
+  assignmentLabelMap: Map<number, string>;
   absenceTypeMap: Map<number, string>;
   loading: boolean;
   loadError: string | null;
   setupStatus: SetupStatus;
   setOrg: (org: Organization) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
-  handleShiftCodesChange: (codes: ShiftCode[]) => void;
+  handleAssignmentDefinitionsChange: (codes: AssignmentDefinition[]) => void;
   handleAbsenceTypesChange: (types: AbsenceType[]) => void;
   setShiftCategories: (cats: ShiftCategory[]) => void;
+  setJobs: (jobs: JobDefinition[]) => void;
   setIndicatorTypes: (types: IndicatorType[]) => void;
   handleCertificationsChange: (items: NamedItem[]) => Promise<void>;
   setOrgRoles: (items: NamedItem[]) => void;
   setDepartments: (items: Department[]) => void;
   coverageRequirements: CoverageRequirement[];
   setCoverageRequirements: (reqs: CoverageRequirement[]) => void;
-  coverageRuleConfigs: CoverageRuleConfig[];
-  setCoverageRuleConfigs: (configs: CoverageRuleConfig[]) => void;
 }
 
 // ── Org context resolution ───────────────��───────────────────────────────────
@@ -74,6 +75,10 @@ interface OrgContext {
   isImpersonating: boolean;
   isGridmaster: boolean;
   resolved: boolean;
+}
+
+interface UseOrganizationDataOptions {
+  includeAssignmentDefinitionCompatibility?: boolean;
 }
 
 const INITIAL_CTX: OrgContext = {
@@ -131,9 +136,11 @@ function useOrgContext(): OrgContext {
 
 // ── Hook ��──────────────────��─────────────────────────────────��───────────────
 
-export function useOrganizationData(): OrganizationData {
+export function useOrganizationData(options?: UseOrganizationDataOptions): OrganizationData {
   const queryClient = useQueryClient();
   const ctx = useOrgContext();
+  const includeAssignmentDefinitionCompatibility =
+    options?.includeAssignmentDefinitionCompatibility ?? true;
 
   // ── Step 1: Fetch organization ────────────���────────────────────────��────
   const orgQuery = useQuery({
@@ -175,10 +182,10 @@ export function useOrganizationData(): OrganizationData {
     staleTime: CONFIG_STALE_TIME,
   });
 
-  const allShiftCodesQuery = useQuery({
-    queryKey: queryKeys.org.shiftCodes(effectiveOrgId!),
-    queryFn: () => fetchShiftCodes(effectiveOrgId!, true),
-    enabled: !!effectiveOrgId,
+  const allAssignmentDefinitionsQuery = useQuery({
+    queryKey: queryKeys.org.assignments(effectiveOrgId!),
+    queryFn: () => fetchAssignmentDefinitions(effectiveOrgId!, true),
+    enabled: !!effectiveOrgId && includeAssignmentDefinitionCompatibility,
     staleTime: CONFIG_STALE_TIME,
   });
 
@@ -192,6 +199,13 @@ export function useOrganizationData(): OrganizationData {
   const shiftCategoriesQuery = useQuery({
     queryKey: queryKeys.org.shiftCategories(effectiveOrgId!),
     queryFn: () => fetchShiftCategories(effectiveOrgId!),
+    enabled: !!effectiveOrgId,
+    staleTime: CONFIG_STALE_TIME,
+  });
+
+  const jobsQuery = useQuery({
+    queryKey: queryKeys.org.jobs(effectiveOrgId!),
+    queryFn: () => fetchJobDefinitions(effectiveOrgId!),
     enabled: !!effectiveOrgId,
     staleTime: CONFIG_STALE_TIME,
   });
@@ -231,28 +245,24 @@ export function useOrganizationData(): OrganizationData {
     staleTime: CONFIG_STALE_TIME,
   });
 
-  const coverageRuleConfigsQuery = useQuery({
-    queryKey: queryKeys.org.coverageRuleConfigs(effectiveOrgId!),
-    queryFn: () => fetchCoverageRuleConfigs(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
   // ── Derived values (memoized to stabilize references for downstream deps) ─
   const focusAreas = useMemo(() => focusAreasQuery.data ?? [], [focusAreasQuery.data]);
-  const allShiftCodes = useMemo(() => allShiftCodesQuery.data ?? [], [allShiftCodesQuery.data]);
+  const allAssignmentDefinitions = useMemo(
+    () => allAssignmentDefinitionsQuery.data ?? [],
+    [allAssignmentDefinitionsQuery.data],
+  );
   const allAbsenceTypes = useMemo(() => allAbsenceTypesQuery.data ?? [], [allAbsenceTypesQuery.data]);
   const shiftCategories = useMemo(() => shiftCategoriesQuery.data ?? [], [shiftCategoriesQuery.data]);
+  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
   const indicatorTypes = useMemo(() => indicatorTypesQuery.data ?? [], [indicatorTypesQuery.data]);
   const certifications = useMemo(() => certificationsQuery.data ?? [], [certificationsQuery.data]);
   const orgRoles = useMemo(() => orgRolesQuery.data ?? [], [orgRolesQuery.data]);
   const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
   const coverageRequirements = useMemo(() => coverageReqsQuery.data ?? [], [coverageReqsQuery.data]);
-  const coverageRuleConfigs = useMemo(() => coverageRuleConfigsQuery.data ?? [], [coverageRuleConfigsQuery.data]);
 
-  const shiftCodes = useMemo(
-    () => allShiftCodes.filter((sc) => !sc.archivedAt),
-    [allShiftCodes],
+  const assignments = useMemo(
+    () => allAssignmentDefinitions.filter((preset) => !preset.archivedAt),
+    [allAssignmentDefinitions],
   );
   const absenceTypes = useMemo(
     () => allAbsenceTypes.filter((at) => !at.archivedAt),
@@ -280,18 +290,33 @@ export function useOrganizationData(): OrganizationData {
     }).catch(() => { /* silent — non-critical */ });
   }, [effectiveOrgId, focusAreasData, departmentsData, refetchFocusAreas, refetchDepartments]);
 
-  const allShiftCodesRef = useRef<ShiftCode[]>(allShiftCodes);
-  useEffect(() => { allShiftCodesRef.current = allShiftCodes; }, [allShiftCodes]);
+  const allAssignmentDefinitionsRef = useRef<AssignmentDefinition[]>(allAssignmentDefinitions);
+  useEffect(() => {
+    allAssignmentDefinitionsRef.current = allAssignmentDefinitions;
+  }, [allAssignmentDefinitions]);
 
   const allAbsenceTypesRef = useRef<AbsenceType[]>(allAbsenceTypes);
   useEffect(() => { allAbsenceTypesRef.current = allAbsenceTypes; }, [allAbsenceTypes]);
 
-  const shiftCodeMap = useMemo(
-    () => new Map(allShiftCodes.map((sc) => [
-      sc.id,
-      org?.shiftDisplayMode === 'name' ? (sc.name || sc.label) : sc.label,
-    ])),
-    [allShiftCodes, org?.shiftDisplayMode],
+  const assignmentLabelMap = useMemo(
+    () =>
+      includeAssignmentDefinitionCompatibility
+        ? buildAssignableShiftDisplayMap({
+            assignments: allAssignmentDefinitions,
+            shiftCategories,
+            jobs,
+            focusAreas,
+            shiftDisplayMode: org?.shiftDisplayMode ?? "code",
+          })
+        : new Map<number, string>(),
+    [
+      allAssignmentDefinitions,
+      focusAreas,
+      includeAssignmentDefinitionCompatibility,
+      jobs,
+      org?.shiftDisplayMode,
+      shiftCategories,
+    ],
   );
 
   const absenceTypeMap = useMemo(
@@ -305,14 +330,14 @@ export function useOrganizationData(): OrganizationData {
   // ── Loading & error states ──────────��───────────────────────────────────
   const configQueriesLoading =
     focusAreasQuery.isLoading ||
-    allShiftCodesQuery.isLoading ||
+    allAssignmentDefinitionsQuery.isLoading ||
     allAbsenceTypesQuery.isLoading ||
     shiftCategoriesQuery.isLoading ||
+    jobsQuery.isLoading ||
     indicatorTypesQuery.isLoading ||
     certificationsQuery.isLoading ||
     orgRolesQuery.isLoading ||
     coverageReqsQuery.isLoading ||
-    coverageRuleConfigsQuery.isLoading ||
     departmentsQuery.isLoading;
 
   const loading = ctx.isGridmaster
@@ -330,14 +355,14 @@ export function useOrganizationData(): OrganizationData {
     const queries = [
       { key: "org", error: orgQuery.error },
       { key: "focusAreas", error: focusAreasQuery.error },
-      { key: "shiftCodes", error: allShiftCodesQuery.error },
+      { key: "assignments", error: allAssignmentDefinitionsQuery.error },
       { key: "absenceTypes", error: allAbsenceTypesQuery.error },
       { key: "shiftCategories", error: shiftCategoriesQuery.error },
+      { key: "jobs", error: jobsQuery.error },
       { key: "indicatorTypes", error: indicatorTypesQuery.error },
       { key: "certifications", error: certificationsQuery.error },
       { key: "orgRoles", error: orgRolesQuery.error },
       { key: "coverageReqs", error: coverageReqsQuery.error },
-      { key: "coverageRuleConfigs", error: coverageRuleConfigsQuery.error },
     ];
     for (const { key, error } of queries) {
       if (error && !handledErrorsRef.current.has(key)) {
@@ -349,26 +374,28 @@ export function useOrganizationData(): OrganizationData {
       }
     }
   }, [
-    orgQuery.error, focusAreasQuery.error, allShiftCodesQuery.error,
+    orgQuery.error, focusAreasQuery.error, allAssignmentDefinitionsQuery.error,
     allAbsenceTypesQuery.error, shiftCategoriesQuery.error,
+    jobsQuery.error,
     indicatorTypesQuery.error, certificationsQuery.error,
-    orgRolesQuery.error, coverageReqsQuery.error, coverageRuleConfigsQuery.error,
+    orgRolesQuery.error, coverageReqsQuery.error,
   ]);
 
   // ── Setup status ────────────────────────────────────────────────────────
   const setupStatus = useMemo<SetupStatus>(() => ({
     isComplete:
       focusAreas.length > 0 &&
-      shiftCodes.length > 0 &&
+      shiftCategories.length > 0 &&
+      jobs.length > 0 &&
       certifications.length > 0 &&
       orgRoles.length > 0,
     missing: {
       focusAreas: focusAreas.length === 0,
-      shiftCodes: shiftCodes.length === 0,
+      scheduleDefinitions: shiftCategories.length === 0 || jobs.length === 0,
       certifications: certifications.length === 0,
       orgRoles: orgRoles.length === 0,
     },
-  }), [focusAreas, shiftCodes, certifications, orgRoles]);
+  }), [certifications, focusAreas, jobs.length, orgRoles, shiftCategories.length]);
 
   // ── Setter functions (update React Query cache) ─────────────────────────
   const setOrg = useCallback((o: Organization) => {
@@ -387,10 +414,13 @@ export function useOrganizationData(): OrganizationData {
     }
   }, [queryClient, effectiveOrgId]);
 
-  const handleShiftCodesChange = useCallback((codes: ShiftCode[]) => {
+  const handleAssignmentDefinitionsChange = useCallback((presets: AssignmentDefinition[]) => {
     if (!effectiveOrgId) return;
-    const archived = allShiftCodesRef.current.filter((sc) => sc.archivedAt);
-    queryClient.setQueryData(queryKeys.org.shiftCodes(effectiveOrgId), [...codes, ...archived]);
+    const archived = allAssignmentDefinitionsRef.current.filter((preset) => preset.archivedAt);
+    queryClient.setQueryData(queryKeys.org.assignments(effectiveOrgId), [
+      ...presets,
+      ...archived,
+    ]);
   }, [queryClient, effectiveOrgId]);
 
   const handleAbsenceTypesChange = useCallback((types: AbsenceType[]) => {
@@ -405,6 +435,12 @@ export function useOrganizationData(): OrganizationData {
     }
   }, [queryClient, effectiveOrgId]);
 
+  const setJobs = useCallback((items: JobDefinition[]) => {
+    if (effectiveOrgId) {
+      queryClient.setQueryData(queryKeys.org.jobs(effectiveOrgId), items);
+    }
+  }, [queryClient, effectiveOrgId]);
+
   const setIndicatorTypes = useCallback((types: IndicatorType[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.indicatorTypes(effectiveOrgId), types);
@@ -414,12 +450,12 @@ export function useOrganizationData(): OrganizationData {
   const handleCertificationsChange = useCallback(async (items: NamedItem[]) => {
     if (!effectiveOrgId) return;
     queryClient.setQueryData(queryKeys.org.certifications(effectiveOrgId), items);
-    // Invalidate shift codes since they reference certifications
+    // Invalidate schedule options since they reference certifications.
     try {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.org.shiftCodes(effectiveOrgId) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.org.assignments(effectiveOrgId) });
     } catch (err) {
       Sentry.captureException(err);
-      toast.error("Failed to refresh shift codes");
+      toast.error("Failed to refresh schedule assignments");
     }
   }, [queryClient, effectiveOrgId]);
 
@@ -441,43 +477,37 @@ export function useOrganizationData(): OrganizationData {
     }
   }, [queryClient, effectiveOrgId]);
 
-  const setCoverageRuleConfigs = useCallback((configs: CoverageRuleConfig[]) => {
-    if (effectiveOrgId) {
-      queryClient.setQueryData(queryKeys.org.coverageRuleConfigs(effectiveOrgId), configs);
-    }
-  }, [queryClient, effectiveOrgId]);
-
   return {
     org,
     focusAreas,
-    shiftCodes,
-    allShiftCodes,
-    allShiftCodesRef,
+    assignments: assignments,
+    allAssignmentDefinitions: allAssignmentDefinitions,
+    allAssignmentDefinitionsRef: allAssignmentDefinitionsRef,
     absenceTypes,
     allAbsenceTypes,
     allAbsenceTypesRef,
     shiftCategories,
+    jobs,
     indicatorTypes,
     certifications,
     orgRoles,
     departments,
-    shiftCodeMap,
+    assignmentLabelMap: assignmentLabelMap,
     absenceTypeMap,
     loading,
     loadError,
     setupStatus,
     setOrg,
     setFocusAreas,
-    handleShiftCodesChange,
+    handleAssignmentDefinitionsChange: handleAssignmentDefinitionsChange,
     handleAbsenceTypesChange,
     setShiftCategories,
+    setJobs,
     setIndicatorTypes,
     handleCertificationsChange,
     setOrgRoles,
     setDepartments,
     coverageRequirements,
     setCoverageRequirements,
-    coverageRuleConfigs,
-    setCoverageRuleConfigs,
   };
 }

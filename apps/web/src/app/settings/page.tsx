@@ -15,8 +15,8 @@ function SettingsPageContent() {
     canViewOrgLabels,
     canManageFocusAreas,
     canViewFocusAreas,
-    canManageShiftCodes,
-    canViewShiftCodes,
+    canManageScheduleDefinitions,
+    canViewScheduleDefinitions,
     canManageIndicatorTypes,
     canViewIndicatorTypes,
     canManageOrgSettings,
@@ -24,11 +24,11 @@ function SettingsPageContent() {
     canViewCoverageRequirements,
   } = usePermissions();
   const {
-    org, focusAreas, shiftCodes, absenceTypes, shiftCategories, indicatorTypes,
-    certifications, orgRoles, departments, coverageRequirements, coverageRuleConfigs, loading, loadError,
-    setOrg, setFocusAreas, handleShiftCodesChange, handleAbsenceTypesChange, setShiftCategories,
-    setIndicatorTypes, handleCertificationsChange, setOrgRoles, setDepartments, setCoverageRequirements, setCoverageRuleConfigs,
-  } = useOrganizationData();
+    org, focusAreas, absenceTypes, shiftCategories, jobs, indicatorTypes,
+    certifications, orgRoles, departments, coverageRequirements, loading, loadError,
+    setOrg, setFocusAreas, handleAbsenceTypesChange, setShiftCategories,
+    setJobs, setIndicatorTypes, handleCertificationsChange, setOrgRoles, setDepartments, setCoverageRequirements,
+  } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
   const isLoading = loading || !org;
 
   if (loadError && !org) {
@@ -54,16 +54,16 @@ function SettingsPageContent() {
         <SettingsPage
           organization={org}
           focusAreas={focusAreas}
-          shiftCodes={shiftCodes}
           shiftCategories={shiftCategories}
+          jobs={jobs}
           indicatorTypes={indicatorTypes}
           certifications={certifications}
           orgRoles={orgRoles}
           departments={departments}
           onOrganizationSave={setOrg}
           onFocusAreasChange={setFocusAreas}
-          onShiftCodesChange={handleShiftCodesChange}
           onShiftCategoriesChange={setShiftCategories}
+          onJobsChange={setJobs}
           onIndicatorTypesChange={setIndicatorTypes}
           onCertificationsChange={handleCertificationsChange}
           onOrgRolesChange={setOrgRoles}
@@ -76,15 +76,13 @@ function SettingsPageContent() {
           canViewOrgLabels={canViewOrgLabels}
           canManageFocusAreas={canManageFocusAreas}
           canViewFocusAreas={canViewFocusAreas}
-          canManageShiftCodes={canManageShiftCodes}
-          canViewShiftCodes={canViewShiftCodes}
+          canManageScheduleDefinitions={canManageScheduleDefinitions}
+          canViewScheduleDefinitions={canViewScheduleDefinitions}
           canManageIndicatorTypes={canManageIndicatorTypes}
           canViewIndicatorTypes={canViewIndicatorTypes}
           canManageOrgSettings={canManageOrgSettings}
           coverageRequirements={coverageRequirements}
           onCoverageRequirementsChange={setCoverageRequirements}
-          coverageRuleConfigs={coverageRuleConfigs}
-          onCoverageRuleConfigsChange={setCoverageRuleConfigs}
           canManageCoverageRequirements={canManageCoverageRequirements}
           canViewCoverageRequirements={canViewCoverageRequirements}
           absenceTypes={absenceTypes}

@@ -105,6 +105,7 @@ function makeOrganizationRow(updatedAt: string, overrides: Record<string, unknow
     department_label: "Departments",
     shift_display_mode: "code",
     timezone: "America/Los_Angeles",
+    pay_period_start_date: null,
     archived_at: null,
     suspended_at: null,
     suspended_reason: null,
@@ -209,6 +210,7 @@ describe("PUT /api/organizations/settings", () => {
       address_state: "CA",
       address_postal_code: "94103",
       timezone: "America/Denver",
+      pay_period_start_date: "2026-04-20",
     });
 
     organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
@@ -229,6 +231,7 @@ describe("PUT /api/organizations/settings", () => {
         addressPostalCode: "94103",
         addressCountry: "United States",
         timezone: "America/Denver",
+        payPeriodStartDate: "2026-04-20",
       }),
     );
 
@@ -242,6 +245,7 @@ describe("PUT /api/organizations/settings", () => {
           addressLine2: "Suite 800",
           addressCity: "San Francisco",
           timezone: "America/Denver",
+          payPeriodStartDate: "2026-04-20",
           updatedAt: updatedRow.updated_at,
         }),
       }),
@@ -258,6 +262,7 @@ describe("PUT /api/organizations/settings", () => {
         address_postal_code: "94103",
         address_country: "United States",
         timezone: "America/Denver",
+        pay_period_start_date: "2026-04-20",
       }),
     );
     expect(auditInsert).toHaveBeenCalledWith(

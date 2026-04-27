@@ -1,15 +1,15 @@
-import { ShiftCode, ShiftDisplayMode } from "@/types";
+import { AssignmentDefinition, ShiftDisplayMode } from "@/types";
 
 // Excluded from legend — internal/meta entries with no printed meaning
 const EXCLUDED = new Set(["OFF", "0.3"]);
 
-export default function PrintLegend({ shiftCodes, shiftDisplayMode = "code" }: { shiftCodes: ShiftCode[]; shiftDisplayMode?: ShiftDisplayMode }) {
+export default function PrintLegend({ assignments, shiftDisplayMode = "code" }: { assignments: AssignmentDefinition[]; shiftDisplayMode?: ShiftDisplayMode }) {
   const isNameMode = shiftDisplayMode === "name";
-  const items = shiftCodes.filter((s) => !EXCLUDED.has(s.label));
+  const items = assignments.filter((s) => !EXCLUDED.has(s.label));
 
   return (
     <div className="print-legend">
-      <div className="print-legend__title">{isNameMode ? "Shift Key" : "Shift Code Key"}</div>
+      <div className="print-legend__title">Shift Key</div>
       <div className="print-legend__grid">
         {items.map((s) => (
           <div key={s.id} className="print-legend__item">

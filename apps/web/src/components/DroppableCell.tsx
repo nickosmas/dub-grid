@@ -2,12 +2,10 @@
 
 import React, { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
+import type { GridCellId } from "@/types";
 
 export interface CellDropData {
-  empId: string;
-  date: Date;
-  dateKey: string;
-  focusAreaName: string;
+  cellId: GridCellId;
 }
 
 interface DroppableCellProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -30,15 +28,9 @@ export default memo(function DroppableCell({
     <div
       ref={setNodeRef}
       {...divProps}
-      aria-label={`Drop zone for ${data.focusAreaName}, ${data.dateKey}`}
+      data-drop-target={isOver && !disabled ? "true" : undefined}
       style={{
         ...style,
-        ...(isOver && !disabled
-          ? {
-              outline: "2px solid var(--color-primary)",
-              outlineOffset: -2,
-            }
-          : undefined),
       }}
     >
       {children}
