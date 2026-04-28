@@ -1,12 +1,5 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@dubgrid/contracts": ["./packages/contracts/src/index.ts"],
-      "@dubgrid/contracts/*": ["./packages/contracts/src/*"]
-    }
-  },
   "include": ["scripts/**/*.ts", "seed.ts", "seed.config.ts"],
   "exclude": ["node_modules", "supabase/functions/**"]
 }

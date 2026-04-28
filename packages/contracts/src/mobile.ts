@@ -126,6 +126,7 @@ export const mobileLinkedEmployeeSchema = z
 export const mobileAbsenceTypeSchema = z.object({
   id: z.number().int(),
   label: z.string(),
+  name: z.string().optional(),
 });
 
 export const mobileFocusAreaSchema = z.object({
@@ -349,6 +350,9 @@ export type MobileBootstrapResponse = z.infer<
 >;
 export type MobileAuthLoginResponse = z.infer<
   typeof mobileAuthLoginResponseSchema
+>;
+export type MobileAuthLoginBody = z.infer<
+  typeof mobileAuthLoginBodySchema
 >;
 export type MobileAbsenceType = z.infer<typeof mobileAbsenceTypeSchema>;
 export type MobileFocusArea = z.infer<typeof mobileFocusAreaSchema>;

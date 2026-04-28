@@ -23,11 +23,11 @@
       ]
     },
     "type-check": {
-      "dependsOn": ["^type-check"],
+      "dependsOn": ["^build", "^type-check"],
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^test"],
+      "dependsOn": ["^build", "^test"],
       "outputs": []
     },
     "dev": {

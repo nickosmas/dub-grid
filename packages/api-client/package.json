@@ -1,5 +1,5 @@
 {
-  "name": "@dubgrid/contracts",
+  "name": "@dubgrid/api-client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,18 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./mobile": {
-      "types": "./dist/mobile.d.ts",
-      "import": "./dist/mobile.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts src"
-  },
-  "dependencies": {
-    "zod": "3.24.4"
+    "type-check": "tsc -p tsconfig.json --noEmit"
   }
 }

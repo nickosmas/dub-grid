@@ -1,5 +1,5 @@
 {
-  "name": "@dubgrid/contracts",
+  "name": "@dubgrid/data-access",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,18 +9,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./mobile": {
-      "types": "./dist/mobile.d.ts",
-      "import": "./dist/mobile.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts src"
+    "type-check": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "zod": "3.24.4"
+    "@dubgrid/contracts": "0.1.0",
+    "@dubgrid/db-types": "0.1.0",
+    "@dubgrid/domain": "0.1.0",
+    "@supabase/supabase-js": "^2.98.0"
   }
 }
