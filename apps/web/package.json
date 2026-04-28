@@ -13,11 +13,11 @@
     "dev": "npm run predev && next dev --turbopack",
     "dev:lan": "npm run predev && next dev --hostname 0.0.0.0 --turbopack",
     "dev:webpack": "next dev --webpack",
-    "build": "next build",
+    "build": "NEXT_IGNORE_INCORRECT_LOCKFILE=1 next build",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --config vitest.config.mts src",
     "start": "next start",
-    "analyze": "ANALYZE=true next build"
+    "analyze": "NEXT_IGNORE_INCORRECT_LOCKFILE=1 ANALYZE=true next build"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
