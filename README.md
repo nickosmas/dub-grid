@@ -25,6 +25,7 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 | Layer         | Technology                                            |
 | ------------- | ----------------------------------------------------- |
 | Framework     | [Next.js 16](https://nextjs.org) + React 19           |
+| Monorepo      | npm workspaces + TurboRepo                            |
 | Language      | TypeScript                                            |
 | Styling       | [Tailwind CSS v4](https://tailwindcss.com)            |
 | Database      | [Supabase](https://supabase.com) (PostgreSQL + Auth + Realtime + RLS) |
@@ -56,7 +57,7 @@ npm install
 2. **Set up environment variables:**
 
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
 Fill in your Supabase credentials:
@@ -92,36 +93,30 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 ## Project Structure
 
 ```
-src/
-├── app/                    # Next.js App Router pages
-│   ├── dashboard/          # Organization dashboard
-│   ├── schedule/           # Schedule grid
-│   ├── people/             # People roster + people/[id] detail
-│   ├── settings/           # Organization configuration
-│   ├── gridmaster/         # Gridmaster portal
-│   ├── login/              # Authentication
-│   ├── forgot-password/    # Password reset request
-│   ├── reset-password/     # Password reset form (via email link)
-│   ├── verify-email/       # Email verification for new accounts
-│   ├── accept-invite/      # Invitation acceptance
-│   ├── onboarding/         # New user org assignment polling
-│   ├── setup/              # Organization setup wizard
-│   ├── request-demo/       # Demo request form (landing page)
-│   ├── profile/            # User profile
-│   └── api/                # API route handlers
-├── components/             # UI components
-│   ├── auth/               # Auth UI (PasswordInput, PasswordStrength, AuthCard)
-│   ├── dashboard/          # Dashboard cards, charts, expanded views
-│   ├── gridmaster/         # Gridmaster portal components
-│   ├── staff/              # Staff list components
-│   ├── staff-detail/       # Staff detail page + tabs
-│   ├── landing/            # Landing page feature mockups
-│   └── ui/                 # Base UI components (shadcn/ui)
-├── hooks/                  # Custom React hooks
-├── lib/                    # Data access, utilities, business logic
-├── types/                  # TypeScript type definitions
-└── __tests__/              # Unit + component tests
-
+apps/
+├── web/
+│   ├── src/
+│   │   ├── app/                    # Next.js App Router pages + API routes
+│   │   ├── components/             # Shared web UI
+│   │   ├── features/               # Domain-first server/client feature modules
+│   │   ├── hooks/                  # Web-only React hooks
+│   │   ├── lib/                    # Data access, utilities, integrations
+│   │   ├── types/                  # Web TypeScript types
+│   │   └── __tests__/              # Web unit + component tests
+│   ├── public/                     # Static web assets
+│   ├── messages/                   # next-intl locale messages
+│   ├── middleware.ts               # Edge middleware for RBAC + subdomain routing
+│   └── next.config.ts              # Next.js config + security headers
+│
+├── mobile/
+│   ├── app/                        # Expo Router entrypoints
+│   └── src/
+│       ├── features/               # auth, schedule, people, requests, profile
+│       └── shared/                 # mobile-wide providers, API client, UI shells
+│
+packages/
+├── contracts/                      # Shared Zod schemas + API contracts
+│
 supabase/
 ├── migrations/
 │   ├── 001_schema.sql              # Enums, tables, FKs, indexes
@@ -130,25 +125,58 @@ supabase/
 │   └── 004_grants.sql              # Grants + default privileges
 ├── seed.ts                         # Seed data for local development
 └── config.toml                     # Supabase local config
-
-middleware.ts               # Edge middleware for RBAC + subdomain routing
 ```
 
 ## Available Scripts
 
 | Script                    | Description                                              |
 | ------------------------- | -------------------------------------------------------- |
-| `npm run dev`             | Start Next.js dev server                                 |
-| `npm run build`           | Production build                                         |
-| `npm run start`           | Start production server                                  |
-| `npm test`                | Run unit + component tests (Vitest)                      |
+| `npm run dev`             | Start the web app through TurboRepo                      |
+| `npm run dev:web`         | Start the Next.js web app through TurboRepo              |
+| `npm run dev:web:lan`     | Start the Next.js web app on `0.0.0.0` for phone access  |
+| `npm run dev:mobile`      | Start the Expo mobile app in tunnel mode for Expo Go     |
+| `npm run dev:mobile:phone`| Start the Expo mobile app in tunnel mode for Expo Go     |
+| `npm run dev:mobile:lan`  | Start the Expo mobile app in LAN mode                    |
+| `npm run build`           | Dependency-aware production build for the web app        |
+| `npm run start`           | Start the web production server                          |
+| `npm run type-check`      | Run workspace type-checks through TurboRepo              |
+| `npm test`                | Run workspace tests through TurboRepo                    |
 | `npm run test:e2e`        | Run Playwright end-to-end tests                          |
 | `npm run test:e2e:ui`     | Run Playwright tests with interactive UI                 |
 | `npm run seed`            | Seed the local database with test data                   |
 | `npm run db:reset`        | Reset local Supabase DB (runs migrations + seed)         |
 | `npm run db:reset:remote` | Reset remote Supabase DB (for staging environments)      |
 | `npm run use:local`       | Switch .env.local to local Supabase credentials          |
+| `npm run use:mobile:local`| Generate `apps/mobile/.env.local` for local phone testing|
+| `npm run use:mobile:remote`| Copy remote mobile envs into `apps/mobile/.env.local`   |
 | `npm run use:remote`      | Switch .env.local to remote Supabase credentials         |
+
+## Turbo Remote Cache
+
+DubGrid uses TurboRepo for task orchestration and can use **Vercel-managed remote caching** for shared cache hits across local machines and GitHub Actions.
+
+Required secrets/config:
+
+- `TURBO_TEAM` — Vercel team slug that owns the remote cache
+- `TURBO_TOKEN` — Vercel Turbo access token with access to that team
+
+Recommended setup:
+
+```bash
+export TURBO_TEAM=your-vercel-team-slug
+export TURBO_TOKEN=your-vercel-turbo-token
+```
+
+With those set:
+
+- `npm run type-check` and `npm test` can reuse remote cache results across machines
+- `npm run build` hashes the public web env inputs that affect the Next.js client bundle
+- `@dubgrid/mobile` benefits from remote caching for Turbo-managed tasks like `test` and `type-check`
+
+Important:
+
+- Turbo remote caching helps monorepo tasks for both web and mobile code
+- It does **not** replace Expo EAS for native iOS/Android builds, signing, or store submission
 
 ## Database
 
@@ -165,7 +193,23 @@ Deployed on **Vercel** with a hosted **Supabase** backend. Edge middleware runs 
 
 Key configuration:
 - All routes are simple pages (no catch-all routes) to enable static prerendering
-- Security headers configured in `next.config.ts`
+
+## Mobile On A Real Phone
+
+For the first stable phone workflow, use Expo Go against the hosted backend:
+
+1. Run `npm run use:mobile:remote`
+2. Run `npm run dev:mobile`
+3. Scan the QR code with Expo Go on your phone
+
+Important:
+
+- `apps/mobile/.env.local` must point `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_API_BASE_URL` at a backend your phone can reach.
+- `127.0.0.1` and `localhost` only point back to the phone itself in Expo Go, so they will not reach services running on your laptop.
+- If Expo Go shows an `exp://192.168.x.x:8081` URL again, you are in LAN mode. Use `npm run dev:mobile` or `npm run dev:mobile:phone` instead.
+- If you want a local backend instead of the hosted one, run `npm run use:mobile:local`. It rewrites the repo's current local Supabase/web URLs to your laptop's private LAN IP and copies the local anon key into `apps/mobile/.env.local`.
+- For local phone testing, start the web app with `npm run dev:web:lan` so your phone can reach the API host written into `apps/mobile/.env.local`.
+- Security headers configured in `apps/web/next.config.ts`
 - Custom access token hook must be enabled in Supabase dashboard
 
 ## Documentation

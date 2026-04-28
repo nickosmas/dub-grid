@@ -50,7 +50,7 @@ Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `or
 | Staff      | `canViewStaff`                 | Always on   | View staff roster (always true)                       |
 | Staff      | `canManageEmployees`           | Yes         | Add, edit, bench, terminate employees                 |
 | Config     | `canManageFocusAreas`          | Yes         | Manage focus areas / departments                      |
-| Config     | `canManageShiftCodes`          | Yes         | Manage shift code definitions                         |
+| Config     | `canManageScheduleDefinitions`          | Yes         | Manage schedule definitions                           |
 | Config     | `canManageIndicatorTypes`      | Yes         | Manage note/indicator type definitions                |
 | Config     | `canManageOrgSettings`         | No          | Edit org name, address, phone, timezone (super_admin only) |
 | Config     | `canManageOrgLabels`           | Yes         | Edit custom terminology labels                        |
@@ -314,31 +314,26 @@ $$;
 | Mitigation | Optimistic locking via version column + client-side idempotency key. Supabase unique constraint on `(org_id, idempotency_key)` prevents duplicate insertion.                                                  |
 
 ```sql
--- shifts table with optimistic lock (composite PK on emp_id + date)
-CREATE TABLE public.shifts (
-  emp_id                   UUID NOT NULL,
-  date                     DATE NOT NULL,
-  org_id                   UUID,
-  user_id                  UUID,
-  version                  BIGINT NOT NULL DEFAULT 0,
-  series_id                UUID,
-  from_recurring           BOOLEAN NOT NULL DEFAULT false,
-  custom_start_time        TIME,
-  custom_end_time          TIME,
-  draft_shift_code_ids     BIGINT[] NOT NULL DEFAULT '{}',
-  published_shift_code_ids BIGINT[] NOT NULL DEFAULT '{}',
-  draft_is_delete          BOOLEAN NOT NULL DEFAULT false,
-  focus_area_id            BIGINT,
-  created_by               UUID,
-  updated_by               UUID,
-  created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+-- canonical schedule cell with optimistic lock (unique on emp_id + date)
+CREATE TABLE public.schedule_cells (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  emp_id         UUID NOT NULL,
+  date           DATE NOT NULL,
+  org_id         UUID NOT NULL,
+  version        BIGINT NOT NULL DEFAULT 0,
+  series_id      UUID,
+  from_recurring BOOLEAN NOT NULL DEFAULT false,
+  focus_area_id  BIGINT,
+  created_by     UUID,
+  updated_by     UUID,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-  PRIMARY KEY (emp_id, date)
+  UNIQUE (emp_id, date)
 );
 ```
 
-> **Note:** Draft/publish status is tracked via separate `draft_shift_code_ids` and `published_shift_code_ids` arrays rather than a single status column. `draft_is_delete` marks shifts staged for deletion.
+> **Note:** Draft and published state now live in `schedule_cell_snapshots`, with ordered work segments in `schedule_cell_segments`. Deletions are represented as a draft snapshot whose `state_kind` is `deleted`.
 
 ### 3.4 Race Condition: Optimistic Lock Violation on Update
 

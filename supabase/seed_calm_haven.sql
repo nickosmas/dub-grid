@@ -61,7 +61,7 @@ END $$;
 
 
 -- =============================================================================
--- Calm Haven: Focus Areas, Shift Categories, and Shift Codes
+-- Calm Haven: Focus Areas, Shift Categories, and Derived Schedule Labels
 -- =============================================================================
 
 DO $$
@@ -99,7 +99,7 @@ BEGIN
     "canViewSchedule": true, "canEditShifts": true, "canPublishSchedule": true,
     "canApplyRecurringSchedule": true, "canEditNotes": true, "canManageRecurringShifts": true,
     "canManageShiftSeries": true, "canViewStaff": true, "canManageEmployees": true,
-    "canManageFocusAreas": true, "canManageShiftCodes": true, "canManageIndicatorTypes": true,
+    "canManageFocusAreas": true, "canManageScheduleDefinitions": true, "canManageIndicatorTypes": true,
     "canManageOrgSettings": false, "canManageOrgLabels": true,
     "canManageCoverageRequirements": true, "canApproveShiftRequests": true
   }'::jsonb)
@@ -110,7 +110,7 @@ BEGIN
     "canViewSchedule": true, "canEditShifts": false, "canPublishSchedule": false,
     "canApplyRecurringSchedule": false, "canEditNotes": false, "canManageRecurringShifts": false,
     "canManageShiftSeries": false, "canViewStaff": true, "canManageEmployees": true,
-    "canManageFocusAreas": false, "canManageShiftCodes": false, "canManageIndicatorTypes": false,
+    "canManageFocusAreas": false, "canManageScheduleDefinitions": false, "canManageIndicatorTypes": false,
     "canManageOrgSettings": false, "canManageOrgLabels": false,
     "canManageCoverageRequirements": false, "canApproveShiftRequests": false
   }'::jsonb)
@@ -118,14 +118,15 @@ BEGIN
 
   -- ── Focus Areas ─────────────────────────────────────────────────────────────
 
-  INSERT INTO public.focus_areas (org_id, department_id, name, sort_order)
+  INSERT INTO public.focus_areas (org_id, department_id, name, color, sort_order)
   VALUES
-    (org, dept_nursing, 'Skilled Nursing', 0),
-    (org, dept_nursing, 'Sheltered Care',  1),
-    (org, dept_nursing, 'Night Shift',     2),
-    (org, dept_visiting, 'Visiting CSNS',  3)
+    (org, dept_nursing, 'Skilled Nursing', '#BFDBFE', 0),
+    (org, dept_nursing, 'Sheltered Care',  '#C7D2FE', 1),
+    (org, dept_nursing, 'Night Shift',     '#A5F3FC', 2),
+    (org, dept_visiting, 'Visiting CSNS',  '#A7F3D0', 3)
   ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO UPDATE
     SET department_id = EXCLUDED.department_id,
+        color = EXCLUDED.color,
         sort_order = EXCLUDED.sort_order;
 
   SELECT id INTO fa_snw  FROM public.focus_areas WHERE org_id = org AND name = 'Skilled Nursing';
@@ -138,31 +139,31 @@ BEGIN
   DELETE FROM public.shift_categories WHERE org_id = org;
 
   -- Skilled Nursing
-  INSERT INTO public.shift_categories (org_id, focus_area_id, name, color, start_time, end_time, sort_order)
-  VALUES (org, fa_snw, 'Day Shift',     '#93C5FD', '07:00', '15:30', 0)
+  INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)
+  VALUES (org, fa_snw, 'Day Shift', 'D', '07:00', '15:30', '#A5F3FC', 0)
   RETURNING id INTO cat_snw_d;
 
-  INSERT INTO public.shift_categories (org_id, focus_area_id, name, color, start_time, end_time, sort_order)
-  VALUES (org, fa_snw, 'Evening Shift', '#FDE68A', '15:30', '00:00', 1)
+  INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)
+  VALUES (org, fa_snw, 'Evening Shift', 'E', '15:30', '00:00', '#FDE68A', 1)
   RETURNING id INTO cat_snw_e;
 
   -- Sheltered Care
-  INSERT INTO public.shift_categories (org_id, focus_area_id, name, color, start_time, end_time, sort_order)
-  VALUES (org, fa_sc, 'Day Shift',     '#6EE7B7', '07:00', '15:30', 0)
+  INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)
+  VALUES (org, fa_sc, 'Day Shift', 'D', '07:00', '15:30', '#C7D2FE', 0)
   RETURNING id INTO cat_sc_d;
 
-  INSERT INTO public.shift_categories (org_id, focus_area_id, name, color, start_time, end_time, sort_order)
-  VALUES (org, fa_sc, 'Evening Shift', '#FDE68A', '15:30', '00:00', 1)
+  INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)
+  VALUES (org, fa_sc, 'Evening Shift', 'E', '15:30', '00:00', '#DDD6FE', 1)
   RETURNING id INTO cat_sc_e;
 
   -- Night Shift
-  INSERT INTO public.shift_categories (org_id, focus_area_id, name, color, start_time, end_time, sort_order)
-  VALUES (org, fa_ns, 'Night Shift', '#C4B5FD', '00:00', '08:00', 0)
+  INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)
+  VALUES (org, fa_ns, 'Night Shift', 'N', '00:00', '08:00', '#FECDD3', 0)
   RETURNING id INTO cat_ns_n;
 
   -- Visiting CSNS
-  INSERT INTO public.shift_categories (org_id, focus_area_id, name, color, start_time, end_time, sort_order)
-  VALUES (org, fa_vcsn, 'Visiting Nursing', '#67E8F9', '07:00', '15:30', 0)
+  INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)
+  VALUES (org, fa_vcsn, 'Visiting Nursing', 'VN', '07:00', '15:30', '#A7F3D0', 0)
   RETURNING id INTO cat_vcsn_vn;
 
 
@@ -184,54 +185,7 @@ BEGIN
     (org, 'UX',   'Unpaid Leave',           '#FED7AA', 'transparent', '#9A3412', 10)
   ON CONFLICT DO NOTHING;
 
-  -- ── Shift Codes ───────────────────────────────────────────────────────────────
-
-  -- Global codes (duration-only — no fixed start/end times)
-  INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, category_id, default_duration_hours, default_duration_minutes)
-  VALUES
-    (org, 'Ofc', 'Office',  '#E2E8F0', 'transparent', '#1E293B', true,  NULL, 1, '{}', NULL, 8, 0),
-    (org, '0.3', 'Partial', '#E2E8F0', 'transparent', '#1E293B', true,  NULL, 2, '{}', NULL, 3, 0)
-  ON CONFLICT DO NOTHING;
-
-  -- Skilled Nursing codes
-  INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
-  VALUES
-    (org, 'D',   'Day',              '#FECACA', 'transparent', '#991B1B', false, fa_snw,  0, '{}', '07:00', '15:30', cat_snw_d),
-    (org, 'Ds',  'Day (Supervisor)', '#FED7AA', 'transparent', '#9A3412', false, fa_snw,  1, '{}', '07:00', '15:30', cat_snw_d),
-    (org, '(D)', 'Day Mentoring',    '#E2E8F0', 'transparent', '#1E293B', false, fa_snw,  3, '{}', '07:00', '15:30', cat_snw_d),
-    (org, 'E',   'Evening',              '#FECACA', 'transparent', '#991B1B', false, fa_snw, 10, '{}', '15:30', '00:00', cat_snw_e),
-    (org, 'Es',  'Evening (Supervisor)', '#E9D5FF', 'transparent', '#6B21A8', false, fa_snw, 11, '{}', '15:30', '00:00', cat_snw_e)
-  ON CONFLICT DO NOTHING;
-
-  -- Sheltered Care codes
-  INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
-  VALUES
-    (org, 'D',   'Day',          '#FED7AA', 'transparent', '#9A3412', false, fa_sc, 0, '{}', '07:00', '15:30', cat_sc_d),
-    (org, 'Dcn', 'Day (CN)',     '#BFDBFE', 'transparent', '#1E40AF', false, fa_sc, 1, '{}', '07:00', '15:30', cat_sc_d),
-    (org, '(D)', 'Day Mentoring','#E2E8F0', 'transparent', '#1E293B', false, fa_sc, 2, '{}', '07:00', '15:30', cat_sc_d),
-    (org, 'E',   'Evening',      '#FED7AA', 'transparent', '#9A3412', false, fa_sc, 3, '{}', '15:30', '00:00', cat_sc_e),
-    (org, 'Ecn', 'Evening (CN)', '#FBCFE8', 'transparent', '#9D174D', false, fa_sc, 4, '{}', '15:30', '00:00', cat_sc_e)
-  ON CONFLICT DO NOTHING;
-
-  -- Night Shift codes
-  INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
-  VALUES
-    (org, 'N',  'Night',              '#FECACA', 'transparent', '#991B1B', false, fa_ns, 0, '{}', '00:00', '08:00', cat_ns_n),
-    (org, 'Ns', 'Night (Supervisor)', '#BFDBFE', 'transparent', '#1E40AF', false, fa_ns, 1, '{}', '00:00', '08:00', cat_ns_n)
-  ON CONFLICT DO NOTHING;
-
-  -- Visiting CSNS codes
-  INSERT INTO public.shift_codes
-    (org_id, label, name, color, border_color, text_color, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, category_id)
-  VALUES
-    (org, 'VN', 'Visiting Nursing', '#FECACA', 'transparent', '#991B1B', false, fa_vcsn, 0, '{}', '07:00', '15:30', cat_vcsn_vn)
-  ON CONFLICT DO NOTHING;
-
-  RAISE NOTICE 'Calm Haven focus areas, shift categories, and shift codes seeded.';
+  RAISE NOTICE 'Calm Haven focus areas, shift categories, and absence types seeded.';
 END $$;
 
 -- =============================================================================
@@ -266,6 +220,12 @@ DECLARE
   fa_sc   bigint;
   fa_ns   bigint;
   fa_vcsn bigint;
+  shift_snw_d bigint;
+  shift_snw_e bigint;
+  shift_sc_d bigint;
+  shift_sc_e bigint;
+  shift_ns_n bigint;
+  shift_vcsn_vn bigint;
 BEGIN
 
   -- ── Look up department IDs ──────────────────────────────────────────────────
@@ -276,7 +236,7 @@ BEGIN
   INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
   VALUES
     (org, dept_nursing,  'Journal Listed Christian Science Nurse', 'JLCSN',  0),
-    (org, dept_nursing,  'Staff Nurse',                          'STAFF',  1),
+    (org, dept_nursing,  'Nurse',                                'Nurse',  1),
     (org, dept_nursing,  'Christian Science Nurse IV',            'CSN IV', 2),
     (org, dept_nursing,  'Christian Science Nurse III',           'CSN III',3),
     (org, dept_nursing,  'Christian Science Nurse II',            'CSN II', 4),
@@ -288,7 +248,7 @@ BEGIN
   SELECT id INTO cert_csn4  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse IV';
   SELECT id INTO cert_csn3  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse III';
   SELECT id INTO cert_csn2  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse II';
-  SELECT id INTO cert_staff FROM public.certifications WHERE org_id = org AND name = 'Staff Nurse';
+  SELECT id INTO cert_staff FROM public.certifications WHERE org_id = org AND name = 'Nurse';
   SELECT id INTO cert_other FROM public.certifications WHERE org_id = org AND name = 'Other';
 
   -- ── Organization Roles ────────────────────────────────────────────────────────
@@ -300,7 +260,7 @@ BEGIN
     (org, dept_nursing,  'Assistant Director of Christian Science Nursing','ADCSN',      3),
     (org, NULL,          'Supervisor',                                     'Supv',       4),
     (org, NULL,          'Mentor',                                         'Mentor',     5),
-    (org, NULL,          'Christian Science Nurse',                        'CN',         6),
+    (org, NULL,          'Nurse',                                          'Nurse',      6),
     (org, dept_nursing,  'Sheltered Care Manager',                         'SC Mgr',     7),
     (org, dept_nursing,  'Activity Coordinator',                           'Act Cor',    8),
     (org, dept_nursing,  'SC/Asst/Act/Cor',                                'SC/Act. Cor',9)
@@ -310,7 +270,7 @@ BEGIN
   SELECT id INTO role_dvcsn  FROM public.organization_roles WHERE org_id = org AND abbr = 'DVCSN';
   SELECT id INTO role_supv   FROM public.organization_roles WHERE org_id = org AND abbr = 'Supv';
   SELECT id INTO role_mentor FROM public.organization_roles WHERE org_id = org AND abbr = 'Mentor';
-  SELECT id INTO role_cn     FROM public.organization_roles WHERE org_id = org AND abbr = 'CN';
+  SELECT id INTO role_cn     FROM public.organization_roles WHERE org_id = org AND abbr = 'Nurse';
   SELECT id INTO role_scmgr  FROM public.organization_roles WHERE org_id = org AND abbr = 'SC Mgr';
   SELECT id INTO role_actcor FROM public.organization_roles WHERE org_id = org AND abbr = 'Act Cor';
   SELECT id INTO role_scasst FROM public.organization_roles WHERE org_id = org AND abbr = 'SC/Act. Cor';
@@ -320,9 +280,109 @@ BEGIN
   SELECT id INTO fa_sc   FROM public.focus_areas WHERE org_id = org AND name = 'Sheltered Care';
   SELECT id INTO fa_ns   FROM public.focus_areas WHERE org_id = org AND name = 'Night Shift';
   SELECT id INTO fa_vcsn FROM public.focus_areas WHERE org_id = org AND name = 'Visiting CSNS';
+  SELECT id INTO shift_snw_d FROM public.shift_categories WHERE org_id = org AND focus_area_id = fa_snw AND name = 'Day Shift';
+  SELECT id INTO shift_snw_e FROM public.shift_categories WHERE org_id = org AND focus_area_id = fa_snw AND name = 'Evening Shift';
+  SELECT id INTO shift_sc_d FROM public.shift_categories WHERE org_id = org AND focus_area_id = fa_sc AND name = 'Day Shift';
+  SELECT id INTO shift_sc_e FROM public.shift_categories WHERE org_id = org AND focus_area_id = fa_sc AND name = 'Evening Shift';
+  SELECT id INTO shift_ns_n FROM public.shift_categories WHERE org_id = org AND focus_area_id = fa_ns AND name = 'Night Shift';
+  SELECT id INTO shift_vcsn_vn FROM public.shift_categories WHERE org_id = org AND focus_area_id = fa_vcsn AND name = 'Visiting Nursing';
+
+  DELETE FROM public.jobs WHERE org_id = org;
+
+  INSERT INTO public.jobs (
+    org_id,
+    name,
+    abbr,
+    show_on_grid,
+    assignment_mode,
+    eligibility_mode,
+    focus_area_ids,
+    department_ids,
+    applicable_shift_ids,
+    eligible_role_ids,
+    required_certification_ids,
+    color,
+    border_color,
+    text_color,
+    shift_time_overrides,
+    shift_color_overrides,
+    default_start_time,
+    default_end_time,
+    default_duration_hours,
+    default_duration_minutes,
+    sort_order,
+    system_key
+  )
+  VALUES
+    (
+      org, 'Office', 'Ofc', true, 'shiftless', 'and',
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '#E2E8F0', 'transparent', '#1E293B',
+      '{}'::jsonb, '{}'::jsonb,
+      NULL, NULL, 8, 0, 0, NULL
+    ),
+    (
+      org, 'Partial', '0.3', true, 'shiftless', 'and',
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '#FDE68A', 'transparent', '#92400E',
+      '{}'::jsonb, '{}'::jsonb,
+      NULL, NULL, 3, 0, 1, NULL
+    ),
+    (
+      org, 'Nurse', 'Nurse', true, 'with_shift', 'and',
+      ARRAY[fa_snw, fa_sc, fa_ns, fa_vcsn],
+      ARRAY[dept_nursing, dept_visiting],
+      ARRAY[shift_snw_d, shift_snw_e, shift_sc_d, shift_sc_e, shift_ns_n, shift_vcsn_vn],
+      '{}'::bigint[],
+      '{}'::bigint[],
+      '#E2E8F0', 'transparent', '#1E293B',
+      '{}'::jsonb, '{}'::jsonb,
+      NULL, NULL, NULL, NULL, 2, NULL
+    ),
+    (
+      org, 'Staff', 'Staff', true, 'with_shift', 'and',
+      ARRAY[fa_sc],
+      ARRAY[dept_nursing],
+      ARRAY[shift_sc_d, shift_sc_e],
+      ARRAY[role_actcor, role_scasst],
+      '{}'::bigint[],
+      '#E2E8F0', 'transparent', '#1E293B',
+      '{}'::jsonb, '{}'::jsonb,
+      NULL, NULL, NULL, NULL, 3, NULL
+    ),
+    (
+      org, 'Supervisor', 'S', true, 'with_shift', 'and',
+      ARRAY[fa_snw, fa_ns],
+      ARRAY[dept_nursing],
+      ARRAY[shift_snw_d, shift_snw_e, shift_ns_n],
+      ARRAY[role_supv],
+      ARRAY[cert_jlcsn, cert_staff, cert_csn4],
+      '#E2E8F0', 'transparent', '#1E293B',
+      '{}'::jsonb, '{}'::jsonb,
+      NULL, NULL, NULL, NULL, 4, NULL
+    ),
+    (
+      org, 'Mentor', 'M', true, 'with_shift', 'and',
+      ARRAY[fa_snw, fa_sc],
+      ARRAY[dept_nursing],
+      ARRAY[shift_snw_d, shift_sc_d],
+      ARRAY[role_mentor],
+      '{}'::bigint[],
+      '#E2E8F0', 'transparent', '#1E293B',
+      '{}'::jsonb, '{}'::jsonb,
+      NULL, NULL, NULL, NULL, 5, NULL
+    );
 
   -- ── Employees ───────────────────────────────────────────────────────────────
-  DELETE FROM public.shifts WHERE org_id = org;
+  DELETE FROM public.schedule_cells WHERE org_id = org;
   DELETE FROM public.employees WHERE org_id = org;
 
   INSERT INTO public.employees
@@ -379,97 +439,128 @@ BEGIN
     dept_admin_ids = ARRAY[(SELECT id FROM public.departments WHERE org_id = org AND name = 'Human Resources')]
   WHERE org_id = org AND last_name IN ('Davenport');
 
-  -- ── Update required certifications for shift codes ─────────────────────────
-  -- Ds, Es (Skilled Nursing): require JLCSN, STAFF, CSN IV
-  UPDATE public.shift_codes SET required_certification_ids = ARRAY[cert_jlcsn, cert_staff, cert_csn4]
-  WHERE org_id = org AND label = 'Ds' AND focus_area_id = fa_snw;
-
-  UPDATE public.shift_codes SET required_certification_ids = ARRAY[cert_jlcsn, cert_staff, cert_csn4]
-  WHERE org_id = org AND label = 'Es' AND focus_area_id = fa_snw;
-
-  -- Dcn, Ecn (Sheltered Care): require JLCSN, STAFF, CSN IV, CSN III
-  UPDATE public.shift_codes SET required_certification_ids = ARRAY[cert_jlcsn, cert_staff, cert_csn4, cert_csn3]
-  WHERE org_id = org AND label = 'Dcn' AND focus_area_id = fa_sc;
-
-  UPDATE public.shift_codes SET required_certification_ids = ARRAY[cert_jlcsn, cert_staff, cert_csn4, cert_csn3]
-  WHERE org_id = org AND label = 'Ecn' AND focus_area_id = fa_sc;
-
 END $$;
 
 -- =============================================================================
--- Seed: shifts + absences  (March 22 – April 4, 2026)
+-- Seed: shifts + absences  (April 19 – May 2, 2026)
 -- Organization: Calm Haven (b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90)
 -- =============================================================================
 
 DO $$
 DECLARE
   org  uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
+  schedule_source_start date := DATE '2026-03-22';
+  schedule_target_start date := DATE '2026-04-19';
   -- Focus area IDs
   snw  bigint;
   sc   bigint;
   ns   bigint;
   vc   bigint;
-  -- Shift code IDs (global)
-  c_ofc  bigint;  -- Office
-  c_03   bigint;  -- Partial (0.3)
+  shift_snw_d bigint;
+  shift_snw_e bigint;
+  shift_sc_d bigint;
+  shift_sc_e bigint;
+  shift_ns_n bigint;
+  shift_vcsn_vn bigint;
+  job_office bigint;
+  job_partial bigint;
+  job_nurse bigint;
+  job_staff bigint;
+  job_supervisor bigint;
+  job_mentor bigint;
+  role_actcor bigint;
+  role_scasst bigint;
+  -- Work labels
+  c_ofc  text := 'Ofc';
+  c_03   text := '0.3';
   -- Absence type IDs
   at_x   bigint;  -- Off (absence type)
-  -- SNW codes
-  c_d_snw    bigint;
-  c_ds_snw   bigint;
-  c_fd_snw   bigint;  -- (D) mentoring (SNW)
-  c_fd_sc    bigint;  -- (D) mentoring (SC)
-  c_e_snw    bigint;
-  c_es_snw   bigint;
-  -- SC codes
-  c_d_sc     bigint;
-  c_dcn_sc   bigint;
-  c_e_sc     bigint;
-  c_ecn_sc   bigint;
-  -- Night codes
-  c_n        bigint;
-  c_ns       bigint;
-  -- Visiting codes
-  c_vn       bigint;
+  c_d_snw    text := 'D';
+  c_ds_snw   text := 'Ds';
+  c_fd_snw   text := '(D)';
+  c_fd_sc    text := '(D)';
+  c_e_snw    text := 'E';
+  c_es_snw   text := 'Es';
+  c_d_sc     text := 'D';
+  c_dcn_sc   text := 'Dcn';
+  c_e_sc     text := 'E';
+  c_ecn_sc   text := 'Ecn';
+  c_n        text := 'N';
+  c_ns       text := 'Ns';
+  c_vn       text := 'VN';
+  work_row   RECORD;
+  absence_row RECORD;
 BEGIN
   -- Focus areas
   SELECT id INTO snw FROM public.focus_areas WHERE org_id = org AND name = 'Skilled Nursing';
   SELECT id INTO sc  FROM public.focus_areas WHERE org_id = org AND name = 'Sheltered Care';
   SELECT id INTO ns  FROM public.focus_areas WHERE org_id = org AND name = 'Night Shift';
   SELECT id INTO vc  FROM public.focus_areas WHERE org_id = org AND name = 'Visiting CSNS';
-
-  -- Global codes
-  SELECT id INTO c_ofc FROM public.shift_codes WHERE org_id = org AND label = 'Ofc' AND focus_area_id IS NULL;
-  SELECT id INTO c_03  FROM public.shift_codes WHERE org_id = org AND label = '0.3' AND focus_area_id IS NULL;
+  SELECT id INTO shift_snw_d FROM public.shift_categories WHERE org_id = org AND focus_area_id = snw AND name = 'Day Shift';
+  SELECT id INTO shift_snw_e FROM public.shift_categories WHERE org_id = org AND focus_area_id = snw AND name = 'Evening Shift';
+  SELECT id INTO shift_sc_d FROM public.shift_categories WHERE org_id = org AND focus_area_id = sc AND name = 'Day Shift';
+  SELECT id INTO shift_sc_e FROM public.shift_categories WHERE org_id = org AND focus_area_id = sc AND name = 'Evening Shift';
+  SELECT id INTO shift_ns_n FROM public.shift_categories WHERE org_id = org AND focus_area_id = ns AND name = 'Night Shift';
+  SELECT id INTO shift_vcsn_vn FROM public.shift_categories WHERE org_id = org AND focus_area_id = vc AND name = 'Visiting Nursing';
+  SELECT id INTO job_office FROM public.jobs WHERE org_id = org AND name = 'Office';
+  SELECT id INTO job_partial FROM public.jobs WHERE org_id = org AND name = 'Partial';
+  SELECT id INTO job_nurse FROM public.jobs WHERE org_id = org AND name = 'Nurse';
+  SELECT id INTO job_staff FROM public.jobs WHERE org_id = org AND name = 'Staff';
+  SELECT id INTO job_supervisor FROM public.jobs WHERE org_id = org AND name = 'Supervisor';
+  SELECT id INTO job_mentor FROM public.jobs WHERE org_id = org AND name = 'Mentor';
+  SELECT id INTO role_actcor FROM public.organization_roles WHERE org_id = org AND abbr = 'Act Cor';
+  SELECT id INTO role_scasst FROM public.organization_roles WHERE org_id = org AND abbr = 'SC/Act. Cor';
 
   -- Absence types
   SELECT id INTO at_x FROM public.absence_types WHERE org_id = org AND label = 'X';
 
-  -- SNW codes
-  SELECT id INTO c_d_snw   FROM public.shift_codes WHERE org_id = org AND label = 'D'   AND focus_area_id = snw;
-  SELECT id INTO c_ds_snw  FROM public.shift_codes WHERE org_id = org AND label = 'Ds'  AND focus_area_id = snw;
-  SELECT id INTO c_fd_snw  FROM public.shift_codes WHERE org_id = org AND label = '(D)' AND focus_area_id = snw;
-  SELECT id INTO c_fd_sc   FROM public.shift_codes WHERE org_id = org AND label = '(D)' AND focus_area_id = sc;
-  SELECT id INTO c_e_snw   FROM public.shift_codes WHERE org_id = org AND label = 'E'   AND focus_area_id = snw;
-  SELECT id INTO c_es_snw  FROM public.shift_codes WHERE org_id = org AND label = 'Es'  AND focus_area_id = snw;
-
-  -- SC codes
-  SELECT id INTO c_d_sc   FROM public.shift_codes WHERE org_id = org AND label = 'D'   AND focus_area_id = sc;
-  SELECT id INTO c_dcn_sc FROM public.shift_codes WHERE org_id = org AND label = 'Dcn' AND focus_area_id = sc;
-  SELECT id INTO c_e_sc   FROM public.shift_codes WHERE org_id = org AND label = 'E'   AND focus_area_id = sc;
-  SELECT id INTO c_ecn_sc FROM public.shift_codes WHERE org_id = org AND label = 'Ecn' AND focus_area_id = sc;
-
-  -- Night codes
-  SELECT id INTO c_n  FROM public.shift_codes WHERE org_id = org AND label = 'N'  AND focus_area_id = ns;
-  SELECT id INTO c_ns FROM public.shift_codes WHERE org_id = org AND label = 'Ns' AND focus_area_id = ns;
-
-  -- Visiting codes
-  SELECT id INTO c_vn FROM public.shift_codes WHERE org_id = org AND label = 'VN' AND focus_area_id = vc;
-
   -- ── Insert work shifts ────────────────────────────────────────────────────
-  INSERT INTO public.shifts (emp_id, date, published_shift_code_ids, org_id, focus_area_id, published_custom_start_time, published_custom_end_time)
-  SELECT e.id, v.dt::date, v.codes, org, v.fa_id, v.cstart::time, v.cend::time
-  FROM (VALUES
+  FOR work_row IN
+    SELECT
+      e.id AS emp_id,
+      schedule_target_start + (v.dt::date - schedule_source_start) AS shift_date,
+      v.codes AS labels,
+      v.fa_id AS focus_area_id,
+      v.cstart::text AS custom_start_time,
+      v.cend::text AS custom_end_time,
+      ARRAY(
+        SELECT CASE selected.code_label
+          WHEN 'Ofc' THEN NULL::bigint
+          WHEN '0.3' THEN NULL::bigint
+          WHEN 'Ds' THEN shift_snw_d
+          WHEN 'Es' THEN shift_snw_e
+          WHEN 'Dcn' THEN shift_sc_d
+          WHEN 'Ecn' THEN shift_sc_e
+          WHEN 'Ns' THEN shift_ns_n
+          WHEN 'VN' THEN shift_vcsn_vn
+          WHEN 'N' THEN shift_ns_n
+          WHEN '(D)' THEN CASE WHEN v.fa_id = sc THEN shift_sc_d ELSE shift_snw_d END
+          WHEN 'D' THEN CASE WHEN v.fa_id = sc THEN shift_sc_d ELSE shift_snw_d END
+          WHEN 'E' THEN CASE WHEN v.fa_id = sc THEN shift_sc_e ELSE shift_snw_e END
+          ELSE NULL::bigint
+        END
+        FROM unnest(v.codes) WITH ORDINALITY AS selected(code_label, ord)
+        ORDER BY selected.ord
+      ) AS shift_ids,
+      ARRAY(
+        SELECT CASE selected.code_label
+          WHEN 'Ofc' THEN job_office
+          WHEN '0.3' THEN job_partial
+          WHEN 'Ds' THEN job_supervisor
+          WHEN 'Es' THEN job_supervisor
+          WHEN 'Ns' THEN job_supervisor
+          WHEN '(D)' THEN job_mentor
+          WHEN 'Dcn' THEN job_nurse
+          WHEN 'Ecn' THEN job_nurse
+          ELSE CASE
+            WHEN e.role_ids && ARRAY[role_actcor, role_scasst] THEN job_staff
+            ELSE job_nurse
+          END
+        END
+        FROM unnest(v.codes) WITH ORDINALITY AS selected(code_label, ord)
+        ORDER BY selected.ord
+      ) AS job_ids
+    FROM (VALUES
 
     -- Margaret Sullivan ─────────────────────────────────────────────────────────────
     ('Margaret Sullivan'::text, '2026-03-24'::date, ARRAY[c_ofc], NULL::bigint, NULL::text, NULL::text),
@@ -783,18 +874,34 @@ BEGIN
     ('Marilyn Davenport', '2026-04-01', ARRAY[c_vn], vc,   NULL, NULL),
     ('Marilyn Davenport', '2026-04-02', ARRAY[c_vn], vc,   NULL, NULL)
 
-  ) AS v(emp_name, dt, codes, fa_id, cstart, cend)
-  JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
-  ON CONFLICT (emp_id, date) DO UPDATE SET
-    published_shift_code_ids = EXCLUDED.published_shift_code_ids,
-    focus_area_id = EXCLUDED.focus_area_id,
-    published_custom_start_time = EXCLUDED.published_custom_start_time,
-    published_custom_end_time = EXCLUDED.published_custom_end_time;
+    ) AS v(emp_name, dt, codes, fa_id, cstart, cend)
+    JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
+  LOOP
+    PERFORM public.write_schedule_cell_snapshot_internal(
+      org,
+      work_row.emp_id,
+      work_row.shift_date,
+      'published',
+      'worked',
+      work_row.shift_ids,
+      work_row.job_ids,
+      NULL,
+      work_row.custom_start_time,
+      work_row.custom_end_time,
+      NULL,
+      FALSE,
+      work_row.focus_area_id,
+      NULL,
+      NULL
+    );
+  END LOOP;
 
   -- ── Insert absence entries ──────────────────────────────────────────────
-  INSERT INTO public.shifts (emp_id, date, published_absence_type_id, draft_absence_type_id, org_id)
-  SELECT e.id, v.dt::date, at_x, at_x, org
-  FROM (VALUES
+  FOR absence_row IN
+    SELECT
+      e.id AS emp_id,
+      schedule_target_start + (v.dt::date - schedule_source_start) AS shift_date
+    FROM (VALUES
     -- Margaret Sullivan
     ('Margaret Sullivan'::text, '2026-03-22'::date),
     ('Margaret Sullivan',       '2026-03-23'),
@@ -952,10 +1059,26 @@ BEGIN
     ('Marilyn Davenport', '2026-03-28'),
     ('Marilyn Davenport', '2026-04-03'),
     ('Marilyn Davenport', '2026-04-04')
-  ) AS v(emp_name, dt)
-  JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
-  ON CONFLICT (emp_id, date) DO UPDATE SET
-    published_absence_type_id = EXCLUDED.published_absence_type_id,
-    draft_absence_type_id = EXCLUDED.draft_absence_type_id;
+    ) AS v(emp_name, dt)
+    JOIN public.employees e ON (e.first_name || ' ' || e.last_name) = v.emp_name AND e.org_id = org
+  LOOP
+    PERFORM public.write_schedule_cell_snapshot_internal(
+      org,
+      absence_row.emp_id,
+      absence_row.shift_date,
+      'published',
+      'absence',
+      '{}'::BIGINT[],
+      '{}'::BIGINT[],
+      at_x,
+      NULL,
+      NULL,
+      NULL,
+      FALSE,
+      NULL,
+      NULL,
+      NULL
+    );
+  END LOOP;
 
 END $$;

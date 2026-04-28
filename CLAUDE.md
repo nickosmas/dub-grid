@@ -60,14 +60,14 @@
 ## 7. Project-Specific Constraints
 
 - **Migrations**: All schema lives in exactly 4 files (001-004). NEVER create new migration files
-- **Routes**: All routes must be simple (`src/app/staff/page.tsx`), NOT catch-all.
+- **Routes**: All routes must be simple (`apps/web/src/app/staff/page.tsx`), NOT catch-all.
   Catch-all routes break static prerendering on Vercel
 - **Naming**: `gridmaster` = platform_role (route: `/gridmaster`). `admin` = org_role.
   Never call the gridmaster portal "admin portal"
 - **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
 - **Cookie consent version**: When adding/removing cookies, changing analytics providers,
   or updating the cookie/privacy policy, bump `CONSENT_VERSION` in
-  `src/components/CookieConsent.tsx`. This re-prompts all users to re-consent on next visit
+  `apps/web/src/components/CookieConsent.tsx`. This re-prompts all users to re-consent on next visit
 
 ---
 ---
@@ -384,7 +384,7 @@ router.push('/dashboard');
 
 ## Middleware
 
-Use `middleware.ts` for cross-cutting concerns that must run on every request:
+Use `apps/web/middleware.ts` for cross-cutting concerns that must run on every request:
 auth guards, redirects, locale detection, A/B flags.
 
 Keep middleware fast and dependency-light — it runs on the Edge runtime.
@@ -537,7 +537,7 @@ React escapes JSX output by default. Never bypass this:
 - Set a strict Content Security Policy (CSP) header
 
 ```ts
-// next.config.ts
+// apps/web/next.config.ts
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'nonce-{NONCE}';
@@ -565,7 +565,7 @@ a CSRF token library.
 
 ## Security Headers
 
-Set security headers in `next.config.ts` for every response:
+Set security headers in `apps/web/next.config.ts` for every response:
 
 ```ts
 const securityHeaders = [

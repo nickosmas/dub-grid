@@ -81,7 +81,7 @@ All authenticated endpoints require a valid Supabase session cookie (`sb-*-auth-
 
 ## Rate Limiting
 
-Rate limits are enforced via Upstash Redis (`src/lib/rate-limit.ts`):
+Rate limits are enforced via Upstash Redis (`apps/web/src/lib/rate-limit.ts`):
 
 | Limiter | Scope | Window | Limit |
 | ------- | ----- | ------ | ----- |

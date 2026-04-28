@@ -1,0 +1,147 @@
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren,
+} from "react";
+import { AppState, Platform, type AppStateStatus } from "react-native";
+import { focusManager, onlineManager } from "@tanstack/react-query";
+import * as Network from "expo-network";
+
+const NETWORK_RECONNECT_STABILITY_MS = 1_500;
+
+type NetworkStatusContextValue = {
+  hasResolvedState: boolean;
+  isOnline: boolean;
+  isOffline: boolean;
+};
+
+const NetworkStatusContext = createContext<NetworkStatusContextValue | null>(null);
+
+function toOnlineValue(state: Pick<
+  Network.NetworkState,
+  "isConnected" | "isInternetReachable"
+>): boolean {
+  return Boolean(state.isInternetReachable ?? state.isConnected);
+}
+
+export function NetworkStateProvider({ children }: PropsWithChildren) {
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isOnlineRef = useRef(true);
+  const [hasResolvedState, setHasResolvedState] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    let receivedLiveEvent = false;
+
+    function clearReconnectTimer() {
+      if (reconnectTimerRef.current != null) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+    }
+
+    function applyOnlineState(nextOnline: boolean) {
+      if (cancelled) {
+        return;
+      }
+
+      setHasResolvedState(true);
+
+      if (!nextOnline) {
+        clearReconnectTimer();
+        setIsOnline(false);
+        isOnlineRef.current = false;
+        onlineManager.setOnline(false);
+        return;
+      }
+
+      if (reconnectTimerRef.current != null || isOnlineRef.current) {
+        return;
+      }
+
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectTimerRef.current = null;
+        if (cancelled) {
+          return;
+        }
+        setIsOnline(true);
+        isOnlineRef.current = true;
+        onlineManager.setOnline(true);
+      }, NETWORK_RECONNECT_STABILITY_MS);
+    }
+
+    Network.getNetworkStateAsync()
+      .then((networkState) => {
+        if (!receivedLiveEvent) {
+          applyOnlineState(toOnlineValue(networkState));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHasResolvedState(true);
+          setIsOnline(true);
+          isOnlineRef.current = true;
+          onlineManager.setOnline(true);
+        }
+      });
+
+    const subscription = Network.addNetworkStateListener((networkState) => {
+      receivedLiveEvent = true;
+      applyOnlineState(toOnlineValue(networkState));
+    });
+
+    return () => {
+      cancelled = true;
+      clearReconnectTimer();
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    function onAppStateChange(status: AppStateStatus) {
+      if (Platform.OS !== "web") {
+        focusManager.setFocused(status === "active");
+      }
+    }
+
+    const subscription = AppState.addEventListener("change", onAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      hasResolvedState,
+      isOnline,
+      isOffline: hasResolvedState && !isOnline,
+    }),
+    [hasResolvedState, isOnline],
+  );
+
+  if (!hasResolvedState) {
+    return null;
+  }
+
+  return (
+    <NetworkStatusContext.Provider value={value}>
+      {children}
+    </NetworkStatusContext.Provider>
+  );
+}
+
+export function useNetworkStatus() {
+  const context = useContext(NetworkStatusContext);
+
+  if (!context) {
+    throw new Error("useNetworkStatus must be used within a NetworkStateProvider.");
+  }
+
+  return context;
+}

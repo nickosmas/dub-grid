@@ -1,127 +1,302 @@
 # Agent Steering
 
-This file is the agent-facing steering guide for DubGrid. It is derived from
-`CLAUDE.md` and should stay aligned with it. Keep the hard constraints here
-explicit, and use `CLAUDE.md` for the longer examples and rationale.
+This is the root Codex instruction file for DubGrid. It is intentionally
+self-contained and repo-specific. Nested `AGENTS.md` files add stricter rules
+for their directories.
 
-If instructions conflict, follow the project-specific constraints first.
+If instructions conflict, follow the most specific nested `AGENTS.md` first,
+then this root file, then the user's latest request.
 
-## Workflow
+## Verified Repository Structure
 
-- Enter a planning step for any non-trivial task, especially work with 3+ steps,
-  architectural decisions, or meaningful verification.
-- If execution stops matching the plan, stop and re-plan before continuing.
-- Prefer autonomous bug fixing: inspect logs, failing tests, and errors, then
-  fix the root cause without unnecessary back-and-forth.
-- Do not mark work complete until it is verified. Compare behavior when
-  relevant, run tests, and check the result like a staff-level review would.
-- Keep changes as simple as possible and limit the blast radius, but do not ship
-  hacks where a clean solution is clearly warranted.
-- If agent tooling supports delegation, use it for bounded research or parallel
-  analysis. Keep one focused task per delegated agent.
+- Package manager: npm, declared as `npm@10.9.2` in `package.json`.
+- Lockfile: `package-lock.json`.
+- Workspaces: npm workspaces for `apps/*` and `packages/*`.
+- Workspace runner: Turborepo via `turbo.json`.
+- Web app: `apps/web`, package `@dubgrid/web`, Next.js 16 App Router in
+  `apps/web/src/app`.
+- Mobile app: `apps/mobile`, package `@dubgrid/mobile`, Expo SDK 54 with Expo
+  Router routes in `apps/mobile/app`.
+- Shared packages:
+  - `packages/api-client`
+  - `packages/authz`
+  - `packages/contracts`
+  - `packages/data-access`
+  - `packages/db-types`
+  - `packages/design-tokens`
+  - `packages/domain`
+  - `packages/mobile-api-core`
+  - `packages/schedule-core`
+- Backend/API areas:
+  - Next Route Handlers in `apps/web/src/app/api`.
+  - Mobile backend routes in `apps/web/src/app/api/mobile/v1`.
+  - Mobile server route implementations in `apps/web/src/features/mobile/server`.
+  - Shared mobile backend logic in `packages/mobile-api-core`.
+  - Supabase data access in `packages/data-access`.
+- Database/Supabase: `supabase` exists. Migrations are intentionally limited to
+  `supabase/migrations/001_schema.sql`, `002_functions_triggers.sql`,
+  `003_rls_policies.sql`, and `004_grants.sql`.
 
-## Core Principles
+## Verified Commands
 
-- Find root causes. Do not stop at temporary fixes.
-- Minimize impact. Touch only what is necessary and avoid introducing risk.
-- When a correction reveals a recurring pattern or misunderstanding, capture the
-  lesson in the project's memory or guidance files.
+- Install: `npm install`.
+- Root dev web: `npm run dev` or `npm run dev:web`.
+- Root dev mobile: `npm run dev:mobile`.
+- Root build: `npm run build` builds the web app through Turbo.
+- Root package build: `npm run build:packages`.
+- Root lint: `npm run lint`.
+- Root typecheck: `npm run type-check`.
+- Root tests: `npm test`.
+- Web tests: `npm run test:web`.
+- Mobile plus contracts tests: `npm run test:mobile`.
+- E2E tests: `npm run test:e2e`.
+- Web app checks:
+  - `npm --workspace @dubgrid/web run type-check`
+  - `npm --workspace @dubgrid/web run test`
+  - `npm --workspace @dubgrid/web run build`
+- Mobile app checks:
+  - `npm --workspace @dubgrid/mobile run type-check`
+  - `npm --workspace @dubgrid/mobile run test`
+- Contracts tests: `npm --workspace @dubgrid/contracts run test`.
+- Supabase local reset and seed: `npm run db:reset`.
+- Supabase type generation script: `npm run gen:types`.
+
+Do not use pnpm, Yarn, Nx, or invented commands unless the repo changes and you
+verify the change first.
+
+## Core Truthfulness Rules
+
+- Never claim something is true unless it has been verified from repository
+  files, tests, logs, official documentation, or explicit user-provided context.
+- If information is uncertain, say so clearly with labels like `Verified`,
+  `Likely`, `Assumption`, `Not checked`, or `Unknown`.
+- Do not invent APIs, files, functions, packages, routes, database tables,
+  environment variables, commands, or product requirements.
+- Before proposing or applying a code change, inspect the relevant files first.
+- Before saying something is fixed or works, run the most relevant available
+  test, typecheck, build, lint, or manual verification command.
+- If a check cannot be run, say exactly why and what was checked instead.
+
+## Evidence Requirements
+
+When answering technical questions:
+
+- Cite exact file paths, functions, classes, commands, logs, or documentation
+  used as evidence.
+- Clearly separate verified facts from inferences.
+- Do not present guesses, estimates, or likely explanations as facts.
+
+When reviewing code:
+
+- Follow `code_review.md` if it exists.
+- Lead with findings, ordered by severity.
+- For every finding, include severity, affected area, file/location, what is
+  wrong, why it matters, and a suggested fix.
+- Do not report speculative issues as confirmed bugs.
+- If no issues are found, say what was reviewed and what was not reviewed.
+
+## Repository Inspection Before Editing
+
+Before editing code:
+
+1. Check `git status --short`.
+2. Inspect the relevant files.
+3. Search for existing patterns with `rg`.
+4. Identify related tests, types, schemas, migrations, route handlers, app
+   routes, configuration files, and package exports.
+5. Confirm current behavior when practical.
+6. Choose the smallest safe change.
+
+Do not overwrite user changes, delete files, rename public interfaces, or move
+files unless explicitly requested or necessary for correctness.
+
+## Git and Change Safety
+
+- Do not run destructive git commands such as `git reset --hard`,
+  `git clean -fd`, `git checkout -- .`, or force pushes unless explicitly
+  instructed.
+- Keep changes focused on the user's request.
+- Avoid unrelated refactors and metadata churn.
+- If unrelated issues are noticed, report them separately instead of fixing them
+  silently.
+- If the worktree is dirty, assume changes you did not make belong to the user
+  and work around them.
+
+## Security, Secrets, and Environment Variables
+
+- Never print, expose, commit, or log secrets, API keys, tokens, passwords,
+  private keys, cookies, session values, or credentials.
+- Do not read `.env.local`, `.env.remote`, app-local `.env.local`, or other
+  non-example env files unless explicitly necessary; never paste their values.
+- Use `.env.example`, `apps/web/.env.example`, and `apps/mobile/.env.example`
+  only as variable-name references.
+- Server-only secrets include `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
+  `UPSTASH_REDIS_REST_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  `SENTRY_AUTH_TOKEN`, `EXPO_ACCESS_TOKEN`, database passwords, and tokens.
+- Public web variables use `NEXT_PUBLIC_*`; public mobile variables use
+  `EXPO_PUBLIC_*`. Treat them as bundled/client-visible.
+- If a new env var is needed, document the variable name and purpose, but do
+  not invent a real value.
+- If a real secret appears in code, logs, config, or command output, stop and
+  report it without repeating the secret.
+
+## Dependency Discipline
+
+- Do not add dependencies unless necessary.
+- First check existing dependencies and local utilities in `apps/*`,
+  `packages/*`, and `scripts`.
+- Explain why any new dependency is needed.
+- Do not upgrade major dependency versions unless explicitly requested.
+- After dependency changes, run `npm install`, report lockfile changes, and run
+  affected build/typecheck/test commands.
+
+## Monorepo and Shared Package Safety
+
+- Prefer shared packages for cross-app logic that is already shared:
+  `@dubgrid/contracts`, `@dubgrid/domain`, `@dubgrid/schedule-core`,
+  `@dubgrid/design-tokens`, `@dubgrid/api-client`, `@dubgrid/authz`,
+  `@dubgrid/db-types`, `@dubgrid/data-access`, and
+  `@dubgrid/mobile-api-core`.
+- Do not duplicate shared logic in both apps when a package already owns it.
+- Preserve public exports from packages unless the user explicitly asks for a
+  breaking change.
+- If shared package behavior changes, run package checks and every affected app
+  check. At minimum consider `npm run build:packages`, `npm run test:web`, and
+  `npm run test:mobile`.
+- Avoid circular workspace dependencies. Keep package dependency direction
+  intentional.
+- Do not import Next-only code into Expo or React Native code.
+- Do not import Expo or React Native-only code into Next server code.
 
 ## Project-Specific Constraints
 
-- Migrations: all schema changes live in exactly 4 files (`001` through `004`).
-  Do not create new migration files.
-- Routes: use simple route files such as `src/app/staff/page.tsx`, not catch-all
-  routes. Catch-all routes break static prerendering on Vercel.
 - Naming: `gridmaster` is the platform role and route (`/gridmaster`).
-  `admin` is the organization role. Do not call the gridmaster portal the
+  `admin` is an organization role. Do not call the gridmaster portal the
   "admin portal."
-- Testing: run `npm test` after changes. The test stack is Vitest with jsdom
-  and Testing Library.
-- Cookie consent: when adding or removing cookies, changing analytics
-  providers, or updating cookie/privacy policy text, bump `CONSENT_VERSION` in
-  `src/components/CookieConsent.tsx`.
+- Routes: use simple route files such as `apps/web/src/app/staff/page.tsx`.
+  Do not add catch-all routes unless the user explicitly approves and the Vercel
+  static prerendering risk is addressed.
+- Migrations: schema changes stay in the existing four files under
+  `supabase/migrations`. Do not create a fifth migration file.
+- Cookie consent: when adding/removing cookies, changing analytics providers,
+  or changing cookie/privacy policy text, bump `CONSENT_VERSION` in
+  `apps/web/src/components/CookieConsent.tsx`.
 
-## React Guidance
+## High-Risk Changes
 
-- Prefer derived values in render over mirrored state. If a value can be
-  computed from props or existing state, compute it inline.
-- Use `useEffect` only to synchronize with systems outside React, such as
-  browser APIs, subscriptions, or third-party libraries.
-- Do not use `useEffect` to sync one piece of state to another, transform props,
-  respond to user events, or reset state on prop changes.
-- Put event-driven logic in event handlers, not effects.
-- Reset component state with a `key` when a prop should force a remount.
-- Use React Query, SWR, or framework-native loaders for data fetching instead of
-  raw `useEffect` plus `fetch`.
-- Use `useMemo` and `useCallback` intentionally, not by default.
-- Favor composition, controlled forms, stable named components, and small
-  focused components.
-- Use stable unique keys in lists. Do not use array indices for re-orderable
-  collections.
+Before making a high-risk change, stop and explain:
 
-## Next.js Guidance
+- What will change.
+- Why it is needed.
+- What could break.
+- How it will be verified.
+- How it can be rolled back.
 
-- Default to Server Components. Add `'use client'` only where browser APIs,
-  event handlers, or React client hooks are required.
-- Push client boundaries to the leaves. Keep data fetching, auth checks, and DB
-  access in Server Components whenever possible.
-- Fetch server data directly in Server Components with `async` and `await`.
-- For client-side fetching after interaction or for user-specific live data, use
-  React Query or SWR, not raw `useEffect` plus `fetch`.
-- Treat caching deliberately. Prefer `revalidatePath` or `revalidateTag` after
-  mutations instead of globally disabling caches.
-- Use Server Actions for internal form submissions and mutations. Validate and
-  sanitize all `FormData` before use.
-- Use Route Handlers only for public HTTP endpoints such as webhooks, callbacks,
-  or externally consumed APIs.
-- Use `layout.tsx`, `loading.tsx`, `error.tsx`, and `not-found.tsx` for route
-  structure. Keep layouts lean and fetch data close to where it is used.
-- Define metadata with the `metadata` export or `generateMetadata`, not with
-  `<Head>`.
-- Validate environment variables at startup. Never expose server-only secrets in
-  Client Components.
-- Use `next/image` for images, `next/font` for fonts, and `next/link` for
-  internal navigation.
-- Keep middleware light and edge-safe. Do not import heavy Node modules or ORMs
-  into middleware.
-- Use `dynamic()` and `Suspense` where they improve performance. Avoid
-  `force-dynamic` unless it is truly necessary.
-- Follow App Router conventions such as route groups, `_components`,
-  co-located `actions/`, and shared `lib/` and `types/` folders.
+High-risk changes include:
 
-## Security Guidance
+- Authentication, authorization, RBAC, `gridmaster`, `admin`, or permission
+  logic.
+- Tenant, organization, facility, department, employee, or user-owned data
+  isolation.
+- Supabase schema, RLS, grants, auth hooks, storage, seed data, or destructive
+  SQL.
+- Billing, Stripe, subscription, or seat logic.
+- Production deployment config, Vercel config, middleware, CSP, Sentry, or
+  analytics.
+- App identifiers, Expo schemes, native permissions, OTA/update behavior, or
+  mobile environment plumbing.
+- Dependency major version upgrades.
+- Changes affecting multiple apps or shared packages.
+- Data deletion, migration, import/export, GDPR erase, or account deletion.
 
-- Validate all inputs at server boundaries, including Server Actions, Route
-  Handlers, and middleware. Use Zod or an equivalent schema layer.
-- Never pass raw user input into database queries, shell commands, or file
-  paths.
-- Use established authentication systems. Check both authentication and
-  authorization inside every Server Action and Route Handler, not only in
-  middleware.
-- Never rely on the client to decide what a user can see or do.
-- Never hardcode secrets. Keep server secrets out of `NEXT_PUBLIC_` variables
-  and validate env vars at startup.
-- Use parameterized SQL, a query builder, or an ORM. Never interpolate user
-  input into SQL.
-- Avoid `dangerouslySetInnerHTML`. If it is unavoidable, sanitize content first
-  and maintain a strict CSP.
-- Do not expose mutating behavior through GET handlers. For mutating Route
-  Handlers, validate `Origin` or use CSRF protection.
-- Configure strong security headers in `next.config.ts`.
-- Rate-limit all public or side-effectful endpoints, especially auth, contact,
-  email, and webhook-style flows.
-- Validate uploaded files by content, enforce size limits, and store them in
-  dedicated storage with access control.
-- Audit dependencies, commit lockfiles, and review new packages before adding
-  them.
-- Do not leak stack traces, internal paths, SQL errors, or implementation
-  details to clients. Return generic client errors and log detailed failures
-  server-side.
-- Never log passwords, tokens, payment data, SSNs, or unnecessary PII.
-- Load third-party scripts through `next/script` and audit their data access.
+## Multi-Tenant and RBAC Safety
 
-## Reference
+This repo uses organization-scoped data (`org_id`), roles, memberships,
+`gridmaster` platform access, organization roles such as `admin` and
+`super_admin`, and Supabase RLS policies.
 
-- `CLAUDE.md` remains the longer-form source for examples, rationale, and the
-  full wording of these rules.
+- Treat tenant isolation bugs as security bugs.
+- Do not remove or weaken `org_id`, user ownership, membership, department, or
+  permission filters.
+- For tenant-owned data, verify how tenant identity is established and enforced
+  before changing queries or policies.
+- Keep `gridmaster` bypasses explicit and server-side.
+- Check both authentication and authorization in Route Handlers and shared
+  backend helpers, not only in middleware.
+- Never rely on client-side checks to authorize data access.
+
+## Database and Supabase Safety
+
+- Treat migrations, RLS policies, grants, auth hooks, seed data, and generated
+  DB types as high risk.
+- Never weaken RLS policies or grants without explicit approval.
+- Never use `SUPABASE_SERVICE_ROLE_KEY` in client-side code, mobile code, or any
+  browser-bundled module.
+- Do not write destructive SQL (`DROP`, `TRUNCATE`, broad `DELETE`, broad
+  `UPDATE`) unless explicitly requested and rollback is documented.
+- If schema changes are made, update the existing migration files, consider
+  `npm run db:reset`, and run `npm run gen:types` if generated type workflow is
+  affected.
+- Do not run `npm run db:reset:remote` unless the user explicitly requests
+  remote reset and confirms the risk.
+
+## React and UI Rules
+
+- Prefer derived values in render over mirrored state.
+- Use `useEffect` only for synchronizing with external systems such as browser
+  APIs, subscriptions, timers, or third-party libraries.
+- Do not use `useEffect` to sync state to state, transform props, respond to
+  user events, or reset state on prop changes.
+- Use stable keys for reorderable lists.
+- Follow existing component, style, and folder patterns before adding new ones.
+- Preserve accessibility basics: labels, semantic elements where applicable,
+  keyboard behavior, focus management, and readable contrast.
+- Do not introduce a new UI library unless explicitly requested.
+
+## Verification Requirements
+
+- Run the narrowest useful checks for the files changed.
+- For any repository change, run `npm test` unless clearly impossible.
+- For web changes, prefer `npm run test:web`, `npm --workspace @dubgrid/web run
+  type-check`, and `npm --workspace @dubgrid/web run build` as risk requires.
+- For mobile changes, prefer `npm run test:mobile` and
+  `npm --workspace @dubgrid/mobile run type-check` as risk requires.
+- For shared package changes, run the package's `build`/`type-check` plus every
+  affected app's tests.
+- For Supabase changes, validate migrations locally when possible and regenerate
+  types when the schema/type workflow requires it.
+- If a command fails, report the failure honestly with the relevant error and
+  do not claim completion unless the failure is unrelated and explained.
+- There is no markdown-specific validation script in `package.json`; use
+  `git diff --check` for Markdown whitespace unless a markdown tool is later
+  added.
+
+## Final Response Format
+
+Use this structure for completed coding or repository-change tasks:
+
+Summary:
+- ...
+
+Repo structure found:
+- Package manager:
+- Workspace tool:
+- Web app:
+- Mobile app:
+- Shared packages:
+- Backend/API:
+- Database/Supabase:
+
+Files changed:
+- ...
+
+Verification:
+- ...
+
+Not checked:
+- ...
+
+Risks or follow-up:
+- ...
+
+If no files changed, say so clearly.

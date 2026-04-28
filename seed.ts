@@ -1,13 +1,14 @@
 import { copycat } from "@snaplet/copycat";
 import { readFileSync } from "fs";
 import { Client } from "pg";
+import { getPresetByBg, normalizePresetBg } from "./apps/web/src/lib/colors";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5-Tenant Seed: Realistic healthcare scheduling data
 // Uses @snaplet/copycat for deterministic fake data, raw pg for inserts
 // ═══════════════════════════════════════════════════════════════════════════
 
-interface ShiftCodeDef {
+interface AssignmentDef {
   label: string;
   name: string;
   color: string;
@@ -20,12 +21,124 @@ interface ShiftCodeDef {
   end?: string;
 }
 
+const FOCUS_AREA_PRESET_COLORS = [
+  "#BFDBFE",
+  "#A7F3D0",
+  "#FDE68A",
+  "#DDD6FE",
+  "#FBCFE8",
+  "#A5F3FC",
+  "#D9F99D",
+  "#FED7AA",
+];
+
 interface AbsenceTypeDef {
   label: string;
   name: string;
   color: string;
   border_color: string;
   text_color: string;
+}
+
+interface SeedRoleRow {
+  id: number;
+  name: string;
+  abbr: string;
+}
+
+interface SeedFocusAreaRow {
+  id: number;
+  department_id: number | null;
+  color: string | null;
+}
+
+interface SeedShiftCategoryRow {
+  id: number;
+  name: string;
+  abbr: string | null;
+  focus_area_id: number | null;
+  start_time: string | null;
+  end_time: string | null;
+  color: string;
+  sort_order: number;
+}
+
+interface SeedAssignmentRow {
+  id: number;
+  label: string;
+  name: string;
+  color: string;
+  border_color: string;
+  text_color: string;
+  is_general: boolean;
+  focus_area_id: number | null;
+  category_id: number | null;
+  sort_order: number;
+  default_start_time: string | null;
+  default_end_time: string | null;
+  default_duration_hours: number | null;
+  default_duration_minutes: number | null;
+  required_certification_ids: number[];
+}
+
+interface ResolvedSeedAssignmentRow {
+  label: string;
+  focus_area_id: number | null;
+  shift_id: number | null;
+  job_id: number;
+  sort_order: number;
+}
+
+interface DerivedJobSeed {
+  key: string;
+  name: string;
+  abbr: string;
+  show_on_grid: boolean;
+  assignment_mode: "with_shift" | "shiftless";
+  eligibility_mode: "and" | "or";
+  focus_area_ids: number[];
+  department_ids: number[];
+  applicable_shift_ids: number[];
+  eligible_role_ids: number[];
+  required_certification_ids: number[];
+  color: string;
+  border_color: string;
+  text_color: string;
+  shift_time_overrides: Record<string, { startTime: string | null; endTime: string | null }>;
+  shift_color_overrides: Record<string, string>;
+  default_start_time: string | null;
+  default_end_time: string | null;
+  default_duration_hours: number | null;
+  default_duration_minutes: number | null;
+  sort_order: number;
+  system_key: string | null;
+}
+
+const DEFAULT_JOB_PRESET = getPresetByBg(normalizePresetBg(null));
+
+function deriveSeedAbbr(value: string, fallback = "GEN"): string {
+  const next = buildFallbackAbbr(value).trim().toUpperCase();
+  return next.length > 0 ? next : fallback;
+}
+
+function deriveShiftTimeOverride(
+  code: SeedAssignmentRow,
+  shift: SeedShiftCategoryRow,
+): { startTime: string | null; endTime: string | null } | null {
+  const startTime =
+    code.default_start_time != null && code.default_start_time !== shift.start_time
+      ? code.default_start_time
+      : null;
+  const endTime =
+    code.default_end_time != null && code.default_end_time !== shift.end_time
+      ? code.default_end_time
+      : null;
+
+  if (startTime == null && endTime == null) {
+    return null;
+  }
+
+  return { startTime, endTime };
 }
 
 const TENANTS = [
@@ -67,14 +180,14 @@ const TENANTS = [
         canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
         canEditNotes: true, canManageRecurringShifts: true, canManageShiftSeries: true,
         canViewStaff: true, canManageEmployees: true, canManageFocusAreas: true,
-        canManageShiftCodes: true, canManageIndicatorTypes: true, canManageOrgSettings: false,
+        canManageScheduleDefinitions: true, canManageIndicatorTypes: true, canManageOrgSettings: false,
         canManageOrgLabels: true, canManageCoverageRequirements: true, canApproveShiftRequests: true,
       }},
       { name: "Human Resources", type: "management" as const, permissions: {
         canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
         canEditNotes: false, canManageRecurringShifts: false, canManageShiftSeries: false,
         canViewStaff: true, canManageEmployees: true, canManageFocusAreas: false,
-        canManageShiftCodes: false, canManageIndicatorTypes: false, canManageOrgSettings: false,
+        canManageScheduleDefinitions: false, canManageIndicatorTypes: false, canManageOrgSettings: false,
         canManageOrgLabels: false, canManageCoverageRequirements: false, canApproveShiftRequests: false,
       }},
       { name: "Maintenance", type: "management" as const },
@@ -83,13 +196,13 @@ const TENANTS = [
     // Independent Living → Residential (1), Respite Care → Nursing (0)
     focusAreaDeptIndex: [0, 1, 1, 0],
     shiftCategories: [
-      { name: "Day Shift", color: "#C7D2FE", start_time: "07:00", end_time: "15:00", faIndex: 0 },
-      { name: "Evening Shift", color: "#FDE68A", start_time: "15:00", end_time: "23:00", faIndex: 0 },
-      { name: "Night Shift", color: "#BAE6FD", start_time: "23:00", end_time: "07:00", faIndex: 0 },
-      { name: "Day Shift", color: "#99F6E4", start_time: "07:00", end_time: "15:00", faIndex: 1 },
-      { name: "Evening Shift", color: "#DDD6FE", start_time: "15:00", end_time: "23:00", faIndex: 1 },
-      { name: "Day Shift", color: "#FECDD3", start_time: "08:00", end_time: "16:00", faIndex: 2 },
-      { name: "Day Shift", color: "#BBF7D0", start_time: "08:00", end_time: "16:00", faIndex: 3 },
+      { name: "Day Shift", start_time: "07:00", end_time: "15:00", faIndex: 0 },
+      { name: "Evening Shift", start_time: "15:00", end_time: "23:00", faIndex: 0 },
+      { name: "Night Shift", start_time: "23:00", end_time: "07:00", faIndex: 0 },
+      { name: "Day Shift", start_time: "07:00", end_time: "15:00", faIndex: 1 },
+      { name: "Evening Shift", start_time: "15:00", end_time: "23:00", faIndex: 1 },
+      { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 2 },
+      { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 3 },
     ],
     absenceTypes: [
       { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
@@ -104,7 +217,7 @@ const TENANTS = [
       { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
       { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
     ] as AbsenceTypeDef[],
-    shiftCodes: [
+    assignments: [
       { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "D", name: "Day", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
@@ -114,7 +227,7 @@ const TENANTS = [
       { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 1, catIndex: 4, start: "15:00", end: "23:00" },
       { label: "D", name: "Day", color: "#A7F3D0", border_color: "transparent", text_color: "#065F46", is_general: false, faIndex: 2, catIndex: 5, start: "08:00", end: "16:00" },
       { label: "D", name: "Day", color: "#BFDBFE", border_color: "transparent", text_color: "#1E40AF", is_general: false, faIndex: 3, catIndex: 6, start: "08:00", end: "16:00" },
-    ] as ShiftCodeDef[],
+    ] as AssignmentDef[],
     employeeCount: 35,
     indicatorTypes: [
       { name: "Readings", color: "#FDE047" },
@@ -162,12 +275,12 @@ const TENANTS = [
     // Hospice → Palliative Services (2), Outpatient → Nursing (0)
     focusAreaDeptIndex: [0, 1, 2, 0],
     shiftCategories: [
-      { name: "Day Shift", color: "#E9D5FF", start_time: "06:00", end_time: "14:00", faIndex: 0 },
-      { name: "Swing Shift", color: "#BFDBFE", start_time: "14:00", end_time: "22:00", faIndex: 0 },
-      { name: "Night Shift", color: "#BAE6FD", start_time: "22:00", end_time: "06:00", faIndex: 0 },
-      { name: "Day Shift", color: "#FECDD3", start_time: "08:00", end_time: "16:30", faIndex: 1 },
-      { name: "Day Shift", color: "#A5F3FC", start_time: "08:00", end_time: "16:00", faIndex: 2 },
-      { name: "Clinic Hours", color: "#FDE047", start_time: "09:00", end_time: "17:00", faIndex: 3 },
+      { name: "Day Shift", start_time: "06:00", end_time: "14:00", faIndex: 0 },
+      { name: "Swing Shift", start_time: "14:00", end_time: "22:00", faIndex: 0 },
+      { name: "Night Shift", start_time: "22:00", end_time: "06:00", faIndex: 0 },
+      { name: "Day Shift", start_time: "08:00", end_time: "16:30", faIndex: 1 },
+      { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 2 },
+      { name: "Clinic Hours", start_time: "09:00", end_time: "17:00", faIndex: 3 },
     ],
     absenceTypes: [
       { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
@@ -182,7 +295,7 @@ const TENANTS = [
       { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
       { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
     ] as AbsenceTypeDef[],
-    shiftCodes: [
+    assignments: [
       { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "D", name: "Day", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 0, catIndex: 0, start: "06:00", end: "14:00" },
@@ -191,7 +304,7 @@ const TENANTS = [
       { label: "R", name: "Rehab", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "16:30" },
       { label: "H", name: "Hospice", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "16:00" },
       { label: "C", name: "Clinic", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "09:00", end: "17:00" },
-    ] as ShiftCodeDef[],
+    ] as AssignmentDef[],
     employeeCount: 40,
     indicatorTypes: [
       { name: "Vitals", color: "#BFDBFE" },
@@ -236,14 +349,14 @@ const TENANTS = [
     // Garden Wing → Activities & Enrichment (1), North Wing → Caregiving (0)
     focusAreaDeptIndex: [0, 0, 1, 0],
     shiftCategories: [
-      { name: "Morning", color: "#A5F3FC", start_time: "07:00", end_time: "15:00", faIndex: 0 },
-      { name: "Afternoon", color: "#99F6E4", start_time: "15:00", end_time: "23:00", faIndex: 0 },
-      { name: "Morning", color: "#DDD6FE", start_time: "07:00", end_time: "15:00", faIndex: 1 },
-      { name: "Afternoon", color: "#E2E8F0", start_time: "15:00", end_time: "23:00", faIndex: 1 },
-      { name: "Morning", color: "#FDE047", start_time: "07:00", end_time: "15:00", faIndex: 2 },
-      { name: "Afternoon", color: "#A5F3FC", start_time: "15:00", end_time: "23:00", faIndex: 2 },
-      { name: "Morning", color: "#A5F3FC", start_time: "07:00", end_time: "15:00", faIndex: 3 },
-      { name: "Afternoon", color: "#BBF7D0", start_time: "15:00", end_time: "23:00", faIndex: 3 },
+      { name: "Morning", start_time: "07:00", end_time: "15:00", faIndex: 0 },
+      { name: "Afternoon", start_time: "15:00", end_time: "23:00", faIndex: 0 },
+      { name: "Morning", start_time: "07:00", end_time: "15:00", faIndex: 1 },
+      { name: "Afternoon", start_time: "15:00", end_time: "23:00", faIndex: 1 },
+      { name: "Morning", start_time: "07:00", end_time: "15:00", faIndex: 2 },
+      { name: "Afternoon", start_time: "15:00", end_time: "23:00", faIndex: 2 },
+      { name: "Morning", start_time: "07:00", end_time: "15:00", faIndex: 3 },
+      { name: "Afternoon", start_time: "15:00", end_time: "23:00", faIndex: 3 },
     ],
     absenceTypes: [
       { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
@@ -258,7 +371,7 @@ const TENANTS = [
       { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
       { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
     ] as AbsenceTypeDef[],
-    shiftCodes: [
+    assignments: [
       { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "M", name: "Morning", color: "#BBF7D0", border_color: "transparent", text_color: "#166534", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
@@ -269,7 +382,7 @@ const TENANTS = [
       { label: "A", name: "Afternoon", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 5, start: "15:00", end: "23:00" },
       { label: "M", name: "Morning", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 3, catIndex: 6, start: "07:00", end: "15:00" },
       { label: "A", name: "Afternoon", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 3, catIndex: 7, start: "15:00", end: "23:00" },
-    ] as ShiftCodeDef[],
+    ] as AssignmentDef[],
     employeeCount: 32,
     indicatorTypes: [
       { name: "Medication", color: "#FDE68A" },
@@ -322,13 +435,13 @@ const TENANTS = [
     // Behavioral Health → Nursing (0)
     focusAreaDeptIndex: [0, 0, 1, 2, 0],
     shiftCategories: [
-      { name: "Day Shift (12hr)", color: "#F5D0FE", start_time: "07:00", end_time: "19:00", faIndex: 0 },
-      { name: "Night Shift (12hr)", color: "#A5F3FC", start_time: "19:00", end_time: "07:00", faIndex: 0 },
-      { name: "Day Shift", color: "#D9F99D", start_time: "07:00", end_time: "15:30", faIndex: 1 },
-      { name: "Evening Shift", color: "#FECDD3", start_time: "15:30", end_time: "23:30", faIndex: 1 },
-      { name: "Clinic Hours", color: "#A7F3D0", start_time: "08:00", end_time: "17:00", faIndex: 2 },
-      { name: "ER Shift (12hr)", color: "#FED7AA", start_time: "07:00", end_time: "19:00", faIndex: 3 },
-      { name: "Day Shift", color: "#A7F3D0", start_time: "08:00", end_time: "16:00", faIndex: 4 },
+      { name: "Day Shift (12hr)", start_time: "07:00", end_time: "19:00", faIndex: 0 },
+      { name: "Night Shift (12hr)", start_time: "19:00", end_time: "07:00", faIndex: 0 },
+      { name: "Day Shift", start_time: "07:00", end_time: "15:30", faIndex: 1 },
+      { name: "Evening Shift", start_time: "15:30", end_time: "23:30", faIndex: 1 },
+      { name: "Clinic Hours", start_time: "08:00", end_time: "17:00", faIndex: 2 },
+      { name: "ER Shift (12hr)", start_time: "07:00", end_time: "19:00", faIndex: 3 },
+      { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 4 },
     ],
     absenceTypes: [
       { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
@@ -343,7 +456,7 @@ const TENANTS = [
       { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
       { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
     ] as AbsenceTypeDef[],
-    shiftCodes: [
+    assignments: [
       { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "12D", name: "12hr Day", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "19:00" },
@@ -353,7 +466,7 @@ const TENANTS = [
       { label: "C", name: "Clinic", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "17:00" },
       { label: "ER", name: "ER Shift", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "07:00", end: "19:00" },
       { label: "BH", name: "Behavioral", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 4, catIndex: 6, start: "08:00", end: "16:00" },
-    ] as ShiftCodeDef[],
+    ] as AssignmentDef[],
     employeeCount: 45,
     indicatorTypes: [
       { name: "Assessment", color: "#DDD6FE" },
@@ -399,11 +512,11 @@ const TENANTS = [
     // Bereavement → Community Outreach (1)
     focusAreaDeptIndex: [0, 0, 1],
     shiftCategories: [
-      { name: "Day Shift", color: "#BBF7D0", start_time: "07:00", end_time: "15:00", faIndex: 0 },
-      { name: "Evening Shift", color: "#FECDD3", start_time: "15:00", end_time: "23:00", faIndex: 0 },
-      { name: "Night Shift", color: "#F5D0FE", start_time: "23:00", end_time: "07:00", faIndex: 0 },
-      { name: "Field Visits", color: "#E9D5FF", start_time: "08:00", end_time: "17:00", faIndex: 1 },
-      { name: "Support Group", color: "#E2E8F0", start_time: "10:00", end_time: "16:00", faIndex: 2 },
+      { name: "Day Shift", start_time: "07:00", end_time: "15:00", faIndex: 0 },
+      { name: "Evening Shift", start_time: "15:00", end_time: "23:00", faIndex: 0 },
+      { name: "Night Shift", start_time: "23:00", end_time: "07:00", faIndex: 0 },
+      { name: "Field Visits", start_time: "08:00", end_time: "17:00", faIndex: 1 },
+      { name: "Support Group", start_time: "10:00", end_time: "16:00", faIndex: 2 },
     ],
     absenceTypes: [
       { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
@@ -418,7 +531,7 @@ const TENANTS = [
       { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
       { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
     ] as AbsenceTypeDef[],
-    shiftCodes: [
+    assignments: [
       { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
       { label: "D", name: "Day", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
@@ -426,7 +539,7 @@ const TENANTS = [
       { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
       { label: "FV", name: "Field Visit", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "17:00" },
       { label: "SG", name: "Support Group", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 2, catIndex: 4, start: "10:00", end: "16:00" },
-    ] as ShiftCodeDef[],
+    ] as AssignmentDef[],
     employeeCount: 30,
     indicatorTypes: [
       { name: "Pain Assessment", color: "#E9D5FF" },
@@ -501,6 +614,828 @@ function parseUsSeedAddress(address: string): ParsedSeedAddress {
   };
 }
 
+function toNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => Number(entry))
+    .filter((entry) => Number.isFinite(entry));
+}
+
+function normalizeSeedLookup(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function uniqueNumbers(values: number[]): number[] {
+  return Array.from(
+    new Set(values.filter((value) => Number.isFinite(value))),
+  ).sort((left, right) => left - right);
+}
+
+function toTitleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getPreferredJobAbbr(
+  role: SeedRoleRow | null,
+  fallback: string,
+): string {
+  const abbr = role?.abbr?.trim() ?? "";
+  if (abbr.length > 0 && abbr.length <= 4) {
+    return abbr;
+  }
+  return fallback;
+}
+
+function buildFallbackAbbr(value: string): string {
+  const compact = value.replace(/[^A-Za-z0-9.]+/g, " ").trim();
+  if (!compact) return "JOB";
+  if (/^\d+(?:\.\d+)?$/.test(compact)) return compact;
+
+  const parts = compact.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    const single = parts[0];
+    if (single.length <= 4) {
+      return single.toUpperCase();
+    }
+    return single.slice(0, 3).toUpperCase();
+  }
+
+  return parts
+    .map((part) => part[0] ?? "")
+    .join("")
+    .slice(0, 4)
+    .toUpperCase();
+}
+
+function findMatchingRoles(
+  roles: SeedRoleRow[],
+  aliases: string[],
+): SeedRoleRow[] {
+  const normalizedAliases = uniqueNormalizedAliases(aliases);
+  if (normalizedAliases.length === 0) {
+    return [];
+  }
+
+  return roles.filter((role) => {
+    const name = normalizeSeedLookup(role.name);
+    const abbr = normalizeSeedLookup(role.abbr);
+
+    return normalizedAliases.some((alias) => {
+      if (alias === name || alias === abbr) {
+        return true;
+      }
+
+      return (
+        alias.length >= 3 &&
+        (name.includes(alias) ||
+          alias.includes(name) ||
+          abbr.includes(alias) ||
+          alias.includes(abbr))
+      );
+    });
+  });
+}
+
+function uniqueNormalizedAliases(values: string[]): string[] {
+  return Array.from(
+    new Set(values.map((value) => normalizeSeedLookup(value)).filter(Boolean)),
+  );
+}
+
+function resolveJobIdentity(
+  rawDescriptor: string,
+  roles: SeedRoleRow[],
+): {
+  name: string;
+  abbr: string;
+  eligibleRoleIds: number[];
+} {
+  const raw = rawDescriptor.trim();
+  const normalized = normalizeSeedLookup(raw);
+
+  const exactAbbrMatches = roles.filter(
+    (role) => normalizeSeedLookup(role.abbr) === normalized,
+  );
+  if (exactAbbrMatches.length > 0) {
+    const primary = exactAbbrMatches[0];
+    return {
+      name: primary.name,
+      abbr: getPreferredJobAbbr(primary, buildFallbackAbbr(primary.name)),
+      eligibleRoleIds: uniqueNumbers(exactAbbrMatches.map((role) => role.id)),
+    };
+  }
+
+  if (
+    normalized.includes("supervisor") ||
+    normalized === "sup" ||
+    normalized === "supv" ||
+    normalized === "ss"
+  ) {
+    const matchedRoles = findMatchingRoles(roles, [
+      "supervisor",
+      "shift supervisor",
+      "sup",
+      "supv",
+      "ss",
+    ]);
+    const primary = matchedRoles[0] ?? null;
+    return {
+      name: primary?.name ?? "Supervisor",
+      abbr: getPreferredJobAbbr(primary, "S"),
+      eligibleRoleIds: uniqueNumbers(matchedRoles.map((role) => role.id)),
+    };
+  }
+
+  if (normalized.includes("mentor")) {
+    const matchedRoles = findMatchingRoles(roles, ["mentor", "mentoring"]);
+    const primary = matchedRoles[0] ?? null;
+    return {
+      name: primary?.name ?? "Mentor",
+      abbr: getPreferredJobAbbr(primary, "M"),
+      eligibleRoleIds: uniqueNumbers(matchedRoles.map((role) => role.id)),
+    };
+  }
+
+  if (
+    normalized === "cn" ||
+    normalized.includes("charge nurse") ||
+    normalized.includes("christian science nurse")
+  ) {
+    const matchedRoles = findMatchingRoles(roles, [
+      "cn",
+      "charge nurse",
+      "christian science nurse",
+    ]);
+    const primary = matchedRoles[0] ?? null;
+    return {
+      name: primary?.name ?? "Charge Nurse",
+      abbr: getPreferredJobAbbr(primary, "CN"),
+      eligibleRoleIds: uniqueNumbers(matchedRoles.map((role) => role.id)),
+    };
+  }
+
+  if (normalized === "office" || normalized === "ofc") {
+    return { name: "Office", abbr: "Ofc", eligibleRoleIds: [] };
+  }
+
+  if (normalized === "partial" || normalized === "0 3") {
+    return { name: "Partial", abbr: "0.3", eligibleRoleIds: [] };
+  }
+
+  const exactNameMatches = roles.filter(
+    (role) => normalizeSeedLookup(role.name) === normalized,
+  );
+  if (exactNameMatches.length > 0) {
+    const primary = exactNameMatches[0];
+    return {
+      name: primary.name,
+      abbr: getPreferredJobAbbr(primary, buildFallbackAbbr(primary.name)),
+      eligibleRoleIds: uniqueNumbers(exactNameMatches.map((role) => role.id)),
+    };
+  }
+
+  const fuzzyMatches = findMatchingRoles(roles, [raw]);
+  const title = toTitleCase(raw);
+  return {
+    name: title || raw,
+    abbr: buildFallbackAbbr(title || raw),
+    eligibleRoleIds: uniqueNumbers(fuzzyMatches.map((role) => role.id)),
+  };
+}
+
+function deriveJobDescriptor(
+  assignment: SeedAssignmentRow,
+  shift: SeedShiftCategoryRow,
+): string | null {
+  const rawName = assignment.name.trim();
+  if (!rawName) {
+    return null;
+  }
+
+  let working = rawName;
+  const shiftName = shift.name.trim();
+  const shiftNameWithoutShift = shiftName
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\bshift\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const removablePhrases = Array.from(
+    new Set([shiftName, shiftNameWithoutShift].filter(Boolean)),
+  );
+  for (const phrase of removablePhrases) {
+    working = working.replace(new RegExp(escapeRegExp(phrase), "ig"), " ");
+  }
+
+  const removableTokens = Array.from(
+    new Set(
+      shiftNameWithoutShift
+        .split(/\s+/)
+        .filter(Boolean)
+        .concat("shift"),
+    ),
+  );
+  for (const token of removableTokens) {
+    working = working.replace(
+      new RegExp(`\\b${escapeRegExp(token)}\\b`, "ig"),
+      " ",
+    );
+  }
+
+  working = working
+    .replace(/[()[\]/-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const normalizedWorking = normalizeSeedLookup(working);
+  if (!normalizedWorking) {
+    return null;
+  }
+
+  const normalizedShiftName = normalizeSeedLookup(shiftName);
+  const normalizedShiftBase = normalizeSeedLookup(shiftNameWithoutShift);
+  if (
+    normalizedWorking === normalizedShiftName ||
+    normalizedWorking === normalizedShiftBase
+  ) {
+    return null;
+  }
+
+  return working;
+}
+
+function selectBaseAssignment(
+  codes: SeedAssignmentRow[],
+  shift: SeedShiftCategoryRow,
+): SeedAssignmentRow {
+  const baseCandidates = codes.filter(
+    (code) => deriveJobDescriptor(code, shift) == null,
+  );
+
+  return [...(baseCandidates.length > 0 ? baseCandidates : codes)].sort(
+    (left, right) => {
+      if (left.sort_order !== right.sort_order) {
+        return left.sort_order - right.sort_order;
+      }
+      if (left.label.length !== right.label.length) {
+        return left.label.length - right.label.length;
+      }
+      return left.id - right.id;
+    },
+  )[0];
+}
+
+async function writePublishedWorkScheduleCell(
+  db: Client,
+  input: {
+    orgId: string;
+    empId: string;
+    date: string;
+    shiftIds: Array<number | null>;
+    jobIds: number[];
+    focusAreaId: number | null;
+    customStartTime?: string | null;
+    customEndTime?: string | null;
+    fromRecurring?: boolean;
+  },
+): Promise<void> {
+  await db.query(
+    `SELECT public.write_schedule_cell_snapshot_internal(
+       $1::uuid,
+       $2::uuid,
+       $3::date,
+       'published',
+       'worked',
+       COALESCE($4::bigint[], '{}'::bigint[]),
+       COALESCE($5::bigint[], '{}'::bigint[]),
+       NULL,
+       $6::text,
+       $7::text,
+       NULL,
+       COALESCE($8::boolean, false),
+       $9::bigint,
+       NULL,
+       NULL
+     )`,
+    [
+      input.orgId,
+      input.empId,
+      input.date,
+      input.shiftIds,
+      input.jobIds,
+      input.customStartTime ?? null,
+      input.customEndTime ?? null,
+      input.fromRecurring ?? false,
+      input.focusAreaId,
+    ],
+  );
+}
+
+async function writePublishedAbsenceScheduleCell(
+  db: Client,
+  input: {
+    orgId: string;
+    empId: string;
+    date: string;
+    absenceTypeId: number;
+    focusAreaId?: number | null;
+    fromRecurring?: boolean;
+  },
+): Promise<void> {
+  await db.query(
+    `SELECT public.write_schedule_cell_snapshot_internal(
+       $1::uuid,
+       $2::uuid,
+       $3::date,
+       'published',
+       'absence',
+       '{}'::bigint[],
+       '{}'::bigint[],
+       $4::bigint,
+       NULL,
+       NULL,
+       NULL,
+       COALESCE($5::boolean, false),
+       $6::bigint,
+       NULL,
+       NULL
+     )`,
+    [
+      input.orgId,
+      input.empId,
+      input.date,
+      input.absenceTypeId,
+      input.fromRecurring ?? false,
+      input.focusAreaId ?? null,
+    ],
+  );
+}
+
+function splitSqlBeforeFinalScheduleBlock(sql: string): {
+  prefixSql: string;
+  scheduleSql: string;
+} {
+  const doBlockMatches = [...sql.matchAll(/^DO \$\$/gm)];
+  const lastDoIndex = doBlockMatches.at(-1)?.index;
+
+  if (lastDoIndex == null) {
+    throw new Error("Expected at least one DO block in tenant SQL seed file");
+  }
+
+  const prefixSql = sql.slice(0, lastDoIndex).trim();
+  const scheduleSql = sql.slice(lastDoIndex).trim();
+
+  if (!scheduleSql.includes("write_schedule_cell_snapshot_internal")) {
+    throw new Error(
+      "Expected final DO block in tenant SQL seed file to seed schedule cells",
+    );
+  }
+
+  return { prefixSql, scheduleSql };
+}
+
+async function seedTenantSqlBeforeSchedule(
+  db: Client,
+  sqlPath: string,
+  orgId: string,
+): Promise<{
+  totalJobCount: number;
+  scheduledJobCount: number;
+  shiftlessJobCount: number;
+}> {
+  const tenantSql = readFileSync(sqlPath, "utf8");
+  const { prefixSql, scheduleSql } = splitSqlBeforeFinalScheduleBlock(tenantSql);
+
+  if (prefixSql) {
+    await db.query(prefixSql);
+  }
+
+  if (scheduleSql) {
+    await db.query(scheduleSql);
+  }
+
+  const { rows: [counts] } = await db.query(
+    `SELECT
+       COUNT(*)::int AS total_job_count,
+       COUNT(*) FILTER (WHERE assignment_mode = 'with_shift')::int AS scheduled_job_count,
+       COUNT(*) FILTER (WHERE assignment_mode = 'shiftless')::int AS shiftless_job_count
+     FROM public.jobs
+     WHERE org_id = $1 AND archived_at IS NULL`,
+    [orgId],
+  );
+
+  return {
+    totalJobCount: Number(counts?.total_job_count ?? 0),
+    scheduledJobCount: Number(counts?.scheduled_job_count ?? 0),
+    shiftlessJobCount: Number(counts?.shiftless_job_count ?? 0),
+  };
+}
+
+async function seedJobsForOrg(
+  db: Client,
+  orgId: string,
+  assignmentDefinitions: SeedAssignmentRow[],
+): Promise<{
+  totalJobCount: number;
+  scheduledJobCount: number;
+  shiftlessJobCount: number;
+  resolvedAssignments: ResolvedSeedAssignmentRow[];
+}> {
+  const { rows: rawRoles } = await db.query(
+    `SELECT id, name, abbr
+     FROM public.organization_roles
+     WHERE org_id = $1 AND archived_at IS NULL AND COALESCE(is_schedule_role, true) = true
+     ORDER BY sort_order, id`,
+    [orgId],
+  );
+  const roles: SeedRoleRow[] = rawRoles.map((row) => ({
+    id: id(row.id),
+    name: row.name,
+    abbr: row.abbr,
+  }));
+
+  const { rows: rawFocusAreas } = await db.query(
+    `SELECT id, department_id, color
+     FROM public.focus_areas
+     WHERE org_id = $1 AND archived_at IS NULL`,
+    [orgId],
+  );
+  const focusAreas: SeedFocusAreaRow[] = rawFocusAreas.map((row) => ({
+    id: id(row.id),
+    department_id: row.department_id != null ? id(row.department_id) : null,
+    color: row.color ?? null,
+  }));
+  const focusAreaDepartmentById = new Map(
+    focusAreas.map((focusArea) => [focusArea.id, focusArea.department_id]),
+  );
+  const focusAreaIdsByDepartmentId = new Map<number, number[]>();
+  for (const focusArea of focusAreas) {
+    if (focusArea.department_id == null) continue;
+    const existing = focusAreaIdsByDepartmentId.get(focusArea.department_id) ?? [];
+    existing.push(focusArea.id);
+    focusAreaIdsByDepartmentId.set(focusArea.department_id, existing);
+  }
+
+  const { rows: rawShiftCategories } = await db.query(
+    `SELECT id, name, abbr, start_time, end_time, color, sort_order, focus_area_id
+     FROM public.shift_categories
+     WHERE org_id = $1 AND archived_at IS NULL
+     ORDER BY sort_order, id`,
+    [orgId],
+  );
+  const shiftCategories: SeedShiftCategoryRow[] = rawShiftCategories.map((row) => ({
+    id: id(row.id),
+    name: row.name,
+    abbr: row.abbr ?? null,
+    start_time: row.start_time ?? null,
+    end_time: row.end_time ?? null,
+    color: row.color ?? DEFAULT_JOB_PRESET.bg,
+    sort_order: row.sort_order,
+    focus_area_id: row.focus_area_id != null ? id(row.focus_area_id) : null,
+  }));
+  const shiftIdsByFocusAreaId = new Map<number, number[]>();
+  for (const shift of shiftCategories) {
+    if (shift.focus_area_id == null) continue;
+    const existing = shiftIdsByFocusAreaId.get(shift.focus_area_id) ?? [];
+    existing.push(shift.id);
+    shiftIdsByFocusAreaId.set(shift.focus_area_id, existing);
+  }
+
+  const assignments = [...assignmentDefinitions].sort(
+    (left, right) => left.sort_order - right.sort_order || left.id - right.id,
+  );
+
+  await db.query(`DELETE FROM public.jobs WHERE org_id = $1`, [orgId]);
+
+  const shiftById = new Map(shiftCategories.map((shift) => [shift.id, shift]));
+  const codesByShiftId = new Map<number, SeedAssignmentRow[]>();
+  for (const code of assignments) {
+    if (code.category_id == null || code.is_general) continue;
+    const existing = codesByShiftId.get(code.category_id) ?? [];
+    existing.push(code);
+    codesByShiftId.set(code.category_id, existing);
+  }
+
+  const assignmentJobKeys = new Map<number, string>();
+  const assignmentShiftIds = new Map<number, number | null>();
+  const shiftAbbrUpdates = new Map<number, string>();
+  const scheduledJobMap = new Map<string, DerivedJobSeed>();
+  const shiftlessJobMap = new Map<string, DerivedJobSeed>();
+
+  for (const shift of shiftCategories) {
+    const group = [...(codesByShiftId.get(shift.id) ?? [])].sort(
+      (left, right) => left.sort_order - right.sort_order || left.id - right.id,
+    );
+    if (group.length === 0) continue;
+
+    const baseCode = selectBaseAssignment(group, shift);
+    const baseIdentity = resolveJobIdentity("Staff", roles);
+    const baseJobKey = `scheduled:${normalizeSeedLookup(baseIdentity.name)}`;
+    shiftAbbrUpdates.set(shift.id, baseCode.label);
+
+    for (const code of group) {
+      assignmentShiftIds.set(code.id, shift.id);
+      const descriptor = deriveJobDescriptor(code, shift);
+      const identity =
+        code.id === baseCode.id || group.length === 1 || !descriptor
+          ? baseIdentity
+          : resolveJobIdentity(descriptor, roles);
+      const key =
+        code.id === baseCode.id || group.length === 1 || !descriptor
+          ? baseJobKey
+          : `scheduled:${normalizeSeedLookup(identity.name)}`;
+      const existing = scheduledJobMap.get(key);
+      const shiftDepartmentId =
+        shift.focus_area_id != null
+          ? focusAreaDepartmentById.get(shift.focus_area_id) ?? null
+          : null;
+      const nextTimeOverride = deriveShiftTimeOverride(code, shift);
+      if (existing) {
+        existing.focus_area_ids = uniqueNumbers(
+          existing.focus_area_ids.concat(
+            shift.focus_area_id != null ? [shift.focus_area_id] : [],
+          ),
+        );
+        existing.department_ids = uniqueNumbers(
+          existing.department_ids.concat(
+            shiftDepartmentId != null ? [shiftDepartmentId] : [],
+          ),
+        );
+        existing.applicable_shift_ids = uniqueNumbers(
+          existing.applicable_shift_ids.concat(shift.id),
+        );
+        existing.eligible_role_ids = uniqueNumbers(
+          existing.eligible_role_ids.concat(identity.eligibleRoleIds),
+        );
+        existing.required_certification_ids = uniqueNumbers(
+          existing.required_certification_ids.concat(
+            code.required_certification_ids,
+          ),
+        );
+        if (nextTimeOverride) {
+          existing.shift_time_overrides[String(shift.id)] = nextTimeOverride;
+        }
+        existing.sort_order = Math.min(existing.sort_order, code.sort_order);
+      } else {
+        scheduledJobMap.set(key, {
+          key,
+          name: identity.name,
+          abbr: identity.abbr,
+          show_on_grid: code.id !== baseCode.id,
+          assignment_mode: "with_shift",
+          eligibility_mode: "and",
+          focus_area_ids: shift.focus_area_id != null ? [shift.focus_area_id] : [],
+          department_ids: shiftDepartmentId != null ? [shiftDepartmentId] : [],
+          applicable_shift_ids: [shift.id],
+          eligible_role_ids: identity.eligibleRoleIds,
+          required_certification_ids: uniqueNumbers(
+            code.required_certification_ids,
+          ),
+          color: "#E2E8F0",
+          border_color: "transparent",
+          text_color: "#1E293B",
+          shift_time_overrides:
+            nextTimeOverride != null ? { [String(shift.id)]: nextTimeOverride } : {},
+          shift_color_overrides: {},
+          default_start_time: null,
+          default_end_time: null,
+          default_duration_hours: null,
+          default_duration_minutes: null,
+          sort_order: code.sort_order,
+          system_key: null,
+        });
+      }
+
+      assignmentJobKeys.set(code.id, key);
+    }
+  }
+
+  for (const code of assignments) {
+    if (!code.is_general && code.category_id != null) {
+      continue;
+    }
+
+    const identity = resolveJobIdentity(code.name || code.label, roles);
+    const key = `shiftless:${normalizeSeedLookup(identity.name)}`;
+    const existing = shiftlessJobMap.get(key);
+    if (existing) {
+      existing.eligible_role_ids = uniqueNumbers(
+        existing.eligible_role_ids.concat(identity.eligibleRoleIds),
+      );
+      existing.required_certification_ids = uniqueNumbers(
+        existing.required_certification_ids.concat(
+          code.required_certification_ids,
+        ),
+      );
+      existing.sort_order = Math.min(existing.sort_order, code.sort_order);
+      existing.default_start_time =
+        existing.default_start_time ?? code.default_start_time;
+      existing.default_end_time =
+        existing.default_end_time ?? code.default_end_time;
+      existing.default_duration_hours =
+        existing.default_duration_hours ?? code.default_duration_hours;
+      existing.default_duration_minutes =
+        existing.default_duration_minutes ?? code.default_duration_minutes;
+    } else {
+      shiftlessJobMap.set(key, {
+        key,
+        name: identity.name,
+        abbr: identity.abbr,
+        show_on_grid: true,
+        assignment_mode: "shiftless",
+        eligibility_mode: "and",
+        focus_area_ids: [],
+        department_ids: [],
+        applicable_shift_ids: [],
+        eligible_role_ids: identity.eligibleRoleIds,
+        required_certification_ids: uniqueNumbers(
+          code.required_certification_ids,
+        ),
+        color: code.color,
+        border_color: code.border_color,
+        text_color: code.text_color,
+        shift_time_overrides: {},
+        shift_color_overrides: {},
+        default_start_time: code.default_start_time,
+        default_end_time: code.default_end_time,
+        default_duration_hours: code.default_duration_hours,
+        default_duration_minutes: code.default_duration_minutes,
+        sort_order: code.sort_order,
+        system_key: null,
+      });
+    }
+
+    assignmentShiftIds.set(code.id, null);
+    assignmentJobKeys.set(code.id, key);
+  }
+
+  const scheduledJobs = [...scheduledJobMap.values()].sort((left, right) => {
+    const leftFocusAreaId = left.focus_area_ids[0] ?? 0;
+    const rightFocusAreaId = right.focus_area_ids[0] ?? 0;
+    if (leftFocusAreaId !== rightFocusAreaId) {
+      return leftFocusAreaId - rightFocusAreaId;
+    }
+    if (left.sort_order !== right.sort_order) {
+      return left.sort_order - right.sort_order;
+    }
+    return left.name.localeCompare(right.name);
+  });
+  for (const job of scheduledJobs) {
+    job.department_ids = uniqueNumbers(
+      job.department_ids.concat(
+        job.focus_area_ids
+          .map((focusAreaId) => focusAreaDepartmentById.get(focusAreaId))
+          .filter((departmentId): departmentId is number => departmentId != null),
+      ),
+    );
+
+    const placementFocusAreaIds =
+      job.focus_area_ids.length > 0
+        ? job.focus_area_ids
+        : uniqueNumbers(
+            job.department_ids.flatMap(
+              (departmentId) => focusAreaIdsByDepartmentId.get(departmentId) ?? [],
+            ),
+          );
+    const placementShiftIds = uniqueNumbers(
+      placementFocusAreaIds.flatMap(
+        (focusAreaId) => shiftIdsByFocusAreaId.get(focusAreaId) ?? [],
+      ),
+    );
+
+  }
+  const shiftlessJobs = [...shiftlessJobMap.values()].sort((left, right) => {
+    if (left.sort_order !== right.sort_order) {
+      return left.sort_order - right.sort_order;
+    }
+    return left.name.localeCompare(right.name);
+  });
+
+  const orderedJobs: DerivedJobSeed[] = [...scheduledJobs, ...shiftlessJobs].map((job, index) => ({
+    ...job,
+    sort_order: index,
+  }));
+
+  const jobIdByKey = new Map<string, number>();
+  for (const job of orderedJobs) {
+    const { rows: [row] } = await db.query(
+      `INSERT INTO public.jobs (
+         org_id,
+         name,
+         abbr,
+         show_on_grid,
+         assignment_mode,
+         eligibility_mode,
+         focus_area_ids,
+         department_ids,
+         applicable_shift_ids,
+         eligible_role_ids,
+         required_certification_ids,
+         color,
+         border_color,
+         text_color,
+         shift_time_overrides,
+         shift_color_overrides,
+         default_start_time,
+         default_end_time,
+         default_duration_hours,
+         default_duration_minutes,
+         sort_order,
+         system_key
+       )
+       VALUES (
+         $1, $2, $3, $4, $5, $6,
+         $7::bigint[],
+         $8::bigint[],
+         $9::bigint[],
+         $10::bigint[],
+         $11::bigint[],
+         $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22
+       )
+       RETURNING id`,
+      [
+        orgId,
+        job.name,
+        job.abbr,
+        job.show_on_grid,
+        job.assignment_mode,
+        job.eligibility_mode,
+        job.focus_area_ids,
+        job.department_ids,
+        job.applicable_shift_ids,
+        job.eligible_role_ids,
+        job.required_certification_ids,
+        job.color,
+        job.border_color,
+        job.text_color,
+        JSON.stringify(job.shift_time_overrides),
+        JSON.stringify(job.shift_color_overrides),
+        job.default_start_time,
+        job.default_end_time,
+        job.default_duration_hours,
+        job.default_duration_minutes,
+        job.sort_order,
+        job.system_key,
+      ],
+    );
+    jobIdByKey.set(job.key, id(row.id));
+  }
+
+  for (const [shiftId, abbr] of shiftAbbrUpdates) {
+    const shift = shiftById.get(shiftId);
+    if (shift?.abbr?.trim()) {
+      continue;
+    }
+    await db.query(
+      `UPDATE public.shift_categories
+       SET abbr = $1
+       WHERE id = $2`,
+      [abbr, shiftId],
+    );
+  }
+
+  const resolvedAssignments: ResolvedSeedAssignmentRow[] = [];
+  for (const code of assignments) {
+    const jobKey = assignmentJobKeys.get(code.id);
+    if (!jobKey) {
+      throw new Error(`Unable to resolve seeded job key for assignment ${code.id}`);
+    }
+    const jobId = jobIdByKey.get(jobKey);
+    if (jobId == null) {
+      throw new Error(`Unable to resolve seeded job for assignment ${code.id}`);
+    }
+    resolvedAssignments.push({
+      label: code.label,
+      focus_area_id: code.focus_area_id,
+      shift_id: assignmentShiftIds.get(code.id) ?? null,
+      job_id: jobId,
+      sort_order: code.sort_order,
+    });
+  }
+
+  return {
+    totalJobCount: orderedJobs.length,
+    scheduledJobCount: scheduledJobs.length,
+    shiftlessJobCount: shiftlessJobs.length,
+    resolvedAssignments,
+  };
+}
+
 async function main() {
   let connectionString: string;
 
@@ -537,14 +1472,16 @@ async function main() {
       TRUNCATE
         public.organization_memberships,
         public.schedule_notes,
-        public.shifts,
+        public.schedule_cell_segments,
+        public.schedule_cell_snapshots,
+        public.schedule_cells,
         public.recurring_shifts,
         public.shift_series,
         public.schedule_draft_sessions,
         public.recurring_shifts_draft_sessions,
         public.publish_history,
         public.employees,
-        public.shift_codes,
+        public.jobs,
         public.shift_categories,
         public.indicator_types,
         public.organization_roles,
@@ -584,9 +1521,10 @@ async function main() {
          focus_area_label,
          certification_label,
          role_label,
+         department_label,
          employee_count
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING id`,
       [
         tenant.name,
@@ -603,6 +1541,7 @@ async function main() {
         tenant.focus_area_label,
         tenant.certification_label,
         tenant.role_label,
+        "Scheduled Departments",
         tenant.employeeCount,
       ]
     );
@@ -613,10 +1552,11 @@ async function main() {
     if (tenant.departments) {
       for (let i = 0; i < tenant.departments.length; i++) {
         const dept = tenant.departments[i];
+        const deptAbbr = ((dept as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(dept.name, "DEPT");
         const { rows: [row] } = await db.query(
-          `INSERT INTO public.departments (org_id, name, type, sort_order, permissions)
-           VALUES ($1, $2, $3::department_type, $4, $5::jsonb) RETURNING id`,
-          [orgId, dept.name, dept.type, i, dept.permissions ? JSON.stringify(dept.permissions) : null]
+          `INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
+           VALUES ($1, $2, $3, $4::department_type, $5, $6::jsonb) RETURNING id`,
+          [orgId, dept.name, deptAbbr, dept.type, i, dept.permissions ? JSON.stringify(dept.permissions) : null]
         );
         deptIds.push(id(row.id));
       }
@@ -630,9 +1570,15 @@ async function main() {
         ? deptIds[tenant.focusAreaDeptIndex[i]]
         : null;
       const { rows: [row] } = await db.query(
-        `INSERT INTO public.focus_areas (org_id, department_id, name, sort_order)
-         VALUES ($1, $2, $3, $4) RETURNING id`,
-        [orgId, deptId, fa.name, i]
+        `INSERT INTO public.focus_areas (org_id, department_id, name, color, sort_order)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [
+          orgId,
+          deptId,
+          fa.name,
+          FOCUS_AREA_PRESET_COLORS[i % FOCUS_AREA_PRESET_COLORS.length],
+          i,
+        ]
       );
       focusAreaIds.push(id(row.id));
     }
@@ -655,23 +1601,30 @@ async function main() {
     for (let i = 0; i < tenant.orgRoles.length; i++) {
       const r = tenant.orgRoles[i];
       const deptId = r.deptIndex != null ? deptIds[r.deptIndex] : null;
+      const isScheduleRole =
+        (r as { isScheduleRole?: boolean }).isScheduleRole ?? true;
       const { rows: [row] } = await db.query(
-        `INSERT INTO public.organization_roles (org_id, department_id, name, abbr, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [orgId, deptId, r.name, r.abbr, i]
+        `INSERT INTO public.organization_roles (org_id, department_id, name, abbr, is_schedule_role, sort_order)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [orgId, deptId, r.name, r.abbr, isScheduleRole, i]
       );
       roleIds.push(id(row.id));
     }
 
     // 6. Shift Categories
     const catIds: number[] = [];
-    for (let i = 0; i < tenant.shiftCategories.length; i++) {
-      const cat = tenant.shiftCategories[i];
-      const faId = cat.faIndex !== null ? focusAreaIds[cat.faIndex] : null;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.shift_categories (org_id, name, color, start_time, end_time, sort_order, focus_area_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        [orgId, cat.name, cat.color, cat.start_time, cat.end_time, i, faId]
+      for (let i = 0; i < tenant.shiftCategories.length; i++) {
+        const cat = tenant.shiftCategories[i];
+        const faId = cat.faIndex !== null ? focusAreaIds[cat.faIndex] : null;
+        const catAbbr = ((cat as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(cat.name, "SHF");
+        const catBreakMinutes = (cat as { break_minutes?: number | null }).break_minutes ?? null;
+        const catColor =
+          tenant.assignments.find((assignment) => assignment.catIndex === i && !assignment.is_general)?.color ??
+          DEFAULT_JOB_PRESET.bg;
+        const { rows: [row] } = await db.query(
+        `INSERT INTO public.shift_categories (org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+        [orgId, cat.name, catAbbr, cat.start_time, cat.end_time, catColor, i, faId, catBreakMinutes]
       );
       catIds.push(id(row.id));
     }
@@ -691,29 +1644,25 @@ async function main() {
       absenceTypeRows.push({ id: id(row.id), label: row.label });
     }
 
-    // 7b. Shift Codes
-    interface ShiftCodeRow { id: number; label: string; focus_area_id: number | null }
-    const shiftCodeRows: ShiftCodeRow[] = [];
-    for (let i = 0; i < tenant.shiftCodes.length; i++) {
-      const sc = tenant.shiftCodes[i];
-      const faId = sc.faIndex !== null ? focusAreaIds[sc.faIndex] : null;
-      const catId = sc.catIndex !== null ? catIds[sc.catIndex] : null;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.shift_codes
-           (org_id, label, name, color, border_color, text_color, is_general,
-            sort_order, focus_area_id, category_id, default_start_time, default_end_time, required_certification_ids)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-         RETURNING id, label, focus_area_id`,
-        [orgId, sc.label, sc.name, sc.color, sc.border_color, sc.text_color,
-         sc.is_general, i, faId, catId,
-         sc.start ?? null, sc.end ?? null, '{}']
-      );
-      shiftCodeRows.push({
-        id: id(row.id),
-        label: row.label,
-        focus_area_id: row.focus_area_id != null ? id(row.focus_area_id) : null,
-      });
-    }
+    const assignmentRows: SeedAssignmentRow[] = tenant.assignments.map((assignment, index) => ({
+      id: index,
+      label: assignment.label,
+      name: assignment.name,
+      color: assignment.color,
+      border_color: assignment.border_color,
+      text_color: assignment.text_color,
+      is_general: assignment.is_general,
+      focus_area_id:
+        assignment.faIndex !== null ? focusAreaIds[assignment.faIndex] : null,
+      category_id:
+        assignment.catIndex !== null ? catIds[assignment.catIndex] : null,
+      sort_order: index,
+      default_start_time: assignment.start ?? null,
+      default_end_time: assignment.end ?? null,
+      default_duration_hours: null,
+      default_duration_minutes: null,
+      required_certification_ids: [],
+    }));
 
     // 8. Indicator Types
     for (let i = 0; i < tenant.indicatorTypes.length; i++) {
@@ -784,25 +1733,36 @@ async function main() {
       }
     }
 
-    // 10. Shifts (March 22 – April 4, 2026 — 2 weeks of data)
+    const seededJobs = await seedJobsForOrg(db, orgId, assignmentRows);
+
+    // 10. Schedule cells (April 19 – May 2, 2026 — 2 weeks of data)
     const offAbsenceType = absenceTypeRows[0]; // First absence type (e.g., "Off")
     let shiftCount = 0;
 
-    // Batch insert for performance — separate arrays for work shifts and absences
-    // Work shifts: [emp_id, date, org_id, code_ids, code_ids, focus_area_id, from_recurring, version]
-    const workShiftValues: unknown[][] = [];
-    // Absences: [emp_id, date, org_id, absence_type_id, absence_type_id, from_recurring, version]
-    const absenceValues: unknown[][] = [];
+    const workShiftValues: Array<{
+      empId: string;
+      date: string;
+      shiftIds: Array<number | null>;
+      jobIds: number[];
+      focusAreaId: number | null;
+    }> = [];
+    const absenceValues: Array<{
+      empId: string;
+      date: string;
+      absenceTypeId: number;
+    }> = [];
 
     for (const emp of employees) {
       if (emp.status === "terminated") continue;
       const primaryFaId = emp.focus_area_ids[0] ?? null;
-      const empWorkCodes = shiftCodeRows.filter(
-        (sc) => sc.focus_area_id === primaryFaId || sc.focus_area_id === null
+      const empWorkAssignments = seededJobs.resolvedAssignments.filter(
+        (assignment) =>
+          assignment.focus_area_id === primaryFaId ||
+          assignment.focus_area_id === null,
       );
-      if (empWorkCodes.length === 0) continue;
+      if (empWorkAssignments.length === 0) continue;
 
-      const shiftStart = new Date(2026, 2, 22); // March 22, 2026
+      const shiftStart = new Date(2026, 3, 19); // April 19, 2026
       for (let i = 0; i < 14; i++) {
         const d = new Date(shiftStart);
         d.setDate(d.getDate() + i);
@@ -814,72 +1774,75 @@ async function main() {
         if (rand > 0.75 || (dow === 0 && rand > 0.4)) {
           // Off day (~25% chance, higher on Sundays)
           if (offAbsenceType) {
-            absenceValues.push([emp.id, dt, orgId, offAbsenceType.id, offAbsenceType.id, false, 1]);
+            absenceValues.push({
+              empId: emp.id,
+              date: dt,
+              absenceTypeId: offAbsenceType.id,
+            });
           }
         } else {
-          const code = empWorkCodes[i % empWorkCodes.length];
-          const faId = code.focus_area_id ?? primaryFaId;
-          workShiftValues.push([emp.id, dt, orgId, [code.id], [code.id], faId, false, 1]);
+          const assignment =
+            empWorkAssignments[i % empWorkAssignments.length];
+          const faId = assignment.focus_area_id ?? primaryFaId;
+          workShiftValues.push({
+            empId: emp.id,
+            date: dt,
+            shiftIds: [assignment.shift_id],
+            jobIds: [assignment.job_id],
+            focusAreaId: faId,
+          });
         }
         shiftCount++;
       }
     }
 
-    // Batch insert work shifts (50 at a time)
-    for (let i = 0; i < workShiftValues.length; i += 50) {
-      const batch = workShiftValues.slice(i, i + 50);
-      const placeholders = batch.map((_, idx) => {
-        const base = idx * 8;
-        return `($${base + 1},$${base + 2},$${base + 3},$${base + 4}::integer[],$${base + 5}::integer[],$${base + 6},$${base + 7},$${base + 8})`;
-      }).join(",");
-      const params = batch.flat();
-      await db.query(
-        `INSERT INTO public.shifts
-           (emp_id, date, org_id, published_shift_code_ids, draft_shift_code_ids, focus_area_id, from_recurring, version)
-         VALUES ${placeholders}
-         ON CONFLICT (emp_id, date) DO NOTHING`,
-        params
-      );
+    for (const workShift of workShiftValues) {
+      await writePublishedWorkScheduleCell(db, {
+        orgId,
+        empId: workShift.empId,
+        date: workShift.date,
+        shiftIds: workShift.shiftIds,
+        jobIds: workShift.jobIds,
+        focusAreaId: workShift.focusAreaId,
+      });
     }
 
-    // Batch insert absence shifts (50 at a time)
-    for (let i = 0; i < absenceValues.length; i += 50) {
-      const batch = absenceValues.slice(i, i + 50);
-      const placeholders = batch.map((_, idx) => {
-        const base = idx * 7;
-        return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7})`;
-      }).join(",");
-      const params = batch.flat();
-      await db.query(
-        `INSERT INTO public.shifts
-           (emp_id, date, org_id, published_absence_type_id, draft_absence_type_id, from_recurring, version)
-         VALUES ${placeholders}
-         ON CONFLICT (emp_id, date) DO NOTHING`,
-        params
-      );
+    for (const absence of absenceValues) {
+      await writePublishedAbsenceScheduleCell(db, {
+        orgId,
+        empId: absence.empId,
+        date: absence.date,
+        absenceTypeId: absence.absenceTypeId,
+      });
     }
 
-    console.log(`    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.shiftCodes.length} codes, ${employees.length} employees, ${shiftCount} shifts`);
+    console.log(`    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.assignments.length} schedule labels, ${seededJobs.totalJobCount} jobs, ${employees.length} employees, ${shiftCount} shifts`);
   }
 
   // ── Calm Haven (6th tenant) — from SQL seed file ────────────────────
   console.log(`\n  [6/7] Calm Haven...`);
 
-  const calmHavenSql = readFileSync('supabase/seed_calm_haven.sql', 'utf8');
-  await db.query(calmHavenSql);
+  const calmHavenJobs = await seedTenantSqlBeforeSchedule(
+    db,
+    'supabase/seed_calm_haven.sql',
+    "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+  );
 
-  console.log(`    ✓ 4 focus areas, 6 certs, 8 roles, 17 codes, 28 employees, shifts seeded`);
+  console.log(`    ✓ 4 focus areas, 6 certs, 8 roles, 17 schedule labels, ${calmHavenJobs.totalJobCount} jobs, 28 employees, shifts seeded`);
 
   // ── Arden Wood (7th tenant) — Calm Haven config + PDF-derived roster ──────
   console.log(`\n  [7/7] Arden Wood...`);
 
-  const ardenWoodSql = readFileSync('supabase/seed_arden_wood.sql', 'utf8');
-  await db.query(ardenWoodSql);
+  const ardenWoodJobs = await seedTenantSqlBeforeSchedule(
+    db,
+    'supabase/seed_arden_wood.sql',
+    "964c29d1-dc1e-4cd6-861c-8b8ab00d20c0",
+  );
 
   const gridmasterSql = readFileSync('supabase/seed_gridmaster.sql', 'utf8');
   await db.query(gridmasterSql);
 
-  console.log(`    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees and seeded shifts`);
+  console.log(`    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees, ${ardenWoodJobs.totalJobCount} jobs, and seeded shifts`);
 
   // ── Auth Users & Profiles ──────────────────────────────────────────────
   // Create 3 test users, all assigned to a seeded organization.
@@ -907,7 +1870,7 @@ async function main() {
     canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
     canEditNotes: true, canViewRecurringShifts: true, canManageRecurringShifts: true, canManageShiftSeries: true,
     canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: true,
-    canViewFocusAreas: true, canManageFocusAreas: true, canViewShiftCodes: true, canManageShiftCodes: true,
+    canViewFocusAreas: true, canManageFocusAreas: true, canViewScheduleDefinitions: true, canManageScheduleDefinitions: true,
     canViewIndicatorTypes: true, canManageIndicatorTypes: true, canManageOrgSettings: true,
     canViewOrgLabels: true, canManageOrgLabels: true, canViewCoverageRequirements: true, canManageCoverageRequirements: true,
     canApproveShiftRequests: true, canViewDashboardAnalytics: true,
@@ -918,7 +1881,7 @@ async function main() {
     canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
     canEditNotes: false, canViewRecurringShifts: true, canManageRecurringShifts: false, canManageShiftSeries: false,
     canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: false,
-    canViewFocusAreas: true, canManageFocusAreas: false, canViewShiftCodes: true, canManageShiftCodes: false,
+    canViewFocusAreas: true, canManageFocusAreas: false, canViewScheduleDefinitions: true, canManageScheduleDefinitions: false,
     canViewIndicatorTypes: true, canManageIndicatorTypes: false, canManageOrgSettings: false,
     canViewOrgLabels: true, canManageOrgLabels: false, canViewCoverageRequirements: true, canManageCoverageRequirements: false,
     canApproveShiftRequests: false, canViewDashboardAnalytics: true,

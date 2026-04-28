@@ -11,7 +11,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Realtime cache invalidation via CDC on config tables (useRealtimeInvalidation hook)
 - StaleDataBanner component for connection loss / stale data warnings
-- Comprehensive audit logging on all config mutations (shift codes, categories, employees, departments, coverage)
+- Comprehensive audit logging on all schedule-definition config mutations (jobs, shifts, employees, departments, coverage)
 - Gridmaster: force logout, audit log for viewed_all_users
 - `org_id` NOT NULL constraint on shifts table
 - Custom time format validation constraints on shifts

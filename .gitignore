@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,13 +16,19 @@
 
 # next.js
 /.next/
+.next/
 /out/
+/.turbo/
+.turbo/
 
 # production
 /build
+packages/*/dist/
 
 # misc
 .DS_Store
+.expo/
+.snaplet/
 *.pem
 .venv/
 .pdfenv/

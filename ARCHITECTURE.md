@@ -146,12 +146,14 @@ organizations ──────┐
   │                  │
   ├── employees ─────┤
   │     │            │
-  │     ├── shifts   │
+  │     ├── schedule_cells
+  │     │     ├── schedule_cell_snapshots
+  │     │     └── schedule_cell_segments
   │     ├── recurring_shifts
   │     └── shift_series
   │                  │
   ├── focus_areas    │
-  ├── shift_codes    │
+  ├── jobs           │
   ├── shift_categories
   ├── coverage_requirements
   ├── certifications │
@@ -177,9 +179,10 @@ user_sessions           — per-device session tracking
 
 ### Key Design Patterns
 
-- **Optimistic Locking** — `shifts.version` column prevents concurrent overwrites. The update query includes `.eq('version', expected)` — a version mismatch means another user edited first.
-- **Idempotency Keys** — `role_change_log.idempotency_key` and `shifts.idempotency_key` prevent duplicate writes from network retries.
-- **Draft/Published Status** — Shifts and notes have a `status` column (`draft` | `published`). Drafts are only visible to editors; publish promotes all drafts atomically.
+- **Canonical Schedule State** — dated schedule truth lives in `schedule_cells`, `schedule_cell_snapshots`, and `schedule_cell_segments`. Recurring templates and series templates store only `ScheduleCellState` JSON in `recurring_shifts.state` and `shift_series.state`; derived assignment IDs and labels are read-model compatibility only.
+- **Optimistic Locking** — `schedule_cells.version` prevents concurrent overwrites. Writes include the expected version, and a mismatch means another user edited first.
+- **Idempotency Keys** — `role_change_log.idempotency_key` prevents duplicate role/audit writes from network retries.
+- **Draft/Published Status** — schedule cells store separate draft and published snapshots. Drafts are only visible to schedulers; publish promotes drafts atomically.
 - **Soft Status on Employees** — Employees use `status` (active/benched/terminated) rather than hard deletes, preserving historical schedule data.
 
 ---
@@ -211,7 +214,7 @@ All hooks are barrel-exported from `src/hooks/index.ts`.
 | Hook | Purpose |
 | ---- | ------- |
 | `usePermissions` | Decodes JWT, fetches admin_permissions from DB, provides `can(permission)` helper. Exports `getPermissionsFromSession()` and `clearPermsCache()` |
-| `useOrganizationData` | Fetches org config, focus areas, shift codes, categories, coverage requirements. Exports `clearOrgDataCache()` |
+| `useOrganizationData` | Fetches org config, focus areas, jobs, shifts, and coverage requirements. Exports `clearOrgDataCache()` |
 | `useEmployees` | Employee list with filtering, search, and pagination. Exports `clearEmployeeCache()` |
 | `useCellLocks` | Real-time cell lock/occupancy via Supabase Realtime subscriptions |
 | `useShiftRequests` | Shift pickup/swap requests with status management |
@@ -243,7 +246,7 @@ DubGrid uses a layered approach to styling with Tailwind v4 as the foundation:
 | File | Purpose |
 | ---- | ------- |
 | `src/lib/palette.ts` | Static hex values matching CSS custom properties, used for JS inline styles. Defines backgrounds, borders, text, brand, state, and grid colors. |
-| `src/lib/colors.ts` | Predefined color presets for shift codes and focus areas (18 color pairs). Draft border colors. Designation badge colors. |
+| `src/lib/colors.ts` | Predefined color presets for jobs, shifts, and focus areas (18 color pairs). Draft border colors. Designation badge colors. |
 | `src/lib/styles.ts` | Shared CSS-in-JS style objects for consistent layouts (section cards, table headers/cells, form labels, role badge colors). |
 | `src/lib/email.ts` | Branded HTML email templates with header, wrapper, and sanitization utilities. Used by invite and demo request API routes. |
 
