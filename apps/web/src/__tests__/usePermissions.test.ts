@@ -1,0 +1,765 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
+
+// ── Mock account client adapter ──────────────────────────────────────────────
+const mockGetSession = vi.fn();
+const mockGetUser = vi.fn();
+const mockOnAuthStateChange = vi.fn();
+const mockGetVerifiedBrowserAuth = vi.fn();
+const mockFetchAccountPermissions = vi.fn();
+const mockRemoveBrowserRealtimeChannel = vi.fn();
+
+function createMockChannel() {
+  const channel = {
+    on: vi.fn(),
+    subscribe: vi.fn(),
+  };
+  channel.on.mockReturnValue(channel);
+  channel.subscribe.mockReturnValue(channel);
+  return channel;
+}
+
+const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => createMockChannel());
+
+vi.mock("@/features/account/client", () => ({
+  createBrowserRealtimeChannel: (name: string) =>
+    mockCreateBrowserRealtimeChannel(name),
+  fetchAccountPermissions: () => mockFetchAccountPermissions(),
+  getVerifiedBrowserAuth: () => mockGetVerifiedBrowserAuth(),
+  removeBrowserRealtimeChannel: (channel: unknown) =>
+    mockRemoveBrowserRealtimeChannel(channel),
+  subscribeToBrowserAuthChanges: (cb: unknown) => {
+    mockOnAuthStateChange(cb);
+    return { data: { subscription: { unsubscribe: vi.fn() } } };
+  },
+}));
+
+// ── Import after mocks ──────────────────────────────────────────────────────
+import {
+  getPermissionsFromSession,
+  buildPerms,
+  ROLE_LEVEL,
+  unionPermissions,
+  applyViewImplications,
+  READ_ONLY_PERMS,
+} from "@/features/permissions";
+import {
+  clearPermsCache,
+  usePermissions,
+} from "@/features/permissions/client";
+import { ALL_FALSE_PERMS } from "./factories";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+type TestJwtClaims = {
+  platform_role?: string;
+  org_role?: string;
+  org_id?: string | null;
+  org_slug?: string;
+};
+
+function encodeJwtPart(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function createAccessToken(claims: TestJwtClaims): string {
+  return `${encodeJwtPart({ alg: "none", typ: "JWT" })}.${encodeJwtPart(claims)}.signature`;
+}
+
+function createSession(
+  claims: TestJwtClaims,
+  userId = "u-1",
+): Parameters<typeof getPermissionsFromSession>[0] {
+  return {
+    access_token: createAccessToken(claims),
+    user: { id: userId },
+  } as Parameters<typeof getPermissionsFromSession>[0];
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  clearPermsCache();
+  let latestSession: ReturnType<typeof createSession> | null = null;
+  mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
+  mockGetVerifiedBrowserAuth.mockImplementation(async () => {
+    const [
+      {
+        data: { session },
+      },
+      {
+        data: { user },
+      },
+    ] = await Promise.all([mockGetSession(), mockGetUser()]);
+
+    latestSession = session;
+    if (!session?.access_token || !user) {
+      return { session: null, user: null };
+    }
+    return { session, user };
+  });
+  mockFetchAccountPermissions.mockImplementation(async () => ({
+    permissions: getPermissionsFromSession(latestSession),
+  }));
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part A: ROLE_LEVEL constant
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("ROLE_LEVEL", () => {
+  it("has correct hierarchy values", () => {
+    expect(ROLE_LEVEL.gridmaster).toBe(4);
+    expect(ROLE_LEVEL.super_admin).toBe(3);
+    expect(ROLE_LEVEL.admin).toBe(2);
+    expect(ROLE_LEVEL.user).toBe(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part B: getPermissionsFromSession (pure function)
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("getPermissionsFromSession", () => {
+  it("returns NO_PERMS for null session", () => {
+    const perms = getPermissionsFromSession(null);
+    expect(perms.role).toBe("user");
+    expect(perms.orgId).toBeNull();
+    expect(perms.isLoading).toBe(false);
+    expect(perms.isGridmaster).toBe(false);
+  });
+
+  it("returns NO_PERMS for session with no access_token", () => {
+    const perms = getPermissionsFromSession({ access_token: "" } as Parameters<typeof getPermissionsFromSession>[0]);
+    expect(perms.role).toBe("user");
+  });
+
+  it("returns gridmaster perms for gridmaster JWT", () => {
+    const session = createSession({
+      platform_role: "gridmaster",
+      org_role: "user",
+      org_id: null,
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.role).toBe("gridmaster");
+    expect(perms.isGridmaster).toBe(true);
+    expect(perms.level).toBe(4);
+    expect(perms.canEditShifts).toBe(true);
+    expect(perms.canManageEmployees).toBe(true);
+    expect(perms.canManageOrg).toBe(true);
+  });
+
+  it("returns super_admin perms for super_admin JWT", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.role).toBe("super_admin");
+    expect(perms.isSuperAdmin).toBe(true);
+    expect(perms.level).toBe(3);
+    expect(perms.canEditShifts).toBe(true);
+    expect(perms.canManageUsers).toBe(true);
+  });
+
+  it("returns read-only perms for admin JWT (no admin_permissions from JWT alone)", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.role).toBe("admin");
+    expect(perms.level).toBe(2);
+    // Without admin_permissions from DB, falls back to READ_ONLY
+    expect(perms.canEditShifts).toBe(false);
+    expect(perms.canViewSchedule).toBe(true);
+    expect(perms.canViewStaff).toBe(true);
+  });
+
+  it("returns read-only perms for user JWT", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.role).toBe("user");
+    expect(perms.level).toBe(0);
+    expect(perms.canEditShifts).toBe(false);
+    expect(perms.canViewSchedule).toBe(true);
+  });
+
+  it("returns user perms when JWT decode fails", () => {
+    const session = { access_token: "bad-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
+    const perms = getPermissionsFromSession(session);
+    expect(perms.role).toBe("user");
+    expect(perms.orgId).toBeNull();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part C: Permission derivation tests (via getPermissionsFromSession)
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("permission derivation", () => {
+  it("atLeast works correctly for admin", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.atLeast("user")).toBe(true);
+    expect(perms.atLeast("admin")).toBe(true);
+    expect(perms.atLeast("super_admin")).toBe(false);
+    expect(perms.atLeast("gridmaster")).toBe(false);
+  });
+
+  it("canManageUsers is false for admin role", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.canManageUsers).toBe(false);
+    expect(perms.canConfigureAdminPermissions).toBe(false);
+  });
+
+  it("canManageUsers is true for super_admin", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.canManageUsers).toBe(true);
+    expect(perms.canConfigureAdminPermissions).toBe(true);
+  });
+
+  it("canManageOrg is true for super_admin", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.canManageOrg).toBe(true);
+  });
+
+  it("canManageOrg is false for user role", () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+    });
+    const perms = getPermissionsFromSession(session);
+    expect(perms.canManageOrg).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part D: usePermissions hook
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("usePermissions hook", () => {
+  it("starts with loading state", async () => {
+    mockGetSession.mockResolvedValue({ data: { session: null } });
+    const { result } = renderHook(() => usePermissions());
+    expect(result.current.isLoading).toBe(true);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it("resolves gridmaster perms from session", async () => {
+    const session = createSession(
+      {
+        platform_role: "gridmaster",
+        org_role: "user",
+        org_id: null,
+      },
+      "gm-1",
+    );
+    mockGetSession.mockResolvedValue({ data: { session } });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("gridmaster");
+    expect(result.current.isGridmaster).toBe(true);
+    expect(result.current.canEditShifts).toBe(true);
+  });
+
+  it("resolves admin perms from the account permissions adapter", async () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+    });
+    mockGetSession.mockResolvedValue({ data: { session } });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("admin", "org-1", false, {
+        canViewSchedule: true,
+        canEditShifts: true,
+        canPublishSchedule: false,
+        canApplyRecurringSchedule: false,
+        canEditNotes: true,
+        canViewRecurringShifts: false,
+        canManageRecurringShifts: false,
+        canManageShiftSeries: false,
+        canViewStaff: true,
+        canViewEmployeeDetails: false,
+        canManageEmployees: false,
+        canViewFocusAreas: false,
+        canManageFocusAreas: false,
+        canViewScheduleDefinitions: false,
+        canManageScheduleDefinitions: false,
+        canViewIndicatorTypes: false,
+        canManageIndicatorTypes: false,
+        canManageOrgSettings: false,
+        canViewOrgLabels: false,
+        canManageOrgLabels: false,
+        canViewCoverageRequirements: false,
+        canManageCoverageRequirements: false,
+        canApproveShiftRequests: false,
+        canViewDashboardAnalytics: false,
+      }),
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("admin");
+    expect(result.current.canEditShifts).toBe(true);
+    expect(result.current.canEditNotes).toBe(true);
+    expect(result.current.canPublishSchedule).toBe(false);
+  });
+
+  it("clears perms on SIGNED_OUT event", async () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    mockGetSession.mockResolvedValue({ data: { session } });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+
+    // Simulate SIGNED_OUT auth state change
+    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
+    act(() => {
+      authCallback("SIGNED_OUT", null);
+    });
+
+    await waitFor(() => expect(result.current.role).toBe("user"));
+  });
+
+  it("keeps resolved perms during same-user TOKEN_REFRESHED revalidation", async () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    mockGetSession.mockResolvedValue({ data: { session } });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+
+    const sessionDeferred = deferred<{ data: { session: typeof session } }>();
+    const userDeferred = deferred<{ data: { user: { id: string } } }>();
+    mockGetSession.mockReturnValueOnce(sessionDeferred.promise);
+    mockGetUser.mockReturnValueOnce(userDeferred.promise);
+
+    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
+    act(() => {
+      authCallback("TOKEN_REFRESHED", session);
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.role).toBe("super_admin");
+
+    await act(async () => {
+      sessionDeferred.resolve({ data: { session } });
+      userDeferred.resolve({ data: { user: { id: "u-1" } } });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+  });
+
+  it("enters blocking loading when auth changes to a different user", async () => {
+    const firstSession = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    const secondSession = createSession(
+      {
+        platform_role: "gridmaster",
+        org_role: "user",
+        org_id: null,
+      },
+      "u-2",
+    );
+    mockGetSession.mockResolvedValue({ data: { session: firstSession } });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+
+    const sessionDeferred = deferred<{ data: { session: typeof secondSession } }>();
+    const userDeferred = deferred<{ data: { user: { id: string } } }>();
+    mockGetSession.mockReturnValueOnce(sessionDeferred.promise);
+    mockGetUser.mockReturnValueOnce(userDeferred.promise);
+
+    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
+    act(() => {
+      authCallback("SIGNED_IN", secondSession);
+    });
+
+    expect(result.current.isLoading).toBe(true);
+
+    await act(async () => {
+      sessionDeferred.resolve({ data: { session: secondSession } });
+      userDeferred.resolve({ data: { user: { id: "u-2" } } });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("gridmaster");
+    expect(result.current.isGridmaster).toBe(true);
+  });
+
+  it("resolves user role correctly", async () => {
+    const session = createSession({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+    });
+    mockGetSession.mockResolvedValue({ data: { session } });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("user", "org-1", false),
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("user");
+    expect(result.current.canEditShifts).toBe(false);
+    expect(result.current.canViewSchedule).toBe(true);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part E: unionPermissions
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("unionPermissions", () => {
+  it("returns READ_ONLY_PERMS baseline for empty input", () => {
+    const result = unionPermissions([]);
+    expect(result).toEqual({ ...READ_ONLY_PERMS, canManageOrgSettings: false });
+  });
+
+  it("returns the single permission set when given one input", () => {
+    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canManageEmployees: true };
+    const result = unionPermissions([perms]);
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canManageEmployees).toBe(true);
+    expect(result.canPublishSchedule).toBe(false);
+  });
+
+  it("unions multiple permission sets (most permissive wins)", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
+    const deptB = { ...ALL_FALSE_PERMS, canManageEmployees: true, canEditNotes: true };
+    const result = unionPermissions([deptA, deptB]);
+
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canManageEmployees).toBe(true);
+    expect(result.canEditNotes).toBe(true);
+    expect(result.canPublishSchedule).toBe(false);
+  });
+
+  it("always blocks canManageOrgSettings regardless of input", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
+    const result = unionPermissions([perms]);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+
+  it("preserves canViewSchedule and canViewStaff from READ_ONLY baseline", () => {
+    const result = unionPermissions([ALL_FALSE_PERMS]);
+    expect(result.canViewSchedule).toBe(true);
+    expect(result.canViewStaff).toBe(true);
+  });
+
+  it("handles three departments with disjoint permissions", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canEditShifts: true };
+    const deptB = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
+    const deptC = { ...ALL_FALSE_PERMS, canApproveShiftRequests: true };
+    const result = unionPermissions([deptA, deptB, deptC]);
+
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canManageFocusAreas).toBe(true);
+    expect(result.canApproveShiftRequests).toBe(true);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part F: applyViewImplications
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("applyViewImplications", () => {
+  it("canManageEmployees implies canViewEmployeeDetails", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageEmployees: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewEmployeeDetails).toBe(true);
+    expect(result.canManageEmployees).toBe(true);
+  });
+
+  it("canManageFocusAreas implies canViewFocusAreas", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewFocusAreas).toBe(true);
+  });
+
+  it("canManageScheduleDefinitions implies canViewScheduleDefinitions", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageScheduleDefinitions: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewScheduleDefinitions).toBe(true);
+  });
+
+  it("canManageIndicatorTypes implies canViewIndicatorTypes", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageIndicatorTypes: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewIndicatorTypes).toBe(true);
+  });
+
+  it("canManageCoverageRequirements implies canViewCoverageRequirements", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageCoverageRequirements: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewCoverageRequirements).toBe(true);
+  });
+
+  it("canManageRecurringShifts implies canViewRecurringShifts", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageRecurringShifts: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewRecurringShifts).toBe(true);
+  });
+
+  it("canManageOrgLabels implies canViewOrgLabels", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgLabels: true };
+    const result = applyViewImplications(perms);
+    expect(result.canViewOrgLabels).toBe(true);
+  });
+
+  it("does not set canView when canManage is false", () => {
+    const result = applyViewImplications(ALL_FALSE_PERMS);
+    expect(result.canViewEmployeeDetails).toBe(false);
+    expect(result.canViewFocusAreas).toBe(false);
+    expect(result.canViewScheduleDefinitions).toBe(false);
+    expect(result.canViewIndicatorTypes).toBe(false);
+    expect(result.canViewCoverageRequirements).toBe(false);
+    expect(result.canViewRecurringShifts).toBe(false);
+    expect(result.canViewOrgLabels).toBe(false);
+    expect(result.canViewDashboardAnalytics).toBe(false);
+  });
+
+  it("preserves explicit canView when canManage is false (view-only mode)", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true, canManageFocusAreas: false };
+    const result = applyViewImplications(perms);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canManageFocusAreas).toBe(false);
+  });
+
+  it("sets canViewDashboardAnalytics when any edit permission is true", () => {
+    const perms1 = { ...ALL_FALSE_PERMS, canEditShifts: true };
+    expect(applyViewImplications(perms1).canViewDashboardAnalytics).toBe(true);
+
+    const perms2 = { ...ALL_FALSE_PERMS, canManageEmployees: true };
+    expect(applyViewImplications(perms2).canViewDashboardAnalytics).toBe(true);
+
+    const perms3 = { ...ALL_FALSE_PERMS, canPublishSchedule: true };
+    expect(applyViewImplications(perms3).canViewDashboardAnalytics).toBe(true);
+
+    const perms4 = { ...ALL_FALSE_PERMS, canApproveShiftRequests: true };
+    expect(applyViewImplications(perms4).canViewDashboardAnalytics).toBe(true);
+  });
+
+  it("backward compat: admin with old-style permissions gets view implied", () => {
+    // Simulates an admin whose JSONB has manage perms but no view keys
+    const oldStylePerms = {
+      ...ALL_FALSE_PERMS,
+      canManageEmployees: true,
+      canManageFocusAreas: true,
+      canManageScheduleDefinitions: true,
+      // canViewEmployeeDetails, canViewFocusAreas, canViewScheduleDefinitions are false (not in JSONB)
+    };
+    const result = applyViewImplications(oldStylePerms);
+    expect(result.canViewEmployeeDetails).toBe(true);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canViewScheduleDefinitions).toBe(true);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part G: canAccessSettings
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("canAccessSettings", () => {
+  it("is true for super_admin", async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: createSession({
+          platform_role: "none",
+          org_role: "super_admin",
+          org_id: "org-1",
+          org_slug: "acme",
+        }),
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.canAccessSettings).toBe(true);
+  });
+
+  it("is true for admin with view-only permissions", async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: createSession(
+          {
+            platform_role: "none",
+            org_role: "admin",
+            org_id: "org-1",
+            org_slug: "acme",
+          },
+          "user-1",
+        ),
+      },
+      error: null,
+    });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("admin", "org-1", false, {
+        ...ALL_FALSE_PERMS,
+        canViewFocusAreas: true,
+      }),
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.canAccessSettings).toBe(true);
+    expect(result.current.canManageOrg).toBe(false);
+  });
+
+  it("is false for user with no view or manage permissions", async () => {
+    mockGetSession.mockResolvedValue({
+      data: {
+        session: createSession(
+          {
+            platform_role: "none",
+            org_role: "user",
+            org_id: "org-1",
+            org_slug: "acme",
+          },
+          "user-1",
+        ),
+      },
+      error: null,
+    });
+    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("user", "org-1", false),
+    });
+
+    const { result } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.canAccessSettings).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part H: unionPermissions with view permissions
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part H: buildPerms — user role with direct + department permissions
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("buildPerms — user role per-user permissions", () => {
+  it("user with admin_permissions set", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
+    const result = buildPerms("user", "org-1", false, perms);
+    expect(result.canViewDashboardAnalytics).toBe(true);
+    expect(result.canViewEmployeeDetails).toBe(true);
+    expect(result.canEditShifts).toBe(false);
+    expect(result.canViewSchedule).toBe(true);
+    expect(result.canViewStaff).toBe(true);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+
+  it("user with edit perms configured per-user", () => {
+    const perms = { ...ALL_FALSE_PERMS, canEditShifts: true, canEditNotes: true };
+    const result = buildPerms("user", "org-1", false, perms);
+    expect(result.canEditShifts).toBe(true);
+    expect(result.canEditNotes).toBe(true);
+    expect(result.canViewSchedule).toBe(true);
+    expect(result.canViewStaff).toBe(true);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+
+  it("user with canManageOrgSettings true — forced false", () => {
+    const perms = { ...ALL_FALSE_PERMS, canManageOrgSettings: true };
+    const result = buildPerms("user", "org-1", false, perms);
+    expect(result.canManageOrgSettings).toBe(false);
+  });
+
+  it("user with no permissions gets READ_ONLY_PERMS", () => {
+    const result = buildPerms("user", "org-1", false, null);
+    expect(result.canViewSchedule).toBe(true);
+    expect(result.canViewStaff).toBe(true);
+    expect(result.canEditShifts).toBe(false);
+    expect(result.canViewDashboardAnalytics).toBe(false);
+    expect(result.canAccessSettings).toBe(false);
+  });
+
+  it("user with view perms gets canAccessSettings", () => {
+    const perms = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const result = buildPerms("user", "org-1", false, perms);
+    expect(result.canAccessSettings).toBe(true);
+    expect(result.canManageOrg).toBe(false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Part I: unionPermissions with view permissions
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("unionPermissions with view permissions", () => {
+  it("unions canView permissions from multiple departments", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const deptB = { ...ALL_FALSE_PERMS, canViewScheduleDefinitions: true };
+    const result = unionPermissions([deptA, deptB]);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canViewScheduleDefinitions).toBe(true);
+    expect(result.canManageFocusAreas).toBe(false);
+    expect(result.canManageScheduleDefinitions).toBe(false);
+  });
+
+  it("preserves view permissions alongside manage permissions", () => {
+    const deptA = { ...ALL_FALSE_PERMS, canViewFocusAreas: true };
+    const deptB = { ...ALL_FALSE_PERMS, canManageFocusAreas: true };
+    const result = unionPermissions([deptA, deptB]);
+    expect(result.canViewFocusAreas).toBe(true);
+    expect(result.canManageFocusAreas).toBe(true);
+  });
+});

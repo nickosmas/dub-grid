@@ -1,0 +1,879 @@
+import type { MobileNotification, ScheduleCellState } from "@dubgrid/contracts";
+import type {
+  AdminPermissions,
+  PlatformRole,
+} from "@dubgrid/domain";
+import type {
+  DbAbsenceType,
+  DbCoverageRequirement,
+  DbEmployee,
+  DbFocusArea,
+  DbJobDefinition,
+  DbNamedItem,
+  DbOrganization,
+  DbOrganizationMembership,
+  DbScheduleCell,
+  DbScheduleCellSnapshot,
+  DbShiftCategory,
+} from "@dubgrid/db-types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const FOCUS_AREA_COLS =
+  "id, org_id, department_id, name, color, sort_order, archived_at";
+const SHIFT_CATEGORY_COLS =
+  "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
+const JOB_COLS =
+  "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
+const NAMED_ITEM_COLS =
+  "id, org_id, name, abbr, department_id, sort_order, archived_at";
+const ORG_ROLE_COLS =
+  "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
+const EMPLOYEE_COLS =
+  "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
+const COVERAGE_REQ_COLS =
+  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
+
+const POSTGREST_UNSAFE = /[(),."\\]/;
+
+function assertSafeFilterValue(value: string, label: string): void {
+  if (POSTGREST_UNSAFE.test(value)) {
+    throw new Error(`Unsafe PostgREST filter value for ${label}`);
+  }
+}
+
+export interface MobileAbsenceTypeRow
+  extends Pick<
+    DbAbsenceType,
+    "id" | "label" | "name" | "color" | "border_color" | "text_color"
+  > {}
+
+export interface MobileFocusAreaRow
+  extends Pick<DbFocusArea, "id" | "name"> {}
+
+export interface MobileJobNameRow
+  extends Pick<DbJobDefinition, "id" | "name"> {}
+
+export interface MobileProfileNameRow {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+export interface MobilePublishHistoryRow {
+  published_by: string | null;
+  start_date: string;
+  end_date: string;
+  published_at: string;
+}
+
+export interface MobileOrganizationMembershipRow
+  extends Pick<
+    DbOrganizationMembership,
+    | "user_id"
+    | "org_role"
+    | "admin_permissions"
+    | "joined_at"
+    | "updated_at"
+    | "department_ids"
+    | "dept_admin_ids"
+  > {
+  organization: {
+    id: string;
+    name: string;
+    slug: string | null;
+  };
+}
+
+export interface MobileEmbeddedEmployeeRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  org_id: string;
+  seniority: number | null;
+  focus_area_ids: number[];
+}
+
+export interface MobilePublishedScheduleRow {
+  emp_id: string;
+  date: string;
+  focus_area_id: number | null;
+  state: ScheduleCellState;
+  employees: MobileEmbeddedEmployeeRow;
+}
+
+type MobileScheduleCellQueryRow = DbScheduleCell & {
+  employees: unknown;
+  snapshots?: DbScheduleCellSnapshot[] | null;
+};
+
+export interface MobileAssignmentSeedRows {
+  focusAreaRows: DbFocusArea[];
+  shiftCategoryRows: DbShiftCategory[];
+  jobRows: DbJobDefinition[];
+  organizationRoleRows: DbNamedItem[];
+  certificationRows: DbNamedItem[];
+}
+
+export interface MobileOpenShiftContextRows
+  extends MobileAssignmentSeedRows {
+  coverageRequirementRows: DbCoverageRequirement[];
+  employeeRows: DbEmployee[];
+}
+
+export interface MobileShiftRequestQueryRow {
+  id: string;
+  org_id: string;
+  type: string;
+  status: string;
+  requester_emp_id: string;
+  requester_shift_date: string;
+  requester_state: ScheduleCellState;
+  target_emp_id: string | null;
+  target_shift_date: string | null;
+  target_state: ScheduleCellState | null;
+  absence_type_id: number | null;
+  parent_request_id: string | null;
+  admin_user_id: string | null;
+  admin_note: string | null;
+  expires_at: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  requester:
+    | { first_name: string; last_name: string }
+    | Array<{ first_name: string; last_name: string }>
+    | null;
+  target:
+    | { first_name: string; last_name: string }
+    | Array<{ first_name: string; last_name: string }>
+    | null;
+}
+
+export interface MobilePeopleQueryRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  status: string | null;
+  status_changed_at: string | null;
+  status_note: string | null;
+  focus_area_ids: number[] | null;
+  phone: string | null;
+  email: string | null;
+  contact_notes: string | null;
+  version: number | null;
+}
+
+export interface MobilePushTokenRow {
+  expo_push_token: string;
+}
+
+export interface MobileAuditLogInsertInput {
+  org_id: string;
+  actor_id: string;
+  actor_email: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  details: Record<string, unknown>;
+  ip_address: string | null;
+  user_agent: string | null;
+}
+
+type MembershipOrganizationRelation = {
+  id?: unknown;
+  name?: unknown;
+  slug?: unknown;
+};
+
+function normalizeMembershipOrganization(
+  value: unknown,
+): MobileOrganizationMembershipRow["organization"] | null {
+  const organization = Array.isArray(value) ? value[0] : value;
+  if (!organization || typeof organization !== "object") {
+    return null;
+  }
+
+  const candidate = organization as MembershipOrganizationRelation;
+  if (typeof candidate.id !== "string" || typeof candidate.name !== "string") {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    slug: typeof candidate.slug === "string" ? candidate.slug : null,
+  };
+}
+
+function normalizeEmbeddedEmployee(value: unknown): MobileEmbeddedEmployeeRow | null {
+  if (Array.isArray(value)) {
+    return normalizeEmbeddedEmployee(value[0] ?? null);
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as Partial<MobileEmbeddedEmployeeRow>;
+  if (
+    typeof candidate.id !== "string" ||
+    typeof candidate.first_name !== "string" ||
+    typeof candidate.last_name !== "string" ||
+    typeof candidate.org_id !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    first_name: candidate.first_name,
+    last_name: candidate.last_name,
+    org_id: candidate.org_id,
+    seniority:
+      typeof candidate.seniority === "number" ? candidate.seniority : null,
+    focus_area_ids: Array.isArray(candidate.focus_area_ids)
+      ? candidate.focus_area_ids.filter(
+          (entry): entry is number => typeof entry === "number",
+        )
+      : [],
+  };
+}
+
+function normalizePublishedScheduleRow(
+  row: MobileScheduleCellQueryRow,
+): MobilePublishedScheduleRow | null {
+  const publishedSnapshot = (row.snapshots ?? []).find(
+    (snapshot: DbScheduleCellSnapshot) => snapshot.snapshot_kind === "published",
+  );
+  if (!publishedSnapshot) {
+    return null;
+  }
+
+  const orderedSegments = [...(publishedSnapshot.segments ?? [])].sort(
+    (left, right) => left.position - right.position,
+  );
+  const employee = normalizeEmbeddedEmployee(row.employees);
+  if (!employee) {
+    return null;
+  }
+
+  return {
+    emp_id: row.emp_id,
+    date: row.date,
+    focus_area_id: row.focus_area_id ?? null,
+    state:
+      publishedSnapshot.state_kind === "absence"
+        ? {
+            kind: "absence",
+            segments: [],
+            absenceTypeId: publishedSnapshot.absence_type_id ?? null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          }
+        : {
+            kind: "worked",
+            segments: orderedSegments.map((segment) => ({
+              shiftId: segment.shift_id ?? null,
+              jobId: segment.job_id,
+              position: segment.position,
+            })),
+            absenceTypeId: null,
+            customStartTime: publishedSnapshot.custom_start_time ?? null,
+            customEndTime: publishedSnapshot.custom_end_time ?? null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+    employees: employee,
+  };
+}
+
+export async function fetchLinkedEmployeeRowForUser(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<DbEmployee | null> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select(EMPLOYEE_COLS)
+    .eq("org_id", orgId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as DbEmployee;
+}
+
+export async function fetchMobileOrganizationMembershipRows(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<MobileOrganizationMembershipRow[]> {
+  const { data, error } = await serviceClient
+    .from("organization_memberships")
+    .select(
+      `
+        user_id,
+        org_role,
+        admin_permissions,
+        joined_at,
+        updated_at,
+        department_ids,
+        dept_admin_ids,
+        organizations!inner(id, name, slug)
+      `,
+    )
+    .eq("user_id", userId)
+    .is("archived_at", null);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    user_id: string;
+    org_role: string | null;
+    admin_permissions: AdminPermissions | null;
+    joined_at: string;
+    updated_at: string | null;
+    department_ids: number[] | null;
+    dept_admin_ids: number[] | null;
+    organizations: unknown;
+  }>).map((row) => {
+    const organization = normalizeMembershipOrganization(row.organizations);
+    if (!organization) {
+      throw new Error("Invalid organization membership relation shape");
+    }
+
+    return {
+      user_id: row.user_id,
+      org_role: row.org_role ?? "user",
+      admin_permissions: row.admin_permissions ?? null,
+      joined_at: row.joined_at,
+      updated_at: row.updated_at,
+      department_ids: row.department_ids ?? [],
+      dept_admin_ids: row.dept_admin_ids ?? [],
+      organization,
+    };
+  });
+}
+
+export async function fetchMobileOrganizationRowById(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<DbOrganization | null> {
+  const { data, error } = await serviceClient
+    .from("organizations")
+    .select(
+      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides, updated_at",
+    )
+    .eq("id", orgId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as DbOrganization | null | undefined) ?? null;
+}
+
+export async function fetchMobileProfilePlatformRole(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<PlatformRole | null> {
+  const { data, error } = await serviceClient
+    .from("profiles")
+    .select("platform_role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data?.platform_role as PlatformRole | null | undefined) ?? null;
+}
+
+export async function fetchMobileAssignmentSeedRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileAssignmentSeedRows> {
+  const [
+    focusAreaResult,
+    shiftResult,
+    jobResult,
+    roleResult,
+    certificationResult,
+  ] = await Promise.all([
+    serviceClient
+      .from("focus_areas")
+      .select(FOCUS_AREA_COLS)
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    serviceClient
+      .from("shift_categories")
+      .select(SHIFT_CATEGORY_COLS)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("sort_order"),
+    serviceClient
+      .from("jobs")
+      .select(JOB_COLS)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("sort_order"),
+    serviceClient
+      .from("organization_roles")
+      .select(ORG_ROLE_COLS)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("sort_order"),
+    serviceClient
+      .from("certifications")
+      .select(NAMED_ITEM_COLS)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .order("sort_order"),
+  ]);
+
+  if (focusAreaResult.error) throw focusAreaResult.error;
+  if (shiftResult.error) throw shiftResult.error;
+  if (jobResult.error) throw jobResult.error;
+  if (roleResult.error) throw roleResult.error;
+  if (certificationResult.error) throw certificationResult.error;
+
+  return {
+    focusAreaRows: (focusAreaResult.data ?? []) as DbFocusArea[],
+    shiftCategoryRows: (shiftResult.data ?? []) as DbShiftCategory[],
+    jobRows: (jobResult.data ?? []) as DbJobDefinition[],
+    organizationRoleRows: (roleResult.data ?? []) as DbNamedItem[],
+    certificationRows: (certificationResult.data ?? []) as DbNamedItem[],
+  };
+}
+
+export async function fetchMobileAbsenceTypeRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileAbsenceTypeRow[]> {
+  const { data, error } = await serviceClient
+    .from("absence_types")
+    .select("id, label, name, color, border_color, text_color")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("label", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileAbsenceTypeRow[];
+}
+
+export async function fetchMobileFocusAreaRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileFocusAreaRow[]> {
+  const { data, error } = await serviceClient
+    .from("focus_areas")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileFocusAreaRow[];
+}
+
+export async function fetchMobileJobNameRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileJobNameRow[]> {
+  const { data, error } = await serviceClient
+    .from("jobs")
+    .select("id, name")
+    .eq("org_id", orgId)
+    .is("archived_at", null);
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileJobNameRow[];
+}
+
+export async function fetchMobilePublishHistoryRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobilePublishHistoryRow[]> {
+  const { data, error } = await serviceClient
+    .from("publish_history")
+    .select("published_by, start_date, end_date, published_at")
+    .eq("org_id", orgId)
+    .order("published_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  return (data ?? []) as MobilePublishHistoryRow[];
+}
+
+export async function fetchProfileNameRowsByIds(
+  serviceClient: SupabaseClient,
+  profileIds: string[],
+): Promise<MobileProfileNameRow[]> {
+  if (profileIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await serviceClient
+    .from("profiles")
+    .select("id, first_name, last_name")
+    .in("id", profileIds);
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileProfileNameRow[];
+}
+
+export async function fetchPublishedMobileScheduleRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+): Promise<MobilePublishedScheduleRow[]> {
+  let query = serviceClient
+    .from("schedule_cells")
+    .select(
+      `
+        id,
+        emp_id,
+        date,
+        org_id,
+        focus_area_id,
+        version,
+        series_id,
+        from_recurring,
+        created_by,
+        updated_by,
+        created_at,
+        updated_at,
+        snapshots:schedule_cell_snapshots(
+          id,
+          cell_id,
+          org_id,
+          snapshot_kind,
+          state_kind,
+          absence_type_id,
+          custom_start_time,
+          custom_end_time,
+          segments:schedule_cell_segments(
+            id,
+            snapshot_id,
+            org_id,
+            position,
+            shift_id,
+            job_id
+          )
+        ),
+        employees!inner(id, first_name, last_name, org_id, seniority, focus_area_ids)
+      `,
+    )
+    .eq("org_id", input.orgId)
+    .gte("date", input.startDate)
+    .lte("date", input.endDate)
+    .order("date", { ascending: true });
+
+  if (input.employeeId) {
+    query = query.eq("emp_id", input.employeeId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return ((data ?? []) as MobileScheduleCellQueryRow[])
+    .map((row) => normalizePublishedScheduleRow(row))
+    .filter((row): row is MobilePublishedScheduleRow => row != null);
+}
+
+export async function fetchMobileOpenShiftContextRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileOpenShiftContextRows> {
+  const [assignmentSeedRows, coverageResult, employeeResult] =
+    await Promise.all([
+      fetchMobileAssignmentSeedRows(serviceClient, orgId),
+      serviceClient
+        .from("coverage_requirements")
+        .select(COVERAGE_REQ_COLS)
+        .eq("org_id", orgId),
+      serviceClient
+        .from("employees")
+        .select(EMPLOYEE_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .eq("status", "active"),
+    ]);
+
+  if (coverageResult.error) throw coverageResult.error;
+  if (employeeResult.error) throw employeeResult.error;
+
+  return {
+    ...assignmentSeedRows,
+    coverageRequirementRows:
+      (coverageResult.data ?? []) as DbCoverageRequirement[],
+    employeeRows: (employeeResult.data ?? []) as DbEmployee[],
+  };
+}
+
+export async function fetchMobileShiftRequestRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId?: string;
+    includeOpenPickupRequests?: boolean;
+    startDate?: string;
+    endDate?: string;
+  },
+): Promise<MobileShiftRequestQueryRow[]> {
+  let query = serviceClient
+    .from("shift_requests")
+    .select(
+      `*,
+       requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
+       target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
+    )
+    .eq("org_id", input.orgId)
+    .order("created_at", { ascending: false });
+
+  if (input.employeeId) {
+    assertSafeFilterValue(input.employeeId, "employeeId");
+    const filters = [
+      `requester_emp_id.eq.${input.employeeId}`,
+      `target_emp_id.eq.${input.employeeId}`,
+    ];
+
+    if (input.includeOpenPickupRequests) {
+      filters.push("and(status.eq.open,type.eq.pickup)");
+    }
+
+    query = query.or(filters.join(","));
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = (data ?? []) as MobileShiftRequestQueryRow[];
+
+  return rows.filter((row) => {
+    if (!input.startDate && !input.endDate) {
+      return true;
+    }
+
+    const requesterDate = String(row.requester_shift_date ?? "");
+    const targetDate =
+      row.target_shift_date == null ? null : String(row.target_shift_date);
+    const dateValues = [requesterDate, targetDate].filter(
+      (value): value is string => value != null && value.length > 0,
+    );
+
+    return dateValues.some((dateValue) => {
+      if (input.startDate && dateValue < input.startDate) {
+        return false;
+      }
+      if (input.endDate && dateValue > input.endDate) {
+        return false;
+      }
+      return true;
+    });
+  });
+}
+
+export async function fetchMobilePeopleRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobilePeopleQueryRow[]> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select(
+      "id, first_name, last_name, status, status_changed_at, status_note, focus_area_ids, phone, email, contact_notes, version",
+    )
+    .eq("org_id", orgId)
+    .order("first_name", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobilePeopleQueryRow[];
+}
+
+export async function fetchMobileEmployeeRowById(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employeeId: string,
+): Promise<DbEmployee | null> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select(EMPLOYEE_COLS)
+    .eq("id", employeeId)
+    .eq("org_id", orgId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as DbEmployee;
+}
+
+export async function updateMobileEmployeeStatusRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    status: DbEmployee["status"];
+    statusNote: string;
+    statusChangedAt: string;
+    archivedAt?: string | null;
+  },
+): Promise<DbEmployee | null> {
+  const update: Record<string, unknown> = {
+    status: input.status,
+    status_note: input.statusNote,
+    status_changed_at: input.statusChangedAt,
+    version: input.expectedVersion + 1,
+  };
+
+  if (input.archivedAt !== undefined) {
+    update.archived_at = input.archivedAt;
+  }
+
+  const { data, error } = await serviceClient
+    .from("employees")
+    .update(update)
+    .eq("id", input.employeeId)
+    .eq("org_id", input.orgId)
+    .eq("version", input.expectedVersion)
+    .select(EMPLOYEE_COLS)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as DbEmployee | null | undefined) ?? null;
+}
+
+export async function insertMobileAuditLogEntry(
+  serviceClient: SupabaseClient,
+  input: MobileAuditLogInsertInput,
+): Promise<void> {
+  const { error } = await serviceClient.from("audit_log").insert(input);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function upsertMobilePushTokenRow(
+  serviceClient: SupabaseClient,
+  input: {
+    userId: string;
+    orgId: string;
+    platform: "ios" | "android";
+    expoPushToken: string;
+    disabled?: boolean;
+  },
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await serviceClient
+    .from("mobile_device_tokens")
+    .upsert(
+      {
+        user_id: input.userId,
+        org_id: input.orgId,
+        platform: input.platform,
+        expo_push_token: input.expoPushToken,
+        last_seen_at: now,
+        disabled_at: input.disabled ? now : null,
+      },
+      {
+        onConflict: "expo_push_token",
+      },
+    );
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function fetchActiveMobilePushTokenRows(
+  serviceClient: SupabaseClient,
+  input: {
+    userId: string;
+    orgId: string;
+  },
+): Promise<MobilePushTokenRow[]> {
+  const { data, error } = await serviceClient
+    .from("mobile_device_tokens")
+    .select("expo_push_token")
+    .eq("user_id", input.userId)
+    .eq("org_id", input.orgId)
+    .is("disabled_at", null);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as MobilePushTokenRow[];
+}
+
+export async function fetchMobileUnreadNotificationCount(
+  userClient: SupabaseClient,
+): Promise<number> {
+  const { data, error } = await userClient.rpc(
+    "get_unread_notification_count",
+  );
+
+  if (error) throw error;
+
+  return (data as number) ?? 0;
+}
+
+export async function fetchMobileNotificationsPage(
+  userClient: SupabaseClient,
+  input: { limit: number; offset: number },
+): Promise<{ unreadCount: number; notifications: MobileNotification[] }> {
+  const [
+    { data: notifications, error: notificationError },
+    { data: unreadCount, error: unreadError },
+  ] = await Promise.all([
+    userClient.rpc("get_notifications", {
+      p_limit: input.limit,
+      p_offset: input.offset,
+    }),
+    userClient.rpc("get_unread_notification_count"),
+  ]);
+
+  if (notificationError) throw notificationError;
+  if (unreadError) throw unreadError;
+
+  return {
+    unreadCount: (unreadCount as number) ?? 0,
+    notifications: (notifications ?? []).map(
+      (row: Record<string, unknown>) => ({
+        id: row.id as string,
+        type: row.type as MobileNotification["type"],
+        channel: (row.channel as "in_app" | "email") ?? "in_app",
+        category: (row.category as string | null) ?? null,
+        title: row.title as string,
+        message: row.message as string,
+        metadata: (row.metadata ?? {}) as Record<string, unknown>,
+        readAt: (row.read_at as string | null) ?? null,
+        createdAt: row.created_at as string,
+      }),
+    ),
+  };
+}

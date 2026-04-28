@@ -133,7 +133,7 @@ Self-service password reset is fully implemented with security best practices.
    - Confirmation field with match validation
    - 5-second timeout fallback for invalid/expired tokens
    - Automatic local sign-out after successful reset
-3. **Auth components** in `src/components/auth/`: `PasswordInput` (show/hide toggle), `PasswordStrength` (visual meter), `AuthCard` (consistent layout)
+3. **Auth components** in `apps/web/src/components/auth/`: `PasswordInput` (show/hide toggle), `PasswordStrength` (visual meter), `AuthCard` (consistent layout)
 
 ### 3.2 Flow Diagram
 
@@ -205,7 +205,7 @@ New accounts created via invitation acceptance go through email verification:
 
 ## 5. Rate Limiting
 
-All public-facing API routes are rate-limited via Upstash Redis (`src/lib/rate-limit.ts`):
+All public-facing API routes are rate-limited via Upstash Redis (`apps/web/src/lib/rate-limit.ts`):
 
 | Limiter | Scope | Applied To |
 | ------- | ----- | ---------- |
@@ -217,7 +217,7 @@ All public-facing API routes are rate-limited via Upstash Redis (`src/lib/rate-l
 
 ## 6. Branded Email Templates
 
-Shared email template system in `src/lib/email.ts`:
+Shared email template system in `apps/web/src/lib/email.ts`:
 - `sanitizeHeaderValue()` — Prevents email header injection (strips CRLF, null bytes)
 - `escapeHtml()` — Prevents XSS in email content
 - `emailWrapper()` — Branded HTML template with DubGrid header, card layout, responsive design

@@ -1,0 +1,109 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+function resolveMigrationPath() {
+  const cwd = process.cwd();
+  const workspacePath = resolve(cwd, "supabase/migrations/002_functions_triggers.sql");
+
+  if (existsSync(workspacePath)) {
+    return workspacePath;
+  }
+
+  return resolve(cwd, "../../supabase/migrations/002_functions_triggers.sql");
+}
+
+function resolveSchemaPath() {
+  const cwd = process.cwd();
+  const workspacePath = resolve(cwd, "supabase/migrations/001_schema.sql");
+
+  if (existsSync(workspacePath)) {
+    return workspacePath;
+  }
+
+  return resolve(cwd, "../../supabase/migrations/001_schema.sql");
+}
+
+function tableBlock(sql: string, tableName: string): string {
+  const match = sql.match(new RegExp(`CREATE TABLE public\\.${tableName} \\([\\s\\S]*?\\n\\);`));
+  if (!match) throw new Error(`${tableName} block not found`);
+  return match[0];
+}
+
+describe("recurring schedule database contract", () => {
+  it("keeps recurring and series templates state-only in the schema", () => {
+    const sql = readFileSync(resolveSchemaPath(), "utf8");
+    const recurring = tableBlock(sql, "recurring_shifts");
+    const series = tableBlock(sql, "shift_series");
+
+    expect(recurring).toContain("state           JSONB NOT NULL");
+    expect(series).toContain("state           JSONB NOT NULL");
+    expect(recurring).not.toMatch(/\n\s+shift_id\s+BIGINT/);
+    expect(recurring).not.toMatch(/\n\s+job_id\s+BIGINT/);
+    expect(recurring).not.toMatch(/\n\s+absence_type_id\s+BIGINT/);
+    expect(series).not.toMatch(/\n\s+shift_id\s+BIGINT/);
+    expect(series).not.toMatch(/\n\s+job_id\s+BIGINT/);
+    expect(series).not.toMatch(/\n\s+absence_type_id\s+BIGINT/);
+    expect(sql).not.toContain("idx_recurring_shifts_shift_id");
+    expect(sql).not.toContain("idx_shift_series_shift_id");
+  });
+
+  it("defines the upsert_recurring_shift RPC used by recurring saves", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.upsert_recurring_shift\s*\(/);
+    expect(sql).toContain("canManageRecurringShifts");
+    expect(sql).toContain("p_state JSONB");
+    expect(sql).toMatch(
+      /GRANT EXECUTE ON FUNCTION public\.upsert_recurring_shift\(UUID, UUID, SMALLINT, JSONB, DATE\) TO authenticated;/,
+    );
+  });
+
+  it("does not write legacy recurring or series convenience columns", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).not.toMatch(
+      /\b(?:INSERT|UPDATE)\b[\s\S]{0,240}\brecurring_shifts\b[\s\S]{0,240}\b(?:shift_id|job_id|absence_type_id)\b/i,
+    );
+    expect(sql).not.toMatch(
+      /\b(?:INSERT|UPDATE)\b[\s\S]{0,240}\bshift_series\b[\s\S]{0,240}\b(?:shift_id|job_id|absence_type_id)\b/i,
+    );
+  });
+
+  it("writes recurring autofill through canonical schedule cell snapshots", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.apply_recurring_schedules\s*\(/);
+    expect(sql).toContain("public.resolve_schedule_state_storage");
+    expect(sql).toContain("public.schedule_cell_has_effective_content");
+    expect(sql).toContain("public.write_schedule_cell_snapshot_internal");
+    expect(sql).toContain("state.shift_ids");
+    expect(sql).toContain("state.job_ids");
+    expect(sql).toContain("state.absence_type_id");
+    expect(sql).toContain("'absenceTypeId', r.absence_type_id");
+  });
+
+  it("derives recurring autofill labels directly from shifts and jobs", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).toContain("LEFT JOIN public.shift_categories shift");
+    expect(sql).toContain("LEFT JOIN public.jobs job");
+    expect(sql).toContain("'label', r.shift_label");
+    expect(sql).not.toContain("derive_assignment_ids_for_segments");
+    expect(sql).not.toContain("rs.shift_id");
+    expect(sql).not.toContain("rs.job_id");
+    expect(sql).not.toContain("rs.absence_type_id");
+  });
+
+  it("updates series templates from canonical state only", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.update_series_all_shifts\s*\(\s*p_series_id UUID,\s*p_org_id UUID,\s*p_state JSONB/);
+    expect(sql).toContain("UPDATE public.shift_series");
+    expect(sql).toContain("state = p_state");
+    expect(sql).toContain("public.resolve_schedule_state_storage(p_org_id, p_state)");
+    expect(sql).not.toContain("SET shift_id =");
+    expect(sql).not.toContain("SET job_id =");
+    expect(sql).not.toContain("SET absence_type_id =");
+  });
+});

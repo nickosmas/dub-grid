@@ -117,7 +117,7 @@ flowchart TB
         end
         subgraph Config["Configuration"]
             P6["canManageFocusAreas"]
-            P7["canManageShiftCodes"]
+            P7["canManageScheduleDefinitions"]
             P8["canManageIndicatorTypes"]
             P9["canManageOrgLabels"]
         end
@@ -330,23 +330,6 @@ erDiagram
         integer break_minutes
     }
 
-    shift_codes {
-        bigint id PK
-        uuid org_id FK "→ organizations"
-        text label "e.g. D, EVE, N"
-        text name "e.g. Day Shift"
-        text color
-        text border_color
-        text text_color
-        bigint category_id FK "→ shift_categories"
-        bigint focus_area_id FK "→ focus_areas"
-        bigint_arr required_certification_ids "→ certifications[]"
-        time default_start_time
-        time default_end_time
-        numeric default_duration_hours
-        integer default_duration_minutes
-    }
-
     absence_types {
         bigint id PK
         uuid org_id FK "→ organizations"
@@ -358,17 +341,31 @@ erDiagram
         integer sort_order
     }
 
-    shifts {
-        uuid emp_id PK,FK "→ employees"
-        date date PK
+    schedule_cells {
+        uuid id PK
+        uuid emp_id FK "→ employees"
+        date date
         uuid org_id FK "→ organizations"
         bigint version "optimistic lock"
         uuid series_id FK "→ shift_series"
         boolean from_recurring
-        bigint_arr draft_shift_code_ids "→ shift_codes[]"
-        bigint_arr published_shift_code_ids "→ shift_codes[]"
-        boolean draft_is_delete
         bigint focus_area_id FK "→ focus_areas"
+    }
+
+    schedule_cell_snapshots {
+        uuid id PK
+        uuid cell_id FK "→ schedule_cells"
+        text snapshot_kind
+        text state_kind
+        bigint absence_type_id FK "→ absence_types"
+    }
+
+    schedule_cell_segments {
+        uuid id PK
+        uuid snapshot_id FK "→ schedule_cell_snapshots"
+        integer position
+        bigint shift_id
+        bigint job_id
     }
 
     recurring_shifts {
@@ -376,8 +373,7 @@ erDiagram
         uuid emp_id FK "→ employees"
         uuid org_id FK "→ organizations"
         smallint day_of_week "0=Sun 6=Sat"
-        bigint shift_code_id FK "→ shift_codes"
-        bigint absence_type_id FK "→ absence_types"
+        jsonb state "ScheduleCellState"
         date effective_from
         date effective_until
     }
@@ -390,7 +386,7 @@ erDiagram
         smallint_arr days_of_week
         date start_date
         date end_date
-        bigint shift_code_id FK "→ shift_codes"
+        jsonb state "ScheduleCellState"
     }
 
     schedule_notes {
@@ -413,7 +409,8 @@ erDiagram
         bigint id PK
         uuid org_id FK "→ organizations"
         bigint focus_area_id FK "→ focus_areas"
-        bigint shift_code_id FK "→ shift_codes"
+        bigint preferred_shift_id FK "→ shift_categories"
+        bigint preferred_job_id
         smallint day_of_week "nullable = all days"
         integer min_staff
     }
@@ -425,13 +422,13 @@ erDiagram
         shift_request_status status
         uuid requester_emp_id FK "→ employees"
         date requester_shift_date
-        bigint_arr requester_shift_code_ids "→ shift_codes[]"
+        jsonb requester_state
         bigint requester_focus_area_id FK "→ focus_areas"
         time requester_custom_start_time
         time requester_custom_end_time
         uuid target_emp_id FK "→ employees (swap)"
         date target_shift_date
-        bigint_arr target_shift_code_ids "→ shift_codes[]"
+        jsonb target_state
         bigint target_focus_area_id FK "→ focus_areas"
         time target_custom_start_time
         time target_custom_end_time
@@ -525,7 +522,6 @@ erDiagram
     organizations ||--o{ certifications : "has certs"
     organizations ||--o{ organization_roles : "has roles"
     organizations ||--o{ shift_categories : "has categories"
-    organizations ||--o{ shift_codes : "has codes"
     organizations ||--o{ absence_types : "has absence types"
     organizations ||--o{ indicator_types : "has indicators"
     organizations ||--o{ coverage_requirements : "has requirements"
@@ -538,7 +534,7 @@ erDiagram
 
     profiles }o--o| organizations : "primary org"
 
-    employees ||--o{ shifts : "assigned shifts"
+    employees ||--o{ schedule_cells : "assigned schedule cells"
     employees ||--o{ recurring_shifts : "recurring patterns"
     employees ||--o{ shift_series : "shift series"
     employees ||--o{ schedule_notes : "has notes"
@@ -546,16 +542,10 @@ erDiagram
     employees }o--o| auth_users : "linked user"
 
     focus_areas ||--o{ shift_categories : "scoped categories"
-    focus_areas ||--o{ shift_codes : "scoped codes"
     focus_areas ||--o{ coverage_requirements : "staffing rules"
+    absence_types ||--o{ schedule_cell_snapshots : "cell absence"
 
-    shift_categories ||--o{ shift_codes : "categorizes"
-    absence_types ||--o{ recurring_shifts : "template absence"
-    shift_codes ||--o{ recurring_shifts : "template code"
-    shift_codes ||--o{ shift_series : "series code"
-    shift_codes ||--o{ coverage_requirements : "requirement for"
-
-    shift_series ||--o{ shifts : "generated shifts"
+    shift_series ||--o{ schedule_cells : "linked cells"
 
     indicator_types ||--o{ schedule_notes : "note type"
 
@@ -593,7 +583,7 @@ flowchart TD
     subgraph DataScope["Data Scoping"]
         direction TB
         RLS["RLS policies enforce:<br/><code>org_id = caller_org_id()</code>"]
-        TABLES["All org-scoped tables:<br/>employees, shifts, focus_areas,<br/>shift_codes, certifications,<br/>schedule_notes, etc."]
+        TABLES["All org-scoped tables:<br/>employees, shifts, focus_areas,<br/>certifications, schedule_notes,<br/>schedule_cells, etc."]
         ZERO["Zero cross-tenant<br/>data leakage"]
     end
 
@@ -696,7 +686,7 @@ sequenceDiagram
 flowchart LR
     subgraph Draft["Draft Phase"]
         EDIT["Admin edits shifts<br/>(drag/drop/type)"]
-        DRAFTCODES["draft_shift_code_ids<br/>updated in shifts table"]
+        DRAFTCODES["draft snapshot + segments<br/>updated in schedule_cells"]
         SAVE["Auto-save draft session<br/>(schedule_draft_sessions)"]
         PREVIEW["Visual diff:<br/>draft vs published"]
     end
@@ -704,8 +694,8 @@ flowchart LR
     subgraph Publish["Publish Phase"]
         PUB["Admin clicks Publish"]
         VALIDATE["Validate changes<br/>(coverage requirements)"]
-        COPY["Copy draft → published<br/>published_shift_code_ids =<br/>draft_shift_code_ids"]
-        CLEAR["Clear draft flags<br/>draft_is_delete = false"]
+        COPY["Replace published snapshot<br/>with current draft snapshot"]
+        CLEAR["Delete draft snapshot<br/>after publish"]
         LOG["Insert publish_history<br/>(changes JSONB, date range)"]
     end
 
@@ -804,7 +794,7 @@ flowchart TD
     subgraph SetupGuard["SetupGuard Component"]
         SETUP_CHECK{"Org setup<br/>complete?"}
         SETUP["Redirect → /setup<br/>Admin setup wizard"]
-        CHECKLIST["Setup checklist:<br/>✓ Add employees<br/>✓ Configure focus areas<br/>✓ Set up shift codes<br/>✓ Publish schedule"]
+        CHECKLIST["Setup checklist:<br/>✓ Add employees<br/>✓ Configure focus areas<br/>✓ Set up shifts & jobs<br/>✓ Publish schedule"]
         COMPLETE{"All steps done +<br/>≥1 employee?"}
     end
 

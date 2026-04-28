@@ -20,7 +20,7 @@
 
 Care facilities typically manage employee scheduling across multiple wings or departments, often using manually maintained spreadsheets — horizontal grids covering dozens of employees across multiple shift types and sections.
 
-DubGrid is a multi-tenant scheduling platform that replaces spreadsheet-based scheduling. Each tenant (organization) can configure its own focus areas (wings/sections), shift codes, staff roster, and scheduling conventions. The application delivers a modern, polished user experience with real-time collaboration, draft/publish workflows, and a comprehensive role-based access control system.
+DubGrid is a multi-tenant scheduling platform that replaces spreadsheet-based scheduling. Each tenant (organization) can configure its own focus areas (wings/sections), shifts, jobs, staff roster, and scheduling conventions. The application delivers a modern, polished user experience with real-time collaboration, draft/publish workflows, and a comprehensive role-based access control system.
 
 The system is self-contained with no third-party integrations required.
 
@@ -54,7 +54,7 @@ Many care facilities manage employee scheduling through manually maintained spre
 
 - A two-week date range displayed horizontally (Sunday through Saturday, two consecutive weeks)
 - Staff listed vertically on the left with their name and designation code
-- Each cell contains a shift code (D, E, N, X, etc.) or is blank
+- Each cell contains a worked assignment, an absence, or is blank
 - The schedule is divided into labeled sections (wings/departments), each with its own staff rows and count rows
 - Some staff members appear in multiple sections due to cross-department assignments
 - A printed version includes the print date, date range, and a legend
@@ -65,12 +65,12 @@ DubGrid supports multiple organizations via subdomain-based routing, each with t
 
 - **Organizations** — Each tenant is an independent organization with its own data, staff, settings, and subdomain (e.g., `acme.dubgrid.com`)
 - **Focus Areas** — Each organization defines its own schedule sections (e.g., nursing wings, departments, shift groups). The label "Focus Areas" is customizable per org.
-- **Shift Codes** — A default set of shift codes is provided; organizations can customize labels, colors, and add custom codes
+- **Schedule Definitions** — Organizations configure shifts and jobs, with derived labels, colors, and timing metadata used throughout the schedule
 - **Shift Categories** — Tally buckets with optional time windows for grouping shift counts
 - **Staff Roster** — Each organization maintains its own employee roster with designations, certifications, roles, and focus area assignments
 - **Certifications** — Customizable skill levels per organization (label is configurable)
 - **Organization Roles** — Custom display roles per organization (label is configurable)
-- **Coverage Requirements** — Minimum staffing rules per focus area, shift code, and day of week
+- **Coverage Requirements** — Minimum staffing rules per focus area, preferred shift/job, and day of week
 
 ### 3.3 Customizable Terminology
 
@@ -113,7 +113,7 @@ Admins receive a configurable set of permissions stored as JSONB in `organizatio
 | Staff      | `canViewStaff`                   | Always on   | View staff roster (always true)                       |
 | Staff      | `canManageEmployees`             | Yes         | Add, edit, bench, terminate employees                 |
 | Config     | `canManageFocusAreas`            | Yes         | Manage focus areas / wings                            |
-| Config     | `canManageShiftCodes`            | Yes         | Manage shift code definitions                         |
+| Config     | `canManageScheduleDefinitions`            | Yes         | Manage schedule definitions                           |
 | Config     | `canManageIndicatorTypes`        | Yes         | Manage note/indicator type definitions                |
 | Config     | `canManageOrgLabels`             | Yes         | Edit custom terminology labels                        |
 | Config     | `canManageOrgSettings`           | No          | Edit org name, address, phone, employee count, timezone (super_admin only) |
@@ -158,7 +158,7 @@ All codes below are provided as defaults and must be supported as valid cell val
 | `0.3`                 | Part-Time Fraction     | Denotes part-time staffing weight (e.g., 0.3 FTE)                       |
 | `E/Ns`                | Split / Transition     | Shift spanning two shift types (e.g., Eve moving into Night Supervisor) |
 
-**Shift codes support:** custom colors (background, text, border), default start/end times, certification requirements, off-day designation, and assignment to shift categories for tally grouping.
+**Jobs + shifts support:** custom colors (background, text, border), default start/end times, certification requirements, off-day designation, and shift grouping for tally displays.
 
 ---
 
@@ -193,16 +193,16 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
-| FR-01 | Schedule Grid           | Must     | ✅     | 1-week, 2-week, and month view. Staff rows × date columns with shift code cells. Toggle between views via toolbar.     |
+| FR-01 | Schedule Grid           | Must     | ✅     | 1-week, 2-week, and month view. Staff rows × date columns with schedule cells. Toggle between views via toolbar.       |
 | FR-02 | Focus Area Sections     | Must     | ✅     | Configurable sections with color-coded headers. Filter by focus area in toolbar. Each org defines its own sections.     |
-| FR-03 | Shift Code Entry        | Must     | ✅     | Click cell to open shift edit panel. Select from org's configured shift codes. Supports custom times per entry.         |
+| FR-03 | Schedule Cell Editing   | Must     | ✅     | Click cell to open shift edit panel. Select from the org's configured shifts and jobs. Supports custom times per entry. |
 | FR-04 | Cross-Wing Staff        | Must     | ✅     | Employees can be assigned to multiple focus areas. Grid displays assignments per focus area with filtering.             |
-| FR-05 | Shift Count Row         | Must     | ✅     | Auto-calculated tally rows per section. Shift codes are grouped by shift category; counts appear at the bottom of each focus area section. |
+| FR-05 | Shift Count Row         | Must     | ✅     | Auto-calculated tally rows per section. Assignments are grouped by shift category; counts appear at the bottom of each focus area section. |
 | FR-06 | Seniority Sorting       | Must     | ✅     | Staff rows sortable by seniority within focus areas.                                                                   |
 | FR-07 | Staff Designations      | Must     | ✅     | Each employee stores certifications and roles. Displayed in staff view and grid name column.                           |
 | FR-08 | Skills / Role Tags      | Must     | ✅     | Certifications and roles are configurable per org. Employees tagged with multiple certifications and roles.            |
 | FR-11 | Print Layout            | Must     | ✅     | Print-optimized view with customizable options. Select focus areas and date range. Landscape format with legend.        |
-| FR-12 | Schedule Legend          | Must     | ✅     | Legend displaying all shift codes with colors. Included in print view via PrintLegend component.                       |
+| FR-12 | Schedule Legend         | Must     | ✅     | Legend displaying all derived schedule labels with colors. Included in print view via PrintLegend component.           |
 | FR-13 | Staff Management        | Must     | ✅     | Full CRUD: add (bulk import), edit, bench, activate, terminate employees. Status tracking with timestamps and notes.   |
 | FR-14 | Date Navigation         | Must     | ✅     | Back/Today/Forward buttons in toolbar. Steps by active view span. Month view calendar navigation.                      |
 | FR-15 | Focus Area Filter       | Must     | ✅     | Filter schedule view by focus area: All or any individual section. Staff search within filtered view.                  |
@@ -248,7 +248,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-60 | Forgot Password         | Must     | ✅     | Email-based password reset request with enumeration protection (always shows success). Rate limited.                   |
 | FR-61 | Reset Password          | Must     | ✅     | Token-validated reset form via email link. Password strength meter (4 levels). Minimum 10 characters. Signs out after. |
 | FR-62 | Email Verification      | Must     | ✅     | Verification page for new accounts with resend button (60s cooldown). Auto-redirects on confirmation.                  |
-| FR-63 | Organization Setup      | Must     | ✅     | Setup wizard for new orgs: add employees, configure focus areas, set up shift codes, publish schedule. Auto-redirects when complete. |
+| FR-63 | Organization Setup      | Must     | ✅     | Setup wizard for new orgs: add employees, configure focus areas, set up shifts and jobs, publish schedule. Auto-redirects when complete. |
 | FR-64 | User Onboarding         | Must     | ✅     | Polling page for newly invited users awaiting org assignment. Auto-polls every 15s for up to 5 minutes.                |
 | FR-65 | Demo Request Form       | Should   | ✅     | Landing page contact form with Zod validation, CSRF protection, and branded email notification via Resend.            |
 
@@ -291,7 +291,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
-| FR-45 | Coverage Requirements   | Should   | ✅     | Define minimum staffing levels per focus area, shift code, and day of week.                                            |
+| FR-45 | Coverage Requirements   | Should   | ✅     | Define minimum staffing levels per focus area, preferred shift/job, and day of week.                                   |
 | FR-46 | Coverage Status         | Should   | ✅     | Visual coverage panel showing actual vs. required staffing with met/unmet indicators.                                  |
 
 ### 7.12 Gridmaster Portal
@@ -317,21 +317,28 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | `profiles`                  | id (FK auth.users), org_id, platform_role (enum), version, role_locked                               |
 | `organization_memberships`  | user_id, org_id, org_role (enum), admin_permissions (JSONB), joined_at                               |
 | `employees`                 | id, org_id, first_name, last_name, status (active/benched/terminated), certification_id (FK), role_ids[], focus_area_ids[], phone, email, seniority, user_id (FK auth.users, nullable) |
-| `shifts`                    | emp_id, date (composite PK), org_id, draft_shift_code_ids[], published_shift_code_ids[], draft_absence_type_id, published_absence_type_id, draft_is_delete, version (optimistic lock), series_id, from_recurring, draft_custom_start_time, published_custom_start_time, focus_area_id |
+| `schedule_cells`            | id, emp_id, date, org_id, version (optimistic lock), series_id, from_recurring, focus_area_id |
+| `schedule_cell_snapshots`   | id, cell_id, snapshot_kind (draft/published), state_kind (worked/absence/deleted), absence_type_id, custom_start_time, custom_end_time |
+| `schedule_cell_segments`    | id, snapshot_id, position, shift_id, job_id |
 | `focus_areas`               | id, org_id, name, color_bg, color_text, sort_order, break_minutes                                    |
-| `shift_codes`               | id, org_id, label, name, color, text_color, border_color, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, category_id, focus_area_id, required_certification_ids[] |
+| `assignments (derived)` | label, name, colors, default timing, shift/category linkage, focus area linkage, required_certification_ids[] |
 | `shift_categories`          | id, org_id, name, color, start_time, end_time, sort_order, focus_area_id, break_minutes              |
 | `schedule_notes`            | id, org_id, emp_id, date, indicator_type_id, status (published/draft/draft_deleted), focus_area_id   |
 | `indicator_types`           | id, org_id, name, color, sort_order                                                                  |
 | `certifications`            | id, org_id, name, abbr, sort_order                                                                   |
 | `organization_roles`        | id, org_id, name, abbr, sort_order                                                                   |
-| `recurring_shifts`          | id, org_id, emp_id, shift_code_id, absence_type_id, day_of_week (0-6), effective_from, effective_until |
-| `shift_series`              | id, org_id, emp_id, shift_code_id, frequency (daily/weekly/biweekly), days_of_week[], start_date, end_date, max_occurrences |
-| `coverage_requirements`     | id, org_id, focus_area_id, shift_code_id, day_of_week, min_staff                                    |
+| `recurring_shifts`          | id, org_id, emp_id, state (JSONB), day_of_week (0-6), effective_from, effective_until |
+| `shift_series`              | id, org_id, emp_id, state (JSONB), frequency (daily/weekly/biweekly), days_of_week[], start_date, end_date, max_occurrences |
+| `coverage_requirements`     | id, org_id, focus_area_id, preferred_shift_id, preferred_job_id, day_of_week, min_staff                                    |
 | `absence_types`             | id, org_id, label (X/V/S), name, color, border_color, text_color, sort_order                        |
 | `shift_requests`            | id, org_id, type (pickup/swap), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, admin_user_id, expires_at |
 | `schedule_draft_sessions`   | id, org_id, saved_by, start_date, end_date, saved_at                                                |
 | `publish_history`           | id, org_id, published_by, start_date, end_date, change_count, changes (JSONB), published_at         |
+
+`recurring_shifts.state` and `shift_series.state` are canonical `ScheduleCellState`
+payloads. Those tables do not store `shift_id`, `job_id`, or `absence_type_id`
+convenience columns. Dated schedule identity is normalized through
+`schedule_cell_snapshots.absence_type_id` and `schedule_cell_segments.shift_id/job_id`.
 
 ### 8.2 RBAC & Security Tables
 
@@ -400,7 +407,7 @@ Edge middleware (`middleware.ts`) enforces:
 | `src/app/dashboard/page.tsx`      | Organization dashboard with analytics                      |
 | `src/app/people/page.tsx`         | People roster management                                   |
 | `src/app/people/[id]/page.tsx`    | Staff detail page with tabbed views                        |
-| `src/app/settings/page.tsx`       | Organization settings (terminology, shift codes, etc.)     |
+| `src/app/settings/page.tsx`       | Organization settings (terminology, shifts, jobs, etc.)    |
 | `src/app/gridmaster/page.tsx`     | Gridmaster command center                                  |
 | `src/app/login/page.tsx`          | Auth login with org subdomain validation                   |
 | `src/app/accept-invite/page.tsx`  | Invitation acceptance flow                                 |
@@ -411,11 +418,11 @@ Edge middleware (`middleware.ts`) enforces:
 | `src/lib/staff-detail-stats.ts`   | Staff detail analytics                                     |
 | `src/lib/email.ts`                | Branded HTML email templates + sanitization utilities       |
 | `src/lib/rate-limit.ts`           | Upstash Redis rate limiters (API, invite, demo)            |
-| `src/lib/colors.ts`               | Color presets for shift codes, focus areas, drafts          |
+| `src/lib/colors.ts`               | Color presets for schedule labels, focus areas, drafts      |
 | `src/lib/styles.ts`               | Shared CSS-in-JS style objects for layout consistency       |
 | `src/types/index.ts`              | All domain + RBAC TypeScript types                         |
 | `src/hooks/usePermissions.ts`     | JWT claim parsing + DB admin permission fetching           |
-| `src/hooks/useOrganizationData.ts`| Org, focus areas, shift codes, coverage data               |
+| `src/hooks/useOrganizationData.ts`| Org, focus areas, schedule definitions, coverage data      |
 | `src/hooks/useEmployees.ts`       | Employee list with filtering                               |
 | `src/hooks/useCellLocks.ts`       | Real-time cell lock tracking                               |
 | `middleware.ts`                   | Edge middleware for RBAC + subdomain routing                |
@@ -456,8 +463,8 @@ AppShell.tsx (root layout — sidebar, header, navigation)
 │
 ├── ScheduleGrid.tsx (employee × date grid with DND)
 │   ├── DraggableShift.tsx / DroppableCell.tsx
-│   ├── ShiftEditPanel.tsx (shift code picker, notes)
-│   ├── ShiftPicker.tsx (shift code selector)
+│   ├── ShiftEditPanel.tsx (canonical assignment picker, notes)
+│   ├── ShiftPicker.tsx (shift/job selector)
 │   ├── ShiftContextMenu.tsx (right-click actions)
 │   ├── RepeatForm.tsx (shift series creation)
 │   ├── DraftBanner.tsx (draft change count + publish/cancel)
@@ -578,7 +585,7 @@ gridmaster/page.tsx
 - Landscape orientation with customizable options
 - Select which focus areas and date range to include
 - Header: organization name, printed date, schedule date range
-- Legend with all shift codes and their colors
+- Legend with all schedule labels and their colors
 - Optimized font sizing for legibility
 
 ### 10.7 Toolbar
@@ -595,8 +602,8 @@ gridmaster/page.tsx
 
 - **Organization** — Name, address, phone, employee count, timezone, custom terminology labels
 - **Shift Categories** — Create/edit/delete shift categories with time windows
-- **Shift Codes** — Schedule codes with colors, times, certification requirements
-- **Coverage** — Minimum staffing requirements per focus area, shift code, and day
+- **Shifts & Jobs** — Schedule definitions with colors, times, and qualification rules
+- **Coverage** — Minimum staffing requirements per focus area, shift/job assignment, and day
 - **Indicators** — Note/indicator type definitions with colors
 - **Staff Config** — Focus areas, certifications, absence types, organization roles
 - **Users** — User management, role assignment, admin permission configuration (super_admin only)

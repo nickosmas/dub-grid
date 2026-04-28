@@ -1,0 +1,344 @@
+"use client";
+
+import type {
+  AuditLogEntry,
+  FullAuditLogEntry,
+  ImpersonationHistoryEntry,
+  Organization,
+  AssignableOrganizationRole,
+  PlatformUser,
+  UserMembership,
+} from "@/types";
+
+export interface GridmasterInvitationRecord {
+  id: string;
+  org_id: string;
+  email: string;
+  role_to_assign: string;
+  invited_by?: string | null;
+  token?: string | null;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+  revoked_at: string | null;
+  updated_at: string | null;
+  employee_id?: string | null;
+}
+
+export interface GridmasterReadOnlyShiftRow {
+  empId: string;
+  empName: string;
+  date: string;
+  assignments: string[];
+  absenceLabel: string | null;
+  focusAreaName: string | null;
+  isDraft: boolean;
+}
+
+export interface TenantStats {
+  orgId: string;
+  userCount: number;
+  employeeCount: number;
+}
+
+export interface GridmasterDashboardData {
+  organizations: Organization[];
+  stats: TenantStats[];
+}
+
+export interface StartImpersonationResult {
+  sessionId: string;
+  expiresAt: string;
+}
+
+export interface GridmasterOrganizationSetupInput {
+  name: string;
+  slug: string;
+  addressLine1: string;
+  addressLine2: string;
+  addressCity: string;
+  addressState: string;
+  addressPostalCode: string;
+  addressCountry: string;
+  phone: string;
+  timezone: string;
+  focusAreaLabel: string;
+  certificationLabel: string;
+  roleLabel: string;
+  shiftDisplayMode: "code" | "name";
+  superAdminFirstName: string;
+  superAdminLastName: string;
+  superAdminEmail: string;
+  superAdminPhone: string;
+}
+
+export type GridmasterSuperAdminSetupResult =
+  | { kind: "none" }
+  | { kind: "assigned"; displayName: string }
+  | {
+      kind: "pending-invite";
+      displayName: string;
+      pendingInvite: { token: string; email: string; name: string };
+    }
+  | { kind: "invite-error"; displayName: string; message: string };
+
+function resolveClientUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) {
+    return path;
+  }
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return new URL(path, window.location.origin).toString();
+  }
+  return path;
+}
+
+async function requestGridmasterJson<T>(
+  input: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(resolveClientUrl(input), init);
+  const contentType = response.headers.get("content-type") ?? "";
+  const body = contentType.includes("application/json")
+    ? ((await response.json()) as Record<string, unknown>)
+    : null;
+
+  if (!response.ok) {
+    throw new Error(
+      typeof body?.error === "string"
+        ? body.error
+        : "Gridmaster request failed.",
+    );
+  }
+
+  return body as T;
+}
+
+export function fetchGridmasterUsers(): Promise<{ users: PlatformUser[] }> {
+  return requestGridmasterJson("/api/gridmaster/users");
+}
+
+export function updateGridmasterUserActivation(input: {
+  userId: string;
+  orgId: string;
+  deactivate: boolean;
+}): Promise<{ success: true }> {
+  return requestGridmasterJson("/api/gridmaster/users", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchGridmasterUserMemberships(
+  userId: string,
+): Promise<{ memberships: UserMembership[] }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/users/${encodeURIComponent(userId)}/memberships`,
+  );
+}
+
+export function forceLogoutGridmasterUser(
+  userId: string,
+): Promise<{ success: true }> {
+  return requestGridmasterJson(
+    `/api/gridmaster/users/${encodeURIComponent(userId)}/force-logout`,
+    { method: "POST" },
+  );
+}
+
+export function fetchGridmasterInvitations(
+  orgId: string,
+): Promise<{ invitations: GridmasterInvitationRecord[] }> {
+  const params = new URLSearchParams({ orgId });
+  return requestGridmasterJson(`/api/gridmaster/invitations?${params}`);
+}
+
+export function fetchGridmasterReadOnlySchedule(input: {
+  orgId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<{ shifts: GridmasterReadOnlyShiftRow[] }> {
+  const params = new URLSearchParams(input);
+  return requestGridmasterJson(`/api/gridmaster/schedule?${params}`);
+}
+
+export function fetchGridmasterDashboardData(): Promise<GridmasterDashboardData> {
+  return requestGridmasterJson("/api/gridmaster/dashboard");
+}
+
+export function fetchGridmasterAuditLog(options?: {
+  orgId?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AuditLogEntry[]> {
+  const params = new URLSearchParams();
+  if (options?.orgId) {
+    params.set("orgId", options.orgId);
+  }
+  if (typeof options?.limit === "number") {
+    params.set("limit", String(options.limit));
+  }
+  if (typeof options?.offset === "number") {
+    params.set("offset", String(options.offset));
+  }
+  const suffix = params.toString();
+  return requestGridmasterJson<{ entries: AuditLogEntry[] }>(
+    `/api/gridmaster/audit-log${suffix ? `?${suffix}` : ""}`,
+  ).then((data) => data.entries);
+}
+
+export function fetchGridmasterFullAuditLog(options?: {
+  orgId?: string;
+  action?: string;
+  actionPrefix?: string;
+  resourceType?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<FullAuditLogEntry[]> {
+  const params = new URLSearchParams();
+  if (options?.orgId) {
+    params.set("orgId", options.orgId);
+  }
+  if (options?.action) {
+    params.set("action", options.action);
+  }
+  if (options?.actionPrefix) {
+    params.set("actionPrefix", options.actionPrefix);
+  }
+  if (options?.resourceType) {
+    params.set("resourceType", options.resourceType);
+  }
+  if (typeof options?.limit === "number") {
+    params.set("limit", String(options.limit));
+  }
+  if (typeof options?.offset === "number") {
+    params.set("offset", String(options.offset));
+  }
+  const suffix = params.toString();
+  return requestGridmasterJson<{ entries: FullAuditLogEntry[] }>(
+    `/api/gridmaster/audit-log/full${suffix ? `?${suffix}` : ""}`,
+  ).then((data) => data.entries);
+}
+
+export function fetchGridmasterImpersonationHistory(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<ImpersonationHistoryEntry[]> {
+  const params = new URLSearchParams();
+  if (typeof options?.limit === "number") {
+    params.set("limit", String(options.limit));
+  }
+  if (typeof options?.offset === "number") {
+    params.set("offset", String(options.offset));
+  }
+  const suffix = params.toString();
+  return requestGridmasterJson<{ entries: ImpersonationHistoryEntry[] }>(
+    `/api/gridmaster/impersonation${suffix ? `?${suffix}` : ""}`,
+  ).then((data) => data.entries);
+}
+
+export function startGridmasterImpersonation(input: {
+  targetUserId: string;
+  justification: string;
+  targetOrgId?: string;
+  userAgent?: string;
+}): Promise<StartImpersonationResult> {
+  return requestGridmasterJson<StartImpersonationResult>(
+    "/api/gridmaster/impersonation",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "start", ...input }),
+    },
+  );
+}
+
+export function endGridmasterImpersonation(input: {
+  sessionId: string;
+  reason?: string;
+  targetOrgId?: string | null;
+}): Promise<{ success: true }> {
+  return requestGridmasterJson<{ success: true }>(
+    "/api/gridmaster/impersonation",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "end", ...input }),
+    },
+  );
+}
+
+export function archiveGridmasterOrganization(orgId: string): Promise<void> {
+  return requestGridmasterJson<{ success: true }>(
+    "/api/gridmaster/organizations/manage",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "archiveOrganization", orgId }),
+    },
+  ).then(() => undefined);
+}
+
+export function restoreGridmasterOrganization(orgId: string): Promise<void> {
+  return requestGridmasterJson<{ success: true }>(
+    "/api/gridmaster/organizations/manage",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restoreOrganization", orgId }),
+    },
+  ).then(() => undefined);
+}
+
+export function suspendGridmasterOrganization(
+  orgId: string,
+  reason: string,
+): Promise<void> {
+  return requestGridmasterJson<{ success: true }>(
+    "/api/gridmaster/organizations/manage",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "suspendOrganization", orgId, reason }),
+    },
+  ).then(() => undefined);
+}
+
+export function unsuspendGridmasterOrganization(orgId: string): Promise<void> {
+  return requestGridmasterJson<{ success: true }>(
+    "/api/gridmaster/organizations/manage",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "unsuspendOrganization", orgId }),
+    },
+  ).then(() => undefined);
+}
+
+export function assignGridmasterOrgRoleByEmail(
+  orgId: string,
+  email: string,
+  role: AssignableOrganizationRole,
+): Promise<void> {
+  return requestGridmasterJson<{ success: true }>(
+    "/api/gridmaster/organizations/manage",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "assignOrgRoleByEmail", orgId, email, role }),
+    },
+  ).then(() => undefined);
+}
+
+export function createGridmasterOrganizationSetup(
+  input: GridmasterOrganizationSetupInput,
+): Promise<{ org: Organization; superAdmin: GridmasterSuperAdminSetupResult }> {
+  return requestGridmasterJson<{
+    org: Organization;
+    superAdmin: GridmasterSuperAdminSetupResult;
+  }>("/api/gridmaster/organizations/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "createOrganizationSetup", input }),
+  });
+}
