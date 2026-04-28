@@ -74,7 +74,7 @@ export default function TimezoneSelect({
               flexDirection: "column",
               gap: 8,
               width: "min(max(var(--anchor-width), 340px), calc(100vw - 24px))",
-              maxHeight: "max(220px, var(--available-height))",
+              maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
             }}
           >
             <input
@@ -106,7 +106,19 @@ export default function TimezoneSelect({
               }}
               placeholder="Search time zones…"
             />
-            <div role="listbox" aria-label="Time zones" style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+            <div
+              role="listbox"
+              aria-label="Time zones"
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+              }}
+            >
               {filteredOptions.length === 0 ? (
                 <div
                   style={{

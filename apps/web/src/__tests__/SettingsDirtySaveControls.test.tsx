@@ -15,12 +15,12 @@ import AbsenceTypesSettings from "@/components/settings/AbsenceTypes";
 import {
   saveCoverageRequirements,
   saveDepartments,
-  updateOrganizationSettings,
   upsertFocusArea,
   upsertIndicatorType,
   upsertJobDefinition,
   upsertShiftCategory,
-} from "@/lib/db";
+} from "@/features/settings/client";
+import { updateOrganizationSettings } from "@/features/organization/client";
 import {
   makeCoverageRequirement,
   makeDepartment,
@@ -39,8 +39,7 @@ import type {
   ShiftCategory,
 } from "@/types";
 
-vi.mock("@/lib/db", () => ({
-  updateOrganization: vi.fn(),
+vi.mock("@/features/organization/client", () => ({
   updateOrganizationSettings: vi.fn(),
   OrganizationSettingsConflictError: class OrganizationSettingsConflictError extends Error {
     latestOrganization: Organization;
@@ -51,6 +50,9 @@ vi.mock("@/lib/db", () => ({
       this.name = "OrganizationSettingsConflictError";
     }
   },
+}));
+
+vi.mock("@/features/settings/client", () => ({
   upsertIndicatorType: vi.fn(),
   deleteIndicatorType: vi.fn(),
   saveDepartments: vi.fn(),
@@ -229,8 +231,9 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByText("SCHEDULED DEPARTMENTS LABEL")).toBeInTheDocument();
     expect(
-      screen.getByText("Management Departments: Administration"),
+      screen.getByText("Scheduled only. Does not rename management departments."),
     ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });
 
   it("display mode uses Cancel while the mode selection is dirty", async () => {
@@ -265,18 +268,13 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /full names/i }));
 
     const cancelButton = screen.getByRole("button", { name: /^cancel$/i });
-    expect(screen.getByText(/display mode guide/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/grid cells show full shift names/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
     expect(saveButton).toBeEnabled();
     expect(cancelButton).toBeEnabled();
 
     await user.click(cancelButton);
 
-    expect(
-      screen.getByText(/grid cells stay compact with short codes/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
     expect(
       screen.queryByRole("button", { name: /^cancel$/i }),
@@ -2399,9 +2397,9 @@ describe("settings dirty save controls", () => {
       applicableShiftIds: [],
       eligibleRoleIds: [],
       requiredCertificationIds: [],
-      color: "#E2E8F0",
-      border: "#CBD5E1",
-      text: "#475569",
+      color: "",
+      border: "",
+      text: "",
       shiftTimeOverrides: {
         "11": {
           startTime: "23:00",
@@ -2455,6 +2453,9 @@ describe("settings dirty save controls", () => {
     await waitFor(() => {
       expect(upsertJobDefinition).toHaveBeenCalledWith(
         expect.objectContaining({
+          color: "",
+          border: "",
+          text: "",
           shiftTimeOverrides: {
             "11": {
               startTime: "23:00",

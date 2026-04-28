@@ -200,6 +200,9 @@ describe("rowToJobDefinition", () => {
     expect(result.departmentIds).toEqual([2]);
     expect(result.applicableShiftIds).toEqual([10, 11]);
     expect(result.eligibilityMode).toBe("and");
+    expect(result.color).toBe("");
+    expect(result.border).toBe("");
+    expect(result.text).toBe("");
     expect(result.shiftTimeOverrides).toEqual({
       "10": {
         startTime: "08:00",
@@ -211,6 +214,41 @@ describe("rowToJobDefinition", () => {
     });
     expect(result.defaultStartTime).toBe("07:00");
     expect(result.defaultEndTime).toBe("15:00");
+  });
+
+  it("preserves custom style fields for shiftless jobs", () => {
+    const row: DbJobDefinition = {
+      id: 12,
+      org_id: "org-abc",
+      name: "Office",
+      abbr: "OFC",
+      show_on_grid: true,
+      assignment_mode: "shiftless",
+      eligibility_mode: "and",
+      focus_area_ids: [],
+      department_ids: [],
+      applicable_shift_ids: [],
+      eligible_role_ids: [],
+      required_certification_ids: [],
+      color: "#FDE68A",
+      border_color: "#B45309",
+      text_color: "#78350F",
+      shift_time_overrides: {},
+      shift_color_overrides: {},
+      default_start_time: null,
+      default_end_time: null,
+      default_duration_hours: 4,
+      default_duration_minutes: 0,
+      sort_order: 2,
+      system_key: null,
+      archived_at: null,
+    };
+
+    const result = rowToJobDefinition(row);
+
+    expect(result.color).toBe("#FDE68A");
+    expect(result.border).toBe("#B45309");
+    expect(result.text).toBe("#78350F");
   });
 });
 

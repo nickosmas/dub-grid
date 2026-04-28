@@ -5,7 +5,7 @@ import { Organization } from "@/types";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
-} from "@/lib/db";
+} from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE, useEmployeeCount } from "@/hooks";

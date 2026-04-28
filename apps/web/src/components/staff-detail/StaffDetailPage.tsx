@@ -11,21 +11,17 @@ import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import {
+  activateEmployee,
+  benchEmployee,
   fetchEmployeeById,
-  fetchEmployeeShifts,
-  fetchRecurringShifts,
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
-  fetchShiftRequests,
+  fetchEmployeeShifts,
   updateEmployee,
-  revokeInvitation,
-  removeUserFromOrganization,
-  benchEmployee,
-  activateEmployee,
   deleteEmployee,
   EmployeeStatusConflictError,
   OptimisticLockError,
-} from "@/lib/db";
+} from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
 import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
 import {
@@ -43,7 +39,15 @@ import type {
   AuditLogEntry,
   ShiftRequest,
 } from "@/types";
-import { supabase } from "@/lib/supabase";
+import {
+  fetchRecurringShifts,
+  fetchScheduleActorNames,
+  fetchShiftRequests,
+} from "@/features/schedule/client";
+import {
+  removeUserFromOrganization,
+  revokeInvitation,
+} from "@/features/organization/client";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
 import { EmployeeStatusActions } from "./EmployeeStatusActions";
@@ -159,7 +163,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
         if (emp.userId && perms.isGridmaster) {
           try {
-            const history = await fetchEmployeeRoleHistory(emp.userId);
+            const history = await fetchEmployeeRoleHistory(emp.userId, orgId);
             if (!cancelled) setRoleHistory(history);
           } catch {
             // Non-critical — don't crash the page if audit log is unavailable
@@ -343,17 +347,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
-          .from("profiles")
-          .select("id, first_name, last_name")
-          .in("id", Array.from(ids));
+        if (!orgId) return;
+        const { names } = await fetchScheduleActorNames({
+          ids: Array.from(ids),
+          orgId,
+        });
         if (cancelled) return;
         const map = new Map<string, string>();
-        for (const row of data ?? []) {
-          const first = row.first_name?.trim() || "";
-          const last = row.last_name?.trim() || "";
-          const name = [first, last].filter(Boolean).join(" ");
-          if (name) map.set(row.id, name);
+        for (const [id, name] of Object.entries(names)) {
+          if (name) map.set(id, name);
         }
         setAuditNames(map);
       } catch {
@@ -361,7 +363,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       }
     })();
     return () => { cancelled = true; };
-  }, [shifts]);
+  }, [orgId, shifts]);
 
   const pendingInvite = useMemo(() => {
     return invitations.find(i => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date()) ?? null;

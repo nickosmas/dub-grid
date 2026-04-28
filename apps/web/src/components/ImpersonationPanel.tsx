@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { startImpersonation, endImpersonation } from "@/lib/db";
+import {
+  endGridmasterImpersonation,
+  startGridmasterImpersonation,
+} from "@/features/gridmaster/client";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function ImpersonationPanel() {
@@ -17,14 +20,13 @@ export default function ImpersonationPanel() {
     setLoading(true);
     setError(null);
     try {
-      const result = await startImpersonation(
-        targetUserId.trim(),
-        justification.trim(),
-        undefined,
-        navigator.userAgent,
-      );
-      setSessionId(result.session_id);
-      setExpiresAt(result.expires_at);
+      const result = await startGridmasterImpersonation({
+        targetUserId: targetUserId.trim(),
+        justification: justification.trim(),
+        userAgent: navigator.userAgent,
+      });
+      setSessionId(result.sessionId);
+      setExpiresAt(result.expiresAt);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to start impersonation",
@@ -39,7 +41,7 @@ export default function ImpersonationPanel() {
     setLoading(true);
     setError(null);
     try {
-      await endImpersonation(sessionId);
+      await endGridmasterImpersonation({ sessionId });
       setSessionId(null);
       setExpiresAt(null);
       setTargetUserId("");

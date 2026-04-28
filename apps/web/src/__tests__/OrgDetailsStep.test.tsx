@@ -16,10 +16,6 @@ vi.mock("@/hooks", async () => {
   };
 });
 
-vi.mock("@/lib/db", () => ({
-  updateOrganization: vi.fn(),
-}));
-
 function makeOrganization(): Organization {
   return {
     id: "org-1",

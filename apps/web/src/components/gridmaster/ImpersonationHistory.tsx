@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchImpersonationHistory } from "@/lib/db";
+import { fetchGridmasterImpersonationHistory } from "@/features/gridmaster/client";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
@@ -85,7 +85,7 @@ export default function ImpersonationHistory() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
-    fetchImpersonationHistory({ limit: PAGE_SIZE, offset: page * PAGE_SIZE })
+    fetchGridmasterImpersonationHistory({ limit: PAGE_SIZE, offset: page * PAGE_SIZE })
       .then((data) => { if (!cancelled) setEntries(data); })
       .catch((err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load impersonation history"); })
       .finally(() => { if (!cancelled) setLoading(false); });

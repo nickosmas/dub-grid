@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
@@ -14,6 +13,14 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { Eye, EyeOff } from "lucide-react";
 import { MFAVerify } from "@/components/profile/MFAVerify";
+import {
+  fetchAccessibleWorkspaces,
+  getBrowserAuthSession,
+  refreshBrowserSession,
+  setBrowserSession,
+  signOutFromBrowser,
+  switchBrowserWorkspace,
+} from "@/features/account/client";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -348,11 +355,10 @@ function GridmasterLogin() {
       }
 
       // Set the session in the client using the tokens from the server
-      const { error: setError } = await supabase.auth.setSession({
+      await setBrowserSession({
         access_token: result.session.access_token,
         refresh_token: result.session.refresh_token,
       });
-      if (setError) throw setError;
 
       // Check if MFA is required before proceeding
       if (result.mfa_required) {
@@ -363,7 +369,7 @@ function GridmasterLogin() {
 
       // Refresh the session so the custom_access_token_hook has a chance to
       // bake platform_role=gridmaster into the new JWT before we navigate.
-      await supabase.auth.refreshSession();
+      await refreshBrowserSession();
 
       window.location.replace("/dashboard");
 
@@ -384,13 +390,13 @@ function GridmasterLogin() {
 
   function handleMFAVerified() {
     // After MFA verification, refresh session and navigate
-    supabase.auth.refreshSession().then(() => {
+    refreshBrowserSession().then(() => {
       window.location.replace("/dashboard");
     });
   }
 
   function handleMFACancel() {
-    supabase.auth.signOut({ scope: "local" });
+    void signOutFromBrowser("local");
     setMfaRequired(false);
     setLoading(false);
   }
@@ -608,11 +614,10 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
       }
 
       // Set the session in the client using the tokens from the server
-      const { error: setError } = await supabase.auth.setSession({
+      await setBrowserSession({
         access_token: result.session.access_token,
         refresh_token: result.session.refresh_token,
       });
-      if (setError) throw setError;
 
       // Check if MFA is required before proceeding
       if (result.mfa_required) {
@@ -629,38 +634,29 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
         if (userSlug !== orgSlug) {
           // Slug mismatch — check membership
-          const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
+          const { organizations: orgs } = await fetchAccessibleWorkspaces();
 
-          if (rpcError || !orgs) {
-            await supabase.auth.signOut({ scope: "local" });
+          if (!orgs) {
+            await signOutFromBrowser("local");
             toast.error("Unable to verify workspace access. Please try again.");
             setLoading(false);
             return;
           }
 
-          const targetOrg = orgs.find((o: { org_slug: string }) => o.org_slug === orgSlug);
+          const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
 
           if (targetOrg) {
-            const { error: switchError } = await supabase.rpc("switch_org", {
-              target_org_id: targetOrg.org_id,
-            });
-
-            if (switchError) {
-              await supabase.auth.signOut({ scope: "local" });
+            try {
+              await switchBrowserWorkspace(targetOrg.org_id);
+              await refreshBrowserSession();
+            } catch {
+              await signOutFromBrowser("local");
               toast.error("Failed to switch workspace. Please try again.");
               setLoading(false);
               return;
             }
-
-            const { error: refreshError } = await supabase.auth.refreshSession();
-            if (refreshError) {
-              await supabase.auth.signOut({ scope: "local" });
-              toast.error("Failed to switch workspace. Please sign in again.");
-              setLoading(false);
-              return;
-            }
           } else {
-            await supabase.auth.signOut({ scope: "local" });
+            await signOutFromBrowser("local");
             toast.error("Your account is not associated with this workspace.");
             setLoading(false);
             return;
@@ -689,7 +685,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     // After MFA verification, proceed with the org slug verification and dashboard redirect
     async function proceed() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getBrowserAuthSession();
         if (!session) {
           toast.error("Session expired. Please sign in again.");
           setMfaRequired(false);
@@ -702,25 +698,26 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         if (!isGridmaster) {
           const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
           if (userSlug !== orgSlug) {
-            const { data: orgs, error: rpcError } = await supabase.rpc("get_my_organizations");
-            if (rpcError || !orgs) {
-              await supabase.auth.signOut({ scope: "local" });
+            const { organizations: orgs } = await fetchAccessibleWorkspaces();
+            if (!orgs) {
+              await signOutFromBrowser("local");
               toast.error("Unable to verify workspace access. Please try again.");
               setMfaRequired(false);
               return;
             }
-            const targetOrg = orgs.find((o: { org_slug: string }) => o.org_slug === orgSlug);
+            const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
             if (targetOrg) {
-              const { error: switchError } = await supabase.rpc("switch_org", { target_org_id: targetOrg.org_id });
-              if (switchError) {
-                await supabase.auth.signOut({ scope: "local" });
+              try {
+                await switchBrowserWorkspace(targetOrg.org_id);
+                await refreshBrowserSession();
+              } catch {
+                await signOutFromBrowser("local");
                 toast.error("Failed to switch workspace.");
                 setMfaRequired(false);
                 return;
               }
-              await supabase.auth.refreshSession();
             } else {
-              await supabase.auth.signOut({ scope: "local" });
+              await signOutFromBrowser("local");
               toast.error("Your account is not associated with this workspace.");
               setMfaRequired(false);
               return;
@@ -738,7 +735,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   }
 
   function handleMFACancel() {
-    supabase.auth.signOut({ scope: "local" });
+    void signOutFromBrowser("local");
     setMfaRequired(false);
     setLoading(false);
   }

@@ -4,14 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { AdminPermissions, OrganizationUser, OrganizationRole } from "@/types";
 import {
   fetchOrganizationUsers,
-  fetchInvitations,
+  fetchOrganizationInvitations,
   updateOrganizationMembershipGuarded,
   OrganizationAccessConflictError,
   removeOrganizationMembershipGuarded,
   revokeOrganizationInvitationGuarded,
   resendOrganizationInvitationGuarded,
   InvitationAccessConflictError,
-} from "@/lib/db";
+} from "@/features/organization/client";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -156,7 +156,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     fetchOrganizationUsers(orgId)
       .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
       .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
-    fetchInvitations(orgId)
+    fetchOrganizationInvitations(orgId)
       .then((inv) => { if (mounted) setInvitations(inv); })
       .catch(() => {});
     return () => { mounted = false; };

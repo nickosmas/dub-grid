@@ -1,25 +1,14 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
-import { fetchAssignmentDefinitions } from "@/lib/db/config";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays, formatDateKey } from "@/lib/utils";
 import { getScheduleStartForSpan } from "@/lib/schedule-view";
-import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
-import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
-import type { DbScheduleCell } from "@/lib/db/types";
-
-interface ShiftRow {
-  empId: string;
-  empName: string;
-  date: string;
-  assignments: string[];
-  absenceLabel: string | null;
-  focusAreaName: string | null;
-  isDraft: boolean;
-}
+import {
+  fetchGridmasterReadOnlySchedule,
+  type GridmasterReadOnlyShiftRow as ShiftRow,
+} from "@/features/gridmaster/client";
 
 function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -58,106 +47,13 @@ export default function ReadOnlyScheduleView({
 
     (async () => {
       try {
-        // Fetch schedule option labels for this org.
-        const codes = await fetchAssignmentDefinitions(orgId, true);
-        const codeMap = new Map<number, string>(
-          codes.map((code) => [code.id, code.label]),
-        );
-        const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
-          codes,
-        );
-
-        // Fetch absence type labels
-        const { data: absences } = await supabase
-          .from("absence_types")
-          .select("id, label")
-          .eq("org_id", orgId);
-        const absMap = new Map<number, string>(
-          ((absences ?? []) as Array<{ id: number; label: string }>).map((a) => [
-            a.id,
-            a.label,
-          ]),
-        );
-
-        const { data: scheduleCellData, error: scheduleCellError } = await supabase
-          .from("schedule_cells")
-          .select(`
-            id,
-            emp_id,
-            date,
-            org_id,
-            focus_area_id,
-            version,
-            series_id,
-            from_recurring,
-            created_by,
-            updated_by,
-            created_at,
-            updated_at,
-            snapshots:schedule_cell_snapshots(
-              id,
-              cell_id,
-              org_id,
-              snapshot_kind,
-              state_kind,
-              absence_type_id,
-              custom_start_time,
-              custom_end_time,
-              created_at,
-              updated_at,
-              segments:schedule_cell_segments(
-                id,
-                snapshot_id,
-                org_id,
-                position,
-                shift_id,
-                job_id,
-                created_at,
-                updated_at
-              )
-            ),
-            employees(first_name, last_name),
-            focus_areas(name)
-          `)
-          .eq("org_id", orgId)
-          .gte("date", startDate)
-          .lte("date", endDate)
-          .order("date")
-          .order("emp_id");
-
-        if (scheduleCellError) throw scheduleCellError;
+        const { shifts: nextShifts } = await fetchGridmasterReadOnlySchedule({
+          orgId,
+          startDate,
+          endDate,
+        });
         if (cancelled) return;
-
-        const rows = ((scheduleCellData ?? []) as Array<DbScheduleCell & Record<string, unknown>>)
-          .map((row) => {
-            const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
-              isScheduler: true,
-              assignmentLabelMap: codeMap,
-              assignmentIdByPair,
-              absenceTypeMap: absMap,
-            });
-            if (!entry) return null;
-
-            const emp = row.employees as { first_name: string; last_name: string } | null;
-            const fa = row.focus_areas as { name?: unknown } | null;
-            const focusAreaName = typeof fa?.name === "string" ? fa.name : null;
-
-            return {
-              empId: row.emp_id,
-              empName: emp ? `${emp.first_name} ${emp.last_name}` : row.emp_id.slice(0, 8),
-              date: row.date,
-              assignments: entry.assignmentIds.map((id) => codeMap.get(id) ?? `?${id}`),
-              absenceLabel:
-                entry.absenceTypeId != null
-                  ? (absMap.get(entry.absenceTypeId) ?? null)
-                  : null,
-              focusAreaName,
-              isDraft: entry.draftKind != null,
-            } satisfies ShiftRow;
-          })
-          .filter((row): row is ShiftRow => row != null);
-
-        setShifts(rows);
+        setShifts(nextShifts);
       } catch (err: unknown) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load shifts");
       } finally {

@@ -43,7 +43,7 @@ describe("schedule view fallback", () => {
 });
 
 describe("schedule grid layout", () => {
-  it("fits a wide 2-week code grid to the container when content is compact", () => {
+  it("keeps the 2-week code-mode staff column width stable in compact weeks", () => {
     const layout = getScheduleGridLayout({
       spanWeeks: 2,
       shiftDisplayMode: "code",
@@ -53,7 +53,7 @@ describe("schedule grid layout", () => {
     });
 
     expect(layout.fitToContainer).toBe(true);
-    expect(layout.nameColWidth).toBe(200);
+    expect(layout.nameColWidth).toBe(220);
     expect(layout.colWidth).toBeGreaterThanOrEqual(80);
   });
 

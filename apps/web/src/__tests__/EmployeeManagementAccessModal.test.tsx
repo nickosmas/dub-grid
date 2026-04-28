@@ -4,25 +4,25 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
 import type { Department, DirectoryPerson, Employee, Invitation, OrganizationUser } from "@/types";
 import {
+  createOrganizationInvitation,
   fetchOrganizationUsers,
-  linkEmployeeToUser,
-  reconcileEmployeeNameAndLinkUser,
   resendOrganizationInvitationGuarded,
-  sendInvitation,
   revokeOrganizationInvitationGuarded,
   updateOrganizationInvitationGuarded,
   updateOrganizationMembershipGuarded,
   updateAppOnlyUser,
-} from "@/lib/db";
+} from "@/features/organization/client";
+import {
+  linkEmployeeToUser,
+  reconcileEmployeeNameAndLinkUser,
+} from "@/features/employees/client";
 import { NameMismatchError } from "@/lib/account-linking";
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/organization/client", () => ({
+  createOrganizationInvitation: vi.fn(),
   fetchOrganizationUsers: vi.fn(),
-  linkEmployeeToUser: vi.fn(),
-  reconcileEmployeeNameAndLinkUser: vi.fn(),
   resendOrganizationInvitationGuarded: vi.fn(),
   revokeOrganizationInvitationGuarded: vi.fn(),
-  sendInvitation: vi.fn(),
   updateOrganizationInvitationGuarded: vi.fn(),
   updateOrganizationMembershipGuarded: vi.fn(),
   updateAppOnlyUser: vi.fn(),
@@ -46,6 +46,14 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/features/employees/client", () => ({
+  createEmployeeFromOrgUser: vi.fn(),
+  reconcileEmployeeFromOrgUser: vi.fn(),
+  linkEmployeeToUser: vi.fn(),
+  reconcileEmployeeNameAndLinkUser: vi.fn(),
+  updateEmployeeIdentity: vi.fn(),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
@@ -57,7 +65,7 @@ const fetchOrganizationUsersMock = vi.mocked(fetchOrganizationUsers);
 const linkEmployeeToUserMock = vi.mocked(linkEmployeeToUser);
 const reconcileEmployeeNameAndLinkUserMock = vi.mocked(reconcileEmployeeNameAndLinkUser);
 const updateAppOnlyUserMock = vi.mocked(updateAppOnlyUser);
-const sendInvitationMock = vi.mocked(sendInvitation);
+const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
 const updateOrganizationInvitationGuardedMock = vi.mocked(updateOrganizationInvitationGuarded);
 const resendOrganizationInvitationGuardedMock = vi.mocked(resendOrganizationInvitationGuarded);
 const revokeOrganizationInvitationGuardedMock = vi.mocked(revokeOrganizationInvitationGuarded);
@@ -179,7 +187,7 @@ describe("EmployeeManagementAccessModal", () => {
     reconcileEmployeeNameAndLinkUserMock.mockResolvedValue({ status: "linked" });
     updateAppOnlyUserMock.mockResolvedValue(undefined);
     updateOrganizationMembershipGuardedMock.mockResolvedValue(makeOrganizationUser());
-    sendInvitationMock.mockResolvedValue({
+    createOrganizationInvitationMock.mockResolvedValue({
       invitationId: "inv-1",
       token: "token-1",
       expiresAt: "2026-12-31T00:00:00.000Z",

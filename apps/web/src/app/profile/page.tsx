@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { useOrganizationData, usePermissions } from "@/hooks";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -19,6 +18,12 @@ import { ProfileSectionTabs } from "@/components/profile/ProfileSectionTabs";
 import { SelfWorkOverview, SelfWorkSchedule } from "@/components/profile/SelfWorkProfile";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import {
+  signOutFromBrowser,
+  updateBrowserUserEmail,
+  updateBrowserUserPassword,
+  updateSelfProfileDetails,
+} from "@/features/account/client";
 
 const ROLE_LABELS: Record<string, string> = {
   gridmaster: "Gridmaster",
@@ -64,8 +69,6 @@ export function ProfilePageContent() {
     absenceTypes,
     certifications,
     orgRoles,
-    assignmentLabelMap,
-    absenceTypeMap,
   } = useOrganizationData();
   const {
     user,
@@ -79,7 +82,7 @@ export function ProfilePageContent() {
     error: selfProfileError,
     setProfile,
     setEmployee,
-  } = useSelfProfileData({ orgId, assignmentLabelMap, absenceTypeMap });
+  } = useSelfProfileData({ orgId });
 
   type ProfileSection = "account" | "overview" | "schedule";
 
@@ -184,41 +187,17 @@ export function ProfilePageContent() {
       const nextEmail = editEmail.trim().toLowerCase();
 
       if (hasNameChanges) {
-        const profileUpdate = await supabase
-          .from("profiles")
-          .update({
-            first_name: nextFirstName,
-            last_name: nextLastName,
-          })
-          .eq("id", user.id);
-        if (profileUpdate.error) throw profileUpdate.error;
-
-        if (employee) {
-          const employeeUpdate = await supabase
-            .from("employees")
-            .update({
-              first_name: nextFirstName ?? "",
-              last_name: nextLastName ?? "",
-            })
-            .eq("id", employee.id);
-          if (employeeUpdate.error) throw employeeUpdate.error;
-        }
-
-        setProfile((current) => ({
-          first_name: nextFirstName,
-          last_name: nextLastName,
-          mfa_enabled: current?.mfa_enabled ?? false,
-        }));
-        setEmployee((current) => current ? {
-          ...current,
-          firstName: nextFirstName ?? "",
-          lastName: nextLastName ?? "",
-        } : current);
+        const updated = await updateSelfProfileDetails({
+          firstName: nextFirstName,
+          lastName: nextLastName,
+          orgId,
+        });
+        setProfile(updated.profile);
+        setEmployee(updated.employee);
       }
 
       if (hasEmailChanges) {
-        const { error } = await supabase.auth.updateUser({ email: nextEmail });
-        if (error) throw error;
+        await updateBrowserUserEmail(nextEmail);
       }
 
       setIsEditingAccountDetails(false);
@@ -253,8 +232,7 @@ export function ProfilePageContent() {
 
     setSavingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
-      if (error) throw error;
+      await updateBrowserUserPassword(newPassword);
       toast.success("Password updated successfully.");
       setNewPassword("");
       setConfirmNewPassword("");
@@ -301,8 +279,7 @@ export function ProfilePageContent() {
   async function handleSignOutOthers() {
     setSigningOut("others");
     try {
-      const { error } = await supabase.auth.signOut({ scope: "others" });
-      if (error) throw error;
+      await signOutFromBrowser("others");
       toast.success("All other sessions have been signed out.");
     } catch {
       toast.error("Failed to sign out other sessions.");
@@ -314,7 +291,7 @@ export function ProfilePageContent() {
   async function handleSignOutAll() {
     setSigningOut("global");
     try {
-      await supabase.auth.signOut({ scope: "global" });
+      await signOutFromBrowser("global");
       window.location.replace("/login");
     } catch {
       toast.error("Failed to sign out. Please try again.");

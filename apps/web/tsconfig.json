@@ -3,9 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@dubgrid/contracts": ["../../packages/contracts/src/index.ts"],
-      "@dubgrid/contracts/*": ["../../packages/contracts/src/*"]
+      "@/*": ["./src/*"]
     },
     "plugins": [
       {

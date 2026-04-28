@@ -21,11 +21,11 @@ import {
   ShiftJobSegment,
   ShiftDisplayMode,
 } from "@/types";
-import { supabase } from "@/lib/supabase";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import * as Sentry from "@/lib/sentry";
 import { addDays, cn, iterateDateRange } from "@/lib/utils";
 import ScrollableTabs from "@/components/ScrollableTabs";
+import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -406,21 +406,18 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     if (datesToCheck.size === 0) { setOverwrites(0); return; }
 
     const sortedDates = [...datesToCheck].sort();
-    const minDate = sortedDates[0];
-    const maxDate = sortedDates[sortedDates.length - 1];
 
     (async () => {
-      const { data, error } = await supabase
-        .from("schedule_cells")
-        .select("date")
-        .eq("emp_id", empId)
-        .gte("date", minDate)
-        .lte("date", maxDate);
+      const { overwriteCount } = await fetchRepeatOverwriteCount({
+        empId,
+        dates: sortedDates,
+      });
       if (cancelled) return;
-      if (error) { Sentry.captureException(error); return; }
-      const overlap = (data ?? []).filter((row: { date: string }) => datesToCheck.has(row.date)).length;
-      setOverwrites(overlap);
-    })();
+      setOverwrites(overwriteCount);
+    })().catch((error: unknown) => {
+      if (cancelled) return;
+      Sentry.captureException(error);
+    });
 
     return () => { cancelled = true; };
   }, [generatedDates, empId, originDateKey]);

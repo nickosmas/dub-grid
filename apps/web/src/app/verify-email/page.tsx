@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { PublicRoute } from "@/components/RouteGuards";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -10,6 +9,10 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Mail } from "lucide-react";
+import {
+  resendBrowserSignupEmail,
+  subscribeToBrowserAuthChanges,
+} from "@/features/account/client";
 
 function VerifyEmailContent() {
   const [email, setEmail] = useState<string | null>(null);
@@ -26,7 +29,7 @@ function VerifyEmailContent() {
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
+    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent) => {
       if (event === "SIGNED_IN") {
         window.location.replace("/dashboard");
       }
@@ -46,10 +49,7 @@ function VerifyEmailContent() {
     setResending(true);
 
     try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email,
-      });
+      const { error } = await resendBrowserSignupEmail(email);
       if (error) throw error;
       toast.success("Verification email sent. Check your inbox.");
 

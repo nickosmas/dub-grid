@@ -7,9 +7,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import {
   fetchOrganizationUsers,
-  linkEmployeeToUser,
-  reconcileEmployeeNameAndLinkUser,
-  sendInvitation,
+  createOrganizationInvitation,
   resendOrganizationInvitationGuarded,
   revokeOrganizationInvitationGuarded,
   updateOrganizationInvitationGuarded,
@@ -17,7 +15,11 @@ import {
   OrganizationAccessConflictError,
   InvitationAccessConflictError,
   updateAppOnlyUser,
-} from "@/lib/db";
+} from "@/features/organization/client";
+import {
+  linkEmployeeToUser,
+  reconcileEmployeeNameAndLinkUser,
+} from "@/features/employees/client";
 import { NameMismatchError } from "@/lib/account-linking";
 import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
 import { validateEmail } from "@/components/FormField";
@@ -268,18 +270,16 @@ export function EmployeeManagementAccessModal({
           });
           token = resent.token;
         } else {
-          const created = await sendInvitation(
-            effectiveEmail.trim(),
+          const created = await createOrganizationInvitation({
+            email: effectiveEmail.trim(),
             role,
             orgId,
-            employee.id,
-            {
-              firstName: employee.firstName,
-              lastName: employee.lastName,
-              phone: employee.phone || undefined,
-              departmentIds: managementDepartmentIds,
-            },
-          );
+            employeeId: employee.id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            phone: employee.phone || undefined,
+            departmentIds: managementDepartmentIds,
+          });
           token = created.token;
         }
         await sendInviteEmail(token, effectiveEmail.trim());

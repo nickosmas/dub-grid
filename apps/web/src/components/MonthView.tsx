@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  useEffect,
   useMemo,
   useState,
   useRef,
@@ -27,6 +28,8 @@ function pillText(label: string, max: number): string {
 interface MonthViewProps {
   monthStart: Date;
   filteredEmployees: Employee[];
+  highlightEmpIds?: Set<string>;
+  highlightScrollKey?: string;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   isAbsenceForKey?: (empId: string, date: Date) => boolean;
@@ -44,10 +47,17 @@ type DayCellData = {
   date: Date;
   dateKey: string;
   isToday: boolean;
+  hasHighlightedEmployee: boolean;
   categoryCounts: Map<number, number>;
   byFocusArea: Map<
     string,
-    { name: string; shift: string; style: AssignmentDefinition; draftKind: DraftKind }[]
+    {
+      name: string;
+      shift: string;
+      style: AssignmentDefinition;
+      draftKind: DraftKind;
+      isHighlighted: boolean;
+    }[]
   >;
   activeCats: ShiftCategory[];
   focusAreaSections: string[];
@@ -82,11 +92,13 @@ function DayPopover({
   data,
   onClose,
   isNameMode = false,
+  hasHighlightedSearch = false,
 }: {
   anchorEl: HTMLElement;
   data: DayCellData;
   onClose: () => void;
   isNameMode?: boolean;
+  hasHighlightedSearch?: boolean;
 }) {
   const { date, focusAreaSections, byFocusArea } = data;
 
@@ -182,13 +194,38 @@ function DayPopover({
                       style={{ display: "flex", flexDirection: "column", gap: 2 }}
                     >
                       {workers.map(
-                        ({ name, shift, style: s, draftKind: dk }, ni) => (
+                        (
+                          {
+                            name,
+                            shift,
+                            style: s,
+                            draftKind: dk,
+                            isHighlighted,
+                          },
+                          ni,
+                        ) => (
                           <div
                             key={`${name}-${shift}-${ni}`}
                             style={{
                               display: "flex",
                               alignItems: "center",
                               gap: 5,
+                              padding: "2px 4px",
+                              borderRadius: 6,
+                              background:
+                                hasHighlightedSearch && isHighlighted
+                                  ? "var(--color-brand-bg)"
+                                  : "transparent",
+                              boxShadow:
+                                hasHighlightedSearch && isHighlighted
+                                  ? "inset 3px 0 0 0 var(--color-brand)"
+                                  : undefined,
+                              opacity:
+                                hasHighlightedSearch && !isHighlighted
+                                  ? 0.35
+                                  : 1,
+                              transition:
+                                "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
                             }}
                           >
                             <div
@@ -220,7 +257,10 @@ function DayPopover({
                             <span
                               style={{
                                 fontSize: "var(--dg-fs-footnote)",
-                                color: "var(--color-text-secondary)",
+                                color:
+                                  hasHighlightedSearch && isHighlighted
+                                    ? "var(--color-brand)"
+                                    : "var(--color-text-secondary)",
                                 whiteSpace: "nowrap",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -246,6 +286,8 @@ function DayPopover({
 export default function MonthView({
   monthStart,
   filteredEmployees,
+  highlightEmpIds,
+  highlightScrollKey,
   shiftForKey,
   assignmentIdsForKey,
   isAbsenceForKey,
@@ -262,6 +304,10 @@ export default function MonthView({
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
   const focusAreaNames = focusAreas.map((w) => w.name);
+  const hasHighlightedSearch = !!(
+    highlightEmpIds && highlightEmpIds.size > 0
+  );
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Look up assignments by ID so cross-focus-area shifts render in their own color
   const assignmentById = useMemo(() => {
@@ -319,6 +365,7 @@ export default function MonthView({
       const isToday = dateKey === todayKey;
 
       const categoryCounts = new Map<number, number>();
+      let hasHighlightedEmployee = false;
       const byFocusArea = new Map<
         string,
         {
@@ -326,6 +373,7 @@ export default function MonthView({
           shift: string;
           style: AssignmentDefinition;
           draftKind: DraftKind;
+          isHighlighted: boolean;
         }[]
       >();
 
@@ -340,6 +388,7 @@ export default function MonthView({
         const empHomeFas = focusAreas.filter((fa) =>
           emp.focusAreaIds.includes(fa.id),
         );
+        const isHighlighted = highlightEmpIds?.has(emp.id) ?? false;
         const shiftLabels = combinedLabel.split("/");
         shiftLabels.forEach((label, li) => {
           const codeEntry =
@@ -355,6 +404,10 @@ export default function MonthView({
             );
           }
 
+          if (isHighlighted) {
+            hasHighlightedEmployee = true;
+          }
+
           const dk = draftKindForKey?.(emp.id, date) ?? null;
 
           if (style.focusAreaId != null) {
@@ -367,6 +420,7 @@ export default function MonthView({
               shift: label,
               style,
               draftKind: dk,
+              isHighlighted,
             });
             byFocusArea.set(fa.name, list);
           } else {
@@ -380,6 +434,7 @@ export default function MonthView({
                 shift: label,
                 style,
                 draftKind: dk,
+                isHighlighted,
               });
               byFocusArea.set(primaryFa.name, list);
             }
@@ -406,6 +461,7 @@ export default function MonthView({
         date,
         dateKey,
         isToday,
+        hasHighlightedEmployee,
         categoryCounts,
         byFocusArea,
         activeCats,
@@ -426,14 +482,32 @@ export default function MonthView({
     shiftCategories,
     focusAreaNames,
     activeFocusArea,
+    highlightEmpIds,
     draftKindForKey,
     shiftSortOrder,
   ]);
 
   const popoverData = popoverDateKey ? dayDataMap.get(popoverDateKey) : null;
 
+  useEffect(() => {
+    if (!highlightScrollKey || !hasHighlightedSearch) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const firstHighlightedDay = rootRef.current?.querySelector<HTMLElement>(
+        '[data-search-highlight="true"]',
+      );
+      firstHighlightedDay?.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "smooth",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [highlightScrollKey, hasHighlightedSearch]);
+
   return (
-    <div>
+    <div ref={rootRef}>
       {/* Day-of-week column headers */}
       <div
         style={{
@@ -485,14 +559,24 @@ export default function MonthView({
 
           const dateKey = formatDateKey(date);
           const data = dayDataMap.get(dateKey)!;
-          const { isToday, focusAreaSections, byFocusArea } = data;
+          const {
+            isToday,
+            focusAreaSections,
+            byFocusArea,
+            hasHighlightedEmployee,
+          } = data;
           const isOpen = popoverDateKey === dateKey;
+          const isSearchHighlightedDay =
+            hasHighlightedSearch && hasHighlightedEmployee;
 
           return (
             <div
               key={dateKey}
               role="button"
               tabIndex={0}
+              data-search-highlight={
+                isSearchHighlightedDay ? "true" : undefined
+              }
               aria-label={date.toLocaleDateString("en-US", {
                 weekday: "long",
                 year: "numeric",
@@ -507,11 +591,17 @@ export default function MonthView({
                 }
               }}
               style={{
-                background: isToday
-                  ? "var(--color-today-bg)"
-                  : "var(--color-surface)",
+                background: isSearchHighlightedDay
+                  ? isToday
+                    ? "linear-gradient(180deg, var(--color-brand-bg) 0%, var(--color-today-bg) 100%)"
+                    : "var(--color-brand-bg)"
+                  : isToday
+                    ? "var(--color-today-bg)"
+                    : "var(--color-surface)",
                 border: isOpen
                   ? "2px solid var(--color-brand-border)"
+                  : isSearchHighlightedDay
+                    ? "2px solid var(--color-brand-border)"
                   : isToday
                     ? "2px solid var(--color-today-text)"
                     : "1px solid var(--color-border)",
@@ -520,9 +610,14 @@ export default function MonthView({
                 minHeight: 64,
                 boxShadow: isOpen
                   ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
+                  : isSearchHighlightedDay
+                    ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
                   : "0 1px 3px rgba(0,0,0,0.04)",
                 cursor: "pointer",
-                transition: "border-color 150ms ease, box-shadow 150ms ease",
+                opacity:
+                  hasHighlightedSearch && !hasHighlightedEmployee ? 0.35 : 1,
+                transition:
+                  "border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease, background 150ms ease",
               }}
             >
               {/* Date number */}
@@ -614,6 +709,7 @@ export default function MonthView({
           data={popoverData}
           onClose={closePopover}
           isNameMode={isNameMode}
+          hasHighlightedSearch={hasHighlightedSearch}
         />
       )}
       {/* eslint-enable react-hooks/refs */}

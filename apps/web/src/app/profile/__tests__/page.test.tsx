@@ -2,12 +2,14 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfilePageContent } from "@/app/profile/page";
-import { supabase } from "@/lib/supabase";
 
 const mockUsePermissions = vi.fn();
 const mockUseOrganizationData = vi.fn();
 const mockUseSelfProfileData = vi.fn();
-const mockAuthUpdateUser = vi.fn();
+const mockUpdateSelfProfileDetails = vi.fn();
+const mockUpdateBrowserUserEmail = vi.fn();
+const mockUpdateBrowserUserPassword = vi.fn();
+const mockSignOutFromBrowser = vi.fn();
 const mockSetProfile = vi.fn();
 const mockSetEmployee = vi.fn();
 
@@ -28,15 +30,15 @@ vi.mock("@/hooks/useSelfProfileData", () => ({
   useSelfProfileData: () => mockUseSelfProfileData(),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    from: vi.fn(),
-    auth: {
-      updateUser: (...args: unknown[]) => mockAuthUpdateUser(...args),
-      signOut: vi.fn(),
-    },
-  },
-  validateConfig: vi.fn(),
+vi.mock("@/features/account/client", () => ({
+  updateSelfProfileDetails: (...args: unknown[]) =>
+    mockUpdateSelfProfileDetails(...args),
+  updateBrowserUserEmail: (...args: unknown[]) =>
+    mockUpdateBrowserUserEmail(...args),
+  updateBrowserUserPassword: (...args: unknown[]) =>
+    mockUpdateBrowserUserPassword(...args),
+  signOutFromBrowser: (...args: unknown[]) =>
+    mockSignOutFromBrowser(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -171,14 +173,35 @@ describe("ProfilePageContent", () => {
     });
 
     mockUseSelfProfileData.mockReturnValue(buildSelfProfileData());
-
-    vi.mocked(supabase.from).mockImplementation(() => ({
-      update: vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      }),
-    }) as unknown as ReturnType<typeof supabase.from>);
-
-    mockAuthUpdateUser.mockResolvedValue({ error: null });
+    mockUpdateSelfProfileDetails.mockResolvedValue({
+      profile: {
+        first_name: "Janet",
+        last_name: "Doe",
+        mfa_enabled: false,
+      },
+      employee: {
+        id: "emp-1",
+        firstName: "Janet",
+        lastName: "Doe",
+        status: "active",
+        statusChangedAt: null,
+        statusNote: "",
+        certificationId: null,
+        roleIds: [],
+        seniority: 1,
+        focusAreaIds: [],
+        phone: "",
+        email: "jane@example.com",
+        contactNotes: "",
+        userId: "user-1",
+        departmentIds: [],
+        deptAdminIds: [],
+        version: 0,
+      },
+    });
+    mockUpdateBrowserUserEmail.mockResolvedValue(undefined);
+    mockUpdateBrowserUserPassword.mockResolvedValue(undefined);
+    mockSignOutFromBrowser.mockResolvedValue(undefined);
   });
 
   it("disables name save until the edited name actually changes", async () => {
@@ -231,23 +254,6 @@ describe("ProfilePageContent", () => {
   it("updates both profile and linked employee names from /profile", async () => {
     const user = userEvent.setup();
 
-    const profileEq = vi.fn().mockResolvedValue({ error: null });
-    const employeeEq = vi.fn().mockResolvedValue({ error: null });
-
-    vi.mocked(supabase.from).mockImplementation((table: string) => {
-      if (table === "profiles") {
-        return {
-          update: vi.fn().mockReturnValue({ eq: profileEq }),
-        } as unknown as ReturnType<typeof supabase.from>;
-      }
-      if (table === "employees") {
-        return {
-          update: vi.fn().mockReturnValue({ eq: employeeEq }),
-        } as unknown as ReturnType<typeof supabase.from>;
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
     render(<ProfilePageContent />);
 
     await user.click(screen.getByRole("button", { name: /edit account details/i }));
@@ -257,10 +263,23 @@ describe("ProfilePageContent", () => {
     await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
-      expect(profileEq).toHaveBeenCalledWith("id", "user-1");
-      expect(employeeEq).toHaveBeenCalledWith("id", "emp-1");
-      expect(mockSetProfile).toHaveBeenCalled();
-      expect(mockSetEmployee).toHaveBeenCalled();
+      expect(mockUpdateSelfProfileDetails).toHaveBeenCalledWith({
+        firstName: "Janet",
+        lastName: "Doe",
+        orgId: "org-1",
+      });
+      expect(mockSetProfile).toHaveBeenCalledWith({
+        first_name: "Janet",
+        last_name: "Doe",
+        mfa_enabled: false,
+      });
+      expect(mockSetEmployee).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "emp-1",
+          firstName: "Janet",
+          lastName: "Doe",
+        }),
+      );
     });
   });
 

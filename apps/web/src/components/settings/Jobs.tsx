@@ -15,8 +15,8 @@ import {
   checkJobDependencies,
   deleteJobDefinition,
   upsertJobDefinition,
-} from "@/lib/db";
-import type { DependencyInfo } from "@/lib/db";
+} from "@/features/settings/client";
+import type { DependencyInfo } from "@/features/settings/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -27,10 +27,6 @@ import {
   getEditorDismissLabel,
   getEditorSaveLabel,
 } from "@/components/ui/editor-action-labels";
-import {
-  ExplainerSection,
-  PreviewFrame,
-} from "@/components/ui/explainer-section";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import {
   PresetColorPicker,
@@ -80,9 +76,13 @@ type JobFormState = {
   defaultDurationMinutes: number | null;
 };
 
-const CLEARED_SCHEDULED_JOB_COLOR = "#E2E8F0";
-const CLEARED_SCHEDULED_JOB_BORDER = TRANSPARENT_BORDER;
-const CLEARED_SCHEDULED_JOB_TEXT = "#1E293B";
+const DEFAULT_JOB_PRESET_COLOR = "#E2E8F0";
+const DEFAULT_JOB_PRESET_TEXT = "#1E293B";
+const EMPTY_SCHEDULED_JOB_STYLE = {
+  color: "",
+  border: "",
+  text: "",
+} as const;
 
 function getJobSection(job: Pick<JobDefinition, "assignmentMode">): JobSection {
   return job.assignmentMode === "shiftless" ? "shiftless" : "scheduled";
@@ -216,9 +216,15 @@ function buildJobFormState(
     eligibilityMode: job.eligibilityMode ?? "and",
     shiftTimeOverrides: normalizeShiftTimeOverrides(job.shiftTimeOverrides),
     shiftColorOverrides: normalizeShiftColorOverrides(job.shiftColorOverrides),
-    color: isShiftlessJob && job.color !== "transparent" ? job.color : CLEARED_SCHEDULED_JOB_COLOR,
-    border: isShiftlessJob && job.border !== "transparent" ? job.border : CLEARED_SCHEDULED_JOB_BORDER,
-    text: isShiftlessJob && job.text !== "transparent" ? job.text : CLEARED_SCHEDULED_JOB_TEXT,
+    color: isShiftlessJob
+      ? (job.color !== "transparent" ? job.color : DEFAULT_JOB_PRESET_COLOR)
+      : EMPTY_SCHEDULED_JOB_STYLE.color,
+    border: isShiftlessJob
+      ? (job.border !== "transparent" ? job.border : TRANSPARENT_BORDER)
+      : EMPTY_SCHEDULED_JOB_STYLE.border,
+    text: isShiftlessJob
+      ? (job.text !== "transparent" ? job.text : DEFAULT_JOB_PRESET_TEXT)
+      : EMPTY_SCHEDULED_JOB_STYLE.text,
     defaultStartTime: normalizedTiming.defaultStartTime,
     defaultEndTime: normalizedTiming.defaultEndTime,
     defaultDurationHours: normalizedTiming.defaultDurationHours,
@@ -247,6 +253,9 @@ function serializeJobFormState(form: JobFormState, section: JobSection): string 
     ...form,
     name: form.name.trim(),
     abbr: form.abbr.trim().toUpperCase(),
+    color: section === "shiftless" ? form.color : EMPTY_SCHEDULED_JOB_STYLE.color,
+    border: section === "shiftless" ? form.border : EMPTY_SCHEDULED_JOB_STYLE.border,
+    text: section === "shiftless" ? form.text : EMPTY_SCHEDULED_JOB_STYLE.text,
     departmentIds: [...form.departmentIds].sort((left, right) => left - right),
     focusAreaIds: [...form.focusAreaIds].sort((left, right) => left - right),
     applicableShiftIds: [...form.applicableShiftIds].sort((left, right) => left - right),
@@ -377,16 +386,18 @@ function SectionBlock({
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div
-          style={{
-            fontSize: "var(--dg-fs-label)",
-            fontWeight: 800,
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          {title}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 800,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            {title}
+          </div>
         </div>
         {description ? (
           <div
@@ -512,7 +523,12 @@ function EligibilityModeToggle({
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ ...labelStyle, marginBottom: 0 }}>MATCHING RULE</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ ...labelStyle, marginBottom: 0 }}>MATCHING RULE</div>
+        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.35 }}>
+          Choose whether staff must match both lists or either list.
+        </div>
+      </div>
       <div
         style={{
           display: "inline-flex",
@@ -965,9 +981,9 @@ function JobRow({
         applicableShiftIds: section === "scheduled" ? [...form.applicableShiftIds] : [],
         eligibleRoleIds: [...form.eligibleRoleIds],
         requiredCertificationIds: [...form.requiredCertificationIds],
-        color: section === "shiftless" ? form.color : CLEARED_SCHEDULED_JOB_COLOR,
-        border: section === "shiftless" ? form.border : CLEARED_SCHEDULED_JOB_BORDER,
-        text: section === "shiftless" ? form.text : CLEARED_SCHEDULED_JOB_TEXT,
+        color: section === "shiftless" ? form.color : EMPTY_SCHEDULED_JOB_STYLE.color,
+        border: section === "shiftless" ? form.border : EMPTY_SCHEDULED_JOB_STYLE.border,
+        text: section === "shiftless" ? form.text : EMPTY_SCHEDULED_JOB_STYLE.text,
         shiftTimeOverrides: section === "scheduled" ? normalizedShiftTimeOverrides : {},
         shiftColorOverrides: section === "scheduled" ? normalizedShiftColorOverrides : {},
         defaultStartTime: section === "shiftless" ? timingDefaults.defaultStartTime : null,
@@ -1686,7 +1702,7 @@ function JobRow({
                   {selectedShifts.map((shift) => {
                     const shiftLabel = shiftLabelById.get(shift.id) ?? shift.name;
                     const colorOverride = getJobShiftColorOverride(form, shift.id);
-                    const resolvedColor = colorOverride ?? shift.color ?? CLEARED_SCHEDULED_JOB_COLOR;
+                    const resolvedColor = colorOverride ?? shift.color ?? DEFAULT_JOB_PRESET_COLOR;
                     const timeOverride = getJobShiftTimeOverride(form, shift.id);
                     const previewPrimary = getShiftPreviewPrimaryLabel({
                       shiftName: shift.name,
@@ -1896,7 +1912,7 @@ function JobRow({
 
           <SectionBlock
             title="Eligibility"
-            description={`Only schedule-eligible ${roleLabel.toLowerCase()} are listed here. Leave either list empty to keep that gate open.`}
+            description={`Use schedule-eligible ${roleLabel.toLowerCase()}, ${certificationLabel.toLowerCase()}, or both to qualify staff. Leave either list empty to keep that gate open.`}
           >
             <div
               style={{
@@ -2243,9 +2259,9 @@ export default function JobsSettings({
             .map((shift) => shift.id),
       eligibleRoleIds: [],
       requiredCertificationIds: [],
-      color: CLEARED_SCHEDULED_JOB_COLOR,
-      border: CLEARED_SCHEDULED_JOB_BORDER,
-      text: CLEARED_SCHEDULED_JOB_TEXT,
+      color: EMPTY_SCHEDULED_JOB_STYLE.color,
+      border: EMPTY_SCHEDULED_JOB_STYLE.border,
+      text: EMPTY_SCHEDULED_JOB_STYLE.text,
       shiftTimeOverrides: {},
       shiftColorOverrides: {},
       defaultStartTime: null,
@@ -2311,63 +2327,8 @@ export default function JobsSettings({
     [emitPersistedJobs, local],
   );
 
-  const infoPoints = [
-    {
-      title: "Build jobs from placement down",
-      description: "Scheduled jobs start with departments, then narrow into focus areas and shifts using the same checklist pattern throughout.",
-    },
-    {
-      title: "Shift stays visually primary",
-      description: "Each per-shift row previews the exact stacked pill the schedule will use, with the shift on top and the job underneath.",
-    },
-    {
-      title: "Eligibility can require both or either",
-      description: `Use the matching rule to decide whether selected ${roleLabel.toLowerCase()} and ${certificationLabel.toLowerCase()} both matter or whether either one can qualify staff.`,
-    },
-  ];
-  const scheduledPreviewSecondary = getJobPreviewLabel({
-    jobName: "Supervisor",
-    jobAbbr: "SUPV",
-    shiftDisplayMode,
-  });
-  const shiftlessPreviewPrimary = getJobPreviewLabel({
-    jobName: "Office",
-    jobAbbr: "OFFICE",
-    shiftDisplayMode,
-  });
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <ExplainerSection
-        title="Job logic"
-        defaultOpen
-        storageKey="dg-explainer-jobs"
-        points={infoPoints}
-        preview={(
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            <PreviewFrame title="Scheduled job" subtitle="Shift stays primary">
-              <ShiftPreviewPill
-                primary={getShiftPreviewPrimaryLabel({
-                  shiftName: "Day Shift",
-                  shiftAbbr: "D",
-                  shiftDisplayMode,
-                })}
-                secondary={scheduledPreviewSecondary}
-                bg="#FDE68A"
-                mode={shiftDisplayMode}
-              />
-            </PreviewFrame>
-            <PreviewFrame title="General job" subtitle="No paired shift">
-              <ShiftPreviewPill
-                primary={shiftlessPreviewPrimary}
-                bg="#BFDBFE"
-                mode={shiftDisplayMode}
-              />
-            </PreviewFrame>
-          </div>
-        )}
-      />
-
       {scheduleRoles.length === 0 ? (
         <div
           style={{

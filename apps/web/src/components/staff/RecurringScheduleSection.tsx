@@ -25,7 +25,7 @@ import {
   getRecurringDraft,
   saveRecurringDraft,
   upsertRecurringShift,
-} from "@/lib/db";
+} from "@/features/schedule/client";
 import * as Sentry from "@/lib/sentry";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { useMediaQuery, MOBILE } from "@/hooks";

@@ -35,6 +35,10 @@ export const queryKeys = {
   shiftRequests: {
     all: (orgId: string) => ["shiftRequests", orgId] as const,
   },
+  account: {
+    self: (userId: string, orgId: string | null) =>
+      ["account", userId, orgId ?? "no-org", "self"] as const,
+  },
   gridmaster: {
     allOrganizations: () => ["gm", "organizations"] as const,
     allUsers: () => ["gm", "users"] as const,

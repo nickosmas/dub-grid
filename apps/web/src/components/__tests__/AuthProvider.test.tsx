@@ -5,24 +5,21 @@
 import { render, screen, act, waitFor, cleanup } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-// ─── Mock supabase ───────────────────────────────────────────────────────────
+// ─── Mock account client ─────────────────────────────────────────────────────
 
 const mockGetSession = vi.fn();
 const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
 const mockSignOut = vi.fn();
-const mockFrom = vi.fn();
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      getSession: (...args: unknown[]) => mockGetSession(...args),
-      getUser: (...args: unknown[]) => mockGetUser(...args),
-      onAuthStateChange: (...args: unknown[]) => mockOnAuthStateChange(...args),
-      signOut: (...args: unknown[]) => mockSignOut(...args),
-    },
-    from: (...args: unknown[]) => mockFrom(...args),
-  },
+vi.mock("@/features/account/client", () => ({
+  clearBrowserAuthState: vi.fn(),
+  getBrowserAuthSession: (...args: unknown[]) => mockGetSession(...args),
+  getVerifiedBrowserAuthUser: (...args: unknown[]) => mockGetUser(...args),
+  isRecoverableBrowserAuthFailure: () => false,
+  signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
+  subscribeToBrowserAuthChanges: (...args: unknown[]) =>
+    mockOnAuthStateChange(...args),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -54,12 +51,8 @@ const fakeSession = { user: fakeUser, access_token: "token-abc" };
 beforeEach(() => {
   vi.clearAllMocks();
   // Default: no session
-  mockGetSession.mockResolvedValue({
-    data: { session: null },
-  });
-  mockGetUser.mockResolvedValue({
-    data: { user: null },
-  });
+  mockGetSession.mockResolvedValue(null);
+  mockGetUser.mockResolvedValue(null);
   // Default: subscription setup
   mockOnAuthStateChange.mockImplementation(() => ({
     data: { subscription: { unsubscribe: vi.fn() } },
@@ -75,9 +68,7 @@ afterEach(() => {
 
 describe("AuthProvider — initial session", () => {
   it("starts with isLoading=true, then sets isLoading=false after getSession resolves", async () => {
-    mockGetSession.mockResolvedValue({
-      data: { session: null },
-    });
+    mockGetSession.mockResolvedValue(null);
 
     render(
       <AuthProvider>
@@ -95,12 +86,8 @@ describe("AuthProvider — initial session", () => {
   });
 
   it("sets user from existing session on mount", async () => {
-    mockGetSession.mockResolvedValue({
-      data: { session: fakeSession },
-    });
-    mockGetUser.mockResolvedValue({
-      data: { user: fakeUser },
-    });
+    mockGetSession.mockResolvedValue(fakeSession);
+    mockGetUser.mockResolvedValue(fakeUser);
 
     render(
       <AuthProvider>
@@ -115,9 +102,7 @@ describe("AuthProvider — initial session", () => {
   });
 
   it("sets user to null when getSession returns no session", async () => {
-    mockGetSession.mockResolvedValue({
-      data: { session: null },
-    });
+    mockGetSession.mockResolvedValue(null);
 
     render(
       <AuthProvider>
@@ -150,9 +135,7 @@ describe("AuthProvider — initial session", () => {
 describe("AuthProvider — auth state changes", () => {
   it("updates user when onAuthStateChange fires SIGNED_IN", async () => {
     let authCallback: (event: string, session: unknown) => void = () => {};
-    mockGetUser.mockResolvedValue({
-      data: { user: fakeUser },
-    });
+    mockGetUser.mockResolvedValue(fakeUser);
 
     mockOnAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
       authCallback = cb;
@@ -177,12 +160,8 @@ describe("AuthProvider — auth state changes", () => {
   });
 
   it("clears user when onAuthStateChange fires SIGNED_OUT", async () => {
-    mockGetSession.mockResolvedValue({
-      data: { session: fakeSession },
-    });
-    mockGetUser.mockResolvedValue({
-      data: { user: fakeUser },
-    });
+    mockGetSession.mockResolvedValue(fakeSession);
+    mockGetUser.mockResolvedValue(fakeUser);
 
     let authCallback: (event: string, session: unknown) => void = () => {};
 
@@ -210,13 +189,9 @@ describe("AuthProvider — auth state changes", () => {
 });
 
 describe("AuthProvider — signOut", () => {
-  it("calls supabase.auth.signOut when signOut is invoked", async () => {
-    mockGetSession.mockResolvedValue({
-      data: { session: fakeSession },
-    });
-    mockGetUser.mockResolvedValue({
-      data: { user: fakeUser },
-    });
+  it("calls account client signOut when signOut is invoked", async () => {
+    mockGetSession.mockResolvedValue(fakeSession);
+    mockGetUser.mockResolvedValue(fakeUser);
 
     render(
       <AuthProvider>

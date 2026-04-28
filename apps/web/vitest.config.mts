@@ -1,11 +1,13 @@
 import path from "path";
-import react from "@vitejs/plugin-react";
 import { defineConfig, mergeConfig } from "vitest/config";
 import { sharedVitestConfig } from "../../vitest.shared";
 
-export default mergeConfig(
-  sharedVitestConfig,
-  defineConfig({
+export default defineConfig(async () => {
+  const { default: react } = await import("@vitejs/plugin-react");
+
+  return mergeConfig(
+    sharedVitestConfig,
+    {
     plugins: [react()],
     resolve: {
       alias: [
@@ -14,10 +16,10 @@ export default mergeConfig(
           replacement: path.resolve(__dirname, "./src"),
         },
         {
-          find: "@dubgrid/contracts",
+          find: "jose",
           replacement: path.resolve(
             __dirname,
-            "../../packages/contracts/src/index.ts",
+            "./node_modules/jose/dist/webapi/index.js",
           ),
         },
         {
@@ -33,5 +35,6 @@ export default mergeConfig(
       environment: "jsdom",
       setupFiles: [path.resolve(__dirname, "./src/__tests__/setup.ts")],
     },
-  }),
-);
+    },
+  );
+});

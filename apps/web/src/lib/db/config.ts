@@ -39,6 +39,12 @@ export interface DependencyInfo {
   summary: string;
 }
 
+const SCHEDULED_JOB_STORAGE_STYLE = {
+  color: "#E2E8F0",
+  borderColor: "transparent",
+  textColor: "#1E293B",
+} as const;
+
 type ScheduleCellDependencyRow = Pick<DbScheduleCell, "id"> & {
   employees?: { archived_at?: string | null } | Array<{ archived_at?: string | null }> | null;
   snapshots?: Array<{
@@ -73,7 +79,7 @@ async function loadActiveScheduleCellDependencies(
         absence_type_id,
         segments:schedule_cell_segments(
           shift_id,
-          job_id,
+          job_id
         )
       )
     `)
@@ -681,6 +687,13 @@ export async function upsertJobDefinition(
   const departmentIds = getStoredJobDepartmentIds(job);
   const normalizedTiming = normalizeShiftlessJobTiming(job);
   const isShiftlessJob = (job.assignmentMode ?? "with_shift") === "shiftless";
+  const storedStyle = isShiftlessJob
+    ? {
+        color: job.color,
+        borderColor: job.border,
+        textColor: job.text,
+      }
+    : SCHEDULED_JOB_STORAGE_STYLE;
   const row = {
     org_id: job.orgId,
     name: job.name,
@@ -693,9 +706,9 @@ export async function upsertJobDefinition(
     applicable_shift_ids: normalizePlacementIds(job.applicableShiftIds),
     eligible_role_ids: job.eligibleRoleIds ?? [],
     required_certification_ids: job.requiredCertificationIds ?? [],
-    color: isShiftlessJob ? job.color : "#E2E8F0",
-    border_color: isShiftlessJob ? job.border : "transparent",
-    text_color: isShiftlessJob ? job.text : "#1E293B",
+    color: storedStyle.color,
+    border_color: storedStyle.borderColor,
+    text_color: storedStyle.textColor,
     shift_time_overrides: normalizeShiftTimeOverrides(job.shiftTimeOverrides),
     shift_color_overrides: normalizeShiftColorOverrides(job.shiftColorOverrides),
     default_start_time: normalizedTiming.defaultStartTime,

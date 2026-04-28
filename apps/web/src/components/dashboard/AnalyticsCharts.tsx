@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import * as Sentry from "@/lib/sentry";
-import {
-  fetchWeeklyShiftHours,
-  fetchEmployeeUtilization,
-  type WeeklyShiftHours,
-  type EmployeeUtilization,
-} from "@/lib/analytics";
+import { fetchDashboardAnalytics } from "@/features/dashboard/client";
+import type {
+  EmployeeUtilization,
+  WeeklyShiftHours,
+} from "@/features/dashboard/shared/analytics";
 import {
   chartTooltipContentStyle,
   chartTooltipWrapperStyle,
@@ -45,12 +44,9 @@ export default function AnalyticsCharts({ orgId }: { orgId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [hours, util] = await Promise.all([
-        fetchWeeklyShiftHours(orgId, weeks),
-        fetchEmployeeUtilization(orgId, weeks),
-      ]);
-      setHoursData(hours);
-      setUtilData(util);
+      const analytics = await fetchDashboardAnalytics({ orgId, weeks });
+      setHoursData(analytics.weeklyShiftHours);
+      setUtilData(analytics.employeeUtilization);
     } catch (err) {
       Sentry.captureException(err, {
         extra: { context: "dashboard-analytics-charts", orgId, weeks },

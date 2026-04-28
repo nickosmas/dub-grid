@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { supabase } from "@/lib/supabase";
-import { getImpersonationFromCookie } from "@/lib/impersonation";
-import { getVerifiedBrowserAuth } from "@/lib/browser-auth";
+import {
+  createBrowserRealtimeChannel,
+  fetchAccountPermissions,
+  getVerifiedBrowserAuth,
+  removeBrowserRealtimeChannel,
+  subscribeToBrowserAuthChanges,
+  type BrowserRealtimeChannel,
+} from "@/features/account/client";
 import {
   READ_ONLY_PERMS,
   ROLE_LEVEL,
@@ -120,114 +125,18 @@ export function usePermissions(): Permissions {
         if (mounted) setPerms({ ...LOADING_PERMS });
       }
 
-      // ── Impersonation override ──────────────────────────────────────
-      // When a gridmaster has an active impersonation cookie, resolve
-      // permissions as the target user instead of the gridmaster.
-      if (typeof document !== "undefined") {
-        const imp = getImpersonationFromCookie(document.cookie);
-        if (imp) {
-          const targetRole = imp.targetOrgRole;
-          const targetOrgId = imp.targetOrgId;
-
-          if (targetRole === "super_admin") {
-            setPermsAndCache(buildPerms("super_admin", targetOrgId, false, null, true), sessionUserId);
-            return;
-          }
-
-          if (targetRole === "admin") {
-            // Fetch the target user's admin_permissions
-            const { data } = await supabase
-              .from("organization_memberships")
-              .select("org_role, admin_permissions")
-              .eq("user_id", imp.targetUserId)
-              .eq("org_id", targetOrgId)
-              .single();
-
-            if (mounted) {
-              const dbRole = data?.org_role ?? "user";
-              setPermsAndCache(buildPerms(dbRole, targetOrgId, false, data?.admin_permissions ?? null, true), sessionUserId);
-            }
-            return;
-          }
-
-          // user role — permissions come from admin_permissions (per-user)
-          {
-            const { data: mem } = await supabase
-              .from("organization_memberships")
-              .select("admin_permissions")
-              .eq("user_id", imp.targetUserId)
-              .eq("org_id", targetOrgId)
-              .single();
-
-            if (mounted) {
-              setPermsAndCache(buildPerms("user", targetOrgId, false, mem?.admin_permissions ?? null, true), sessionUserId);
-            }
-          }
-          return;
-        }
-      }
-
       const { effectiveRole, orgId } = extractJwtClaims(session.access_token);
 
-      // gridmaster / super_admin: all perms, no DB query needed.
-      if (effectiveRole === "gridmaster" || effectiveRole === "super_admin") {
-        setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
-        return;
-      }
-
-      // admin: fetch admin_permissions from organization_memberships.
-      // Also fetch org_role to detect role changes (e.g. downgrade) since the JWT.
-      if (effectiveRole === "admin" && verifiedUserId && orgId) {
-        const { data } = await supabase
-          .from("organization_memberships")
-          .select("org_role, admin_permissions")
-          .eq("user_id", verifiedUserId)
-          .eq("org_id", orgId)
-          .single();
-
+      try {
+        const { permissions } = await fetchAccountPermissions();
         if (mounted) {
-          const dbRole = data?.org_role ?? "user";
-          setPermsAndCache(buildPerms(dbRole, orgId, false, data?.admin_permissions ?? null), sessionUserId);
+          setPermsAndCache(permissions, sessionUserId);
         }
-        return;
-      }
-
-      // user role from JWT — confirm against DB in case token is stale.
-      if (verifiedUserId) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("org_id, platform_role")
-          .eq("id", verifiedUserId)
-          .single();
-
-        if (mounted && profile) {
-          if (profile.platform_role === "gridmaster") {
-            setPermsAndCache(buildPerms("gridmaster", profile.org_id, false), sessionUserId);
-            return;
-          }
-
-          if (profile.org_id) {
-            const { data: membership } = await supabase
-              .from("organization_memberships")
-              .select("org_role, admin_permissions")
-              .eq("user_id", verifiedUserId)
-              .eq("org_id", profile.org_id)
-              .single();
-
-            if (mounted && membership) {
-              setPermsAndCache(buildPerms(
-                membership.org_role,
-                profile.org_id,
-                false,
-                membership.admin_permissions ?? null,
-              ), sessionUserId);
-              return;
-            }
-          }
+      } catch {
+        if (mounted) {
+          setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
         }
       }
-
-      setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
     }
 
     getVerifiedBrowserAuth()
@@ -246,7 +155,7 @@ export function usePermissions(): Permissions {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: string, session: Session | null) => {
+    } = subscribeToBrowserAuthChanges((event: string, session: Session | null) => {
       if (event === "INITIAL_SESSION") return;
       // On sign-out, immediately clear cached perms to prevent stale data
       // flashing when a different user signs in.
@@ -271,8 +180,8 @@ export function usePermissions(): Permissions {
     // When another session (e.g. super_admin) updates the current user's
     // admin_permissions, org_role, or a department's permissions template,
     // we get a Postgres change event and immediately re-resolve.
-    let membershipChannel: ReturnType<typeof supabase.channel> | null = null;
-    let departmentChannel: ReturnType<typeof supabase.channel> | null = null;
+    let membershipChannel: BrowserRealtimeChannel | null = null;
+    let departmentChannel: BrowserRealtimeChannel | null = null;
     // Unique channel name per effect instance avoids reusing an already-subscribed
     // channel during React strict-mode double-mounts.
     const channelId = `perms:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
@@ -284,49 +193,45 @@ export function usePermissions(): Permissions {
       });
     };
 
-    if (typeof supabase.channel === "function") {
-      getVerifiedBrowserAuth().then(({ session: s, user }) => {
-        if (!mounted || !s?.access_token || !user?.id) return;
-        const uid = user.id;
-        membershipChannel = supabase
-          .channel(channelId)
+    getVerifiedBrowserAuth().then(({ session: s, user }) => {
+      if (!mounted || !s?.access_token || !user?.id) return;
+      const uid = user.id;
+      membershipChannel = createBrowserRealtimeChannel(channelId)
+        .on(
+          "postgres_changes" as "system",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "organization_memberships",
+            filter: `user_id=eq.${uid}`,
+          } as Record<string, unknown>,
+          reResolve,
+        )
+        .subscribe();
+
+      // Listen for department permission template changes (scoped to user's org)
+      const { orgId: userOrgId } = extractJwtClaims(s.access_token);
+      if (userOrgId) {
+        departmentChannel = createBrowserRealtimeChannel(`dept-perms:${channelId}`)
           .on(
             "postgres_changes" as "system",
             {
               event: "UPDATE",
               schema: "public",
-              table: "organization_memberships",
-              filter: `user_id=eq.${uid}`,
+              table: "departments",
+              filter: `org_id=eq.${userOrgId}`,
             } as Record<string, unknown>,
             reResolve,
           )
           .subscribe();
-
-        // Listen for department permission template changes (scoped to user's org)
-        const { orgId: userOrgId } = extractJwtClaims(s.access_token);
-        if (userOrgId) {
-          departmentChannel = supabase
-            .channel(`dept-perms:${channelId}`)
-            .on(
-              "postgres_changes" as "system",
-              {
-                event: "UPDATE",
-                schema: "public",
-                table: "departments",
-                filter: `org_id=eq.${userOrgId}`,
-              } as Record<string, unknown>,
-              reResolve,
-            )
-            .subscribe();
-        }
-      });
-    }
+      }
+    });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      if (membershipChannel) supabase.removeChannel(membershipChannel);
-      if (departmentChannel) supabase.removeChannel(departmentChannel);
+      if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
+      if (departmentChannel) void removeBrowserRealtimeChannel(departmentChannel);
     };
   }, []);
 

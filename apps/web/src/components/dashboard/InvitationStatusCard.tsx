@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { fetchInvitations } from "@/lib/db";
+import { fetchOrganizationInvitations } from "@/features/organization/client";
 import type { Invitation } from "@/types";
 
 interface InvitationStatusCardProps {
@@ -22,7 +22,7 @@ export default function InvitationStatusCard({ orgId }: InvitationStatusCardProp
 
   useEffect(() => {
     let cancelled = false;
-    fetchInvitations(orgId)
+    fetchOrganizationInvitations(orgId)
       .then((data) => {
         if (!cancelled) setInvitations(data);
       })

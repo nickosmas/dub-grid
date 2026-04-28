@@ -1,16 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { acceptInvitation } from "@/lib/db";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
-import { acceptTerms } from "@/lib/terms";
 import * as Sentry from "@/lib/sentry";
+import {
+  fetchInvitationLookup,
+  recordCurrentTermsAcceptance,
+  signInBrowserWithPassword,
+  signOutFromBrowser,
+  signUpBrowserUser,
+} from "@/features/account/client";
+import { acceptInvitation } from "@/features/organization/client";
 
 type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
 
@@ -46,13 +50,8 @@ export default function AcceptInvitePage() {
       }
       setState("form");
       // Fetch org name for context (best-effort)
-      supabase
-        .from("invitations")
-        .select("organizations(name)")
-        .eq("token", t)
-        .maybeSingle()
-        .then(({ data }: { data: { organizations: { name: string } | null } | null }) => {
-          const name = data?.organizations?.name;
+      fetchInvitationLookup(t)
+        .then(({ orgName: name }) => {
           if (name) setOrgName(name);
         })
         .catch(() => { /* best-effort */ });
@@ -87,7 +86,7 @@ export default function AcceptInvitePage() {
 
     try {
       // 1. Sign up — create the Supabase auth account
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await signUpBrowserUser({
         email,
         password,
       });
@@ -99,7 +98,7 @@ export default function AcceptInvitePage() {
       // If no session (email confirmation required or user already exists),
       // try signing in directly
       if (data.user && !data.session) {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { error: signInError } = await signInBrowserWithPassword({
           email,
           password,
         });
@@ -133,12 +132,8 @@ export default function AcceptInvitePage() {
         }
         // Try to look up the org slug for redirect
         try {
-          const { data: inv } = await supabase
-            .from("invitations")
-            .select("org_id, organizations(slug)")
-            .eq("token", token!)
-            .maybeSingle();
-          slug = (inv?.organizations as { slug: string | null } | null)?.slug ?? null;
+          const lookup = await fetchInvitationLookup(token!);
+          slug = lookup.orgSlug;
         } catch {
           // Best-effort
         }
@@ -146,10 +141,7 @@ export default function AcceptInvitePage() {
 
       // 2b. Record terms acceptance (best-effort — user is already authenticated)
       try {
-        const user = await getVerifiedBrowserUser();
-        if (user) {
-          await acceptTerms(user.id);
-        }
+        await recordCurrentTermsAcceptance();
       } catch {
         // Non-blocking — TermsAcceptanceGate will catch this on next login
       }
@@ -157,7 +149,7 @@ export default function AcceptInvitePage() {
       // 3. Sign out so user re-authenticates with fresh JWT claims.
       // Use global scope to revoke the server-side refresh token too,
       // otherwise the login page will find a stale token in cookies.
-      await supabase.auth.signOut({ scope: "global" });
+      await signOutFromBrowser("global");
 
       setOrgSlug(slug);
       setState("success");

@@ -4,6 +4,7 @@ import { relative, resolve } from "path";
 
 import { buttonVariants } from "@/components/ui/button";
 import { tabsListVariants } from "@/components/ui/tabs";
+import { createWebCssVariables } from "@dubgrid/design-tokens";
 
 function resolveRepoRoot(): string {
   const cwd = process.cwd();
@@ -20,6 +21,7 @@ function resolveWebSource(path: string): string {
 }
 
 const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8");
+const webCssVariables = createWebCssVariables();
 const settingsPage = readFileSync(resolveWebSource("components/settings/SettingsPage.tsx"), "utf-8");
 const gridmasterPortal = readFileSync(resolveWebSource("components/gridmaster/GridmasterPortal.tsx"), "utf-8");
 const staffView = readFileSync(resolveWebSource("components/StaffView.tsx"), "utf-8");
@@ -72,20 +74,20 @@ describe("shared chrome theming", () => {
     );
   });
 
-  it("defines the neutral control token ramp in globals", () => {
-    expect(globalsCss).toContain("--color-control-primary: #0F172A;");
-    expect(globalsCss).toContain("--color-control-active-bg: #F1F5F9;");
-    expect(globalsCss).toContain("--color-control-active-border: #CBD5E1;");
-    expect(globalsCss).toContain("--dg-btn-radius: 6px;");
-    expect(globalsCss).toContain("--dg-btn-h: 38px;");
-    expect(globalsCss).toContain("--dg-toolbar-h: 38px;");
-    expect(globalsCss).toContain("--dg-radius-sm: 6px;");
-    expect(globalsCss).toContain("--dg-radius-md: 8px;");
-    expect(globalsCss).toContain("--dg-radius-lg: 10px;");
-    expect(globalsCss).toContain("--dg-radius-xl: 12px;");
-    expect(globalsCss).toContain("--dg-tab-shell-radius: var(--dg-radius-md);");
-    expect(globalsCss).toContain("--dg-tab-shell-pad: 2px;");
-    expect(globalsCss).toContain("--dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));");
+  it("defines the neutral control token ramp through shared runtime vars", () => {
+    expect(globalsCss).toContain("--color-control-primary: var(--dg-color-control-primary);");
+    expect(globalsCss).toContain("--color-control-active-bg: var(--dg-color-control-active-bg);");
+    expect(globalsCss).toContain("--color-control-active-border: var(--dg-color-control-active-border);");
+    expect(webCssVariables["--dg-btn-radius"]).toBe("6px");
+    expect(webCssVariables["--dg-btn-h"]).toBe("38px");
+    expect(webCssVariables["--dg-toolbar-h"]).toBe("38px");
+    expect(webCssVariables["--dg-radius-sm"]).toBe("6px");
+    expect(webCssVariables["--dg-radius-md"]).toBe("8px");
+    expect(webCssVariables["--dg-radius-lg"]).toBe("10px");
+    expect(webCssVariables["--dg-radius-xl"]).toBe("12px");
+    expect(webCssVariables["--dg-tab-shell-radius"]).toBe("var(--dg-radius-md)");
+    expect(webCssVariables["--dg-tab-shell-pad"]).toBe("2px");
+    expect(webCssVariables["--dg-tab-inner-radius"]).toBe("calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad))");
     expect(globalsCss).toContain(".dg-btn-warning-filled");
   });
 

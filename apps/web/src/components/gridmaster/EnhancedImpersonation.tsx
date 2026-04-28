@@ -3,7 +3,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchOrganizationUsers, startImpersonation, endImpersonation } from "@/lib/db";
+import { fetchOrganizationUsers } from "@/features/organization/client";
+import {
+  endGridmasterImpersonation,
+  startGridmasterImpersonation,
+} from "@/features/gridmaster/client";
 import { setImpersonationCookie, clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "@/features/permissions/client";
 import type { Organization, OrganizationUser } from "@/types";
@@ -115,16 +119,15 @@ export default function EnhancedImpersonation({
     }
     setLoading(true);
     try {
-      const result = await startImpersonation(
-        selectedUser.id,
-        trimmedJustification,
-        undefined,
-        navigator.userAgent,
-        selectedOrg.id,
-      );
+      const result = await startGridmasterImpersonation({
+        targetUserId: selectedUser.id,
+        justification: trimmedJustification,
+        userAgent: navigator.userAgent,
+        targetOrgId: selectedOrg.id,
+      });
       const effectiveRole = roleOverride || selectedUser.orgRole || "user";
       setImpersonationCookie({
-        sessionId: result.session_id,
+        sessionId: result.sessionId,
         targetUserId: selectedUser.id,
         targetOrgId: selectedOrg.id,
         targetOrgSlug: selectedOrg.slug ?? "",
@@ -132,7 +135,7 @@ export default function EnhancedImpersonation({
         targetEmail: selectedUser.email ?? "",
         targetOrgName: selectedOrg.name,
         justification: trimmedJustification,
-        expiresAt: result.expires_at,
+        expiresAt: result.expiresAt,
       });
       clearPermsCache();
       queryClient.clear();
@@ -143,7 +146,7 @@ export default function EnhancedImpersonation({
           targetEmail: selectedUser.email,
           targetOrgName: selectedOrg.name,
           type: "start",
-          sessionId: result.session_id,
+          sessionId: result.sessionId,
           justification: trimmedJustification,
         }),
       }).catch(() => {});
@@ -160,7 +163,11 @@ export default function EnhancedImpersonation({
     if (!sessionId) return;
     setLoading(true);
     try {
-      await endImpersonation(sessionId, "manual");
+      await endGridmasterImpersonation({
+        sessionId,
+        reason: "manual",
+        targetOrgId: selectedOrg?.id ?? null,
+      });
     } catch {
       // Best-effort — clearing cookie is what matters
     }

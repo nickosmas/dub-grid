@@ -5,7 +5,7 @@ import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Employee, FocusArea, NamedItem, ScheduleCellSegmentInput } from "@/types";
-import { upsertRecurringShift } from "@/lib/db";
+import { upsertRecurringShift } from "@/features/schedule/client";
 
 const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
   mockToastSuccess: vi.fn(),
@@ -108,19 +108,22 @@ vi.mock("@/components/ShiftPicker", () => ({
   },
 }));
 
-vi.mock("@/lib/db", () => ({
-  fetchInvitations: vi.fn().mockResolvedValue([]),
-  revokeInvitation: vi.fn(),
-  resendInvitation: vi.fn(),
+vi.mock("@/features/schedule/client", () => ({
   fetchRecurringShifts: vi.fn().mockResolvedValue([]),
   getRecurringDraft: vi.fn().mockResolvedValue(null),
   upsertRecurringShift: vi.fn(),
   deleteRecurringShift: vi.fn(),
   saveRecurringDraft: vi.fn(),
   deleteRecurringDraft: vi.fn(),
+}));
+
+vi.mock("@/features/organization/client", () => ({
+  fetchOrganizationInvitations: vi.fn().mockResolvedValue([]),
+  revokeOrganizationInvitationGuarded: vi.fn(),
+  resendOrganizationInvitationGuarded: vi.fn(),
   removeUserFromOrganization: vi.fn(),
   updateAppOnlyUser: vi.fn(),
-  updatePendingInvitation: vi.fn(),
+  updateOrganizationInvitationGuarded: vi.fn(),
 }));
 
 vi.mock("@/components/ui/sidebar", () => {

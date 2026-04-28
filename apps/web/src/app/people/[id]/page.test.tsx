@@ -24,7 +24,7 @@ vi.mock("@/hooks", () => ({
   usePermissions: () => mockUsePermissions(),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/employees/client", () => ({
   fetchEmployeeByUserId: (...args: unknown[]) => mockFetchEmployeeByUserId(...args),
 }));
 

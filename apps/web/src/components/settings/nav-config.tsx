@@ -54,6 +54,7 @@ export interface NavItem {
   id: SectionId;
   label: string;
   icon: React.ReactNode;
+  helpHint?: string;
   description?: string;
 }
 
@@ -92,26 +93,26 @@ export function buildNavGroups(
   if (perms.canAccessSettings) {
     const orgItems: NavItem[] = [];
     if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "Organization Details", icon: iconBuilding, description: "Manage your organization's name and basic profile information." });
-    if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels, description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
+    if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels, helpHint: "Labels rename visible wording across DubGrid but do not change behavior.", description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
     if (orgItems.length > 0) groups.push({ id: "organization", label: "Organization", items: orgItems });
   }
 
   if (perms.canAccessSettings) {
     const staffItems: NavItem[] = [];
-    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: scheduledDepartmentLabel, icon: iconDepartment, description: "Organize your scheduled departments, focus areas, and management departments." });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, description: "Manage visible role tags and choose which ones actually count for job eligibility on the schedule." });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations, description: "The certification badge shown next to the employee's name on the schedule grid." });
+    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: scheduledDepartmentLabel, icon: iconDepartment, helpHint: "Scheduled departments drive the grid; management departments are app-only.", description: "Organize your scheduled departments, focus areas, and management departments." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, helpHint: "Roles are visible tags; only schedule-eligible roles can gate jobs.", description: "Manage visible role tags and choose which ones actually count for job eligibility on the schedule." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations, helpHint: "Certifications can display on staff and can restrict assignments.", description: "The certification badge shown next to the employee's name on the schedule grid." });
     if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff & Designations", items: staffItems });
   }
 
   if (perms.canAccessSettings) {
     const schedItems: NavItem[] = [];
-    if (perms.canManageOrgSettings) schedItems.push({ id: "org-display", label: "Shift Display Mode", icon: iconDisplay, description: "Choose how shifts appear on the schedule grid — short codes or full names." });
+    if (perms.canManageOrgSettings) schedItems.push({ id: "org-display", label: "Shift Display Mode", icon: iconDisplay, helpHint: "Choose between readable full names and denser short shift codes.", description: "Choose how shifts appear on the schedule grid — short codes or full names." });
     if (perms.isSuperAdmin) schedItems.push({ id: "schedule-rules", label: "Schedule Rules", icon: iconRules, description: "Configure automated scheduling rules and constraints." });
     if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-shifts", label: "Shifts", icon: iconTag, description: "Configure your core Day, Evening, Night, and similar shift definitions with default times and colors." });
-    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-jobs", label: "Jobs", icon: iconCalendar, description: "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility." });
-    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-absence-types", label: "Absence Types", icon: iconCalendar, description: "Manage PTO, sick, vacation, calloff, and other non-worked schedule labels." });
-    if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", icon: iconCoverage, description: "Set minimum staffing requirements by focus area and assignable shift/job combination." });
+    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-jobs", label: "Jobs", icon: iconCalendar, helpHint: "Jobs can be scheduled or general and can restrict qualification.", description: "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility." });
+    if (perms.canManageScheduleDefinitions || perms.canViewScheduleDefinitions) schedItems.push({ id: "schedule-absence-types", label: "Absence Types", icon: iconCalendar, helpHint: "Absences replace worked assignments and are excluded from coverage.", description: "Manage PTO, sick, vacation, calloff, and other non-worked schedule labels." });
+    if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", icon: iconCoverage, helpHint: "Coverage sets minimum headcount by focus area, shift, and job.", description: "Set minimum staffing requirements by focus area and assignable shift/job combination." });
     if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes) schedItems.push({ id: "staff-indicators", label: "Indicators", icon: iconIndicator, description: "Define custom indicators that can be attached to shift cells on the schedule." });
     if (schedItems.length > 0) groups.push({ id: "scheduling", label: "Scheduling", items: schedItems });
   }

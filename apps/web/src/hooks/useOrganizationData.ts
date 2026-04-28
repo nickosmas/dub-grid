@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { fetchUserOrganization, fetchOrganizationById, fetchFocusAreas, fetchAssignmentDefinitions as fetchAssignmentDefinitions, fetchAbsenceTypes, fetchShiftCategories, fetchJobDefinitions, fetchIndicatorTypes, fetchCertifications, fetchOrganizationRoles, fetchDepartments, fetchCoverageRequirements, autoMigrateOrphanedFocusAreas } from "@/lib/db";
-import { supabase, validateConfig } from "@/lib/supabase";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
 import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
+import { fetchAccountOrgContext } from "@/features/account/client";
+import { fetchOrganizationBootstrap } from "@/features/organization/client";
 import type {
   Organization,
   FocusArea,
@@ -21,8 +20,6 @@ import type {
   Department,
   CoverageRequirement,
 } from "@/types";
-
-// ── Types ────────────────────────��───────────────────────────────────────────
 
 export interface SetupStatus {
   isComplete: boolean;
@@ -68,8 +65,6 @@ export interface OrganizationData {
   setCoverageRequirements: (reqs: CoverageRequirement[]) => void;
 }
 
-// ── Org context resolution ───────────────��───────────────────────────────────
-
 interface OrgContext {
   orgId: string | null;
   isImpersonating: boolean;
@@ -95,46 +90,55 @@ function useOrgContext(): OrgContext {
     let cancelled = false;
 
     async function resolve() {
-      try { validateConfig(); } catch { /* proceed */ }
-
       let earlyOrgId: string | null = null;
       let isImpersonating = false;
 
       if (typeof document !== "undefined") {
-        const imp = getImpersonationFromCookie(document.cookie);
-        if (imp) {
-          earlyOrgId = imp.targetOrgId;
+        const impersonation = getImpersonationFromCookie(document.cookie);
+        if (impersonation) {
+          earlyOrgId = impersonation.targetOrgId;
           isImpersonating = true;
         }
       }
 
       if (!earlyOrgId) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            const payload = decodeJwt(session.access_token) as Record<string, unknown>;
-            if (payload.platform_role === "gridmaster") {
-              if (!cancelled) setCtx({ orgId: null, isImpersonating: false, isGridmaster: true, resolved: true });
-              return;
+          const orgContext = await fetchAccountOrgContext();
+          if (orgContext.isGridmaster) {
+            if (!cancelled) {
+              setCtx({
+                orgId: null,
+                isImpersonating: false,
+                isGridmaster: true,
+                resolved: true,
+              });
             }
-            earlyOrgId = (payload.org_id as string) || null;
+            return;
           }
-        } catch { /* proceed without hint */ }
+          earlyOrgId = orgContext.orgId;
+        } catch {
+          // Proceed without a server-side hint.
+        }
       }
 
       if (!cancelled) {
-        setCtx({ orgId: earlyOrgId, isImpersonating, isGridmaster: false, resolved: true });
+        setCtx({
+          orgId: earlyOrgId,
+          isImpersonating,
+          isGridmaster: false,
+          resolved: true,
+        });
       }
     }
 
     resolve();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return ctx;
 }
-
-// ── Hook ��──────────────────��─────────────────────────────────��───────────────
 
 export function useOrganizationData(options?: UseOrganizationDataOptions): OrganizationData {
   const queryClient = useQueryClient();
@@ -142,153 +146,81 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const includeAssignmentDefinitionCompatibility =
     options?.includeAssignmentDefinitionCompatibility ?? true;
 
-  // ── Step 1: Fetch organization ────────────���────────────────────────��────
-  const orgQuery = useQuery({
-    queryKey: ctx.orgId
-      ? queryKeys.org.detail(ctx.orgId)
-      : queryKeys.org.bySubdomain(),
-    queryFn: async () => {
-      if (ctx.isImpersonating && ctx.orgId) {
-        return fetchOrganizationById(ctx.orgId);
-      }
-      const org = await fetchUserOrganization();
-      if (!org) throw new Error("No organization found. Check your database setup.");
-      return org;
-    },
-    enabled: ctx.resolved && !ctx.isGridmaster,
-    staleTime: 5 * 60_000, // 5 min — org data rarely changes mid-session
+  const bootstrapQuery = useQuery({
+    queryKey: [
+      "organization-bootstrap",
+      ctx.orgId ?? "auto",
+      includeAssignmentDefinitionCompatibility,
+    ],
+    queryFn: () =>
+      fetchOrganizationBootstrap({
+        includeAssignments: includeAssignmentDefinitionCompatibility,
+      }),
+    enabled: ctx.resolved,
+    staleTime: 5 * 60_000,
   });
 
-  const org = orgQuery.data ?? null;
+  const bootstrap = bootstrapQuery.data;
+  const org = bootstrap?.org ?? null;
   const effectiveOrgId = ctx.orgId ?? org?.id ?? null;
 
-  // When org loads via subdomain and we didn't have an orgId, also seed the
-  // detail key so subsequent lookups by id hit the cache.
   useEffect(() => {
-    if (org && !ctx.orgId) {
-      queryClient.setQueryData(queryKeys.org.detail(org.id), org);
+    if (!bootstrap || !effectiveOrgId) return;
+
+    if (bootstrap.org) {
+      queryClient.setQueryData(queryKeys.org.detail(bootstrap.org.id), bootstrap.org);
     }
-  }, [org, ctx.orgId, queryClient]);
+    queryClient.setQueryData(queryKeys.org.focusAreas(effectiveOrgId), bootstrap.focusAreas);
+    queryClient.setQueryData(queryKeys.org.absenceTypes(effectiveOrgId), bootstrap.allAbsenceTypes);
+    queryClient.setQueryData(queryKeys.org.shiftCategories(effectiveOrgId), bootstrap.shiftCategories);
+    queryClient.setQueryData(queryKeys.org.jobs(effectiveOrgId), bootstrap.jobs);
+    queryClient.setQueryData(queryKeys.org.indicatorTypes(effectiveOrgId), bootstrap.indicatorTypes);
+    queryClient.setQueryData(queryKeys.org.certifications(effectiveOrgId), bootstrap.certifications);
+    queryClient.setQueryData(queryKeys.org.orgRoles(effectiveOrgId), bootstrap.orgRoles);
+    queryClient.setQueryData(queryKeys.org.departments(effectiveOrgId), bootstrap.departments);
+    queryClient.setQueryData(queryKeys.org.coverageRequirements(effectiveOrgId), bootstrap.coverageRequirements);
+    if (includeAssignmentDefinitionCompatibility) {
+      queryClient.setQueryData(queryKeys.org.assignments(effectiveOrgId), bootstrap.allAssignmentDefinitions);
+    }
+  }, [bootstrap, effectiveOrgId, includeAssignmentDefinitionCompatibility, queryClient]);
 
-  // ── Step 2: Fetch config entities (enabled once orgId is known) ─────────
-  // Config queries use a longer staleTime (5 min) since these entities
-  // rarely change mid-session and setter functions update the cache directly.
-  const CONFIG_STALE_TIME = 5 * 60_000;
-
-  const focusAreasQuery = useQuery({
-    queryKey: queryKeys.org.focusAreas(effectiveOrgId!),
-    queryFn: () => fetchFocusAreas(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const allAssignmentDefinitionsQuery = useQuery({
-    queryKey: queryKeys.org.assignments(effectiveOrgId!),
-    queryFn: () => fetchAssignmentDefinitions(effectiveOrgId!, true),
-    enabled: !!effectiveOrgId && includeAssignmentDefinitionCompatibility,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const allAbsenceTypesQuery = useQuery({
-    queryKey: queryKeys.org.absenceTypes(effectiveOrgId!),
-    queryFn: () => fetchAbsenceTypes(effectiveOrgId!, true),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const shiftCategoriesQuery = useQuery({
-    queryKey: queryKeys.org.shiftCategories(effectiveOrgId!),
-    queryFn: () => fetchShiftCategories(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const jobsQuery = useQuery({
-    queryKey: queryKeys.org.jobs(effectiveOrgId!),
-    queryFn: () => fetchJobDefinitions(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const indicatorTypesQuery = useQuery({
-    queryKey: queryKeys.org.indicatorTypes(effectiveOrgId!),
-    queryFn: () => fetchIndicatorTypes(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const certificationsQuery = useQuery({
-    queryKey: queryKeys.org.certifications(effectiveOrgId!),
-    queryFn: () => fetchCertifications(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const orgRolesQuery = useQuery({
-    queryKey: queryKeys.org.orgRoles(effectiveOrgId!),
-    queryFn: () => fetchOrganizationRoles(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const departmentsQuery = useQuery({
-    queryKey: queryKeys.org.departments(effectiveOrgId!),
-    queryFn: () => fetchDepartments(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  const coverageReqsQuery = useQuery({
-    queryKey: queryKeys.org.coverageRequirements(effectiveOrgId!),
-    queryFn: () => fetchCoverageRequirements(effectiveOrgId!),
-    enabled: !!effectiveOrgId,
-    staleTime: CONFIG_STALE_TIME,
-  });
-
-  // ── Derived values (memoized to stabilize references for downstream deps) ─
-  const focusAreas = useMemo(() => focusAreasQuery.data ?? [], [focusAreasQuery.data]);
+  const focusAreas = useMemo(() => bootstrap?.focusAreas ?? [], [bootstrap?.focusAreas]);
   const allAssignmentDefinitions = useMemo(
-    () => allAssignmentDefinitionsQuery.data ?? [],
-    [allAssignmentDefinitionsQuery.data],
+    () => bootstrap?.allAssignmentDefinitions ?? [],
+    [bootstrap?.allAssignmentDefinitions],
   );
-  const allAbsenceTypes = useMemo(() => allAbsenceTypesQuery.data ?? [], [allAbsenceTypesQuery.data]);
-  const shiftCategories = useMemo(() => shiftCategoriesQuery.data ?? [], [shiftCategoriesQuery.data]);
-  const jobs = useMemo(() => jobsQuery.data ?? [], [jobsQuery.data]);
-  const indicatorTypes = useMemo(() => indicatorTypesQuery.data ?? [], [indicatorTypesQuery.data]);
-  const certifications = useMemo(() => certificationsQuery.data ?? [], [certificationsQuery.data]);
-  const orgRoles = useMemo(() => orgRolesQuery.data ?? [], [orgRolesQuery.data]);
-  const departments = useMemo(() => departmentsQuery.data ?? [], [departmentsQuery.data]);
-  const coverageRequirements = useMemo(() => coverageReqsQuery.data ?? [], [coverageReqsQuery.data]);
+  const allAbsenceTypes = useMemo(
+    () => bootstrap?.allAbsenceTypes ?? [],
+    [bootstrap?.allAbsenceTypes],
+  );
+  const shiftCategories = useMemo(
+    () => bootstrap?.shiftCategories ?? [],
+    [bootstrap?.shiftCategories],
+  );
+  const jobs = useMemo(() => bootstrap?.jobs ?? [], [bootstrap?.jobs]);
+  const indicatorTypes = useMemo(
+    () => bootstrap?.indicatorTypes ?? [],
+    [bootstrap?.indicatorTypes],
+  );
+  const certifications = useMemo(
+    () => bootstrap?.certifications ?? [],
+    [bootstrap?.certifications],
+  );
+  const orgRoles = useMemo(() => bootstrap?.orgRoles ?? [], [bootstrap?.orgRoles]);
+  const departments = useMemo(() => bootstrap?.departments ?? [], [bootstrap?.departments]);
+  const coverageRequirements = useMemo(
+    () => bootstrap?.coverageRequirements ?? [],
+    [bootstrap?.coverageRequirements],
+  );
 
   const assignments = useMemo(
-    () => allAssignmentDefinitions.filter((preset) => !preset.archivedAt),
+    () => allAssignmentDefinitions.filter((assignment) => !assignment.archivedAt),
     [allAssignmentDefinitions],
   );
   const absenceTypes = useMemo(
-    () => allAbsenceTypes.filter((at) => !at.archivedAt),
+    () => allAbsenceTypes.filter((absenceType) => !absenceType.archivedAt),
     [allAbsenceTypes],
   );
-
-  // Auto-migrate orphaned focus areas → create default scheduled department
-  const migrationRanRef = useRef(false);
-  const focusAreasData = focusAreasQuery.data;
-  const departmentsData = departmentsQuery.data;
-  const refetchFocusAreas = focusAreasQuery.refetch;
-  const refetchDepartments = departmentsQuery.refetch;
-  useEffect(() => {
-    if (!effectiveOrgId || migrationRanRef.current) return;
-    if (!focusAreasData || !departmentsData) return;
-    const orphaned = focusAreasData.filter(fa => fa.departmentId === null);
-    const hasScheduledDepts = departmentsData.some(d => d.type === 'scheduled');
-    if (orphaned.length === 0 || hasScheduledDepts) return;
-    migrationRanRef.current = true;
-    autoMigrateOrphanedFocusAreas(effectiveOrgId).then((migrated) => {
-      if (migrated) {
-        void refetchFocusAreas();
-        void refetchDepartments();
-      }
-    }).catch(() => { /* silent — non-critical */ });
-  }, [effectiveOrgId, focusAreasData, departmentsData, refetchFocusAreas, refetchDepartments]);
 
   const allAssignmentDefinitionsRef = useRef<AssignmentDefinition[]>(allAssignmentDefinitions);
   useEffect(() => {
@@ -296,7 +228,9 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   }, [allAssignmentDefinitions]);
 
   const allAbsenceTypesRef = useRef<AbsenceType[]>(allAbsenceTypes);
-  useEffect(() => { allAbsenceTypesRef.current = allAbsenceTypes; }, [allAbsenceTypes]);
+  useEffect(() => {
+    allAbsenceTypesRef.current = allAbsenceTypes;
+  }, [allAbsenceTypes]);
 
   const assignmentLabelMap = useMemo(
     () =>
@@ -320,68 +254,36 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   );
 
   const absenceTypeMap = useMemo(
-    () => new Map(allAbsenceTypes.map((at) => [
-      at.id,
-      org?.shiftDisplayMode === 'name' ? (at.name || at.label) : at.label,
-    ])),
+    () =>
+      new Map(
+        allAbsenceTypes.map((absenceType) => [
+          absenceType.id,
+          org?.shiftDisplayMode === "name"
+            ? (absenceType.name || absenceType.label)
+            : absenceType.label,
+        ]),
+      ),
     [allAbsenceTypes, org?.shiftDisplayMode],
   );
 
-  // ── Loading & error states ──────────��───────────────────────────────────
-  const configQueriesLoading =
-    focusAreasQuery.isLoading ||
-    allAssignmentDefinitionsQuery.isLoading ||
-    allAbsenceTypesQuery.isLoading ||
-    shiftCategoriesQuery.isLoading ||
-    jobsQuery.isLoading ||
-    indicatorTypesQuery.isLoading ||
-    certificationsQuery.isLoading ||
-    orgRolesQuery.isLoading ||
-    coverageReqsQuery.isLoading ||
-    departmentsQuery.isLoading;
-
-  const loading = ctx.isGridmaster
-    ? !ctx.resolved
-    : !ctx.resolved || orgQuery.isLoading || configQueriesLoading;
-
-  // Only the org query error is fatal — config query failures degrade gracefully
-  const loadError = orgQuery.isError
-    ? (orgQuery.error instanceof Error ? orgQuery.error.message : "Failed to load organization")
+  const loading = !ctx.resolved || bootstrapQuery.isLoading;
+  const loadError = bootstrapQuery.isError
+    ? (bootstrapQuery.error instanceof Error
+        ? bootstrapQuery.error.message
+        : "Failed to load organization")
     : null;
 
-  // Handle API errors per-query — each fires its own toast, clears on recovery
   const handledErrorsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const queries = [
-      { key: "org", error: orgQuery.error },
-      { key: "focusAreas", error: focusAreasQuery.error },
-      { key: "assignments", error: allAssignmentDefinitionsQuery.error },
-      { key: "absenceTypes", error: allAbsenceTypesQuery.error },
-      { key: "shiftCategories", error: shiftCategoriesQuery.error },
-      { key: "jobs", error: jobsQuery.error },
-      { key: "indicatorTypes", error: indicatorTypesQuery.error },
-      { key: "certifications", error: certificationsQuery.error },
-      { key: "orgRoles", error: orgRolesQuery.error },
-      { key: "coverageReqs", error: coverageReqsQuery.error },
-    ];
-    for (const { key, error } of queries) {
-      if (error && !handledErrorsRef.current.has(key)) {
-        handledErrorsRef.current.add(key);
-        handleApiError(error);
-      }
-      if (!error && handledErrorsRef.current.has(key)) {
-        handledErrorsRef.current.delete(key);
-      }
+    if (bootstrapQuery.error && !handledErrorsRef.current.has("bootstrap")) {
+      handledErrorsRef.current.add("bootstrap");
+      handleApiError(bootstrapQuery.error);
     }
-  }, [
-    orgQuery.error, focusAreasQuery.error, allAssignmentDefinitionsQuery.error,
-    allAbsenceTypesQuery.error, shiftCategoriesQuery.error,
-    jobsQuery.error,
-    indicatorTypesQuery.error, certificationsQuery.error,
-    orgRolesQuery.error, coverageReqsQuery.error,
-  ]);
+    if (!bootstrapQuery.error && handledErrorsRef.current.has("bootstrap")) {
+      handledErrorsRef.current.delete("bootstrap");
+    }
+  }, [bootstrapQuery.error]);
 
-  // ── Setup status ────────────────────────────────────────────────────────
   const setupStatus = useMemo<SetupStatus>(() => ({
     isComplete:
       focusAreas.length > 0 &&
@@ -397,14 +299,13 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     },
   }), [certifications, focusAreas, jobs.length, orgRoles, shiftCategories.length]);
 
-  // ── Setter functions (update React Query cache) ─────────────────────────
-  const setOrg = useCallback((o: Organization) => {
+  const setOrg = useCallback((nextOrg: Organization) => {
     const key = ctx.orgId
       ? queryKeys.org.detail(ctx.orgId)
       : queryKeys.org.bySubdomain();
-    queryClient.setQueryData(key, o);
+    queryClient.setQueryData(key, nextOrg);
     if (!ctx.orgId) {
-      queryClient.setQueryData(queryKeys.org.detail(o.id), o);
+      queryClient.setQueryData(queryKeys.org.detail(nextOrg.id), nextOrg);
     }
   }, [queryClient, ctx.orgId]);
 
@@ -414,24 +315,27 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     }
   }, [queryClient, effectiveOrgId]);
 
-  const handleAssignmentDefinitionsChange = useCallback((presets: AssignmentDefinition[]) => {
+  const handleAssignmentDefinitionsChange = useCallback((nextAssignments: AssignmentDefinition[]) => {
     if (!effectiveOrgId) return;
-    const archived = allAssignmentDefinitionsRef.current.filter((preset) => preset.archivedAt);
+    const archived = allAssignmentDefinitionsRef.current.filter((assignment) => assignment.archivedAt);
     queryClient.setQueryData(queryKeys.org.assignments(effectiveOrgId), [
-      ...presets,
+      ...nextAssignments,
       ...archived,
     ]);
   }, [queryClient, effectiveOrgId]);
 
   const handleAbsenceTypesChange = useCallback((types: AbsenceType[]) => {
     if (!effectiveOrgId) return;
-    const archived = allAbsenceTypesRef.current.filter((at) => at.archivedAt);
-    queryClient.setQueryData(queryKeys.org.absenceTypes(effectiveOrgId), [...types, ...archived]);
+    const archived = allAbsenceTypesRef.current.filter((absenceType) => absenceType.archivedAt);
+    queryClient.setQueryData(queryKeys.org.absenceTypes(effectiveOrgId), [
+      ...types,
+      ...archived,
+    ]);
   }, [queryClient, effectiveOrgId]);
 
-  const setShiftCategories = useCallback((cats: ShiftCategory[]) => {
+  const setShiftCategories = useCallback((categories: ShiftCategory[]) => {
     if (effectiveOrgId) {
-      queryClient.setQueryData(queryKeys.org.shiftCategories(effectiveOrgId), cats);
+      queryClient.setQueryData(queryKeys.org.shiftCategories(effectiveOrgId), categories);
     }
   }, [queryClient, effectiveOrgId]);
 
@@ -450,11 +354,10 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const handleCertificationsChange = useCallback(async (items: NamedItem[]) => {
     if (!effectiveOrgId) return;
     queryClient.setQueryData(queryKeys.org.certifications(effectiveOrgId), items);
-    // Invalidate schedule options since they reference certifications.
     try {
       await queryClient.invalidateQueries({ queryKey: queryKeys.org.assignments(effectiveOrgId) });
-    } catch (err) {
-      Sentry.captureException(err);
+    } catch (error) {
+      Sentry.captureException(error);
       toast.error("Failed to refresh schedule assignments");
     }
   }, [queryClient, effectiveOrgId]);
@@ -471,18 +374,21 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     }
   }, [queryClient, effectiveOrgId]);
 
-  const setCoverageRequirements = useCallback((reqs: CoverageRequirement[]) => {
+  const setCoverageRequirements = useCallback((requirements: CoverageRequirement[]) => {
     if (effectiveOrgId) {
-      queryClient.setQueryData(queryKeys.org.coverageRequirements(effectiveOrgId), reqs);
+      queryClient.setQueryData(
+        queryKeys.org.coverageRequirements(effectiveOrgId),
+        requirements,
+      );
     }
   }, [queryClient, effectiveOrgId]);
 
   return {
     org,
     focusAreas,
-    assignments: assignments,
-    allAssignmentDefinitions: allAssignmentDefinitions,
-    allAssignmentDefinitionsRef: allAssignmentDefinitionsRef,
+    assignments,
+    allAssignmentDefinitions,
+    allAssignmentDefinitionsRef,
     absenceTypes,
     allAbsenceTypes,
     allAbsenceTypesRef,
@@ -492,14 +398,14 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     certifications,
     orgRoles,
     departments,
-    assignmentLabelMap: assignmentLabelMap,
+    assignmentLabelMap,
     absenceTypeMap,
     loading,
     loadError,
     setupStatus,
     setOrg,
     setFocusAreas,
-    handleAssignmentDefinitionsChange: handleAssignmentDefinitionsChange,
+    handleAssignmentDefinitionsChange,
     handleAbsenceTypesChange,
     setShiftCategories,
     setJobs,

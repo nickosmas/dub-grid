@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import ScheduleGrid, {
   buildScheduleGridModel,
@@ -148,6 +148,8 @@ let observedWidth = 1600;
 const originalResizeObserver = global.ResizeObserver;
 const originalGetBoundingClientRect =
   HTMLElement.prototype.getBoundingClientRect;
+const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+const scrollIntoViewMock = vi.fn();
 
 beforeAll(() => {
   global.ResizeObserver = class ResizeObserverMock {
@@ -196,11 +198,21 @@ beforeAll(() => {
         toJSON: () => ({}),
       } as DOMRect;
     };
+  HTMLElement.prototype.scrollIntoView = function scrollIntoView(
+    ...args: unknown[]
+  ) {
+    scrollIntoViewMock(...args);
+  };
 });
 
 afterAll(() => {
   global.ResizeObserver = originalResizeObserver;
   HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+  HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+});
+
+beforeEach(() => {
+  scrollIntoViewMock.mockClear();
 });
 
 interface RenderGridOptions {
@@ -214,6 +226,7 @@ interface RenderGridOptions {
   getShiftStyle?: (type: string, focusAreaName?: string) => AssignmentDefinition;
   today?: Date;
   highlightEmpIds?: Set<string>;
+  highlightScrollKey?: string;
   focusAreas?: FocusArea[];
   departments?: Department[];
   assignments?: AssignmentDefinition[];
@@ -328,6 +341,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     openShifts: options.openShifts as any,
     activeFocusArea: options.activeFocusArea ?? null,
     highlightEmpIds: options.highlightEmpIds,
+    highlightScrollKey: options.highlightScrollKey,
     isCellInteractive: options.isCellInteractive ?? true,
     canDragShifts: options.canDragShifts,
     shiftDisplayMode: options.shiftDisplayMode ?? "code",
@@ -387,10 +401,27 @@ describe("ScheduleGrid", () => {
 
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "200px",
+      "220px",
     );
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "100px",
+      "98px",
+    );
+  });
+
+  it("preserves the staff column width when navigating to an empty 2-week grid", () => {
+    observedWidth = 1600;
+    const { container } = renderGrid({
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+    });
+    const root = container.firstElementChild as HTMLElement;
+
+    expect(root.dataset.gridFit).toBe("true");
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
+      "220px",
+    );
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
+      "98px",
     );
   });
 
@@ -408,6 +439,55 @@ describe("ScheduleGrid", () => {
     expect(draggable?.style.right).toBe("0px");
     expect(draggable?.style.bottom).toBe("0px");
     expect(draggable?.style.left).toBe("0px");
+  });
+
+  it("keeps all staff rows visible and visibly highlights matches when a staff search highlight set is active", async () => {
+    const localEmployees: Employee[] = [
+      extendedEmployees[0],
+      {
+        ...extendedEmployees[1],
+        focusAreaIds: [2],
+      },
+      extendedEmployees[2],
+    ];
+    const accessors = makeShiftAccessors(assignments, {
+      [`emp-1_${formatDateKey(week1[0])}`]: [1],
+      [`emp-2_${formatDateKey(week1[0])}`]: [1],
+      [`emp-3_${formatDateKey(week1[0])}`]: [1],
+    });
+
+    renderGrid({
+      filteredEmployees: localEmployees,
+      allEmployees: localEmployees,
+      shiftForKey: accessors.shiftForKey,
+      assignmentIdsForKey: accessors.assignmentIdsForKey,
+      highlightEmpIds: new Set(["emp-1"]),
+      highlightScrollKey: "alex",
+    });
+
+    const alexName = screen.getByText("Alex Taylor");
+    const alexRow = alexName.closest('[role="row"]');
+    const jordanRows = screen
+      .getAllByText("Jordan Reed")
+      .map((node) => node.closest('[role="row"]'));
+    const caseyRows = screen
+      .getAllByText("Casey Morgan")
+      .map((node) => node.closest('[role="row"]'));
+
+    expect(alexRow).not.toBeNull();
+    expect(jordanRows.length).toBeGreaterThan(0);
+    expect(caseyRows.length).toBeGreaterThan(0);
+    expect(alexRow).toHaveStyle({ opacity: "1" });
+    expect(alexName).toHaveStyle({ color: "var(--color-brand)" });
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalled());
+    for (const row of jordanRows) {
+      expect(row).not.toBeNull();
+      expect(row).toHaveStyle({ opacity: "0.35" });
+    }
+    for (const row of caseyRows) {
+      expect(row).not.toBeNull();
+      expect(row).toHaveStyle({ opacity: "0.35" });
+    }
   });
 
   it("renders the current job abbreviation instead of a stale derived shift-code suffix", () => {
@@ -538,10 +618,10 @@ describe("ScheduleGrid", () => {
 
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "200px",
+      "220px",
     );
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "100px",
+      "98px",
     );
     expect(firstCell.style.height).not.toBe("72px");
     expect(firstCell.style.zIndex).toBe("8");
@@ -744,10 +824,10 @@ describe("ScheduleGrid", () => {
 
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "200px",
+      "220px",
     );
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "100px",
+      "98px",
     );
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
@@ -1669,10 +1749,10 @@ describe("ScheduleGrid", () => {
 
     expect(root.dataset.gridFit).toBe("true");
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "200px",
+      "220px",
     );
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "100px",
+      "98px",
     );
     expect(firstCell.style.height).not.toBe("72px");
     expect(badge?.textContent).toBe("Deleted");
@@ -1725,10 +1805,10 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
 
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "200px",
+      "220px",
     );
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "100px",
+      "98px",
     );
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(authorPill?.style.left).toBe("5px");
@@ -2289,10 +2369,10 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
 
     expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "200px",
+      "220px",
     );
     expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "100px",
+      "98px",
     );
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(authorPill?.style.left).toBe("5px");

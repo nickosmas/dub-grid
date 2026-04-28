@@ -26,9 +26,9 @@ import {
   fetchShifts,
   fetchPublishHistory,
   fetchPublishedDateRanges,
-  fetchInvitations,
   fetchShiftRequests,
-} from "@/lib/db";
+} from "@/features/schedule/client";
+import { fetchOrganizationInvitations } from "@/features/organization/client";
 import {
   buildPublishedDateSet,
   filterPublishedDates,
@@ -268,7 +268,7 @@ export default function DashboardView({
         () => [],
       ),
       fetchPublishHistory(orgId, 20, 0).catch(() => []),
-      fetchInvitations(orgId).catch(() => []),
+      fetchOrganizationInvitations(orgId).catch(() => []),
       fetchShiftRequests(orgId, assignmentLabelMapRef.current).catch(() => []),
     ])
       .then(

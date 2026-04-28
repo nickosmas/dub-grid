@@ -5,8 +5,8 @@ import { notFound, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
+import { fetchEmployeeByUserId } from "@/features/employees/client";
 import { usePermissions } from "@/hooks";
-import { fetchEmployeeByUserId } from "@/lib/db";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

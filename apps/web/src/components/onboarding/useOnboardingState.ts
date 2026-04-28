@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { completeOnboarding as dbCompleteOnboarding } from "@/lib/db";
+import { completeOnboarding as completeOnboardingRequest } from "@/features/onboarding/client";
 
 export interface StepConfig {
   id: string;
@@ -64,7 +64,7 @@ export function useOnboardingState(
   );
 
   const completeOnboarding = useCallback(async () => {
-    await dbCompleteOnboarding(userId, orgId);
+    await completeOnboardingRequest(orgId);
     localStorage.removeItem(key);
     // Synchronously update cache (not invalidate) to avoid async refetch race
     // that flashes the underlying route before navigation completes

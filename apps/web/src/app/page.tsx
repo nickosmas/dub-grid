@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
+import {
+  fetchAccountIdentity,
+  getVerifiedBrowserAuthUser,
+} from "@/features/account/client";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
@@ -181,21 +183,12 @@ export default function RootPage() {
 
     const checkSession = async () => {
       try {
-        const user = await getVerifiedBrowserUser();
+        const user = await getVerifiedBrowserAuthUser();
         if (user) {
           const parsed = parseHost(window.location.host);
           if (isApexHost(parsed)) {
-            const { data: profile } = await supabase
-              .from("profiles")
-              .select("organizations(slug)")
-              .eq("id", user.id)
-              .maybeSingle();
-
-            const slug = (
-              profile as {
-                organizations?: { slug?: string | null } | null;
-              } | null
-            )?.organizations?.slug;
+            const identity = await fetchAccountIdentity();
+            const slug = identity.orgSlug;
             if (slug) {
               const host = buildSubdomainHost(slug, parsed);
               window.location.replace(

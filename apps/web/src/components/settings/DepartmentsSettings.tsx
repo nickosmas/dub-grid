@@ -2,17 +2,21 @@
 
 import React, { useState, useCallback, useRef, useMemo } from "react";
 import { Department, FocusArea } from "@/types";
-import { saveDepartments, upsertFocusArea, deleteFocusArea, checkDepartmentDependencies } from "@/lib/db";
+import {
+  checkDepartmentDependencies,
+  deleteFocusArea,
+  saveDepartments,
+  upsertFocusArea,
+} from "@/features/settings/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { ExplainerSection, PreviewFrame, WorkflowStrip } from "@/components/ui/explainer-section";
 import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "./useSmoothReorder";
-import type { DependencyInfo } from "@/lib/db";
+import type { DependencyInfo } from "@/features/settings/client";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -830,7 +834,6 @@ export default function DepartmentsSettings({
 }: DepartmentsSettingsProps) {
   const canEdit = canManageFocusAreas || canManageOrgLabels;
   const scheduledDepartmentLabel = departmentLabel || "Scheduled Departments";
-  const scheduledDepartmentSingular = scheduledDepartmentLabel.replace(/s$/i, "");
   const managementDepartmentLabel = "Management Departments";
 
   const scheduledDepts = departments
@@ -839,137 +842,9 @@ export default function DepartmentsSettings({
   const managementDepts = departments
     .filter(d => d.type === "management" && !d.archivedAt)
     .sort((a, b) => a.sortOrder - b.sortOrder);
-  const exampleScheduledDept = scheduledDepts[0]?.name || scheduledDepartmentSingular;
-  const exampleManagementDept = managementDepts[0]?.name || "Administration";
-  const exampleFocusAreas = focusAreas
-    .filter((focusArea) => !focusArea.archivedAt && scheduledDepts.some((department) => department.id === focusArea.departmentId))
-    .slice(0, 2);
-  const infoPoints = [
-    {
-      title: "Departments are the top-level structure",
-      description: `Use ${scheduledDepartmentLabel.toLowerCase()} for the schedule hierarchy and management departments for app-only access.`,
-    },
-    {
-      title: `${focusAreaLabel} live inside ${scheduledDepartmentLabel.toLowerCase()}`,
-      description: `${scheduledDepartmentLabel} can contain one or more ${focusAreaLabel.toLowerCase()}. Those ${focusAreaLabel.toLowerCase()} are the groups that actually appear on the schedule grid.`,
-    },
-    {
-      title: "Management departments are for app access, not staffing rows",
-      description: "Use management departments for people who need org access without appearing as scheduled staff.",
-    },
-    {
-      title: "Moving or archiving items changes grouping everywhere",
-      description: `Reordering, renaming, moving, or archiving a ${scheduledDepartmentSingular.toLowerCase()} or ${focusAreaLabel.replace(/s$/i, "").toLowerCase()} changes how people and schedule sections are organized across the app.`,
-    },
-  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <ExplainerSection
-        title="Department structure"
-        defaultOpen
-        storageKey="dg-explainer-departments"
-        points={infoPoints}
-        preview={(
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            <PreviewFrame
-              title="Scheduled hierarchy"
-              subtitle="How staff reach the schedule grid"
-            >
-              <div
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: "var(--dg-radius-sm)",
-                  background: "var(--color-bg)",
-                  border: "1px solid var(--color-border-light)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Example {scheduledDepartmentSingular.toLowerCase()}
-                </div>
-                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                  {exampleScheduledDept}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {(exampleFocusAreas.length > 0
-                    ? exampleFocusAreas
-                    : [
-                        { id: -1, orgId, departmentId: null, name: "East Wing", sortOrder: 0 },
-                        { id: -2, orgId, departmentId: null, name: "West Wing", sortOrder: 1 },
-                      ]).map((focusArea) => (
-                    <span
-                      key={focusArea.name}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "3px 8px",
-                        borderRadius: 999,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: "var(--color-bg-secondary)",
-                        border: "1px solid var(--color-border-light)",
-                        color: "var(--color-text-secondary)",
-                      }}
-                    >
-                      {focusArea.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <WorkflowStrip
-                steps={[
-                  {
-                    label: exampleScheduledDept,
-                    description: scheduledDepartmentSingular,
-                    tone: "default",
-                  },
-                  {
-                    label: exampleFocusAreas[0]?.name || `${focusAreaLabel.replace(/s$/i, "")} A`,
-                    description: `${focusAreaLabel.replace(/s$/i, "")} on the grid`,
-                    tone: "info",
-                  },
-                  {
-                    label: "Schedule grouping",
-                    description: "Staff rows and coverage rollups",
-                    tone: "success",
-                  },
-                ]}
-              />
-            </PreviewFrame>
-
-            <PreviewFrame
-              title="Management hierarchy"
-              subtitle="App access without schedule rows"
-            >
-              <WorkflowStrip
-                steps={[
-                  {
-                    label: exampleManagementDept,
-                    description: "Management Department",
-                    tone: "default",
-                  },
-                  {
-                    label: "Org access",
-                    description: "Permissions and membership",
-                    tone: "info",
-                  },
-                  {
-                    label: "No grid row",
-                    description: "Does not create a scheduled staff row",
-                    tone: "warning",
-                  },
-                ]}
-              />
-            </PreviewFrame>
-          </div>
-        )}
-      />
-
       <DepartmentSection
         title={scheduledDepartmentLabel}
         description={`${scheduledDepartmentLabel} appear on the grid. Each one has one or more ${focusAreaLabel.toLowerCase()} that define how staff are grouped on the schedule.`}

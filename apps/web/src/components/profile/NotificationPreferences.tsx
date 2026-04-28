@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, type CSSProperties } from "react";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
+import { useAuth } from "@/components/AuthProvider";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { Bell, Mail } from "lucide-react";
 import { MaybeHint } from "@/components/ui/hint";
+import {
+  fetchNotificationPreferences,
+  saveNotificationPreferences,
+} from "@/features/account/client";
 
 interface CategoryPrefs {
   in_app: boolean;
@@ -68,6 +71,7 @@ function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
 }
 
 export function NotificationPreferences({ visibleCategories }: { visibleCategories?: string[] } = {}) {
+  const { user, isLoading: authLoading } = useAuth();
   const [prefs, setPrefs] = useState<AllPrefs>(DEFAULT_PREFS);
   const [savedPrefs, setSavedPrefs] = useState<AllPrefs>(normalizePrefs(DEFAULT_PREFS));
   const [saving, setSaving] = useState(false);
@@ -78,41 +82,41 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const user = await getVerifiedBrowserUser();
-      if (!user || cancelled) return;
+      if (authLoading) return;
+      if (!user || cancelled) {
+        if (!cancelled) {
+          setLoaded(true);
+        }
+        return;
+      }
 
-      const { data } = await supabase
-        .from("notification_preferences")
-        .select("prefs")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      try {
+        const data = await fetchNotificationPreferences();
 
-      if (!cancelled) {
-        const initialPrefs = normalizePrefs((data?.prefs as AllPrefs | undefined) ?? DEFAULT_PREFS);
-        setPrefs(initialPrefs);
-        setSavedPrefs(initialPrefs);
-        setLoaded(true);
+        if (!cancelled) {
+          const initialPrefs = normalizePrefs(
+            (data.prefs as AllPrefs | undefined) ?? DEFAULT_PREFS,
+          );
+          setPrefs(initialPrefs);
+          setSavedPrefs(initialPrefs);
+          setLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoaded(true);
+        }
+        toast.error("Failed to load notification preferences.");
       }
     }
-    load();
+    void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [authLoading, user]);
 
   async function save() {
     setSaving(true);
     try {
-      const user = await getVerifiedBrowserUser();
       if (!user) throw new Error("Not authenticated");
-
-      const { error } = await supabase
-        .from("notification_preferences")
-        .upsert({
-          user_id: user.id,
-          prefs: normalizedPrefs,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-
-      if (error) throw error;
+      await saveNotificationPreferences(normalizedPrefs);
       setPrefs(normalizedPrefs);
       setSavedPrefs(normalizedPrefs);
       toast.success("Notification preferences saved.");

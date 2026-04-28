@@ -51,17 +51,14 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
-    },
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null }),
-    }),
-  },
+vi.mock("@/features/account/client", () => ({
+  fetchAccountIdentity: vi.fn().mockResolvedValue({
+    displayName: null,
+    firstName: null,
+    lastName: null,
+    orgSlug: null,
+    hasOrganizationMembership: false,
+  }),
 }));
 
 beforeEach(() => {

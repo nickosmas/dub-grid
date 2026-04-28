@@ -1,10 +1,13 @@
 "use client";
 
+import React, { useId, useRef, useState } from "react";
+
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import type { HintContent } from "./hint.types";
 import { hint } from "./hint.types";
 
@@ -80,25 +83,75 @@ interface HelpHintProps {
 }
 
 /**
- * A small "?" icon that shows a help tooltip on hover/focus.
- * Drop-in replacement for the legacy HelpTooltip.
+ * A small "?" icon that shows contextual help on click.
  */
 export function HelpHint({ content, side = "top", size = 14 }: HelpHintProps) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popupId = useId();
+
   return (
-    <Hint content={content} side={side}>
+    <>
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Help"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? popupId : undefined}
         className="help-hint-trigger"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen((previous) => !previous);
+        }}
         style={{
-          width: size + 4,
-          height: size + 4,
+          width: size + 6,
+          height: size + 6,
           fontSize: size - 2,
         }}
       >
         ?
       </button>
-    </Hint>
+
+      {open && triggerRef.current ? (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverContent
+            id={popupId}
+            role="dialog"
+            aria-label="Help"
+            anchor={triggerRef}
+            side={side}
+            align="center"
+            sideOffset={8}
+            positionMethod="fixed"
+            collisionPadding={12}
+            collisionAvoidance={{
+              side: "flip",
+              align: "shift",
+              fallbackAxisSide: "none",
+            }}
+            style={{
+              maxWidth: 260,
+              padding: "10px 12px",
+              borderRadius: "var(--dg-radius-md)",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              boxShadow: "var(--tooltip-shadow)",
+              color: "var(--color-text-primary)",
+              fontSize: "var(--dg-fs-caption)",
+              lineHeight: 1.45,
+            }}
+          >
+            {content}
+          </PopoverContent>
+        </Popover>
+      ) : null}
+    </>
   );
 }
 export {

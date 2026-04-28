@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import StepLayout from "../StepLayout";
 import { DisplayModeSample, DISPLAY_MODES } from "@/components/settings/DisplayMode";
 import { useOrganizationData } from "@/hooks";
-import { updateOrganization } from "@/lib/db";
+import { updateOrganizationSettings } from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import type { ShiftDisplayMode } from "@/types";
@@ -31,9 +31,17 @@ export default function DisplayModeStep({ onNext, onBack }: DisplayModeStepProps
     }
     setSaving(true);
     try {
+      if (!org.updatedAt) {
+        throw new Error("Organization settings are out of date. Refresh and try again.");
+      }
       const updated = { ...org, shiftDisplayMode: selected };
-      await updateOrganization(updated);
-      setOrg(updated);
+      const saved = await updateOrganizationSettings({
+        orgId: org.id,
+        expectedUpdatedAt: org.updatedAt,
+        shiftDisplayMode: selected,
+      });
+      const nextOrg = { ...updated, updatedAt: saved.updatedAt };
+      setOrg(nextOrg);
       onNext();
     } catch (err) {
       Sentry.captureException(err);

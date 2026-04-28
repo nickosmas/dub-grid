@@ -2,8 +2,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { ShiftCategory, FocusArea } from "@/types";
-import { upsertShiftCategory, deleteShiftCategory, checkShiftCategoryDependencies } from "@/lib/db";
-import type { DependencyInfo } from "@/lib/db";
+import {
+  checkShiftCategoryDependencies,
+  deleteShiftCategory,
+  upsertShiftCategory,
+} from "@/features/settings/client";
+import type { DependencyInfo } from "@/features/settings/client";
 import { fmt12h, calcTimeDuration, calcNetDuration, resolveEffectiveBreak } from "@/lib/utils";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";

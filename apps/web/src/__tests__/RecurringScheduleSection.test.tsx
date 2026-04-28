@@ -21,7 +21,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/schedule/client", () => ({
   deleteRecurringDraft: vi.fn(),
   deleteRecurringShift: vi.fn(),
   fetchRecurringShifts,

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { DM_Sans, DM_Mono, Geist } from "next/font/google";
+import { createWebCssVariables } from "@dubgrid/design-tokens";
 import "./globals.css";
 import "@/lib/env";
 
@@ -49,6 +51,7 @@ import PostHogProvider from "@/components/PostHogProvider";
 import { Toaster } from "sonner";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const webCssVariables = createWebCssVariables() as CSSProperties;
 
 export default function RootLayout({
   children,
@@ -59,6 +62,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
+      style={webCssVariables}
       className={cn(
         dmSans.variable,
         dmMono.variable,

@@ -239,6 +239,112 @@ describe("Dashboard Metrics", () => {
     expect(openShifts).toEqual([]);
   });
 
+  it("deduplicates day-specific coverage rules when building dashboard open shifts", () => {
+    const monday = weekDates[1];
+    const rnAssignment: AssignmentDefinition = {
+      ...assignment1,
+      id: 201,
+      label: "RN",
+      name: "Registered Nurse",
+      categoryId: 34,
+      shiftId: 34,
+      jobId: 501,
+    };
+    const assignmentById = new Map([[rnAssignment.id, rnAssignment]]);
+    const daySpecificRequirements: CoverageRequirement[] = Array.from(
+      { length: 7 },
+      (_, dayOfWeek) => ({
+        id: dayOfWeek + 1,
+        orgId: "org1",
+        focusAreaId: 1,
+        jobId: 501,
+        preferredShiftId: 34,
+        dayOfWeek,
+        minStaff: 1,
+      }),
+    );
+
+    const openShifts = computeOpenShifts(
+      [focusArea1],
+      [rnAssignment],
+      daySpecificRequirements,
+      [monday],
+      [],
+      {},
+      assignmentById,
+    );
+
+    expect(openShifts).toHaveLength(1);
+    expect(openShifts[0]?.id).toBe(`1_201_${formatDateKey(monday)}`);
+    expect(openShifts[0]?.assignmentLabel).toBe("RN");
+  });
+
+  it("uses assignment-specific ids when multiple open shifts share a category and date", () => {
+    const monday = weekDates[1];
+    const rnAssignment: AssignmentDefinition = {
+      ...assignment1,
+      id: 201,
+      label: "RN",
+      name: "Registered Nurse",
+      categoryId: 34,
+      shiftId: 34,
+      jobId: 501,
+    };
+    const chargeAssignment: AssignmentDefinition = {
+      ...assignment1,
+      id: 202,
+      label: "Charge RN",
+      name: "Charge Nurse",
+      categoryId: 34,
+      shiftId: 34,
+      jobId: 502,
+    };
+    const assignmentById = new Map([
+      [rnAssignment.id, rnAssignment],
+      [chargeAssignment.id, chargeAssignment],
+    ]);
+    const requirements: CoverageRequirement[] = [
+      {
+        id: 1,
+        orgId: "org1",
+        focusAreaId: 1,
+        jobId: 501,
+        preferredShiftId: 34,
+        dayOfWeek: monday.getDay(),
+        minStaff: 1,
+      },
+      {
+        id: 2,
+        orgId: "org1",
+        focusAreaId: 1,
+        jobId: 502,
+        preferredShiftId: 34,
+        dayOfWeek: monday.getDay(),
+        minStaff: 1,
+      },
+    ];
+
+    const openShifts = computeOpenShifts(
+      [focusArea1],
+      [rnAssignment, chargeAssignment],
+      requirements,
+      [monday],
+      [],
+      {},
+      assignmentById,
+    );
+
+    expect(openShifts).toHaveLength(2);
+    expect(openShifts.map((shift) => shift.id).sort()).toEqual([
+      `1_201_${formatDateKey(monday)}`,
+      `1_202_${formatDateKey(monday)}`,
+    ]);
+    expect(openShifts.map((shift) => shift.assignmentLabel).sort()).toEqual([
+      "Charge RN",
+      "RN",
+    ]);
+  });
+
   it("uses category totals for coverage even when one exact code is short", () => {
     const employee3: Employee = {
       ...employee1,

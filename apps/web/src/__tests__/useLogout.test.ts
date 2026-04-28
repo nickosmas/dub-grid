@@ -6,8 +6,8 @@ const mockQueryClientClear = vi.fn();
 const mockSignOut = vi.fn();
 const mockGetChannels = vi.fn();
 const mockRemoveChannel = vi.fn();
-const mockFrom = vi.fn();
-const mockGetVerifiedBrowserUser = vi.fn();
+const mockUntrackChannel = vi.fn();
+const mockClearLogoutCleanup = vi.fn();
 const mockClearImpersonationCookie = vi.fn();
 const mockClearPermsCache = vi.fn();
 const mockParseHost = vi.fn();
@@ -19,20 +19,16 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      signOut: (...args: unknown[]) => mockSignOut(...args),
-    },
-    getChannels: (...args: unknown[]) => mockGetChannels(...args),
-    removeChannel: (...args: unknown[]) => mockRemoveChannel(...args),
-    from: (...args: unknown[]) => mockFrom(...args),
-  },
-}));
-
-vi.mock("@/lib/browser-auth", () => ({
-  getVerifiedBrowserUser: (...args: unknown[]) =>
-    mockGetVerifiedBrowserUser(...args),
+vi.mock("@/features/account/client", () => ({
+  clearLogoutCleanup: (...args: unknown[]) =>
+    mockClearLogoutCleanup(...args),
+  getBrowserRealtimeChannels: (...args: unknown[]) =>
+    mockGetChannels(...args),
+  removeBrowserRealtimeChannel: (...args: unknown[]) =>
+    mockRemoveChannel(...args),
+  signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
+  untrackBrowserRealtimeChannel: (...args: unknown[]) =>
+    mockUntrackChannel(...args),
 }));
 
 vi.mock("@/lib/subdomain", () => ({
@@ -55,26 +51,20 @@ Object.defineProperty(window, "location", {
 describe("useLogout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSignOut.mockResolvedValue({ error: null });
+    mockSignOut.mockResolvedValue(undefined);
     mockGetChannels.mockReturnValue([]);
     mockRemoveChannel.mockResolvedValue("ok");
-    mockGetVerifiedBrowserUser.mockResolvedValue(null);
+    mockUntrackChannel.mockResolvedValue("ok");
+    mockClearLogoutCleanup.mockResolvedValue({ success: true });
     mockParseHost.mockReturnValue({ rootDomain: "localhost", port: "" });
-    mockFrom.mockReturnValue({
-      delete: vi.fn().mockReturnValue({
-        eq: vi.fn(),
-      }),
-    });
   });
 
   it("tears down realtime presence before signing out locally", async () => {
     const joinedChannel = {
       state: "joined",
-      untrack: vi.fn().mockResolvedValue("ok"),
     };
     const closedChannel = {
       state: "closed",
-      untrack: vi.fn().mockResolvedValue("ok"),
     };
     mockGetChannels.mockReturnValue([joinedChannel, closedChannel]);
 
@@ -84,11 +74,11 @@ describe("useLogout", () => {
       await result.current.signOutLocal("/login");
     });
 
-    expect(joinedChannel.untrack).toHaveBeenCalledTimes(1);
-    expect(closedChannel.untrack).not.toHaveBeenCalled();
+    expect(mockUntrackChannel).toHaveBeenCalledTimes(1);
+    expect(mockUntrackChannel).toHaveBeenCalledWith(joinedChannel);
     expect(mockRemoveChannel).toHaveBeenCalledTimes(2);
-    expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" });
-    expect(joinedChannel.untrack.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockSignOut).toHaveBeenCalledWith("local");
+    expect(mockUntrackChannel.mock.invocationCallOrder[0]).toBeLessThan(
       mockSignOut.mock.invocationCallOrder[0],
     );
     expect(mockReplace).toHaveBeenCalledWith("/login");

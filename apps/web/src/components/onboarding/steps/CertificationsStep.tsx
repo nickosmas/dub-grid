@@ -4,7 +4,10 @@ import { useRef } from "react";
 import StepLayout from "../StepLayout";
 import StringListSettings from "@/components/settings/StringListSettings";
 import { useOrganizationData } from "@/hooks";
-import { saveCertifications, checkCertificationDependencies } from "@/lib/db";
+import {
+  checkCertificationDependencies,
+  saveCertifications,
+} from "@/features/settings/client";
 import type { NamedItem } from "@/types";
 
 interface CertificationsStepProps {

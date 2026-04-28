@@ -243,20 +243,29 @@ describe("EditEmployeePanel", () => {
       expect(onCancel).toHaveBeenCalledOnce();
     });
 
-    it("keeps Close after the form becomes dirty", async () => {
+    it("swaps Close for Discard after the form becomes dirty and restores the saved values", async () => {
       const user = userEvent.setup();
-      renderPanel();
+      const onCancel = vi.fn();
+      renderPanel({ onCancel });
 
       const firstNameInput = screen.getByDisplayValue("Alice");
       await user.clear(firstNameInput);
       await user.type(firstNameInput, "Bob");
 
-      const cancelButton = screen.getByRole("button", { name: "Close" });
+      const cancelButton = screen.getByRole("button", { name: "Discard" });
       const saveButton = screen.getByRole("button", { name: "Save" });
 
       expect(cancelButton).toBeInTheDocument();
       expect(cancelButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+
+      await user.click(cancelButton);
+
+      expect(onCancel).not.toHaveBeenCalled();
+      expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
   });
 

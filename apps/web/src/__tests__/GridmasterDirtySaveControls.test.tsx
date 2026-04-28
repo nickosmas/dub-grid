@@ -5,24 +5,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import FeatureFlagsEditor from "@/components/gridmaster/FeatureFlagsEditor";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import {
-  fetchEmployeeCount,
-  updateOrganization,
+  fetchOrganizationEmployeeCount,
   updateOrganizationSettings,
-} from "@/lib/db";
+} from "@/features/organization/client";
 import type { Organization } from "@/types";
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/organization/client", () => ({
   fetchOrganizationUsers: vi.fn(),
-  fetchEmployees: vi.fn(),
-  fetchEmployeeCount: vi.fn(),
-  fetchFocusAreas: vi.fn(),
-  fetchShiftCategories: vi.fn(),
-  fetchJobDefinitions: vi.fn(),
-  fetchCertifications: vi.fn(),
-  fetchOrganizationRoles: vi.fn(),
-  fetchIndicatorTypes: vi.fn(),
-  fetchAbsenceTypes: vi.fn(),
-  updateOrganization: vi.fn(),
+  fetchOrganizationEmployeeCount: vi.fn(),
   updateOrganizationSettings: vi.fn(),
   OrganizationSettingsConflictError: class OrganizationSettingsConflictError extends Error {
     latestOrganization: Organization;
@@ -33,14 +23,34 @@ vi.mock("@/lib/db", () => ({
       this.name = "OrganizationSettingsConflictError";
     }
   },
-  restoreOrganization: vi.fn(),
-  archiveOrganization: vi.fn(),
-  suspendOrganization: vi.fn(),
-  unsuspendOrganization: vi.fn(),
-  changeOrganizationUserRole: vi.fn(),
-  removeUserFromOrganization: vi.fn(),
-  assignOrgRoleByEmail: vi.fn(),
-  updateAdminPermissions: vi.fn(),
+  updateOrganizationMembershipGuarded: vi.fn(),
+  removeOrganizationMembershipGuarded: vi.fn(),
+  revokeOrganizationInvitationGuarded: vi.fn(),
+  InvitationAccessConflictError: class InvitationAccessConflictError extends Error {},
+  OrganizationAccessConflictError: class OrganizationAccessConflictError extends Error {},
+}));
+
+vi.mock("@/features/employees/client", () => ({
+  fetchEmployees: vi.fn(),
+}));
+
+vi.mock("@/features/settings/client", () => ({
+  fetchFocusAreas: vi.fn(),
+  fetchShiftCategories: vi.fn(),
+  fetchJobDefinitions: vi.fn(),
+  fetchCertifications: vi.fn(),
+  fetchOrganizationRoles: vi.fn(),
+  fetchIndicatorTypes: vi.fn(),
+  fetchAbsenceTypes: vi.fn(),
+}));
+
+vi.mock("@/features/gridmaster/client", () => ({
+  fetchGridmasterInvitations: vi.fn().mockResolvedValue({ invitations: [] }),
+  archiveGridmasterOrganization: vi.fn(),
+  restoreGridmasterOrganization: vi.fn(),
+  suspendGridmasterOrganization: vi.fn(),
+  unsuspendGridmasterOrganization: vi.fn(),
+  assignGridmasterOrgRoleByEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/notify", () => ({
@@ -105,9 +115,10 @@ function renderWithQueryClient(ui: React.ReactElement) {
 describe("gridmaster dirty save controls", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(updateOrganization).mockResolvedValue(undefined);
     vi.mocked(updateOrganizationSettings).mockResolvedValue(makeOrganization());
-    vi.mocked(fetchEmployeeCount).mockResolvedValue(42);
+    vi.mocked(fetchOrganizationEmployeeCount).mockResolvedValue({
+      employeeCount: 42,
+    });
   });
 
   it("only shows feature flag Discard when there are unsaved flag edits", async () => {

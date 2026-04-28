@@ -1,35 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 
-// ── Mock jose (must be before import) ────────────────────────────────────────
-const mockDecodeJwt = vi.fn();
-vi.mock("jose", () => ({
-  decodeJwt: (...args: unknown[]) => mockDecodeJwt(...args),
-}));
-
-// ── Mock impersonation ───────────────────────────────────────────────────────
-const mockGetImpersonation = vi.fn().mockReturnValue(null);
-vi.mock("@/lib/impersonation", () => ({
-  getImpersonationFromCookie: (...args: unknown[]) => mockGetImpersonation(...args),
-}));
-
-// ── Mock supabase ────────────────────────────────────────────────────────────
+// ── Mock account client adapter ──────────────────────────────────────────────
 const mockGetSession = vi.fn();
 const mockGetUser = vi.fn();
 const mockOnAuthStateChange = vi.fn();
-const mockSupabaseFrom = vi.fn();
+const mockGetVerifiedBrowserAuth = vi.fn();
+const mockFetchAccountPermissions = vi.fn();
+const mockRemoveBrowserRealtimeChannel = vi.fn();
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      getSession: () => mockGetSession(),
-      getUser: () => mockGetUser(),
-      onAuthStateChange: (cb: unknown) => {
-        mockOnAuthStateChange(cb);
-        return { data: { subscription: { unsubscribe: vi.fn() } } };
-      },
-    },
-    from: (table: string) => mockSupabaseFrom(table),
+function createMockChannel() {
+  const channel = {
+    on: vi.fn(),
+    subscribe: vi.fn(),
+  };
+  channel.on.mockReturnValue(channel);
+  channel.subscribe.mockReturnValue(channel);
+  return channel;
+}
+
+const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => createMockChannel());
+
+vi.mock("@/features/account/client", () => ({
+  createBrowserRealtimeChannel: (name: string) =>
+    mockCreateBrowserRealtimeChannel(name),
+  fetchAccountPermissions: () => mockFetchAccountPermissions(),
+  getVerifiedBrowserAuth: () => mockGetVerifiedBrowserAuth(),
+  removeBrowserRealtimeChannel: (channel: unknown) =>
+    mockRemoveBrowserRealtimeChannel(channel),
+  subscribeToBrowserAuthChanges: (cb: unknown) => {
+    mockOnAuthStateChange(cb);
+    return { data: { subscription: { unsubscribe: vi.fn() } } };
   },
 }));
 
@@ -58,11 +59,55 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+type TestJwtClaims = {
+  platform_role?: string;
+  org_role?: string;
+  org_id?: string | null;
+  org_slug?: string;
+};
+
+function encodeJwtPart(value: unknown): string {
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
+}
+
+function createAccessToken(claims: TestJwtClaims): string {
+  return `${encodeJwtPart({ alg: "none", typ: "JWT" })}.${encodeJwtPart(claims)}.signature`;
+}
+
+function createSession(
+  claims: TestJwtClaims,
+  userId = "u-1",
+): Parameters<typeof getPermissionsFromSession>[0] {
+  return {
+    access_token: createAccessToken(claims),
+    user: { id: userId },
+  } as Parameters<typeof getPermissionsFromSession>[0];
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   clearPermsCache();
-  mockGetImpersonation.mockReturnValue(null);
+  let latestSession: ReturnType<typeof createSession> | null = null;
   mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
+  mockGetVerifiedBrowserAuth.mockImplementation(async () => {
+    const [
+      {
+        data: { session },
+      },
+      {
+        data: { user },
+      },
+    ] = await Promise.all([mockGetSession(), mockGetUser()]);
+
+    latestSession = session;
+    if (!session?.access_token || !user) {
+      return { session: null, user: null };
+    }
+    return { session, user };
+  });
+  mockFetchAccountPermissions.mockImplementation(async () => ({
+    permissions: getPermissionsFromSession(latestSession),
+  }));
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -97,12 +142,11 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns gridmaster perms for gridmaster JWT", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "gridmaster",
       org_role: "user",
       org_id: null,
     });
-    const session = { access_token: "fake-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("gridmaster");
     expect(perms.isGridmaster).toBe(true);
@@ -113,12 +157,11 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns super_admin perms for super_admin JWT", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "super_admin",
       org_id: "org-1",
     });
-    const session = { access_token: "fake-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("super_admin");
     expect(perms.isSuperAdmin).toBe(true);
@@ -128,12 +171,11 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns read-only perms for admin JWT (no admin_permissions from JWT alone)", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "admin",
       org_id: "org-1",
     });
-    const session = { access_token: "fake-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("admin");
     expect(perms.level).toBe(2);
@@ -144,12 +186,11 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns read-only perms for user JWT", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "user",
       org_id: "org-1",
     });
-    const session = { access_token: "fake-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("user");
     expect(perms.level).toBe(0);
@@ -158,7 +199,6 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns user perms when JWT decode fails", () => {
-    mockDecodeJwt.mockImplementation(() => { throw new Error("bad jwt"); });
     const session = { access_token: "bad-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("user");
@@ -172,12 +212,11 @@ describe("getPermissionsFromSession", () => {
 
 describe("permission derivation", () => {
   it("atLeast works correctly for admin", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "admin",
       org_id: "org-1",
     });
-    const session = { access_token: "jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.atLeast("user")).toBe(true);
     expect(perms.atLeast("admin")).toBe(true);
@@ -186,47 +225,43 @@ describe("permission derivation", () => {
   });
 
   it("canManageUsers is false for admin role", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "admin",
       org_id: "org-1",
     });
-    const session = { access_token: "jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.canManageUsers).toBe(false);
     expect(perms.canConfigureAdminPermissions).toBe(false);
   });
 
   it("canManageUsers is true for super_admin", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "super_admin",
       org_id: "org-1",
     });
-    const session = { access_token: "jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.canManageUsers).toBe(true);
     expect(perms.canConfigureAdminPermissions).toBe(true);
   });
 
   it("canManageOrg is true for super_admin", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "super_admin",
       org_id: "org-1",
     });
-    const session = { access_token: "jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.canManageOrg).toBe(true);
   });
 
   it("canManageOrg is false for user role", () => {
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "user",
       org_id: "org-1",
     });
-    const session = { access_token: "jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.canManageOrg).toBe(false);
   });
@@ -245,13 +280,15 @@ describe("usePermissions hook", () => {
   });
 
   it("resolves gridmaster perms from session", async () => {
-    const session = { access_token: "jwt", user: { id: "gm-1" } };
+    const session = createSession(
+      {
+        platform_role: "gridmaster",
+        org_role: "user",
+        org_id: null,
+      },
+      "gm-1",
+    );
     mockGetSession.mockResolvedValue({ data: { session } });
-    mockDecodeJwt.mockReturnValue({
-      platform_role: "gridmaster",
-      org_role: "user",
-      org_id: null,
-    });
 
     const { result } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -260,44 +297,39 @@ describe("usePermissions hook", () => {
     expect(result.current.canEditShifts).toBe(true);
   });
 
-  it("resolves admin perms with DB admin_permissions fetch", async () => {
-    const session = { access_token: "jwt", user: { id: "u-1" } };
-    mockGetSession.mockResolvedValue({ data: { session } });
-    mockDecodeJwt.mockReturnValue({
+  it("resolves admin perms from the account permissions adapter", async () => {
+    const session = createSession({
       platform_role: "none",
       org_role: "admin",
       org_id: "org-1",
     });
-    // Mock DB query for admin permissions
-    mockSupabaseFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({
-              data: {
-                org_role: "admin",
-                admin_permissions: {
-                  canViewSchedule: true,
-                  canEditShifts: true,
-                  canPublishSchedule: false,
-                  canApplyRecurringSchedule: false,
-                  canEditNotes: true,
-                  canManageRecurringShifts: false,
-                  canManageShiftSeries: false,
-                  canViewStaff: true,
-                  canManageEmployees: false,
-                  canManageFocusAreas: false,
-                  canManageScheduleDefinitions: false,
-                  canManageIndicatorTypes: false,
-                  canManageOrgSettings: false,
-                  canManageOrgLabels: false,
-                  canManageCoverageRequirements: false,
-                  canApproveShiftRequests: false,
-                },
-              },
-            }),
-          }),
-        }),
+    mockGetSession.mockResolvedValue({ data: { session } });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("admin", "org-1", false, {
+        canViewSchedule: true,
+        canEditShifts: true,
+        canPublishSchedule: false,
+        canApplyRecurringSchedule: false,
+        canEditNotes: true,
+        canViewRecurringShifts: false,
+        canManageRecurringShifts: false,
+        canManageShiftSeries: false,
+        canViewStaff: true,
+        canViewEmployeeDetails: false,
+        canManageEmployees: false,
+        canViewFocusAreas: false,
+        canManageFocusAreas: false,
+        canViewScheduleDefinitions: false,
+        canManageScheduleDefinitions: false,
+        canViewIndicatorTypes: false,
+        canManageIndicatorTypes: false,
+        canManageOrgSettings: false,
+        canViewOrgLabels: false,
+        canManageOrgLabels: false,
+        canViewCoverageRequirements: false,
+        canManageCoverageRequirements: false,
+        canApproveShiftRequests: false,
+        canViewDashboardAnalytics: false,
       }),
     });
 
@@ -310,13 +342,12 @@ describe("usePermissions hook", () => {
   });
 
   it("clears perms on SIGNED_OUT event", async () => {
-    const session = { access_token: "jwt", user: { id: "u-1" } };
-    mockGetSession.mockResolvedValue({ data: { session } });
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "super_admin",
       org_id: "org-1",
     });
+    mockGetSession.mockResolvedValue({ data: { session } });
 
     const { result } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -332,22 +363,12 @@ describe("usePermissions hook", () => {
   });
 
   it("keeps resolved perms during same-user TOKEN_REFRESHED revalidation", async () => {
-    const session = { access_token: "jwt-1", user: { id: "u-1" } };
-    mockGetSession.mockResolvedValue({ data: { session } });
-    mockDecodeJwt.mockImplementation((token: string) => {
-      if (token === "jwt-1") {
-        return {
-          platform_role: "none",
-          org_role: "super_admin",
-          org_id: "org-1",
-        };
-      }
-      return {
-        platform_role: "none",
-        org_role: "user",
-        org_id: "org-1",
-      };
+    const session = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
     });
+    mockGetSession.mockResolvedValue({ data: { session } });
 
     const { result } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -377,23 +398,20 @@ describe("usePermissions hook", () => {
   });
 
   it("enters blocking loading when auth changes to a different user", async () => {
-    const firstSession = { access_token: "jwt-1", user: { id: "u-1" } };
-    const secondSession = { access_token: "jwt-2", user: { id: "u-2" } };
-    mockGetSession.mockResolvedValue({ data: { session: firstSession } });
-    mockDecodeJwt.mockImplementation((token: string) => {
-      if (token === "jwt-1") {
-        return {
-          platform_role: "none",
-          org_role: "super_admin",
-          org_id: "org-1",
-        };
-      }
-      return {
+    const firstSession = createSession({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+    });
+    const secondSession = createSession(
+      {
         platform_role: "gridmaster",
         org_role: "user",
         org_id: null,
-      };
-    });
+      },
+      "u-2",
+    );
+    mockGetSession.mockResolvedValue({ data: { session: firstSession } });
 
     const { result } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -423,43 +441,14 @@ describe("usePermissions hook", () => {
   });
 
   it("resolves user role correctly", async () => {
-    const session = { access_token: "jwt", user: { id: "u-1" } };
-    mockGetSession.mockResolvedValue({ data: { session } });
-    mockDecodeJwt.mockReturnValue({
+    const session = createSession({
       platform_role: "none",
       org_role: "user",
       org_id: "org-1",
     });
-    // The user path queries profiles first, then organization_memberships.
-    // profiles: .from("profiles").select(...).eq("id", userId).single()
-    // memberships: .from("organization_memberships").select(...).eq("user_id", ...).eq("org_id", ...).single()
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        // profiles query
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { org_id: "org-1", platform_role: "none" },
-              }),
-            }),
-          }),
-        };
-      }
-      // organization_memberships query (double eq chain)
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { org_role: "user", admin_permissions: null },
-              }),
-            }),
-          }),
-        }),
-      };
+    mockGetSession.mockResolvedValue({ data: { session } });
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("user", "org-1", false),
     });
 
     const { result } = renderHook(() => usePermissions());
@@ -628,14 +617,15 @@ describe("applyViewImplications", () => {
 describe("canAccessSettings", () => {
   it("is true for super_admin", async () => {
     mockGetSession.mockResolvedValue({
-      data: { session: { access_token: "tok" } },
+      data: {
+        session: createSession({
+          platform_role: "none",
+          org_role: "super_admin",
+          org_id: "org-1",
+          org_slug: "acme",
+        }),
+      },
       error: null,
-    });
-    mockDecodeJwt.mockReturnValue({
-      platform_role: "none",
-      org_role: "super_admin",
-      org_id: "org-1",
-      org_slug: "acme",
     });
 
     const { result } = renderHook(() => usePermissions());
@@ -645,31 +635,23 @@ describe("canAccessSettings", () => {
 
   it("is true for admin with view-only permissions", async () => {
     mockGetSession.mockResolvedValue({
-      data: { session: { access_token: "tok", user: { id: "user-1" } } },
+      data: {
+        session: createSession(
+          {
+            platform_role: "none",
+            org_role: "admin",
+            org_id: "org-1",
+            org_slug: "acme",
+          },
+          "user-1",
+        ),
+      },
       error: null,
     });
-    mockDecodeJwt.mockReturnValue({
-      platform_role: "none",
-      org_role: "admin",
-      org_id: "org-1",
-      org_slug: "acme",
-    });
-    mockSupabaseFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          eq: () => ({
-            single: () => ({
-              data: {
-                org_role: "admin",
-                admin_permissions: {
-                  ...ALL_FALSE_PERMS,
-                  canViewFocusAreas: true,
-                },
-              },
-              error: null,
-            }),
-          }),
-        }),
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("admin", "org-1", false, {
+        ...ALL_FALSE_PERMS,
+        canViewFocusAreas: true,
       }),
     });
 
@@ -681,41 +663,22 @@ describe("canAccessSettings", () => {
 
   it("is false for user with no view or manage permissions", async () => {
     mockGetSession.mockResolvedValue({
-      data: { session: { access_token: "tok", user: { id: "user-1" } } },
+      data: {
+        session: createSession(
+          {
+            platform_role: "none",
+            org_role: "user",
+            org_id: "org-1",
+            org_slug: "acme",
+          },
+          "user-1",
+        ),
+      },
       error: null,
     });
     mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    mockDecodeJwt.mockReturnValue({
-      platform_role: "none",
-      org_role: "user",
-      org_id: "org-1",
-      org_slug: "acme",
-    });
-    let callCount = 0;
-    mockSupabaseFrom.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { org_id: "org-1", platform_role: "none" },
-              }),
-            }),
-          }),
-        };
-      }
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({
-                data: { org_role: "user", admin_permissions: null },
-              }),
-            }),
-          }),
-        }),
-      };
+    mockFetchAccountPermissions.mockResolvedValue({
+      permissions: buildPerms("user", "org-1", false),
     });
 
     const { result } = renderHook(() => usePermissions());

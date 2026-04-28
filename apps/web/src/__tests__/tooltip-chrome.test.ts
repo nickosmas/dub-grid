@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { existsSync, readFileSync } from "fs"
 import { resolve } from "path"
+import { createWebCssVariables } from "@dubgrid/design-tokens"
 
 function resolveRepoRoot(): string {
   const cwd = process.cwd()
@@ -21,6 +22,7 @@ const tooltipPrimitive = readFileSync(
   "utf-8"
 )
 const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8")
+const webCssVariables = createWebCssVariables()
 const chartTooltipStyles = readFileSync(
   resolveWebSource("components/dashboard/chartTooltipStyles.ts"),
   "utf-8"
@@ -43,7 +45,7 @@ describe("tooltip chrome", () => {
     expect(tooltipPrimitive).toContain("text-[var(--color-text-primary)]")
     expect(tooltipPrimitive).toContain("shadow-[var(--tooltip-shadow)]")
     expect(tooltipPrimitive).toContain("z-[11000]")
-    expect(globalsCss).toContain("--tooltip-shadow: 0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1);")
+    expect(webCssVariables["--tooltip-shadow"]).toBe("0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1)")
     expect(tooltipPrimitive).not.toContain("border-[var(--color-border-light)]")
   })
 

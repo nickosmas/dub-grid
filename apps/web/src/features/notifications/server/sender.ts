@@ -5,6 +5,7 @@ import {
   sendMobilePushNotifications,
 } from "@/features/mobile/server";
 import logger from "@/lib/logger";
+import { sendResendEmail } from "@/lib/resend";
 import type { NotificationType } from "@/types";
 
 const NOTIFICATION_CATEGORIES: Record<string, string> = {
@@ -121,36 +122,25 @@ export async function sendNotification(
       </p>
     `);
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "DubGrid <notifications@dubgrid.com>",
-        to: email,
-        subject: title,
-        html,
-      }),
+    await sendResendEmail({
+      apiKey: resendKey,
+      from: "DubGrid <notifications@dubgrid.com>",
+      to: email,
+      subject: title,
+      html,
     });
 
-    if (!response.ok) {
-      const body = await response.text();
-      logger.error({ status: response.status, body }, "Resend email failed");
-    } else {
-      // Record email notification for throttle tracking
-      await supabase.from("notifications").insert({
-        user_id: userId,
-        org_id: orgId,
-        type,
-        channel: "email",
-        category,
-        title,
-        message,
-        metadata: { ...metadata, email_sent: true },
-      });
-    }
+    // Record email notification for throttle tracking
+    await supabase.from("notifications").insert({
+      user_id: userId,
+      org_id: orgId,
+      type,
+      channel: "email",
+      category,
+      title,
+      message,
+      metadata: { ...metadata, email_sent: true },
+    });
   } catch (err) {
     logger.error({ error: err, userId, type }, "Failed to send email notification");
   }

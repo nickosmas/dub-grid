@@ -1,14 +1,16 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
-import {
-  clearSupabaseBrowserAuthState,
-  getVerifiedBrowserUser,
-  isRecoverableBrowserAuthError,
-} from "@/lib/browser-auth";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { setSentryUser } from "@/lib/sentry";
+import {
+  clearBrowserAuthState,
+  getBrowserAuthSession,
+  getVerifiedBrowserAuthUser,
+  isRecoverableBrowserAuthFailure,
+  signOutFromBrowser,
+  subscribeToBrowserAuthChanges,
+} from "@/features/account/client";
 
 interface AuthContextType {
   user: User | null;
@@ -90,25 +92,17 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           window.location.pathname === "/login" &&
           params.get("verified") === "1";
         if (isVerifiedLoginHandoff) {
-          clearSupabaseBrowserAuthState();
+          clearBrowserAuthState();
         }
 
-        const sessionPromise = supabase.auth.getSession();
+        const sessionPromise = getBrowserAuthSession();
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("session_timeout")), 5000),
         );
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]);
-        if (error) {
-          if (isRecoverableBrowserAuthError(error)) {
-            clearSupabaseBrowserAuthState();
-          }
-          setUser(null);
-          setSentryUser(null);
-          return;
-        }
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
 
         const verifiedUser =
-          session?.access_token ? await getVerifiedBrowserUser() : null;
+          session?.access_token ? await getVerifiedBrowserAuthUser() : null;
         setUser(verifiedUser);
         setSentryUser(
           verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
@@ -121,8 +115,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       } catch (error) {
         // Timeout or stale auth state — clear persisted browser auth so the app
         // can recover cleanly on the next login attempt without noisy refresh-token errors.
-        if (isRecoverableBrowserAuthError(error) || (error instanceof Error && error.message === "session_timeout")) {
-          clearSupabaseBrowserAuthState();
+        if (isRecoverableBrowserAuthFailure(error) || (error instanceof Error && error.message === "session_timeout")) {
+          clearBrowserAuthState();
         }
         setUser(null);
         setSentryUser(null);
@@ -136,7 +130,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Listen for auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, session: Session | null) => {
       if (event === "SIGNED_OUT" || !session?.access_token) {
         setUser(null);
         setIsLoading(false);
@@ -145,7 +139,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
 
       void (async () => {
-        const verifiedUser = await getVerifiedBrowserUser().catch(() => null);
+        const verifiedUser = await getVerifiedBrowserAuthUser().catch(() => null);
         setUser(verifiedUser);
         setIsLoading(false);
         setSentryUser(
@@ -170,7 +164,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut({ scope: "local" });
+    await signOutFromBrowser("local");
   }, []);
 
   const contextValue = useMemo(

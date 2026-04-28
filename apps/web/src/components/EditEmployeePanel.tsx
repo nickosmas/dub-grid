@@ -6,7 +6,10 @@ import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import {
+  EDITOR_ACTION_LABELS,
+  getEditorDismissLabel,
+} from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
@@ -41,6 +44,20 @@ type EditForm = {
   contactNotes: string;
 };
 
+function buildEditForm(employee: Employee): EditForm {
+  return {
+    firstName: employee.firstName || "",
+    lastName: employee.lastName || "",
+    certificationId: employee.certificationId ?? null,
+    focusAreaIds: employee.focusAreaIds || [],
+    roleIds: employee.roleIds || [],
+    departmentIds: employee.departmentIds || [],
+    phone: employee.phone || "",
+    email: employee.email || "",
+    contactNotes: employee.contactNotes || "",
+  };
+}
+
 export default function EditEmployeePanel({
   employee,
   focusAreas,
@@ -57,17 +74,7 @@ export default function EditEmployeePanel({
   onRevoke,
 }: EditEmployeePanelProps) {
   const isMobile = useMediaQuery(MOBILE);
-  const [form, setForm] = useState<EditForm>({
-    firstName: employee.firstName,
-    lastName: employee.lastName,
-    certificationId: employee.certificationId,
-    focusAreaIds: employee.focusAreaIds,
-    roleIds: employee.roleIds,
-    departmentIds: employee.departmentIds,
-    phone: employee.phone,
-    email: employee.email,
-    contactNotes: employee.contactNotes,
-  });
+  const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
 
   const [revoking, setRevoking] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -91,17 +98,7 @@ export default function EditEmployeePanel({
   }, []);
 
   useEffect(() => {
-    setForm({
-      firstName: employee.firstName || "",
-      lastName: employee.lastName || "",
-      certificationId: employee.certificationId ?? null,
-      focusAreaIds: employee.focusAreaIds || [],
-      roleIds: employee.roleIds || [],
-      departmentIds: employee.departmentIds || [],
-      phone: employee.phone || "",
-      email: employee.email || "",
-      contactNotes: employee.contactNotes || "",
-    });
+    setForm(buildEditForm(employee));
     setRevoking(false);
     setTouched({});
   }, [employee]);
@@ -161,6 +158,16 @@ export default function EditEmployeePanel({
       contactNotes: form.contactNotes.trim(),
     });
   }, [form, employee, onSave]);
+
+  const handleDismiss = useCallback(() => {
+    if (isModified) {
+      setForm(buildEditForm(employee));
+      setTouched({});
+      return;
+    }
+
+    onCancel();
+  }, [employee, isModified, onCancel]);
 
   const toggleRole = useCallback(
     (roleId: number) =>
@@ -669,10 +676,10 @@ export default function EditEmployeePanel({
           <EditorActionRow
             secondaryAction={(
               <button
-                onClick={onCancel}
+                onClick={handleDismiss}
                 className="dg-btn dg-btn-secondary"
               >
-                {EDITOR_ACTION_LABELS.close}
+                {getEditorDismissLabel(isModified)}
               </button>
             )}
             primaryAction={(

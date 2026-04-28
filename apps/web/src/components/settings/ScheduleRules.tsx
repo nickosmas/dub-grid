@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
-} from "@/lib/db";
+} from "@/features/organization/client";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 

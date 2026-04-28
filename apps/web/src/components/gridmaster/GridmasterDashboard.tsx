@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import type { Organization, AuditLogEntry, FullAuditLogEntry } from "@/types";
-import type { TenantStats } from "@/lib/db";
-import { fetchAuditLog, fetchFullAuditLog } from "@/lib/db";
+import {
+  fetchGridmasterAuditLog,
+  fetchGridmasterFullAuditLog,
+  type TenantStats,
+} from "@/features/gridmaster/client";
 import { sectionStyle, thStyle } from "@/lib/styles";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
@@ -92,10 +95,10 @@ export default function GridmasterDashboard({
 
   useEffect(() => {
     let cancelled = false;
-    fetchAuditLog({ limit: 10 })
+    fetchGridmasterAuditLog({ limit: 10 })
       .then((entries) => { if (!cancelled) setRecentActivity(entries); })
       .catch(() => {});
-    fetchFullAuditLog({ limit: 100 })
+    fetchGridmasterFullAuditLog({ limit: 100 })
       .then((entries) => { if (!cancelled) setPlatformActivity(entries); })
       .catch(() => {});
     return () => { cancelled = true; };

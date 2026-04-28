@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { PublicRoute } from "@/components/RouteGuards";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -10,6 +9,7 @@ import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
 import { Mail } from "lucide-react";
+import { resetBrowserPasswordForEmail } from "@/features/account/client";
 
 function ForgotPasswordContent() {
   const [email, setEmail] = useState("");
@@ -22,9 +22,7 @@ function ForgotPasswordContent() {
 
     try {
       const redirectTo = `${window.location.origin}/reset-password`;
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo,
-      });
+      const { error } = await resetBrowserPasswordForEmail(email, redirectTo);
       if (error) throw error;
       setSent(true);
     } catch (err: unknown) {

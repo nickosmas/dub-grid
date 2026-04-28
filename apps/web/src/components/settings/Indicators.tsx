@@ -2,7 +2,10 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { IndicatorType } from "@/types";
-import { upsertIndicatorType, deleteIndicatorType } from "@/lib/db";
+import {
+  deleteIndicatorType,
+  upsertIndicatorType,
+} from "@/features/settings/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";

@@ -41,6 +41,10 @@ const resendSchema = z.object({
   expectedUpdatedAt: z.string().datetime({ offset: true }),
 });
 
+const getSchema = z.object({
+  orgId: z.string().uuid(),
+});
+
 function timestampsMatch(left: string | null | undefined, right: string | null | undefined): boolean {
   if (!left || !right) return false;
   return new Date(left).getTime() === new Date(right).getTime();
@@ -151,6 +155,42 @@ async function writeAuditEntry(input: {
       { error, orgId: input.orgId, resourceId: input.resourceId },
       "Invitation audit log write failed",
     );
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAuthenticatedUser(req);
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
+
+  const parsed = getSchema.safeParse(
+    Object.fromEntries(req.nextUrl.searchParams.entries()),
+  );
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  try {
+    const allowed = await requirePrivilegedActor(parsed.data.orgId, user.id);
+    if (!allowed.ok) return allowed.response;
+
+    const serviceClient = getServiceClient();
+    const { data, error } = await serviceClient
+      .from("invitations")
+      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .eq("org_id", parsed.data.orgId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+
+    return NextResponse.json({
+      invitations: (data ?? []).map((row) => rowToInvitation(row as DbInvitation)),
+    });
+  } catch (err) {
+    Sentry.captureException(err, {
+      extra: { context: "organizations/invitations:get", orgId: parsed.data.orgId },
+    });
+    logger.error({ error: err, orgId: parsed.data.orgId }, "Invitation fetch failed");
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }
 

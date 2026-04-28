@@ -1,22 +1,15 @@
-import { supabase } from "@/lib/supabase";
+import "server-only";
+
+import type {
+  EmployeeUtilization,
+  WeeklyShiftHours,
+} from "@/features/dashboard/shared/analytics";
+import { getServiceClient } from "@/lib/supabase-service";
 import {
   fetchPublishedShiftRows,
   resolvePublishedScheduleEntry,
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
-
-export interface WeeklyShiftHours {
-  weekStart: string; // YYYY-MM-DD
-  totalHours: number;
-  shiftCount: number;
-}
-
-export interface EmployeeUtilization {
-  employeeId: string;
-  employeeName: string;
-  totalHours: number;
-  shiftCount: number;
-}
 
 interface ShiftWithEmployee {
   emp_id: string;
@@ -39,7 +32,7 @@ export async function fetchWeeklyShiftHours(
   const start = new Date();
   start.setDate(start.getDate() - weeks * 7);
 
-  const data = await fetchPublishedShiftRows(supabase, {
+  const data = await fetchPublishedShiftRows(getServiceClient(), {
     orgId,
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
@@ -83,7 +76,7 @@ export async function fetchEmployeeUtilization(
   const start = new Date();
   start.setDate(start.getDate() - weeks * 7);
 
-  const data = await fetchPublishedShiftRows(supabase, {
+  const data = await fetchPublishedShiftRows(getServiceClient(), {
     orgId,
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),

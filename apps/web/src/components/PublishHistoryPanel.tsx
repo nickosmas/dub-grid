@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
-import { fetchPublishHistory } from "@/lib/db";
+import { fetchPublishHistory } from "@/features/schedule/client";
 import type {
   PublishHistoryEntryWithName,
   PublishChange,

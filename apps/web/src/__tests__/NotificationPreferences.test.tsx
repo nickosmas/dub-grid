@@ -1,12 +1,23 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationPreferences } from "@/components/profile/NotificationPreferences";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 
-vi.mock("@/lib/browser-auth", () => ({
-  getVerifiedBrowserUser: vi.fn(),
+const mockFetchNotificationPreferences = vi.fn();
+const mockSaveNotificationPreferences = vi.fn();
+
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => ({
+    user: { id: "user-1" },
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@/features/account/client", () => ({
+  fetchNotificationPreferences: (...args: unknown[]) =>
+    mockFetchNotificationPreferences(...args),
+  saveNotificationPreferences: (...args: unknown[]) =>
+    mockSaveNotificationPreferences(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -19,30 +30,19 @@ vi.mock("sonner", () => ({
 describe("NotificationPreferences", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    vi.mocked(getVerifiedBrowserUser).mockResolvedValue({
-      id: "user-1",
-    } as Awaited<ReturnType<typeof getVerifiedBrowserUser>>);
-
-    vi.mocked(supabase.from).mockImplementation(() => {
-      const builder = {
-        select: vi.fn(),
-        eq: vi.fn(),
-        maybeSingle: vi.fn().mockResolvedValue({
-          data: {
-            prefs: {
-              schedule: { in_app: true, email: false },
-              shift_requests: { in_app: true, email: false },
-              system: { in_app: true, email: false },
-            },
-          },
-        }),
-        upsert: vi.fn().mockResolvedValue({ error: null }),
-      };
-
-      builder.select.mockReturnValue(builder);
-      builder.eq.mockReturnValue(builder);
-      return builder as unknown as ReturnType<typeof supabase.from>;
+    mockFetchNotificationPreferences.mockResolvedValue({
+      prefs: {
+        schedule: { in_app: true, email: false },
+        shift_requests: { in_app: true, email: false },
+        system: { in_app: true, email: false },
+      },
+    });
+    mockSaveNotificationPreferences.mockResolvedValue({
+      prefs: {
+        schedule: { in_app: false, email: false },
+        shift_requests: { in_app: true, email: false },
+        system: { in_app: true, email: false },
+      },
     });
   });
 
@@ -55,8 +55,10 @@ describe("NotificationPreferences", () => {
     expect(saveButton).toBeDisabled();
 
     const [scheduleInApp] = screen.getAllByRole("checkbox");
-    await user.click(scheduleInApp);
-    expect(saveButton).toBeEnabled();
+    fireEvent.click(scheduleInApp);
+    await waitFor(() => {
+      expect(saveButton).toBeEnabled();
+    });
 
     await user.click(saveButton);
 

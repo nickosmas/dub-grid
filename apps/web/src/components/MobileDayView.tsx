@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies } from "@/lib/schedule-logic";
@@ -27,6 +27,8 @@ function pillText(label: string, max: number): string {
 interface MobileDayViewProps {
   filteredEmployees: Employee[];
   allEmployees: Employee[];
+  highlightEmpIds?: Set<string>;
+  highlightScrollKey?: string;
   dates: Date[];
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -63,6 +65,8 @@ const GRID_COLS = "100px repeat(7, 1fr)";
 
 export default function MobileDayView({
   filteredEmployees,
+  highlightEmpIds,
+  highlightScrollKey,
   dates,
   shiftForKey,
   assignmentIdsForKey,
@@ -82,6 +86,10 @@ export default function MobileDayView({
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const todayKey = formatDateKey(today);
+  const hasHighlightedSearch = !!(
+    highlightEmpIds && highlightEmpIds.size > 0
+  );
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Always show exactly 7 dates (navigation handled by parent chevrons)
   const visibleDates = useMemo(() => dates.slice(0, 7), [dates]);
@@ -181,8 +189,25 @@ export default function MobileDayView({
     assignmentById,
   ]);
 
+  useEffect(() => {
+    if (!highlightScrollKey || !hasHighlightedSearch) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const firstHighlightedRow = rootRef.current?.querySelector<HTMLElement>(
+        '[data-search-highlight="true"]',
+      );
+      firstHighlightedRow?.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "smooth",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [highlightScrollKey, hasHighlightedSearch]);
+
   return (
-    <div style={{ minHeight: "50vh" }}>
+    <div ref={rootRef} style={{ minHeight: "50vh" }}>
       {/* Sections */}
       {sections.map((sectionName) => {
         const sectionId = focusAreaIdByName[sectionName];
@@ -337,6 +362,18 @@ export default function MobileDayView({
             {/* Employee rows */}
             {sectionEmps.map((emp) => {
               const isGuest = !emp.focusAreaIds.includes(sectionId ?? -1);
+              const isHighlighted = hasHighlightedSearch
+                ? highlightEmpIds?.has(emp.id) ?? false
+                : true;
+              const baseRowBg = isGuest
+                ? "var(--color-bg-secondary)"
+                : "var(--color-surface)";
+              const rowBg =
+                hasHighlightedSearch && isHighlighted
+                  ? isGuest
+                    ? "linear-gradient(90deg, var(--color-brand-bg) 0%, var(--color-bg-secondary) 100%)"
+                    : "var(--color-brand-bg)"
+                  : baseRowBg;
               const certAbbr =
                 emp.certificationId != null
                   ? getCertAbbr(emp.certificationId, certifications)
@@ -346,16 +383,24 @@ export default function MobileDayView({
               return (
                 <div
                   key={emp.id}
+                  data-search-highlight={
+                    hasHighlightedSearch && isHighlighted ? "true" : undefined
+                  }
                   style={{
                     display: "grid",
                     gridTemplateColumns: GRID_COLS,
                     padding: "0 12px",
                     alignItems: "center",
                     minHeight: 44,
-                    background: isGuest
-                      ? "var(--color-bg-secondary)"
-                      : "var(--color-surface)",
+                    background: rowBg,
                     borderBottom: "1px solid var(--color-border)",
+                    boxShadow:
+                      hasHighlightedSearch && isHighlighted
+                        ? "inset 4px 0 0 0 var(--color-brand)"
+                        : undefined,
+                    opacity: isHighlighted ? 1 : 0.35,
+                    transition:
+                      "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
                   }}
                 >
                   {/* Name column */}
@@ -364,7 +409,10 @@ export default function MobileDayView({
                       style={{
                         fontSize: "var(--dg-fs-caption)",
                         fontWeight: 600,
-                        color: "var(--color-text-secondary)",
+                        color:
+                          hasHighlightedSearch && isHighlighted
+                            ? "var(--color-brand)"
+                            : "var(--color-text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",

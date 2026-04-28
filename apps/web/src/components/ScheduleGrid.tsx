@@ -438,6 +438,7 @@ interface LegacyScheduleGridProps {
   ) => void;
   today: Date;
   highlightEmpIds?: Set<string>;
+  highlightScrollKey?: string;
   focusAreas: FocusArea[];
   departments: Department[];
   assignments: AssignmentDefinition[];
@@ -1493,18 +1494,26 @@ const SectionBlock = memo(function SectionBlock({
 
             {/* Employee rows */}
             {employees.map((emp, ri) => {
-              const isHighlighted =
+              const hasHighlightedSearch = !!(
                 highlightEmpIds && highlightEmpIds.size > 0
-                  ? highlightEmpIds.has(emp.id)
-                  : true;
+              );
+              const isHighlighted = hasHighlightedSearch
+                ? highlightEmpIds?.has(emp.id) ?? false
+                : true;
               const isCurrentUser = !!(
                 emp.userId &&
                 currentUser &&
                 emp.userId === currentUser.id
               );
-              const rowBg = isCurrentUser
+              const baseRowBg = isCurrentUser
                 ? "var(--color-today-bg)"
                 : "var(--color-surface)";
+              const rowBg =
+                hasHighlightedSearch && isHighlighted
+                  ? isCurrentUser
+                    ? "linear-gradient(90deg, var(--color-brand-bg) 0%, var(--color-today-bg) 100%)"
+                    : "var(--color-brand-bg)"
+                  : baseRowBg;
               const certAbbr = getCertAbbr(emp.certificationId, certifications);
               const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
@@ -1513,11 +1522,14 @@ const SectionBlock = memo(function SectionBlock({
                   key={emp.id}
                   role="row"
                   className="dg-row-enter"
+                  data-search-highlight={
+                    hasHighlightedSearch && isHighlighted ? "true" : undefined
+                  }
                   style={{
                     ...rowGrid,
                     background: rowBg,
                     opacity: isHighlighted ? 1 : 0.35,
-                    transition: "opacity 150ms ease",
+                    transition: "opacity 150ms ease, background 150ms ease",
                     alignItems: "stretch",
                   }}
                 >
@@ -1540,6 +1552,9 @@ const SectionBlock = memo(function SectionBlock({
                           ? "1px solid var(--color-border-light)"
                           : undefined,
                       boxShadow: joinBoxShadows(
+                        hasHighlightedSearch && isHighlighted
+                          ? "inset 4px 0 0 0 var(--color-brand)"
+                          : undefined,
                         "1px 0 0 0 var(--color-border-light)",
                         "2px 0 4px rgba(0,0,0,0.02)",
                       ),
@@ -1563,7 +1578,10 @@ const SectionBlock = memo(function SectionBlock({
                           style={{
                             fontSize: "var(--dg-fs-label)",
                             fontWeight: 600,
-                            color: "var(--color-text-secondary)",
+                            color:
+                              hasHighlightedSearch && isHighlighted
+                                ? "var(--color-brand)"
+                                : "var(--color-text-secondary)",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
@@ -3262,6 +3280,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   handleCellClick,
   today,
   highlightEmpIds,
+  highlightScrollKey,
   focusAreas,
   departments,
   assignments,
@@ -3483,6 +3502,25 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   });
   const { nameColWidth, colWidth, fitToContainer } = gridLayout;
   const hasAnySections = renderedDepartmentSections.length > 0;
+  const hasHighlightedSearch = (highlightEmpIds?.size ?? 0) > 0;
+
+  useEffect(() => {
+    if (!highlightScrollKey || !hasHighlightedSearch) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const firstHighlightedRow =
+        containerRef.current?.querySelector<HTMLElement>(
+          '[data-search-highlight="true"]',
+        );
+      firstHighlightedRow?.scrollIntoView({
+        block: "center",
+        inline: "nearest",
+        behavior: "smooth",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [highlightScrollKey, hasHighlightedSearch]);
 
   return (
     <div
@@ -3878,6 +3916,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         handleCellClick={handleLegacyCellClick}
         today={model.today}
         highlightEmpIds={model.options.highlightEmpIds}
+        highlightScrollKey={model.options.highlightScrollKey}
         focusAreas={model.focusAreas}
         departments={Array.from(model.departmentsById.values())}
         assignments={model.assignments}

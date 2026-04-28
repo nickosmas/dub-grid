@@ -1,7 +1,6 @@
 // src/hooks/useRoleChange.ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
-import { supabase } from "@/lib/supabase";
 
 export interface RoleChangeParams {
   targetUserId: string;
@@ -46,24 +45,30 @@ export function useRoleChange() {
   return useMutation({
     mutationFn: async (params: RoleChangeParams): Promise<RoleChangeResult> => {
       const idempotencyKey = generateIdempotencyKey();
-
-      const { data: userData } = await supabase.auth.getUser();
-      const changedById = userData.user?.id;
-
-      if (!changedById) {
-        throw new Error("User not authenticated");
-      }
-
-      const { data, error } = await supabase.rpc("change_user_role", {
-        p_target_user_id: params.targetUserId,
-        p_new_role: params.newRole,
-        p_changed_by_id: changedById,
-        p_idempotency_key: idempotencyKey,
-        p_org_id: params.orgId ?? null,
+      const response = await fetch("/api/organizations/role-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: params.targetUserId,
+          newRole: params.newRole,
+          orgId: params.orgId ?? null,
+          idempotencyKey,
+        }),
       });
 
-      if (error) throw error;
-      return data as RoleChangeResult;
+      const body = (await response.json().catch(() => null)) as
+        | { error?: string; result?: RoleChangeResult }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(body?.error ?? "Failed to change role");
+      }
+
+      return (
+        body?.result ?? {
+          status: "success",
+        }
+      );
     },
     onMutate: async (vars: RoleChangeParams) => {
       // Cancel any outgoing refetches to avoid overwriting optimistic update

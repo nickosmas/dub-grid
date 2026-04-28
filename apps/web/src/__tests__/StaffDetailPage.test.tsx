@@ -5,11 +5,13 @@ import { makeEmployee } from "@/__tests__/factories";
 import {
   fetchEmployeeById,
   fetchEmployeeShifts,
-  fetchRecurringShifts,
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
+} from "@/features/employees/client";
+import {
+  fetchRecurringShifts,
   fetchShiftRequests,
-} from "@/lib/db";
+} from "@/features/schedule/client";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -42,27 +44,21 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }));
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/employees/client", () => ({
   fetchEmployeeById: vi.fn(),
   fetchEmployeeShifts: vi.fn(),
-  fetchRecurringShifts: vi.fn(),
   fetchEmployeeInvitations: vi.fn(),
   fetchEmployeeRoleHistory: vi.fn(),
-  fetchShiftRequests: vi.fn(),
   updateEmployee: vi.fn(),
   benchEmployee: vi.fn(),
   activateEmployee: vi.fn(),
   deleteEmployee: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        in: vi.fn().mockResolvedValue({ data: [] }),
-      })),
-    })),
-  },
+vi.mock("@/features/schedule/client", () => ({
+  fetchRecurringShifts: vi.fn(),
+  fetchShiftRequests: vi.fn(),
+  fetchScheduleActorNames: vi.fn().mockResolvedValue({ names: {} }),
 }));
 
 vi.mock("@/components/ProgressBar", () => ({

@@ -1,0 +1,407 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbShiftRequest } from "@dubgrid/db-types";
+import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
+import { rowToShiftRequest } from "@/lib/db/mappers";
+import { assertSafeFilterValue } from "@/lib/db/shared";
+import type {
+  ShiftRequestStatus,
+  ShiftRequestType,
+} from "@/types";
+
+export const dynamic = "force-dynamic";
+
+const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
+const shiftRequestTypeSchema = z.enum(["pickup", "swap", "calloff"]);
+const shiftRequestStatusSchema = z.enum([
+  "open",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "expired",
+  "cancelled",
+]);
+
+const requestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("fetchShiftRequests"),
+    orgId: z.string().uuid(),
+    assignmentLabels: mapEntrySchema,
+    status: z.array(shiftRequestStatusSchema).optional(),
+    type: shiftRequestTypeSchema.optional(),
+    empId: z.string().uuid().optional(),
+  }),
+  z.object({
+    action: z.literal("createShiftRequest"),
+    orgId: z.string().uuid(),
+    type: shiftRequestTypeSchema,
+    requesterEmpId: z.string().uuid(),
+    requesterShiftDate: z.string().date(),
+    targetEmpId: z.string().uuid().optional(),
+    targetShiftDate: z.string().date().optional(),
+    absenceTypeId: z.number().int().optional(),
+  }),
+  z.object({
+    action: z.literal("claimShiftRequest"),
+    orgId: z.string().uuid(),
+    requestId: z.string().uuid(),
+    claimerEmpId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("volunteerForOpenShift"),
+    orgId: z.string().uuid(),
+    empId: z.string().uuid(),
+    shiftDate: z.string().date(),
+    input: scheduleCellStateSchema,
+    focusAreaId: z.number().int(),
+  }),
+  z.object({
+    action: z.literal("respondToShiftRequest"),
+    orgId: z.string().uuid(),
+    requestId: z.string().uuid(),
+    empId: z.string().uuid(),
+    accept: z.boolean(),
+  }),
+  z.object({
+    action: z.literal("resolveShiftRequest"),
+    orgId: z.string().uuid(),
+    requestId: z.string().uuid(),
+    approved: z.boolean(),
+    note: z.string().optional(),
+  }),
+  z.object({
+    action: z.literal("cancelShiftRequest"),
+    orgId: z.string().uuid(),
+    requestId: z.string().uuid(),
+    empId: z.string().uuid(),
+  }),
+]);
+
+async function fetchActorEmployeeId(
+  serviceClient: SupabaseClient,
+  actorId: string,
+  orgId: string,
+): Promise<string | null> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("user_id", actorId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return (data?.id as string | undefined) ?? null;
+}
+
+async function requireEmployeeAction(
+  req: NextRequest,
+  orgId: string,
+  employeeId: string,
+) {
+  const auth = await requireOrgPermissions(
+    req,
+    orgId,
+    (permissions) =>
+      permissions.isGridmaster ||
+      permissions.isSuperAdmin ||
+      permissions.canManageEmployees ||
+      permissions.canEditShifts ||
+      permissions.canViewSchedule,
+  );
+  if ("response" in auth) {
+    return auth;
+  }
+
+  const actorEmployeeId = await fetchActorEmployeeId(
+    auth.serviceClient,
+    auth.actor.id,
+    orgId,
+  );
+  const canActForOthers =
+    auth.permissions.isGridmaster ||
+    auth.permissions.isSuperAdmin ||
+    auth.permissions.canManageEmployees ||
+    auth.permissions.canEditShifts;
+
+  if (!canActForOthers && actorEmployeeId !== employeeId) {
+    return {
+      response: NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      ),
+    } as const;
+  }
+
+  return auth;
+}
+
+export async function POST(req: NextRequest) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = requestSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const data = parsed.data;
+
+  try {
+    switch (data.action) {
+      case "fetchShiftRequests": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        let query = auth.serviceClient
+          .from("shift_requests")
+          .select(
+            `*,
+             requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
+             target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
+          )
+          .eq("org_id", data.orgId)
+          .order("created_at", { ascending: false });
+
+        if (data.status?.length) {
+          query = query.in("status", data.status as ShiftRequestStatus[]);
+        }
+        if (data.type) {
+          query = query.eq("type", data.type as ShiftRequestType);
+        }
+        if (data.empId) {
+          assertSafeFilterValue(data.empId, "empId");
+          query = query.or(
+            `requester_emp_id.eq.${data.empId},target_emp_id.eq.${data.empId}`,
+          );
+        }
+
+        const { data: rows, error } = await query;
+        if (error) {
+          throw error;
+        }
+
+        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
+          auth.serviceClient,
+          data.orgId,
+        );
+
+        return NextResponse.json({
+          requests: ((rows ?? []) as Record<string, unknown>[]).map((row) => {
+            const requester = row.requester as {
+              first_name: string;
+              last_name: string;
+            } | null;
+            const target = row.target as {
+              first_name: string;
+              last_name: string;
+            } | null;
+            const mapped: DbShiftRequest = {
+              id: row.id as string,
+              org_id: row.org_id as string,
+              type: row.type as ShiftRequestType,
+              status: row.status as ShiftRequestStatus,
+              requester_emp_id: row.requester_emp_id as string,
+              requester_shift_date: row.requester_shift_date as string,
+              requester_state: row.requester_state as DbShiftRequest["requester_state"],
+              target_emp_id: (row.target_emp_id as string | null) ?? null,
+              target_shift_date:
+                (row.target_shift_date as string | null) ?? null,
+              target_state:
+                (row.target_state as DbShiftRequest["target_state"] | null) ??
+                null,
+              absence_type_id: (row.absence_type_id as number | null) ?? null,
+              parent_request_id:
+                (row.parent_request_id as string | null) ?? null,
+              admin_user_id: (row.admin_user_id as string | null) ?? null,
+              admin_note: (row.admin_note as string | null) ?? null,
+              expires_at: row.expires_at as string,
+              resolved_at: (row.resolved_at as string | null) ?? null,
+              created_at: row.created_at as string,
+              updated_at: row.updated_at as string,
+              requester_first_name: requester?.first_name,
+              requester_last_name: requester?.last_name,
+              target_first_name: target?.first_name ?? null,
+              target_last_name: target?.last_name ?? null,
+            };
+
+            return rowToShiftRequest(
+              mapped,
+              assignmentLabelMap,
+              undefined,
+              assignmentIdByPair,
+            );
+          }),
+        });
+      }
+
+      case "createShiftRequest": {
+        const auth = await requireEmployeeAction(
+          req,
+          data.orgId,
+          data.requesterEmpId,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: requestId, error } = await auth.serviceClient.rpc(
+          "create_shift_request",
+          {
+            p_org_id: data.orgId,
+            p_type: data.type,
+            p_requester_emp_id: data.requesterEmpId,
+            p_requester_shift_date: data.requesterShiftDate,
+            p_target_emp_id: data.targetEmpId ?? null,
+            p_target_shift_date: data.targetShiftDate ?? null,
+            p_absence_type_id: data.absenceTypeId ?? null,
+          },
+        );
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ requestId: requestId as string });
+      }
+
+      case "claimShiftRequest": {
+        const auth = await requireEmployeeAction(
+          req,
+          data.orgId,
+          data.claimerEmpId,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { error } = await auth.serviceClient.rpc("claim_shift_request", {
+          p_request_id: data.requestId,
+          p_claimer_emp_id: data.claimerEmpId,
+        });
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "volunteerForOpenShift": {
+        const auth = await requireEmployeeAction(req, data.orgId, data.empId);
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        if (data.input.kind !== "worked" || data.input.segments.length === 0) {
+          return NextResponse.json(
+            { error: "Open-shift volunteering requires a worked assignment" },
+            { status: 400 },
+          );
+        }
+
+        const { data: requestId, error } = await auth.serviceClient.rpc(
+          "volunteer_for_open_shift",
+          {
+            p_org_id: data.orgId,
+            p_emp_id: data.empId,
+            p_shift_date: data.shiftDate,
+            p_shift_ids: data.input.segments.map((segment) => segment.shiftId),
+            p_job_ids: data.input.segments.map((segment) => segment.jobId),
+            p_focus_area_id: data.focusAreaId,
+            p_custom_start_time: data.input.customStartTime ?? null,
+            p_custom_end_time: data.input.customEndTime ?? null,
+          },
+        );
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ requestId: requestId as string });
+      }
+
+      case "respondToShiftRequest": {
+        const auth = await requireEmployeeAction(req, data.orgId, data.empId);
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { error } = await auth.serviceClient.rpc(
+          "respond_to_shift_request",
+          {
+            p_request_id: data.requestId,
+            p_emp_id: data.empId,
+            p_accept: data.accept,
+          },
+        );
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "resolveShiftRequest": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canApproveShiftRequests,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { error } = await auth.serviceClient.rpc("resolve_shift_request", {
+          p_request_id: data.requestId,
+          p_approved: data.approved,
+          p_note: data.note ?? null,
+        });
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "cancelShiftRequest": {
+        const auth = await requireEmployeeAction(req, data.orgId, data.empId);
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { error } = await auth.serviceClient.rpc("cancel_shift_request", {
+          p_request_id: data.requestId,
+          p_emp_id: data.empId,
+        });
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Shift request operation failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

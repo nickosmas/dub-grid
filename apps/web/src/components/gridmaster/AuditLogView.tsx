@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { fetchFullAuditLog } from "@/lib/db";
+import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
 import type { FullAuditLogEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import CustomSelect from "@/components/CustomSelect";
@@ -149,7 +149,7 @@ export default function AuditLogView({
   useEffect(() => {
     let cancelled = false;
 
-    fetchFullAuditLog({
+    fetchGridmasterFullAuditLog({
       orgId,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,

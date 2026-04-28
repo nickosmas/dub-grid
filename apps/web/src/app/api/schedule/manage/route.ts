@@ -1,0 +1,1363 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import type {
+  DbRecurringShift,
+  DbScheduleCell,
+  DbScheduleNote,
+  DbShiftRequest,
+} from "@dubgrid/db-types";
+import { scheduleCellStateSchema } from "@dubgrid/contracts";
+import {
+  requireOrgPermissions,
+} from "@/app/api/shared/permissions";
+import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
+import {
+  rowToShiftRequest,
+  generateSeriesDates,
+} from "@/lib/db/mappers";
+import {
+  mapNormalizedScheduleCellRowToScheduleEntry,
+} from "@/lib/schedule-cells";
+import {
+  formatDateKey,
+  iterateDateRange,
+} from "@/lib/utils";
+import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
+import type {
+  GridOpenShift,
+  ScheduleCellInput,
+  ScheduleNote,
+  SeriesFrequency,
+  ShiftSeries,
+  ShiftRequestStatus,
+  ShiftRequestType,
+} from "@/types";
+
+export const dynamic = "force-dynamic";
+
+const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
+const noteStatusSchema = z.enum(["published", "draft", "draft_deleted"]);
+const seriesFrequencySchema = z.enum(["daily", "weekly", "biweekly"]);
+const dragModeSchema = z.enum(["move", "copy"]);
+
+const requestSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("fetchShifts"),
+    orgId: z.string().uuid(),
+    isScheduler: z.boolean(),
+    assignmentLabels: mapEntrySchema,
+    absenceTypeLabels: mapEntrySchema.optional(),
+    startDate: z.string().date().optional(),
+    endDate: z.string().date().optional(),
+  }),
+  z.object({
+    action: z.literal("fetchScheduleNotes"),
+    orgId: z.string().uuid(),
+    startDate: z.string().date().optional(),
+    endDate: z.string().date().optional(),
+  }),
+  z.object({
+    action: z.literal("fetchCalloffOpenShifts"),
+    orgId: z.string().uuid(),
+    startDate: z.string().date(),
+    endDate: z.string().date(),
+    assignmentLabels: mapEntrySchema,
+  }),
+  z.object({
+    action: z.literal("getScheduleLastViewed"),
+    orgId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("updateScheduleLastViewed"),
+    orgId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("upsertShift"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    date: z.string().date(),
+    input: scheduleCellStateSchema,
+    expectedVersion: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    action: z.literal("deleteShift"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    date: z.string().date(),
+    expectedVersion: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    action: z.literal("upsertShiftTimes"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    date: z.string().date(),
+    customStartTime: z.string().nullable(),
+    customEndTime: z.string().nullable(),
+    expectedVersion: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    action: z.literal("moveShift"),
+    orgId: z.string().uuid(),
+    sourceEmpId: z.string().uuid(),
+    sourceDate: z.string().date(),
+    targetEmpId: z.string().uuid(),
+    targetDate: z.string().date(),
+    input: scheduleCellStateSchema,
+    dragMode: dragModeSchema.optional(),
+    expectedVersion: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    action: z.literal("createShiftSeries"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    input: scheduleCellStateSchema,
+    shiftLabel: z.string(),
+    frequency: seriesFrequencySchema,
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).nullable(),
+    startDate: z.string().date(),
+    endDate: z.string().date().nullable(),
+    maxOccurrences: z.number().int().positive().nullable(),
+  }),
+  z.object({
+    action: z.literal("updateSeriesAllShifts"),
+    orgId: z.string().uuid(),
+    seriesId: z.string().uuid(),
+    input: scheduleCellStateSchema,
+  }),
+  z.object({
+    action: z.literal("deleteShiftSeries"),
+    orgId: z.string().uuid(),
+    seriesId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("applyRecurringSchedules"),
+    orgId: z.string().uuid(),
+    startDate: z.string().date(),
+    endDate: z.string().date(),
+  }),
+  z.object({
+    action: z.literal("upsertScheduleNote"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    date: z.string().date(),
+    indicatorTypeId: z.number().int(),
+    focusAreaId: z.number().int(),
+    existingStatus: noteStatusSchema.optional(),
+  }),
+  z.object({
+    action: z.literal("deleteScheduleNote"),
+    orgId: z.string().uuid(),
+    employeeId: z.string().uuid(),
+    date: z.string().date(),
+    indicatorTypeId: z.number().int(),
+    focusAreaId: z.number().int(),
+    existingStatus: noteStatusSchema.optional(),
+  }),
+]);
+
+const MAX_RANGE_DAYS = 366;
+
+class OptimisticLockConflictError extends Error {
+  constructor(
+    public readonly shiftId: string,
+    public readonly expectedVersion: number,
+    public readonly actualVersion?: number,
+  ) {
+    super("Optimistic lock failed");
+  }
+}
+
+type ScheduleServiceClient = Extract<
+  Awaited<ReturnType<typeof requireOrgPermissions>>,
+  { serviceClient: unknown }
+>["serviceClient"];
+
+function assertDateRange(startDate?: string, endDate?: string): void {
+  if (!startDate || !endDate) {
+    return;
+  }
+
+  const diffMs = new Date(endDate).getTime() - new Date(startDate).getTime();
+  if (diffMs > MAX_RANGE_DAYS * 86_400_000) {
+    throw new Error(`Shift query range exceeds ${MAX_RANGE_DAYS} days`);
+  }
+}
+
+function sortSegments(input: ScheduleCellInput["segments"]) {
+  return [...input].sort((left, right) => left.position - right.position);
+}
+
+function normalizeScheduleInput(
+  input: ScheduleCellInput,
+  extra?: Partial<Pick<ScheduleCellInput, "seriesId" | "fromRecurring">>,
+): ScheduleCellInput {
+  const seriesId = extra?.seriesId ?? input.seriesId ?? null;
+  const fromRecurring = extra?.fromRecurring ?? input.fromRecurring ?? false;
+
+  if (input.kind === "deleted") {
+    return {
+      kind: "deleted",
+      segments: [],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId,
+      fromRecurring,
+    };
+  }
+
+  if (input.kind === "absence") {
+    return {
+      kind: "absence",
+      segments: [],
+      absenceTypeId: input.absenceTypeId ?? null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId,
+      fromRecurring,
+    };
+  }
+
+  return {
+    kind: "worked",
+    segments: sortSegments(input.segments).map((segment, index) => ({
+      shiftId: segment.shiftId,
+      jobId: segment.jobId,
+      position: index,
+    })),
+    absenceTypeId: null,
+    customStartTime: input.customStartTime ?? null,
+    customEndTime: input.customEndTime ?? null,
+    seriesId,
+    fromRecurring,
+  };
+}
+
+function getScheduleCellStorage(input: ScheduleCellInput) {
+  if (input.kind === "deleted") {
+    return {
+      shiftIds: [] as Array<number | null>,
+      jobIds: [] as number[],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+    };
+  }
+
+  if (input.kind === "absence") {
+    return {
+      shiftIds: [] as Array<number | null>,
+      jobIds: [] as number[],
+      absenceTypeId: input.absenceTypeId ?? null,
+      customStartTime: null,
+      customEndTime: null,
+    };
+  }
+
+  const orderedSegments = sortSegments(input.segments);
+  return {
+    shiftIds: orderedSegments.map((segment) => segment.shiftId),
+    jobIds: orderedSegments.map((segment) => segment.jobId),
+    absenceTypeId: null,
+    customStartTime: input.customStartTime ?? null,
+    customEndTime: input.customEndTime ?? null,
+  };
+}
+
+async function readCurrentScheduleCellVersion(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+): Promise<number | undefined> {
+  const { data, error } = await serviceClient
+    .from("schedule_cells")
+    .select("version")
+    .eq("org_id", orgId)
+    .eq("emp_id", employeeId)
+    .eq("date", date)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return (data?.version as number | undefined) ?? undefined;
+}
+
+async function raiseOptimisticConflict(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+  expectedVersion: number,
+): Promise<never> {
+  throw new OptimisticLockConflictError(
+    `${employeeId}:${date}`,
+    expectedVersion,
+    await readCurrentScheduleCellVersion(serviceClient, orgId, employeeId, date),
+  );
+}
+
+async function writeShiftSnapshot(
+  serviceClient: ScheduleServiceClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    date: string;
+    state: ScheduleCellInput;
+    expectedVersion?: number;
+  },
+): Promise<void> {
+  if (input.state.kind === "deleted") {
+    await deleteShiftSnapshot(serviceClient, input);
+    return;
+  }
+
+  const state = normalizeScheduleInput(input.state);
+  const {
+    shiftIds,
+    jobIds,
+    absenceTypeId,
+    customStartTime,
+    customEndTime,
+  } = getScheduleCellStorage(state);
+
+  const { error } = await serviceClient.rpc("write_schedule_cell_snapshot", {
+    p_org_id: input.orgId,
+    p_emp_id: input.employeeId,
+    p_date: input.date,
+    p_snapshot_kind: "draft",
+    p_state_kind: state.kind,
+    p_shift_ids: shiftIds,
+    p_job_ids: jobIds,
+    p_absence_type_id: absenceTypeId,
+    p_custom_start_time: customStartTime,
+    p_custom_end_time: customEndTime,
+    p_series_id: state.seriesId ?? null,
+    p_from_recurring: state.fromRecurring ?? false,
+    p_expected_version: input.expectedVersion ?? 0,
+  });
+
+  if (error) {
+    if (error.message?.includes("Optimistic lock failed")) {
+      await raiseOptimisticConflict(
+        serviceClient,
+        input.orgId,
+        input.employeeId,
+        input.date,
+        input.expectedVersion ?? 0,
+      );
+    }
+    throw error;
+  }
+}
+
+async function deleteShiftSnapshot(
+  serviceClient: ScheduleServiceClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    date: string;
+    expectedVersion?: number;
+  },
+): Promise<void> {
+  const { error } = await serviceClient.rpc("delete_schedule_cell_draft", {
+    p_org_id: input.orgId,
+    p_emp_id: input.employeeId,
+    p_date: input.date,
+    p_expected_version: input.expectedVersion ?? null,
+  });
+
+  if (error) {
+    if (error.message?.includes("Optimistic lock failed")) {
+      await raiseOptimisticConflict(
+        serviceClient,
+        input.orgId,
+        input.employeeId,
+        input.date,
+        input.expectedVersion ?? 0,
+      );
+    }
+    throw error;
+  }
+}
+
+async function fetchScheduleCellSnapshotPayload(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  date: string,
+  snapshotKind: "draft" | "published",
+) {
+  const { data, error } = await serviceClient.rpc(
+    "get_schedule_cell_snapshot_payload",
+    {
+      p_org_id: orgId,
+      p_emp_id: employeeId,
+      p_date: date,
+      p_snapshot_kind: snapshotKind,
+    },
+  );
+  if (error) {
+    throw error;
+  }
+  const rows = (data ?? []) as Array<{
+    version: number;
+    focus_area_id: number | null;
+    series_id: string | null;
+    from_recurring: boolean;
+    state_kind: "worked" | "absence" | "deleted";
+    shift_ids: Array<number | null>;
+    job_ids: number[];
+  }>;
+  return rows[0] ?? null;
+}
+
+function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
+  const snapshots = cell.snapshots ?? [];
+  const draft = snapshots.find((snapshot) => snapshot.snapshot_kind === "draft");
+  if (draft) {
+    return draft.state_kind !== "deleted";
+  }
+
+  return snapshots.some((snapshot) => snapshot.snapshot_kind === "published");
+}
+
+async function fetchScheduleCellVersionsForDates(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  employeeId: string,
+  dates: string[],
+): Promise<Map<string, number>> {
+  if (dates.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await serviceClient
+    .from("schedule_cells")
+    .select("date, version")
+    .eq("org_id", orgId)
+    .eq("emp_id", employeeId)
+    .in("date", dates);
+  if (error) {
+    throw error;
+  }
+
+  return new Map(
+    ((data ?? []) as Array<{ date: string; version: number }>).map((row) => [
+      row.date,
+      row.version,
+    ]),
+  );
+}
+
+export async function POST(req: NextRequest) {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const parsed = requestSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  }
+
+  const data = parsed.data;
+
+  try {
+    switch (data.action) {
+      case "fetchShifts": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        assertDateRange(data.startDate, data.endDate);
+        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
+        const absenceTypeMap = new Map<number, string>(
+          data.absenceTypeLabels ?? [],
+        );
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
+          auth.serviceClient,
+          data.orgId,
+        );
+
+        let query = auth.serviceClient
+          .from("schedule_cells")
+          .select(
+            "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+          )
+          .eq("org_id", data.orgId);
+        if (data.startDate) {
+          query = query.gte("date", data.startDate);
+        }
+        if (data.endDate) {
+          query = query.lte("date", data.endDate);
+        }
+
+        const { data: rows, error } = await query;
+        if (error) {
+          throw error;
+        }
+
+        const shifts: Record<string, unknown> = {};
+        for (const row of (rows ?? []) as DbScheduleCell[]) {
+          const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
+            isScheduler: data.isScheduler,
+            assignmentLabelMap,
+            assignmentIdByPair,
+            absenceTypeMap,
+          });
+          if (entry) {
+            shifts[`${row.emp_id}_${row.date}`] = entry;
+          }
+        }
+
+        return NextResponse.json({ shifts });
+      }
+
+      case "fetchScheduleNotes": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        let query = auth.serviceClient
+          .from("schedule_notes")
+          .select(
+            "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+          )
+          .eq("org_id", data.orgId);
+        if (data.startDate) {
+          query = query.gte("date", data.startDate);
+        }
+        if (data.endDate) {
+          query = query.lte("date", data.endDate);
+        }
+
+        const { data: rows, error } = await query;
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({
+          notes: ((rows ?? []) as DbScheduleNote[]).map((row) => ({
+            id: row.id,
+            orgId: row.org_id,
+            empId: row.emp_id,
+            date: row.date,
+            indicatorTypeId: row.indicator_type_id,
+            focusAreaId: row.focus_area_id,
+            status: row.status,
+            createdBy: row.created_by,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          })),
+        });
+      }
+
+      case "fetchCalloffOpenShifts": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: rows, error } = await auth.serviceClient
+          .from("shift_requests")
+          .select(
+            `*, requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name, focus_area_ids)`,
+          )
+          .eq("org_id", data.orgId)
+          .eq("type", "pickup")
+          .eq("status", "open")
+          .not("parent_request_id", "is", null)
+          .gte("requester_shift_date", data.startDate)
+          .lte("requester_shift_date", data.endDate);
+        if (error) {
+          throw error;
+        }
+
+        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
+          auth.serviceClient,
+          data.orgId,
+        );
+
+        const openShifts = ((rows ?? []) as Record<string, unknown>[])
+          .map((row): GridOpenShift | null => {
+            const requester = row.requester as {
+              first_name: string;
+              last_name: string;
+              focus_area_ids: number[];
+            } | null;
+            const mapped: DbShiftRequest = {
+              id: row.id as string,
+              org_id: row.org_id as string,
+              type: row.type as ShiftRequestType,
+              status: row.status as ShiftRequestStatus,
+              requester_emp_id: row.requester_emp_id as string,
+              requester_shift_date: row.requester_shift_date as string,
+              requester_state: row.requester_state as ScheduleCellInput,
+              target_emp_id: (row.target_emp_id as string | null) ?? null,
+              target_shift_date:
+                (row.target_shift_date as string | null) ?? null,
+              target_state:
+                (row.target_state as ScheduleCellInput | null | undefined) ??
+                null,
+              absence_type_id: (row.absence_type_id as number | null) ?? null,
+              parent_request_id:
+                (row.parent_request_id as string | null) ?? null,
+              admin_user_id: (row.admin_user_id as string | null) ?? null,
+              admin_note: (row.admin_note as string | null) ?? null,
+              expires_at: row.expires_at as string,
+              resolved_at: (row.resolved_at as string | null) ?? null,
+              created_at: row.created_at as string,
+              updated_at: row.updated_at as string,
+              requester_first_name: requester?.first_name,
+              requester_last_name: requester?.last_name,
+              target_first_name: null,
+              target_last_name: null,
+            };
+            const request = rowToShiftRequest(
+              mapped,
+              assignmentLabelMap,
+              undefined,
+              assignmentIdByPair,
+            );
+            const resolvedFocusAreaId =
+              request.requesterFocusAreaId ?? requester?.focus_area_ids?.[0];
+            if (resolvedFocusAreaId == null) {
+              return null;
+            }
+            return {
+              id: request.id,
+              source: "calloff",
+              date: request.requesterShiftDate,
+              focusAreaId: resolvedFocusAreaId,
+              shiftIds: request.requesterShiftIds,
+              jobIds: request.requesterJobIds,
+              assignmentIds: request.requesterAssignmentDefinitionIds,
+              assignmentLabel: request.requesterShiftLabel,
+              customStartTime: request.requesterCustomStartTime,
+              customEndTime: request.requesterCustomEndTime,
+              calledOffBy: request.requesterName || undefined,
+              requestId: request.id,
+              needed: 1,
+            } satisfies GridOpenShift;
+          })
+          .filter((item): item is GridOpenShift => item != null);
+
+        return NextResponse.json({ openShifts });
+      }
+
+      case "getScheduleLastViewed": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: value, error } = await auth.serviceClient.rpc(
+          "get_schedule_last_viewed",
+          { p_org_id: data.orgId },
+        );
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ lastViewed: (value as string | null) ?? null });
+      }
+
+      case "updateScheduleLastViewed": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { error } = await auth.serviceClient.rpc(
+          "update_schedule_last_viewed",
+          { p_org_id: data.orgId },
+        );
+        if (error) {
+          throw error;
+        }
+        return NextResponse.json({ success: true });
+      }
+
+      case "upsertShift": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        await writeShiftSnapshot(auth.serviceClient, {
+          orgId: data.orgId,
+          employeeId: data.employeeId,
+          date: data.date,
+          state: data.input,
+          expectedVersion: data.expectedVersion,
+        });
+        return NextResponse.json({ success: true });
+      }
+
+      case "deleteShift": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        await deleteShiftSnapshot(auth.serviceClient, {
+          orgId: data.orgId,
+          employeeId: data.employeeId,
+          date: data.date,
+          expectedVersion: data.expectedVersion,
+        });
+        return NextResponse.json({ success: true });
+      }
+
+      case "upsertShiftTimes": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const draftPayload = await fetchScheduleCellSnapshotPayload(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+          "draft",
+        );
+        const publishedPayload = await fetchScheduleCellSnapshotPayload(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          data.date,
+          "published",
+        );
+        const sourcePayload =
+          draftPayload?.state_kind === "worked"
+            ? draftPayload
+            : publishedPayload?.state_kind === "worked"
+              ? publishedPayload
+              : null;
+        if (!sourcePayload) {
+          return NextResponse.json(
+            { error: "Cannot set custom times without a worked schedule cell" },
+            { status: 400 },
+          );
+        }
+
+        const { error } = await auth.serviceClient.rpc(
+          "write_schedule_cell_snapshot",
+          {
+            p_org_id: data.orgId,
+            p_emp_id: data.employeeId,
+            p_date: data.date,
+            p_snapshot_kind: "draft",
+            p_state_kind: "worked",
+            p_shift_ids: sourcePayload.shift_ids ?? [],
+            p_job_ids: sourcePayload.job_ids ?? [],
+            p_absence_type_id: null,
+            p_custom_start_time: data.customStartTime,
+            p_custom_end_time: data.customEndTime,
+            p_series_id: sourcePayload.series_id ?? null,
+            p_from_recurring: sourcePayload.from_recurring ?? false,
+            p_focus_area_id: sourcePayload.focus_area_id ?? null,
+            p_expected_version:
+              data.expectedVersion ?? sourcePayload.version ?? 0,
+          },
+        );
+        if (error) {
+          if (error.message?.includes("Optimistic lock failed")) {
+            await raiseOptimisticConflict(
+              auth.serviceClient,
+              data.orgId,
+              data.employeeId,
+              data.date,
+              data.expectedVersion ?? sourcePayload.version ?? 0,
+            );
+          }
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "moveShift": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const state = normalizeScheduleInput(data.input);
+        const {
+          shiftIds,
+          jobIds,
+          absenceTypeId,
+          customStartTime,
+          customEndTime,
+        } = getScheduleCellStorage(state);
+        const { error } = await auth.serviceClient.rpc("move_shift", {
+          p_org_id: data.orgId,
+          p_source_emp_id: data.sourceEmpId,
+          p_source_date: data.sourceDate,
+          p_target_emp_id: data.targetEmpId,
+          p_target_date: data.targetDate,
+          p_kind: state.kind,
+          p_shift_ids: shiftIds,
+          p_job_ids: jobIds,
+          p_absence_type_id: absenceTypeId,
+          p_custom_start_time: customStartTime,
+          p_custom_end_time: customEndTime,
+          p_drag_mode: data.dragMode ?? "move",
+          p_expected_version: data.expectedVersion ?? null,
+        });
+        if (error) {
+          if (error.message?.includes("Optimistic lock failed")) {
+            throw new OptimisticLockConflictError(
+              `${data.sourceEmpId}:${data.sourceDate}`,
+              data.expectedVersion ?? 0,
+            );
+          }
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "createShiftSeries": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageShiftSeries,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+        const normalizedInput = normalizeScheduleInput(data.input, {
+          seriesId: id,
+          fromRecurring: false,
+        });
+
+        if (
+          normalizedInput.kind === "absence" &&
+          (normalizedInput.absenceTypeId ?? null) == null
+        ) {
+          return NextResponse.json(
+            { error: "Shift series requires an absence type" },
+            { status: 400 },
+          );
+        }
+        if (
+          normalizedInput.kind === "worked" &&
+          normalizedInput.segments.length === 0
+        ) {
+          return NextResponse.json(
+            { error: "Shift series requires at least one worked segment" },
+            { status: 400 },
+          );
+        }
+
+        const { error } = await auth.serviceClient.from("shift_series").insert({
+          id,
+          emp_id: data.employeeId,
+          org_id: data.orgId,
+          state: normalizedInput,
+          frequency: data.frequency,
+          days_of_week: data.daysOfWeek,
+          start_date: data.startDate,
+          end_date: data.endDate,
+          max_occurrences: data.maxOccurrences,
+        });
+        if (error) {
+          throw error;
+        }
+
+        const dates = generateSeriesDates(
+          data.frequency as SeriesFrequency,
+          data.daysOfWeek,
+          data.startDate,
+          data.endDate,
+          data.maxOccurrences,
+        );
+        const existingVersions = await fetchScheduleCellVersionsForDates(
+          auth.serviceClient,
+          data.orgId,
+          data.employeeId,
+          dates,
+        );
+
+        for (const date of dates) {
+          await writeShiftSnapshot(auth.serviceClient, {
+            orgId: data.orgId,
+            employeeId: data.employeeId,
+            date,
+            state: normalizedInput,
+            expectedVersion: existingVersions.get(date),
+          });
+        }
+
+        const series: ShiftSeries = {
+          id,
+          empId: data.employeeId,
+          orgId: data.orgId,
+          state: normalizedInput,
+          presentation: null,
+          input: normalizedInput,
+          absenceTypeId:
+            normalizedInput.kind === "absence"
+              ? (normalizedInput.absenceTypeId ?? null)
+              : null,
+          shiftLabel: data.shiftLabel,
+          frequency: data.frequency as SeriesFrequency,
+          daysOfWeek: data.daysOfWeek,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          maxOccurrences: data.maxOccurrences,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        return NextResponse.json({ series });
+      }
+
+      case "updateSeriesAllShifts": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageShiftSeries,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const normalizedInput = normalizeScheduleInput(data.input, {
+          seriesId: data.seriesId,
+          fromRecurring: false,
+        });
+        if (
+          normalizedInput.kind === "worked" &&
+          normalizedInput.segments.length === 0
+        ) {
+          return NextResponse.json(
+            { error: "Series updates require at least one worked segment" },
+            { status: 400 },
+          );
+        }
+
+        const { data: cells, error: cellError } = await auth.serviceClient
+          .from("schedule_cells")
+          .select("emp_id, date, version")
+          .eq("org_id", data.orgId)
+          .eq("series_id", data.seriesId);
+        if (cellError) {
+          throw cellError;
+        }
+
+        for (const cell of (cells ?? []) as Array<{
+          emp_id: string;
+          date: string;
+          version: number;
+        }>) {
+          await writeShiftSnapshot(auth.serviceClient, {
+            orgId: data.orgId,
+            employeeId: cell.emp_id,
+            date: cell.date,
+            state: normalizedInput,
+            expectedVersion: cell.version,
+          });
+        }
+
+        const { error } = await auth.serviceClient
+          .from("shift_series")
+          .update({ state: normalizedInput })
+          .eq("org_id", data.orgId)
+          .eq("id", data.seriesId);
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "deleteShiftSeries": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageShiftSeries,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const { data: cells, error: cellError } = await auth.serviceClient
+          .from("schedule_cells")
+          .select("emp_id, date, version")
+          .eq("org_id", data.orgId)
+          .eq("series_id", data.seriesId);
+        if (cellError) {
+          throw cellError;
+        }
+
+        for (const cell of (cells ?? []) as Array<{
+          emp_id: string;
+          date: string;
+          version: number;
+        }>) {
+          await deleteShiftSnapshot(auth.serviceClient, {
+            orgId: data.orgId,
+            employeeId: cell.emp_id,
+            date: cell.date,
+            expectedVersion: cell.version,
+          });
+        }
+
+        const { error } = await auth.serviceClient
+          .from("shift_series")
+          .update({ archived_at: new Date().toISOString() })
+          .eq("org_id", data.orgId)
+          .eq("id", data.seriesId);
+        if (error) {
+          throw error;
+        }
+
+        const { error: clearError } = await auth.serviceClient
+          .from("schedule_cells")
+          .update({ series_id: null })
+          .eq("org_id", data.orgId)
+          .eq("series_id", data.seriesId);
+        if (clearError) {
+          throw clearError;
+        }
+
+        return NextResponse.json({
+          deletedCount: (cells ?? []).length,
+        });
+      }
+
+      case "applyRecurringSchedules": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canApplyRecurringSchedule,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const [{ data: recurringRows, error: recurringError }, { data: cells, error: cellError }] =
+          await Promise.all([
+            auth.serviceClient
+              .from("recurring_shifts")
+              .select(RECURRING_SHIFT_COLS)
+              .eq("org_id", data.orgId)
+              .is("archived_at", null)
+              .lte("effective_from", data.endDate)
+              .or(`effective_until.is.null,effective_until.gte.${data.startDate}`),
+            auth.serviceClient
+              .from("schedule_cells")
+              .select(
+                "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+              )
+              .eq("org_id", data.orgId)
+              .gte("date", data.startDate)
+              .lte("date", data.endDate),
+          ]);
+        if (recurringError) {
+          throw recurringError;
+        }
+        if (cellError) {
+          throw cellError;
+        }
+
+        const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
+        for (const row of (recurringRows ?? []) as DbRecurringShift[]) {
+          const key = `${row.emp_id}_${row.day_of_week}`;
+          const current = templatesByEmpAndDay.get(key);
+          if (!current || row.effective_from > current.effective_from) {
+            templatesByEmpAndDay.set(key, row);
+          }
+        }
+
+        const cellsByKey = new Map<string, DbScheduleCell>();
+        for (const cell of (cells ?? []) as DbScheduleCell[]) {
+          cellsByKey.set(`${cell.emp_id}_${cell.date}`, cell);
+        }
+
+        const assignmentLabelMap = new Map<number, string>();
+        const absenceTypeIds = Array.from(
+          new Set(
+            ((recurringRows ?? []) as DbRecurringShift[])
+              .map((row) =>
+                row.state.kind === "absence"
+                  ? (row.state.absenceTypeId ?? null)
+                  : null,
+              )
+              .filter((id): id is number => id != null),
+          ),
+        );
+        const { data: absenceRows, error: absenceError } = absenceTypeIds.length
+          ? await auth.serviceClient
+              .from("absence_types")
+              .select("id, name")
+              .in("id", absenceTypeIds)
+          : { data: [], error: null };
+        if (absenceError) {
+          throw absenceError;
+        }
+        const absenceTypeLabelMap = new Map(
+          ((absenceRows ?? []) as Array<{ id: number; name: string }>).map(
+            (row) => [row.id, row.name],
+          ),
+        );
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
+          auth.serviceClient,
+          data.orgId,
+        );
+
+        const generated: Array<{
+          empId: string;
+          date: string;
+          label: string;
+          absenceTypeId?: number;
+        }> = [];
+
+        for (const { dateKey, dayOfWeek } of iterateDateRange(
+          new Date(`${data.startDate}T00:00:00`),
+          new Date(`${data.endDate}T00:00:00`),
+        )) {
+          for (const template of templatesByEmpAndDay.values()) {
+            if (template.day_of_week !== dayOfWeek) {
+              continue;
+            }
+            if (template.effective_from > dateKey) {
+              continue;
+            }
+            if (template.effective_until && template.effective_until < dateKey) {
+              continue;
+            }
+
+            const cellKey = `${template.emp_id}_${dateKey}`;
+            const existingCell = cellsByKey.get(cellKey);
+            if (existingCell && cellBlocksRecurringFill(existingCell)) {
+              continue;
+            }
+
+            const normalizedInput = normalizeScheduleInput(template.state, {
+              seriesId: template.state.seriesId ?? null,
+              fromRecurring: true,
+            });
+
+            await writeShiftSnapshot(auth.serviceClient, {
+              orgId: data.orgId,
+              employeeId: template.emp_id,
+              date: dateKey,
+              state: normalizedInput,
+              expectedVersion: existingCell?.version,
+            });
+
+            if (normalizedInput.kind === "absence") {
+              const absenceTypeId = normalizedInput.absenceTypeId ?? null;
+              if (absenceTypeId != null) {
+                generated.push({
+                  empId: template.emp_id,
+                  date: dateKey,
+                  label: absenceTypeLabelMap.get(absenceTypeId) ?? "?",
+                  absenceTypeId,
+                });
+              }
+            } else if (normalizedInput.kind === "worked") {
+              const assignmentIds = normalizedInput.segments
+                .map(
+                  (segment) =>
+                    assignmentIdByPair.get(
+                      `${segment.shiftId ?? "null"}:${segment.jobId}`,
+                    ) ?? null,
+                )
+                .filter((value): value is number => value != null);
+              generated.push({
+                empId: template.emp_id,
+                date: dateKey,
+                label: assignmentIds
+                  .map((id) => assignmentLabelMap.get(id) ?? "?")
+                  .join("/"),
+              });
+            }
+          }
+        }
+
+        return NextResponse.json({ generated });
+      }
+
+      case "upsertScheduleNote": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditNotes,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const status = data.existingStatus === "draft_deleted" ? "published" : "draft";
+        const { error } = await auth.serviceClient.from("schedule_notes").upsert(
+          {
+            org_id: data.orgId,
+            emp_id: data.employeeId,
+            date: data.date,
+            indicator_type_id: data.indicatorTypeId,
+            focus_area_id: data.focusAreaId,
+            status,
+          },
+          { onConflict: "emp_id,date,indicator_type_id,focus_area_id" },
+        );
+        if (error) {
+          throw error;
+        }
+
+        return NextResponse.json({ success: true });
+      }
+
+      case "deleteScheduleNote": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditNotes,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        if (data.existingStatus === "draft") {
+          const { error } = await auth.serviceClient
+            .from("schedule_notes")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("emp_id", data.employeeId)
+            .eq("date", data.date)
+            .eq("indicator_type_id", data.indicatorTypeId)
+            .eq("focus_area_id", data.focusAreaId);
+          if (error) {
+            throw error;
+          }
+        } else {
+          const { error } = await auth.serviceClient
+            .from("schedule_notes")
+            .update({ status: "draft_deleted" })
+            .eq("org_id", data.orgId)
+            .eq("emp_id", data.employeeId)
+            .eq("date", data.date)
+            .eq("indicator_type_id", data.indicatorTypeId)
+            .eq("focus_area_id", data.focusAreaId);
+          if (error) {
+            throw error;
+          }
+        }
+
+        return NextResponse.json({ success: true });
+      }
+    }
+  } catch (error) {
+    if (error instanceof OptimisticLockConflictError) {
+      return NextResponse.json(
+        {
+          error: "Schedule changed elsewhere. Refresh and try again.",
+          code: "OPTIMISTIC_LOCK",
+          shiftId: error.shiftId,
+          expectedVersion: error.expectedVersion,
+          actualVersion: error.actualVersion,
+        },
+        { status: 409 },
+      );
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Schedule request failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

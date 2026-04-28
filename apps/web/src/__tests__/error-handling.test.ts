@@ -7,17 +7,10 @@ vi.mock("sonner", () => ({
   toast: { error: (...args: unknown[]) => mockToastError(...args) },
 }));
 
-// Mock supabase auth
+// Mock account client auth
 const mockSignOut = vi.fn().mockResolvedValue({});
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: { signOut: (...args: unknown[]) => mockSignOut(...args) },
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null }),
-    }),
-  },
+vi.mock("@/features/account/client", () => ({
+  signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
 }));
 
 // Mock window.location.replace
@@ -69,7 +62,7 @@ describe("handleApiError", () => {
       expect.stringContaining("session has expired"),
       expect.any(Object),
     );
-    expect(mockSignOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(mockSignOut).toHaveBeenCalledWith("local");
     expect(mockReplace).toHaveBeenCalledWith("/");
   });
 

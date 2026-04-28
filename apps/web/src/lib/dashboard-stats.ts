@@ -661,6 +661,8 @@ export function computeOpenShifts(
 
     const sc = assignmentById.get(snapshot.preferredOpenAssignmentDefinitionId);
     if (!sc) continue;
+    const requirementAssignmentDefinitionId =
+      snapshot.preferredOpenAssignmentDefinitionId;
 
     const daysUntil = Math.floor(
       (snapshot.date.getTime() - today.getTime()) / 86400000,
@@ -685,12 +687,11 @@ export function computeOpenShifts(
         : (assignmentLabelMap?.get(sc.id) ?? sc.name ?? sc.label);
 
     openShifts.push({
-      id: `${snapshot.focusAreaId}_${snapshot.shiftCategoryId}_${formatDateKey(snapshot.date)}`,
+      id: `${snapshot.focusAreaId}_${requirementAssignmentDefinitionId}_${formatDateKey(snapshot.date)}`,
       date: snapshot.date,
       dayOfWeek: SHORT_DAYS[snapshot.date.getDay()],
       dayOfMonth: snapshot.date.getDate(),
-      requirementAssignmentDefinitionId:
-        snapshot.preferredOpenAssignmentDefinitionId,
+      requirementAssignmentDefinitionId,
       eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
       preferredOpenAssignmentDefinitionId:
         snapshot.preferredOpenAssignmentDefinitionId,

@@ -3,14 +3,27 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import type { Department, Employee } from "@/types";
-import { fetchOrganizationUsers, linkEmployeeToUser, reconcileEmployeeNameAndLinkUser, sendInvitation } from "@/lib/db";
+import {
+  createOrganizationInvitation,
+  fetchOrganizationUsers,
+} from "@/features/organization/client";
+import {
+  linkEmployeeToUser,
+  reconcileEmployeeNameAndLinkUser,
+} from "@/features/employees/client";
 import { NameMismatchError } from "@/lib/account-linking";
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/organization/client", () => ({
+  createOrganizationInvitation: vi.fn(),
   fetchOrganizationUsers: vi.fn(),
+}));
+
+vi.mock("@/features/employees/client", () => ({
+  createEmployeeFromOrgUser: vi.fn(),
+  reconcileEmployeeFromOrgUser: vi.fn(),
   linkEmployeeToUser: vi.fn(),
   reconcileEmployeeNameAndLinkUser: vi.fn(),
-  sendInvitation: vi.fn(),
+  updateEmployeeIdentity: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -23,7 +36,7 @@ vi.mock("sonner", () => ({
 const fetchOrganizationUsersMock = vi.mocked(fetchOrganizationUsers);
 const linkEmployeeToUserMock = vi.mocked(linkEmployeeToUser);
 const reconcileEmployeeNameAndLinkUserMock = vi.mocked(reconcileEmployeeNameAndLinkUser);
-const sendInvitationMock = vi.mocked(sendInvitation);
+const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
 
 const employee: Employee = {
   id: "emp-1",
@@ -66,7 +79,7 @@ const managementDepartments: Department[] = [
 
 describe("InviteEmployeeModal", () => {
   beforeEach(() => {
-    sendInvitationMock.mockResolvedValue({
+    createOrganizationInvitationMock.mockResolvedValue({
       invitationId: "invite-1",
       token: "invite-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
@@ -78,6 +91,9 @@ describe("InviteEmployeeModal", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
+        headers: {
+          get: () => "application/json",
+        },
         json: async () => ({ success: true }),
         text: async () => "",
       }),
@@ -151,18 +167,16 @@ describe("InviteEmployeeModal", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(sendInvitationMock).toHaveBeenCalledWith(
-        "manager@example.com",
-        "user",
-        "org-1",
-        undefined,
-        {
-          firstName: "Jordan",
-          lastName: "Lee",
-          phone: undefined,
-          departmentIds: undefined,
-        },
-      );
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith({
+        email: "manager@example.com",
+        role: "user",
+        orgId: "org-1",
+        employeeId: undefined,
+        firstName: "Jordan",
+        lastName: "Lee",
+        phone: undefined,
+        departmentIds: undefined,
+      });
       expect(onInvited).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
     });
@@ -200,18 +214,16 @@ describe("InviteEmployeeModal", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(sendInvitationMock).toHaveBeenCalledWith(
-        "manager@example.com",
-        "user",
-        "org-1",
-        undefined,
-        {
-          firstName: "Jordan",
-          lastName: "Lee",
-          phone: undefined,
-          departmentIds: [1, 2],
-        },
-      );
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith({
+        email: "manager@example.com",
+        role: "user",
+        orgId: "org-1",
+        employeeId: undefined,
+        firstName: "Jordan",
+        lastName: "Lee",
+        phone: undefined,
+        departmentIds: [1, 2],
+      });
     });
   });
 
@@ -236,13 +248,16 @@ describe("InviteEmployeeModal", () => {
     await user.click(sendButton);
 
     await waitFor(() => {
-      expect(sendInvitationMock).toHaveBeenCalledWith(
-        "alice@example.com",
-        "user",
-        "org-1",
-        "emp-1",
-        undefined,
-      );
+      expect(createOrganizationInvitationMock).toHaveBeenCalledWith({
+        email: "alice@example.com",
+        role: "user",
+        orgId: "org-1",
+        employeeId: "emp-1",
+        firstName: undefined,
+        lastName: undefined,
+        phone: undefined,
+        departmentIds: undefined,
+      });
     });
   });
 

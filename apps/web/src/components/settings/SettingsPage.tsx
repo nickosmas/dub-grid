@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType, JobDefinition } from "@/types";
-import { saveCertifications, saveOrganizationRoles, checkCertificationDependencies, checkRoleDependencies } from "@/lib/db";
+import {
+  checkCertificationDependencies,
+  checkRoleDependencies,
+  saveCertifications,
+  saveOrganizationRoles,
+} from "@/features/settings/client";
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
@@ -22,8 +27,6 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { PreviewFrame } from "@/components/ui/explainer-section";
-
 import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
 import { SectionCard } from "./shared";
 import OrganizationGeneral from "./OrganizationGeneral";
@@ -141,207 +144,12 @@ export default function SettingsPage({
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
   const departmentLabel = organization.departmentLabel || "Scheduled Departments";
-  const certificationsExplainer = {
-    title: `How ${certificationLabel.toLowerCase()} work`,
-    defaultOpen: true,
-    storageKey: "dg-explainer-certifications",
-    points: [
-      {
-        title: "These show on staff and schedule surfaces",
-        description: `${certificationLabel} help people quickly see qualifications in schedule and staffing views.`,
-      },
-      {
-        title: "Jobs and shifts can require them",
-        description: `When a shift requires a ${certificationLabel.replace(/s$/i, "").toLowerCase()}, only qualified staff can be assigned to that shift.`,
-      },
-      {
-        title: "Use them for true qualifications",
-        description: `Reserve ${certificationLabel.toLowerCase()} for real assignment rules. Use ${roleLabel.toLowerCase()} for visible responsibilities that should not block assignment.`,
-      },
-    ],
-    preview: (
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-        <PreviewFrame
-          title="Visible on the schedule"
-          subtitle={`Staff badges and shift requirements`}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-              padding: "10px 12px",
-              borderRadius: "var(--dg-radius-sm)",
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border-light)",
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
-                Jordan Smith
-              </div>
-              <div style={{ fontSize: 11, color: "var(--color-text-muted)" }}>
-                Day Shift
-              </div>
-            </div>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "3px 8px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: "var(--color-brand-bg)",
-                border: "1px solid var(--color-brand-border)",
-                color: "var(--color-brand)",
-              }}
-            >
-              Level 2
-            </span>
-          </div>
-        </PreviewFrame>
-
-        <PreviewFrame
-          title="Assignment gate"
-          subtitle="Required qualification on a shift"
-        >
-          <div
-            style={{
-              padding: "10px 12px",
-              borderRadius: "var(--dg-radius-sm)",
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border-light)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
-              Day Shift
-            </div>
-            <div style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>
-              Requires Level 2
-            </div>
-            <div style={{ fontSize: 11, color: "var(--color-success-text)" }}>
-              Qualified staff can be assigned
-            </div>
-          </div>
-        </PreviewFrame>
-      </div>
-    ),
-  };
-  const rolesExplainer = {
-    title: `How ${roleLabel.toLowerCase()} work`,
-    defaultOpen: true,
-    storageKey: "dg-explainer-roles",
-    points: [
-      {
-        title: "Roles can be cosmetic or schedule-eligible",
-        description: `Mark only the ${roleLabel.toLowerCase()} that should gate jobs on the schedule. Titles like director can stay visible without affecting job eligibility.`,
-      },
-      {
-        title: "Roles do not grant permissions",
-        description: `A ${roleLabel.replace(/s$/i, "").toLowerCase()} tag does not make someone an app admin or change what they can access.`,
-      },
-      {
-        title: "Jobs only use schedule-eligible roles",
-        description: `Job eligibility ignores cosmetic ${roleLabel.toLowerCase()}, so your schedule rules stay focused on real staffing responsibilities.`,
-      },
-    ],
-    preview: (
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-        <PreviewFrame
-          title="Visible responsibility tag"
-          subtitle="What teammates see on the schedule"
-        >
-          <div
-            style={{
-              padding: "10px 12px",
-              borderRadius: "var(--dg-radius-sm)",
-              background: "var(--color-bg)",
-              border: "1px solid var(--color-border-light)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>
-              Jordan Smith
-            </div>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "3px 8px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                background: "var(--color-bg-secondary)",
-                border: "1px solid var(--color-border-light)",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              Supervisor
-            </span>
-          </div>
-        </PreviewFrame>
-
-        <PreviewFrame
-          title="Permissions stay separate"
-          subtitle="Roles do not control app access"
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: 8,
-            }}
-          >
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: "var(--dg-radius-sm)",
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border-light)",
-              }}
-            >
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                {roleLabel.replace(/s$/i, "")}
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)", marginTop: 4 }}>
-                Supervisor
-              </div>
-            </div>
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: "var(--dg-radius-sm)",
-                background: "var(--color-brand-bg)",
-                border: "1px solid var(--color-brand-border)",
-              }}
-            >
-              <div style={{ fontSize: 10, fontWeight: 700, color: "var(--color-brand)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                App access
-              </div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)", marginTop: 4 }}>
-                Managed elsewhere
-              </div>
-            </div>
-          </div>
-        </PreviewFrame>
-      </div>
-    ),
-  };
-
   const navGroups = useMemo(() => buildNavGroups(perms, {
     focusAreaLabel,
     certificationLabel,
     roleLabel,
     departmentLabel,
-  }), [perms, organization.shiftDisplayMode, focusAreaLabel, certificationLabel, roleLabel, departmentLabel]);
+  }), [perms, focusAreaLabel, certificationLabel, roleLabel, departmentLabel]);
 
   const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
@@ -443,6 +251,11 @@ export default function SettingsPage({
 
         {activeItem && (
           <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
+            {activeItem.helpHint && (
+              <p style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-muted)", margin: "0 0 6px", lineHeight: 1.35 }}>
+                {activeItem.helpHint}
+              </p>
+            )}
             <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
               {activeItem.label}
             </h1>
@@ -587,7 +400,6 @@ export default function SettingsPage({
             <StringListSettings
               label={certificationLabel}
               sectionTitle={certificationLabel}
-              explainer={certificationsExplainer}
               maxWidth={maxWidth}
               wideTable
               items={certifications}
@@ -614,7 +426,6 @@ export default function SettingsPage({
             <StringListSettings
               label={roleLabel}
               sectionTitle={roleLabel}
-              explainer={rolesExplainer}
               maxWidth={maxWidth}
               wideTable
               items={orgRoles}
@@ -632,6 +443,7 @@ export default function SettingsPage({
               canEdit={canManageOrgLabels}
               departments={departments}
               showScheduleRoleToggle
+              scheduleEligibilityHelpText="Only schedule-eligible roles can limit jobs."
               onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
             />
           </div>

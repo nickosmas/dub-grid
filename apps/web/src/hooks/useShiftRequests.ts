@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { fetchShiftRequests, createShiftRequest, claimShiftRequest, volunteerForOpenShift, respondToShiftRequest, resolveShiftRequest, cancelShiftRequest } from "@/lib/db";
 import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
+import {
+  createBrowserRealtimeChannel,
+  removeBrowserRealtimeChannel,
+} from "@/features/account/client";
+import {
+  cancelShiftRequest,
+  claimShiftRequest,
+  createShiftRequest,
+  fetchShiftRequests,
+  resolveShiftRequest,
+  respondToShiftRequest,
+  volunteerForOpenShift,
+} from "@/features/schedule/client";
 import type {
   ScheduleCellInput,
   ShiftRequest,
@@ -138,8 +149,7 @@ export function useShiftRequests(
 
     let hadError = false;
 
-    const channel = supabase
-      .channel(`shift_requests_${orgId}`)
+    const channel = createBrowserRealtimeChannel(`shift_requests_${orgId}`)
       .on(
         "postgres_changes",
         {
@@ -163,7 +173,7 @@ export function useShiftRequests(
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      void removeBrowserRealtimeChannel(channel);
     };
   }, [orgId]);
 
@@ -289,7 +299,7 @@ export function useShiftRequests(
     async (requestId: string, claimerEmpId: string): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        await claimShiftRequest(requestId, claimerEmpId);
+        await claimShiftRequest(requestId, claimerEmpId, orgId);
         toast.success("Shift claimed — awaiting admin approval");
         queueNotification({
           action: "shift_request_claimed",
@@ -346,8 +356,9 @@ export function useShiftRequests(
       empId: string,
       accept: boolean
     ): Promise<boolean> => {
+      if (!orgId) return false;
       try {
-        await respondToShiftRequest(requestId, empId, accept);
+        await respondToShiftRequest(requestId, empId, accept, orgId);
         toast.success(
           accept
             ? "Swap accepted — awaiting admin approval"
@@ -370,7 +381,7 @@ export function useShiftRequests(
     ): Promise<boolean> => {
       if (!orgId) return false;
       try {
-        await resolveShiftRequest(requestId, approved, note);
+        await resolveShiftRequest(requestId, approved, note, orgId);
         toast.success(approved ? "Request approved" : "Request rejected");
         // Find the request to get its type for the notification
         const request = requestsRef.current.find((r) => r.id === requestId);
@@ -393,8 +404,9 @@ export function useShiftRequests(
 
   const cancel = useCallback(
     async (requestId: string, empId: string): Promise<boolean> => {
+      if (!orgId) return false;
       try {
-        await cancelShiftRequest(requestId, empId);
+        await cancelShiftRequest(requestId, empId, orgId);
         toast.success("Request cancelled");
         return true;
       } catch (err: unknown) {
@@ -402,7 +414,7 @@ export function useShiftRequests(
         return false;
       }
     },
-    []
+    [orgId]
   );
 
   return {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { PublicRoute } from "@/components/RouteGuards";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -13,6 +12,13 @@ import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
 import { CheckCircle } from "lucide-react";
+import {
+  exchangeBrowserCodeForSession,
+  getBrowserAuthSession,
+  signOutFromBrowser,
+  subscribeToBrowserAuthChanges,
+  updateBrowserUserPassword,
+} from "@/features/account/client";
 
 type PageState = "loading" | "form" | "success" | "error";
 
@@ -43,7 +49,7 @@ function ResetPasswordContent() {
       // Clean the code from the URL so it can't be reused / bookmarked
       window.history.replaceState({}, "", window.location.pathname);
 
-      supabase.auth.exchangeCodeForSession(code).then(({ error }: { error: unknown }) => {
+      exchangeBrowserCodeForSession(code).then(({ error }: { error: unknown }) => {
         if (error) {
           setState("error");
           stateRef.current = "error";
@@ -54,8 +60,8 @@ function ResetPasswordContent() {
       });
     } else {
       // No code — check if session already exists (e.g. from /auth/confirm).
-      void supabase.auth.getSession().then((res: { data: { session: unknown } }) => {
-        if (res.data.session && stateRef.current === "loading") {
+      void getBrowserAuthSession().then((session) => {
+        if (session && stateRef.current === "loading") {
           setState("form");
           stateRef.current = "form";
         }
@@ -66,7 +72,7 @@ function ResetPasswordContent() {
     // or other edge cases where the token arrives via URL hash).
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent) => {
+    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent) => {
       if (event === "PASSWORD_RECOVERY") {
         setState("form");
         stateRef.current = "form";
@@ -103,13 +109,10 @@ function ResetPasswordContent() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password,
-      });
-      if (error) throw error;
+      await updateBrowserUserPassword(password);
 
       // Sign out so user re-authenticates with fresh credentials
-      await supabase.auth.signOut({ scope: "local" });
+      await signOutFromBrowser("local");
 
       setState("success");
       stateRef.current = "success";

@@ -6,7 +6,6 @@ import CustomSelect from "./CustomSelect";
 import { Employee, OrganizationUser, NamedItem, Department, NameMismatchDetails } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
-import { fetchOrganizationUsers, linkEmployeeToUser, reconcileEmployeeNameAndLinkUser, sendInvitation } from "@/lib/db";
 import { validateEmail, validateRequired } from "@/components/FormField";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -15,6 +14,14 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { NameMismatchError } from "@/lib/account-linking";
 import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
+import {
+  fetchOrganizationUsers,
+  createOrganizationInvitation,
+} from "@/features/organization/client";
+import {
+  linkEmployeeToUser,
+  reconcileEmployeeNameAndLinkUser,
+} from "@/features/employees/client";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -232,12 +239,19 @@ export default function InviteEmployeeModal({
     setError(null);
 
     try {
-      const { token } = await sendInvitation(trimmedEmail, role, orgId, employee?.id, isManagementInvite ? {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone.trim() || undefined,
-        departmentIds: departmentIds.length > 0 ? departmentIds : undefined,
-      } : undefined);
+      const { token } = await createOrganizationInvitation({
+        email: trimmedEmail,
+        role,
+        orgId,
+        employeeId: employee?.id,
+        firstName: isManagementInvite ? firstName.trim() : undefined,
+        lastName: isManagementInvite ? lastName.trim() : undefined,
+        phone: isManagementInvite ? (phone.trim() || undefined) : undefined,
+        departmentIds:
+          isManagementInvite && departmentIds.length > 0
+            ? departmentIds
+            : undefined,
+      });
 
       // Send the invitation email
       const res = await fetch("/api/send-invite-email", {

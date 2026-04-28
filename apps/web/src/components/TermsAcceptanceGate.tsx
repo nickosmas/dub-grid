@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
-import { CURRENT_TERMS_VERSION, acceptTerms } from "@/lib/terms";
+import { useAuth } from "@/components/AuthProvider";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { DubGridLogo } from "@/components/Logo";
+import { CURRENT_TERMS_VERSION } from "@/features/account/shared/terms";
+import {
+  fetchTermsAcceptanceStatus,
+  recordCurrentTermsAcceptance,
+  signOutFromBrowser,
+} from "@/features/account/client";
 
 /**
  * Non-dismissable modal that blocks the app until the user accepts
@@ -14,6 +18,7 @@ import { DubGridLogo } from "@/components/Logo";
  * profile.terms_version doesn't match CURRENT_TERMS_VERSION.
  */
 export default function TermsAcceptanceGate({ children }: { children: React.ReactNode }) {
+  const { user, isLoading: authLoading } = useAuth();
   const [needsAcceptance, setNeedsAcceptance] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -21,32 +26,41 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
   useEffect(() => {
     let cancelled = false;
     async function check() {
-      const user = await getVerifiedBrowserUser();
-      if (!user || cancelled) return;
+      if (authLoading) return;
+      if (!user || cancelled) {
+        if (!cancelled) {
+          setNeedsAcceptance(false);
+        }
+        return;
+      }
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("terms_version")
-        .eq("id", user.id)
-        .single();
+      let data;
+      try {
+        data = await fetchTermsAcceptanceStatus();
+      } catch (error) {
+        console.error("Failed to load terms status", error);
+        if (!cancelled) {
+          setNeedsAcceptance(false);
+        }
+        return;
+      }
 
-      if (!cancelled && data?.terms_version !== CURRENT_TERMS_VERSION) {
-        setNeedsAcceptance(true);
+      if (!cancelled) {
+        setNeedsAcceptance(!data.acceptedCurrentTerms);
       }
     }
-    check();
+    void check();
     return () => { cancelled = true; };
-  }, []);
+  }, [authLoading, user]);
 
   async function handleAccept() {
     setLoading(true);
     try {
-      const user = await getVerifiedBrowserUser();
       if (!user) {
         toast.error("Session expired. Please sign in again.");
         return;
       }
-      await acceptTerms(user.id);
+      await recordCurrentTermsAcceptance();
       setNeedsAcceptance(false);
     } catch (err: unknown) {
       const msg = err instanceof Error
@@ -63,7 +77,7 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
         msg.includes("not found");
       if (isStaleSession) {
         toast.error("Session expired. Please sign in again.");
-        await supabase.auth.signOut();
+        await signOutFromBrowser("local");
         window.location.href = "/login";
         return;
       }
@@ -73,7 +87,7 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
     }
   }
 
-  if (!needsAcceptance) return <>{children}</>;
+  if (!user || !needsAcceptance) return <>{children}</>;
 
   return (
     <>

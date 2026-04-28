@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  activateEmployee,
+  benchEmployee,
+  deleteEmployee,
+  EmployeeStatusConflictError,
   fetchEmployees,
   insertEmployee,
   updateEmployee,
-  deleteEmployee,
-  benchEmployee,
-  activateEmployee,
-  EmployeeStatusConflictError,
-} from "@/lib/db";
+} from "@/features/employees/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import Link from "next/link";
+import { verifyBrowserOtp } from "@/features/account/client";
 
 /**
  * Intermediate click-through page for email verification links.
@@ -39,7 +39,7 @@ export default function AuthVerifyPage() {
     }
 
     setLoading(true);
-    const { error: verifyError } = await supabase.auth.verifyOtp({
+    const { error: verifyError } = await verifyBrowserOtp({
       type,
       token_hash: tokenHash,
     });

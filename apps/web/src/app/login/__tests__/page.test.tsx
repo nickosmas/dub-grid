@@ -6,17 +6,15 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import LoginPage from "@/app/login/page";
 
-// Mock supabase module — setSession is called after server-side auth succeeds
+// Mock account client — setBrowserSession is called after server-side auth succeeds
 const mockSetSession = vi.fn();
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: {
-      setSession: (...args: unknown[]) => mockSetSession(...args),
-      signOut: vi.fn().mockResolvedValue({}),
-      refreshSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
-    },
-    rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
-  },
+vi.mock("@/features/account/client", () => ({
+  fetchAccessibleWorkspaces: vi.fn().mockResolvedValue({ organizations: [] }),
+  getBrowserAuthSession: vi.fn().mockResolvedValue(null),
+  refreshBrowserSession: vi.fn().mockResolvedValue(undefined),
+  setBrowserSession: (...args: unknown[]) => mockSetSession(...args),
+  signOutFromBrowser: vi.fn().mockResolvedValue(undefined),
+  switchBrowserWorkspace: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/components/RouteGuards", () => ({

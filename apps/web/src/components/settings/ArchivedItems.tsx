@@ -3,15 +3,23 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  fetchOrganizationRoles, restoreOrganizationRole,
-  fetchCertifications, restoreCertification,
-  fetchDepartments, restoreDepartment,
-  fetchFocusAreas, restoreFocusArea,
-  fetchJobDefinitions, restoreJobDefinition,
-  fetchShiftCategories, restoreShiftCategory,
-  fetchAbsenceTypes, restoreAbsenceType,
-  fetchIndicatorTypes, restoreIndicatorType,
-} from "@/lib/db";
+  fetchAbsenceTypes,
+  fetchCertifications,
+  fetchDepartments,
+  fetchFocusAreas,
+  fetchIndicatorTypes,
+  fetchJobDefinitions,
+  fetchOrganizationRoles,
+  fetchShiftCategories,
+  restoreAbsenceType,
+  restoreCertification,
+  restoreDepartment,
+  restoreFocusArea,
+  restoreIndicatorType,
+  restoreJobDefinition,
+  restoreOrganizationRole,
+  restoreShiftCategory,
+} from "@/features/settings/client";
 import type { NamedItem, FocusArea, JobDefinition, ShiftCategory, Department, AbsenceType, IndicatorType } from "@/types";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";

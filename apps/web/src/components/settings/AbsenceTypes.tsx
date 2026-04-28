@@ -2,8 +2,12 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { AbsenceType, ShiftDisplayMode } from "@/types";
-import { upsertAbsenceType, deleteAbsenceType, checkAbsenceTypeDependencies } from "@/lib/db";
-import type { DependencyInfo } from "@/lib/db";
+import {
+  checkAbsenceTypeDependencies,
+  deleteAbsenceType,
+  upsertAbsenceType,
+} from "@/features/settings/client";
+import type { DependencyInfo } from "@/features/settings/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -11,10 +15,9 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
-import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { PresetColorPicker, labelStyle } from "./shared";
-import { borderColor, PREDEFINED_COLORS, TRANSPARENT_BORDER } from "@/lib/colors";
+import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
 
 type AbsenceTypeFormState = {
   label: string;
@@ -384,38 +387,6 @@ export default function AbsenceTypesSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <ExplainerSection
-        title="Absence logic"
-        defaultOpen
-        storageKey="dg-explainer-absence-types"
-        points={[
-          {
-            title: "Absences are separate from worked assignments",
-            description: "PTO, sick, vacation, and calloff types live on their own settings surface now. They are not shifts and they do not participate in job coverage.",
-          },
-        ]}
-        preview={(
-          <PreviewFrame title="Absence cell" subtitle="Not counted as a shift">
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: "var(--dg-radius-sm)",
-                background: "#E2E8F0",
-                border: `1px solid ${borderColor("#475569")}`,
-                color: "#1E293B",
-                display: "inline-flex",
-                gap: 8,
-                alignItems: "center",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              PTO
-            </div>
-          </PreviewFrame>
-        )}
-      />
-
       <div style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
         <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
           Absence Types

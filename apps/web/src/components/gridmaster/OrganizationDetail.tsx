@@ -19,30 +19,28 @@ import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
-  fetchOrganizationUsers,
-  fetchEmployees,
-  fetchFocusAreas,
-  fetchShiftCategories,
-  fetchCertifications,
-  fetchOrganizationRoles,
-  fetchIndicatorTypes,
   fetchAbsenceTypes,
+  fetchCertifications,
+  fetchDepartments,
+  fetchFocusAreas,
+  fetchIndicatorTypes,
   fetchJobDefinitions,
+  fetchOrganizationRoles,
+  fetchShiftCategories,
+} from "@/features/settings/client";
+import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
-  restoreOrganization,
-  archiveOrganization,
-  suspendOrganization,
-  unsuspendOrganization,
-  assignOrgRoleByEmail,
   updateOrganizationMembershipGuarded,
   removeOrganizationMembershipGuarded,
   OrganizationAccessConflictError,
   revokeOrganizationInvitationGuarded,
   InvitationAccessConflictError,
-} from "@/lib/db";
+} from "@/features/organization/client";
+import { fetchEmployees } from "@/features/employees/client";
+import { fetchOrganizationUsers } from "@/features/organization/client";
 import { queueNotification } from "@/lib/notify";
-import type { TenantStats } from "@/lib/db";
+import type { TenantStats } from "@/features/gridmaster/client";
 import type {
   Organization,
   OrganizationUser,
@@ -79,7 +77,14 @@ import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, l
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import ReadOnlyScheduleView from "@/components/gridmaster/ReadOnlyScheduleView";
 import FeatureFlagsEditor from "@/components/gridmaster/FeatureFlagsEditor";
-import { supabase } from "@/lib/supabase";
+import {
+  archiveGridmasterOrganization,
+  assignGridmasterOrgRoleByEmail,
+  fetchGridmasterInvitations,
+  restoreGridmasterOrganization,
+  suspendGridmasterOrganization,
+  unsuspendGridmasterOrganization,
+} from "@/features/gridmaster/client";
 
 type Tab = "overview" | "users" | "employees" | "config" | "activity" | "invitations" | "schedule" | "features";
 
@@ -211,12 +216,7 @@ export default function OrganizationDetail({
           }
         }
         if (tab === "invitations" && invitations === null) {
-          const { data, error } = await supabase
-            .from("invitations")
-            .select("id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id")
-            .eq("org_id", organization.id)
-            .order("created_at", { ascending: false });
-          if (error) throw error;
+          const { invitations: data } = await fetchGridmasterInvitations(organization.id);
           if (!cancelled) setInvitations(data ?? []);
         }
         if (tab === "config" && focusAreas === null) {
@@ -595,7 +595,7 @@ function OverviewTab({
     setArchiving(true);
     try {
       if (organization.archivedAt) {
-        await restoreOrganization(organization.id);
+        await restoreGridmasterOrganization(organization.id);
         toast.success("Organization restored");
         onOrgUpdated?.({ ...organization, archivedAt: null });
       } else {
@@ -611,7 +611,7 @@ function OverviewTab({
             // Best-effort — proceed with archive even if Stripe cancel fails
           }
         }
-        await archiveOrganization(organization.id);
+        await archiveGridmasterOrganization(organization.id);
         toast.success("Organization archived");
         onOrgUpdated?.({ ...organization, archivedAt: new Date().toISOString() });
       }
@@ -861,7 +861,7 @@ function OverviewTab({
                 onClick={async () => {
                   setSuspending(true);
                   try {
-                    await unsuspendOrganization(organization.id);
+                    await unsuspendGridmasterOrganization(organization.id);
                     toast.success("Organization unsuspended");
                     onOrgUpdated?.({ ...organization, suspendedAt: null, suspendedReason: null });
                   } catch (err: unknown) {
@@ -924,7 +924,10 @@ function OverviewTab({
             }
             setSuspending(true);
             try {
-              await suspendOrganization(organization.id, suspendReason.trim());
+              await suspendGridmasterOrganization(
+                organization.id,
+                suspendReason.trim(),
+              );
               toast.success("Organization suspended");
               onOrgUpdated?.({ ...organization, suspendedAt: new Date().toISOString(), suspendedReason: suspendReason.trim() });
               setSuspendConfirm(false);
@@ -1056,7 +1059,7 @@ function UsersTab({
     if (!addEmail.trim()) return;
     setAdding(true);
     try {
-      await assignOrgRoleByEmail(orgId, addEmail.trim(), addRole);
+      await assignGridmasterOrgRoleByEmail(orgId, addEmail.trim(), addRole);
       toast.success(`User added as ${addRole}`);
       setAddEmail("");
       setShowAddForm(false);

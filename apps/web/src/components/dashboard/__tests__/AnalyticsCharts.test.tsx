@@ -1,14 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const fetchWeeklyShiftHours = vi.fn();
-const fetchEmployeeUtilization = vi.fn();
+const fetchDashboardAnalytics = vi.fn();
 const captureException = vi.fn();
 
-vi.mock("@/lib/analytics", () => ({
-  fetchWeeklyShiftHours: (...args: unknown[]) => fetchWeeklyShiftHours(...args),
-  fetchEmployeeUtilization: (...args: unknown[]) =>
-    fetchEmployeeUtilization(...args),
+vi.mock("@/features/dashboard/client", () => ({
+  fetchDashboardAnalytics: (...args: unknown[]) =>
+    fetchDashboardAnalytics(...args),
 }));
 
 vi.mock("@/lib/sentry", () => ({
@@ -23,8 +21,7 @@ describe("AnalyticsCharts", () => {
   });
 
   it("renders an explicit unavailable state when analytics queries fail", async () => {
-    fetchWeeklyShiftHours.mockRejectedValueOnce(new Error("query failed"));
-    fetchEmployeeUtilization.mockRejectedValueOnce(new Error("query failed"));
+    fetchDashboardAnalytics.mockRejectedValueOnce(new Error("query failed"));
 
     render(<AnalyticsCharts orgId="org-1" />);
 

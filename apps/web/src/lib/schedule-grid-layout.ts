@@ -16,7 +16,6 @@ export interface ScheduleGridLayoutResult {
 }
 
 const BASE_NAME_COL_WIDTH = 220;
-const COMPACT_NAME_COL_WIDTH = 200;
 const ONE_WEEK_CODE_COL_WIDTH = 84;
 const ONE_WEEK_NAME_COL_WIDTH = 160;
 const TWO_WEEK_CODE_COL_WIDTH = 72;
@@ -35,10 +34,7 @@ function getTwoWeekMinimums(
   }
 
   return {
-    nameColWidth:
-      hasOpenShifts || hasStackedCellContent
-        ? BASE_NAME_COL_WIDTH
-        : COMPACT_NAME_COL_WIDTH,
+    nameColWidth: BASE_NAME_COL_WIDTH,
     dayColWidth: hasStackedCellContent ? 88 : hasOpenShifts ? 84 : 80,
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { fetchFullAuditLog } from "@/lib/db";
+import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -303,7 +303,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
   useEffect(() => {
     let cancelled = false;
 
-    fetchFullAuditLog({
+    fetchGridmasterFullAuditLog({
       orgId,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,

@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { signOutFromBrowser } from "@/features/account/client";
 
 /** Extract a human-readable message from an unknown error value. */
 export function extractErrorMessage(err: unknown, fallback: string): string {
@@ -22,7 +22,7 @@ export async function handleApiError(error: unknown, action?: string) {
 
     if (message.includes("jwt expired") || message.includes("Refresh Token Not Found") || message.includes("Invalid Refresh Token")) {
         toast.error("Your session has expired. Please log in again.", { id: "session-expired", duration: Infinity });
-        await supabase.auth.signOut({ scope: "local" });
+        await signOutFromBrowser("local");
         window.location.replace("/");
         return;
     }

@@ -5,14 +5,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
-  fetchInvitations,
+  fetchOrganizationInvitations,
   removeUserFromOrganization,
   resendInvitation,
   revokeInvitation,
   updateAppOnlyUser,
-  updateEmployeeIdentity,
   updatePendingInvitation,
-} from "@/lib/db";
+} from "@/features/organization/client";
+import { updateEmployeeIdentity } from "@/features/employees/client";
 import * as Sentry from "@/lib/sentry";
 import {
   applyManagementDirectoryUpdate,
@@ -400,7 +400,7 @@ export function MembersSection({
     if (!orgId) return;
     let cancelled = false;
 
-    fetchInvitations(orgId)
+    fetchOrganizationInvitations(orgId)
       .then((invites) => {
         if (cancelled) return;
         setPendingInvitations(
@@ -506,7 +506,7 @@ export function MembersSection({
   function refreshInvitations() {
     if (!orgId) return;
 
-    fetchInvitations(orgId)
+    fetchOrganizationInvitations(orgId)
       .then((invites) => {
         setPendingInvitations(
           invites.filter(

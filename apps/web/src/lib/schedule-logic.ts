@@ -384,6 +384,14 @@ function compareAssignmentDefinitions(left: AssignmentDefinition, right: Assignm
   return left.sortOrder - right.sortOrder || left.id - right.id;
 }
 
+function getRequirementGroupKey(
+  focusAreaId: number,
+  jobId: number,
+  preferredShiftId: number | null,
+): string {
+  return `${focusAreaId}:${jobId}:${preferredShiftId ?? "null"}`;
+}
+
 /**
  * Computes coverage snapshots for each focus area/date/assignable option.
  */
@@ -510,31 +518,57 @@ export function computeCoverageCategorySnapshots(
       }
     }
 
-    const localRequirements = newRequirements
-      .filter((requirement) => requirement.focusAreaId === focusArea.id)
-      .map((requirement) => ({
-        requirement,
-        assignment: findCoverageAssignmentDefinition(activeAssignmentDefinitions, requirement),
-      }))
-      .filter((entry): entry is { requirement: CoverageRequirement; assignment: AssignmentDefinition } => entry.assignment != null)
-      .sort((left, right) => compareAssignmentDefinitions(left.assignment, right.assignment));
+    const localRequirementGroups = Array.from(
+      new Map(
+        newRequirements
+          .filter((requirement) => requirement.focusAreaId === focusArea.id)
+          .map((requirement) => {
+            const assignment = findCoverageAssignmentDefinition(
+              activeAssignmentDefinitions,
+              requirement,
+            );
+            if (!assignment) return null;
+            const jobId = requirement.jobId ?? 0;
+            const preferredShiftId = requirement.preferredShiftId ?? null;
+            return [
+              getRequirementGroupKey(
+                focusArea.id,
+                jobId,
+                preferredShiftId,
+              ),
+              {
+                assignment,
+                jobId,
+                preferredShiftId,
+              },
+            ] as const;
+          })
+          .filter(
+            (
+              entry,
+            ): entry is readonly [
+              string,
+              {
+                assignment: AssignmentDefinition;
+                jobId: number;
+                preferredShiftId: number | null;
+              },
+            ] => entry != null,
+          ),
+      ).values(),
+    ).sort((left, right) =>
+      compareAssignmentDefinitions(left.assignment, right.assignment),
+    );
 
-    for (const { requirement, assignment } of localRequirements) {
+    for (const { assignment, jobId, preferredShiftId } of localRequirementGroups) {
       for (const date of dates) {
-        const resolvedRequirement = requirement.assignmentId != null
-          ? resolveRequirement(
-            requirements,
-            focusArea.id,
-            requirement.assignmentId,
-            date.getDay(),
-          )
-          : resolveRequirement(
-            requirements,
-            focusArea.id,
-            requirement.jobId ?? 0,
-            requirement.preferredShiftId ?? null,
-            date.getDay(),
-          );
+        const resolvedRequirement = resolveRequirement(
+          requirements,
+          focusArea.id,
+          jobId,
+          preferredShiftId,
+          date.getDay(),
+        );
         if (!resolvedRequirement || resolvedRequirement.minStaff <= 0) continue;
 
         const status = computeCoverageStatus(

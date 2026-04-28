@@ -3,16 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import UserManagementSettings from "@/components/settings/UserManagement";
 import {
-  fetchInvitations,
+  fetchOrganizationInvitations,
   fetchOrganizationUsers,
   updateOrganizationMembershipGuarded,
-} from "@/lib/db";
+} from "@/features/organization/client";
 import type { Invitation, OrganizationUser } from "@/types";
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/organization/client", () => ({
   fetchOrganizationUsers: vi.fn(),
   updateOrganizationMembershipGuarded: vi.fn(),
-  fetchInvitations: vi.fn(),
+  fetchOrganizationInvitations: vi.fn(),
   removeOrganizationMembershipGuarded: vi.fn(),
   revokeOrganizationInvitationGuarded: vi.fn(),
   resendOrganizationInvitationGuarded: vi.fn(),
@@ -84,7 +84,7 @@ describe("UserManagement dirty save controls", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(fetchOrganizationUsers).mockResolvedValue([makeAdminUser()]);
-    vi.mocked(fetchInvitations).mockResolvedValue([]);
+    vi.mocked(fetchOrganizationInvitations).mockResolvedValue([]);
     updateOrganizationMembershipGuardedMock.mockResolvedValue(
       makeAdminUser({
         updatedAt: "2024-01-06T00:00:00.000Z",

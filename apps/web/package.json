@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "prepare-env": "node ../../scripts/sync-web-env.mjs",
-    "predev": "npm run prepare-env && node -e \"const fs=require('fs'),p=require('path'),d=p.join('.next','dev');fs.mkdirSync(d,{recursive:true});const m=p.join(d,'prerender-manifest.json');if(!fs.existsSync(m))fs.writeFileSync(m,JSON.stringify({version:4,routes:{},dynamicRoutes:{},notFoundRoutes:[],preview:{previewModeId:'',previewModeSigningKey:'',previewModeEncryptionKey:''}}))\"",
-    "predev:webpack": "npm run prepare-env",
+    "prepare-shared-packages": "npm --prefix ../.. run build:packages",
+    "predev": "npm run prepare-shared-packages && npm run prepare-env && node -e \"const fs=require('fs'),p=require('path'),d=p.join('.next','dev');fs.mkdirSync(d,{recursive:true});const m=p.join(d,'prerender-manifest.json');if(!fs.existsSync(m))fs.writeFileSync(m,JSON.stringify({version:4,routes:{},dynamicRoutes:{},notFoundRoutes:[],preview:{previewModeId:'',previewModeSigningKey:'',previewModeEncryptionKey:''}}))\"",
+    "predev:webpack": "npm run prepare-shared-packages && npm run prepare-env",
     "prebuild": "npm run prepare-env",
     "prestart": "npm run prepare-env",
     "preanalyze": "npm run prepare-env",
@@ -14,14 +15,20 @@
     "dev:webpack": "next dev --webpack",
     "build": "next build",
     "type-check": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run --config vitest.config.ts src",
+    "test": "vitest run --config vitest.config.mts src",
     "start": "next start",
     "analyze": "ANALYZE=true next build"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
     "@dnd-kit/core": "^6.3.1",
+    "@dubgrid/authz": "*",
     "@dubgrid/contracts": "*",
+    "@dubgrid/data-access": "*",
+    "@dubgrid/db-types": "*",
+    "@dubgrid/design-tokens": "*",
+    "@dubgrid/domain": "*",
+    "@dubgrid/mobile-api-core": "*",
     "@sentry/nextjs": "^10.50.0",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
@@ -40,7 +47,6 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "recharts": "^3.8.1",
-    "resend": "^6.12.2",
     "sonner": "^2.0.7",
     "stripe": "^21.0.1",
     "tailwind-merge": "^3.5.0",
@@ -49,7 +55,7 @@
     "zod": "3.24.4"
   },
   "devDependencies": {
-    "@next/env": "^16.2.4",
-    "@next/bundle-analyzer": "^16.2.1"
+    "@next/bundle-analyzer": "^16.2.1",
+    "@next/env": "^16.2.4"
   }
 }

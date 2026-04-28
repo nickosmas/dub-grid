@@ -6,13 +6,11 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { ExplainerSection } from "@/components/ui/explainer-section";
-import type { ExplainerSectionProps } from "@/components/ui/explainer-section";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { SectionCard } from "./shared";
 import { useSmoothReorder } from "./useSmoothReorder";
-import type { DependencyInfo } from "@/lib/db";
+import type { DependencyInfo } from "@/features/settings/client";
 
 export default function StringListSettings({
   label,
@@ -25,8 +23,8 @@ export default function StringListSettings({
   initialEditing,
   onCheckDependencies,
   sectionTitle,
-  explainer,
   showScheduleRoleToggle = false,
+  scheduleEligibilityHelpText,
   maxWidth,
   wideTable = false,
 }: {
@@ -43,10 +41,10 @@ export default function StringListSettings({
   onCheckDependencies?: (itemId: number) => Promise<DependencyInfo>;
   /** When provided, wraps content in a SectionCard. */
   sectionTitle?: string;
-  /** Optional explainer shown above the editable list. */
-  explainer?: ExplainerSectionProps;
   /** Shows an extra toggle used to mark which roles affect schedule job eligibility. */
   showScheduleRoleToggle?: boolean;
+  /** Optional visible helper copy for the schedule-eligibility header. */
+  scheduleEligibilityHelpText?: string;
   /** Optional max width for the card wrapper when this list is shown as a settings section. */
   maxWidth?: number;
   /** Give dense multi-column staff label tables more room per column. */
@@ -352,7 +350,7 @@ export default function StringListSettings({
               gridTemplateColumns: gridCols,
               padding: "8px 16px",
               gap: 16,
-              alignItems: "center",
+              alignItems: "start",
               borderBottom: "1px solid var(--color-border-light)",
             }}
           >
@@ -364,8 +362,26 @@ export default function StringListSettings({
                 ? ["Name", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : [])]
                 : ["Full Name", "Abbreviation", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : [])]
             ).map((h, i) => (
-              <div key={i} style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                {h}
+              <div
+                key={i}
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {h === "Schedule Eligibility" && scheduleEligibilityHelpText ? (
+                  <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span>{h}</span>
+                    <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "normal", textTransform: "none", color: "var(--color-text-muted)", lineHeight: 1.35 }}>
+                      {scheduleEligibilityHelpText}
+                    </span>
+                  </span>
+                ) : (
+                  h
+                )}
               </div>
             ))}
           </div>
@@ -387,6 +403,7 @@ export default function StringListSettings({
                   gridTemplateColumns: gridCols,
                   padding: isEditing ? "10px 16px" : "11px 16px",
                   gap: 16,
+                  alignItems: isEditing ? "start" : undefined,
                   borderBottom: i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
                   cursor: isEditing ? "grab" : "default",
                   userSelect: isEditing ? "none" : undefined,
@@ -452,7 +469,7 @@ export default function StringListSettings({
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 8,
+                        gap: 10,
                         fontSize: "var(--dg-fs-label)",
                         color: "var(--color-text-secondary)",
                         cursor: "pointer",
@@ -463,6 +480,7 @@ export default function StringListSettings({
                     >
                       <input
                         type="checkbox"
+                        className="dg-checkbox"
                         checked={item.isScheduleRole ?? true}
                         onChange={(event) => {
                           const checked = event.target.checked;
@@ -476,7 +494,7 @@ export default function StringListSettings({
                         }}
                         draggable={false}
                       />
-                      Use for job eligibility
+                      <span>Use for job eligibility</span>
                     </label>
                   ) : (
                     <div>
@@ -639,30 +657,10 @@ export default function StringListSettings({
   );
 
   if (sectionTitle) {
-    if (explainer) {
-      return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <ExplainerSection {...explainer} />
-          <SectionCard noPadding maxWidth={maxWidth}>
-            {content}
-          </SectionCard>
-        </div>
-      );
-    }
-
     return (
       <SectionCard noPadding maxWidth={maxWidth}>
         {content}
       </SectionCard>
-    );
-  }
-
-  if (explainer) {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <ExplainerSection {...explainer} />
-        {content}
-      </div>
     );
   }
 

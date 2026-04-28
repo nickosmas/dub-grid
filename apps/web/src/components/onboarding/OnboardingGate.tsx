@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
-import { fetchOnboardingStatus } from "@/lib/db";
+import { fetchOnboardingStatus } from "@/features/onboarding/client";
 
 /** Routes where the onboarding gate should never intercept. */
 const PUBLIC_ROUTES = [
@@ -86,7 +86,7 @@ function OnboardingCheck({
 }) {
   const { data: onboardingStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["onboarding-status", userId, orgId],
-    queryFn: () => fetchOnboardingStatus(userId, orgId),
+    queryFn: () => fetchOnboardingStatus(orgId),
     staleTime: 30_000,
   });
 

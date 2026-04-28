@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useLogout, usePermissions, setUserViewActive, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
-import { supabase } from "@/lib/supabase";
+import { fetchAccountIdentity } from "@/features/account/client";
 import MobileNavSheet from "@/components/MobileNavSheet";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
@@ -223,18 +223,17 @@ export default function Header({ orgName }: HeaderProps) {
     if (!authUser) return;
     let cancelled = false;
     void (async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("first_name, last_name")
-        .eq("id", authUser.id)
-        .single();
-      if (cancelled) return;
-      const first = profile?.first_name?.trim() || "";
-      const last = profile?.last_name?.trim() || "";
-      const full = [first, last].filter(Boolean).join(" ");
-      const name = full || authUser.email?.split("@")[0] || null;
-      setUserName(name);
-      if (name) sessionStorage.setItem("dg_user_name", name);
+      try {
+        const identity = await fetchAccountIdentity();
+        if (cancelled) return;
+        const name = identity.displayName || authUser.email?.split("@")[0] || null;
+        setUserName(name);
+        if (name) sessionStorage.setItem("dg_user_name", name);
+      } catch {
+        if (cancelled) return;
+        const fallbackName = authUser.email?.split("@")[0] || null;
+        setUserName(fallbackName);
+      }
     })();
     return () => { cancelled = true; };
   }, [authUser]);

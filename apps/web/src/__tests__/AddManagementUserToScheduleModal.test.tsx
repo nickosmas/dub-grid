@@ -3,10 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import type { DirectoryPerson, FocusArea, NamedItem } from "@/types";
-import { createEmployeeFromOrgUser, reconcileEmployeeFromOrgUser } from "@/lib/db";
+import {
+  createEmployeeFromOrgUser,
+  reconcileEmployeeFromOrgUser,
+} from "@/features/employees/client";
 import { NameMismatchError } from "@/lib/account-linking";
 
-vi.mock("@/lib/db", () => ({
+vi.mock("@/features/employees/client", () => ({
   createEmployeeFromOrgUser: vi.fn(),
   reconcileEmployeeFromOrgUser: vi.fn(),
 }));

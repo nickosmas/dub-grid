@@ -1,14 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { ShieldCheck, ShieldOff, Copy, Check } from "lucide-react";
 import Image from "next/image";
 import { MaybeHint } from "@/components/ui/hint";
+import {
+  disableBrowserMfaFactor,
+  listBrowserMfaFactors,
+  startBrowserTotpEnrollment,
+  updateMfaStatus,
+  verifyBrowserTotpEnrollment,
+} from "@/features/account/client";
 
 type MFAStep = "idle" | "enrolling" | "verifying" | "disabling";
 
@@ -42,10 +47,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   async function startEnrollment() {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({
-        factorType: "totp",
-        friendlyName: "DubGrid Authenticator",
-      });
+      const { data, error } = await startBrowserTotpEnrollment();
       if (error) throw error;
 
       setQrCode(data.totp.qr_code);
@@ -65,20 +67,13 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
     setVerifyError(null);
 
     try {
-      const { error } = await supabase.auth.mfa.challengeAndVerify({
+      const { error } = await verifyBrowserTotpEnrollment({
         factorId,
         code: verifyCode,
       });
       if (error) throw error;
 
-      // Update the profile to reflect MFA enabled
-      const user = await getVerifiedBrowserUser();
-      if (user) {
-        await supabase
-          .from("profiles")
-          .update({ mfa_enabled: true })
-          .eq("id", user.id);
-      }
+      await updateMfaStatus(true);
 
       toast.success("Two-factor authentication enabled.");
       onStatusChange(true);
@@ -98,23 +93,16 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   async function disableMFA() {
     setLoading(true);
     try {
-      const { data: factorsData, error: listError } = await supabase.auth.mfa.listFactors();
+      const { data: factorsData, error: listError } = await listBrowserMfaFactors();
       if (listError) throw listError;
 
       const totpFactors = factorsData.totp.filter((f: { status: string }) => f.status === "verified");
       for (const factor of totpFactors) {
-        const { error } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        const { error } = await disableBrowserMfaFactor(factor.id);
         if (error) throw error;
       }
 
-      // Update the profile
-      const user = await getVerifiedBrowserUser();
-      if (user) {
-        await supabase
-          .from("profiles")
-          .update({ mfa_enabled: false })
-          .eq("id", user.id);
-      }
+      await updateMfaStatus(false);
 
       toast.success("Two-factor authentication disabled.");
       onStatusChange(false);
@@ -338,7 +326,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           onClick={() => {
             // Cancel enrollment — unenroll the pending factor
             if (factorId) {
-              supabase.auth.mfa.unenroll({ factorId }).catch(() => {});
+              disableBrowserMfaFactor(factorId).catch(() => {});
             }
             resetState();
           }}

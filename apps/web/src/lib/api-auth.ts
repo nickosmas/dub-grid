@@ -4,6 +4,7 @@ import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 
 type Claims = JwtPayload & {
   platform_role?: unknown;
+  org_id?: unknown;
 };
 
 type AuthResult =

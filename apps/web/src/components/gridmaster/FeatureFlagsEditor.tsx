@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { OrganizationSettingsConflictError, updateOrganizationSettings } from "@/lib/db";
+import {
+  OrganizationSettingsConflictError,
+  updateOrganizationSettings,
+} from "@/features/organization/client";
 import { getEditorSaveLabel, EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import type { Organization } from "@/types";

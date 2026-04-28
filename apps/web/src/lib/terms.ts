@@ -1,17 +1,15 @@
-/**
- * Terms of Service version tracking.
- * Bump CURRENT_TERMS_VERSION whenever terms change to require re-acceptance.
- */
+import "server-only";
 
-export const CURRENT_TERMS_VERSION = "1.0.0";
+import { CURRENT_TERMS_VERSION } from "@/features/account/shared/terms";
+import { getServiceClient } from "@/lib/supabase-service";
 
-import { supabase } from "@/lib/supabase";
+export { CURRENT_TERMS_VERSION };
 
 /**
  * Check if a user has accepted the current terms version.
  */
 export async function hasAcceptedCurrentTerms(userId: string): Promise<boolean> {
-  const { data } = await supabase
+  const { data } = await getServiceClient()
     .from("profiles")
     .select("terms_version")
     .eq("id", userId)
@@ -26,7 +24,7 @@ export async function hasAcceptedCurrentTerms(userId: string): Promise<boolean> 
 export async function acceptTerms(userId: string): Promise<void> {
   // Insert immutable acceptance record (ignore duplicate — user may have
   // already accepted this version on a different org/session)
-  const { error: insertError } = await supabase
+  const { error: insertError } = await getServiceClient()
     .from("terms_acceptances")
     .insert({
       user_id: userId,
@@ -37,7 +35,7 @@ export async function acceptTerms(userId: string): Promise<void> {
   }
 
   // Update profile with latest acceptance
-  const { error: updateError } = await supabase
+  const { error: updateError } = await getServiceClient()
     .from("profiles")
     .update({
       terms_accepted_at: new Date().toISOString(),

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { z } from "zod";
 import { demoLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
+import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
 
 const bodySchema = z.object({
@@ -143,8 +143,8 @@ export async function POST(req: NextRequest) {
       </div>`);
 
   try {
-    const resend = new Resend(apiKey);
-    await resend.emails.send({
+    await sendResendEmail({
+      apiKey,
       from: fromEmail,
       to: recipientEmail,
       replyTo: sanitizeHeaderValue(email),

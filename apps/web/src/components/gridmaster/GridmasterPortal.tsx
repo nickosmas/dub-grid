@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { usePermissions, useLogout, useMediaQuery, MOBILE } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
-import { supabase } from "@/lib/supabase";
+import { fetchAccountIdentity } from "@/features/account/client";
 import { DubGridLogo } from "@/components/Logo";
 import {
   SidebarProvider,
@@ -27,10 +27,9 @@ import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
 import {
-  fetchAllOrganizations,
-  fetchTenantStats,
+  fetchGridmasterDashboardData,
   type TenantStats,
-} from "@/lib/db";
+} from "@/features/gridmaster/client";
 import type { Organization } from "@/types";
 
 type GridmasterView =
@@ -265,18 +264,17 @@ export default function GridmasterPortal() {
     if (cached) { setUserName(cached); return; }
     let cancelled = false;
     void (async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("first_name, last_name")
-        .eq("id", authUser.id)
-        .single();
-      if (cancelled) return;
-      const first = profile?.first_name?.trim() || "";
-      const last = profile?.last_name?.trim() || "";
-      const full = [first, last].filter(Boolean).join(" ");
-      const name = full || authUser.email?.split("@")[0] || null;
-      setUserName(name);
-      if (name) sessionStorage.setItem("dg_user_name", name);
+      try {
+        const identity = await fetchAccountIdentity();
+        if (cancelled) return;
+        const name = identity.displayName || authUser.email?.split("@")[0] || null;
+        setUserName(name);
+        if (name) sessionStorage.setItem("dg_user_name", name);
+      } catch {
+        if (cancelled) return;
+        const fallbackName = authUser.email?.split("@")[0] || null;
+        setUserName(fallbackName);
+      }
     })();
     return () => { cancelled = true; };
   }, [authUser]);
@@ -316,13 +314,10 @@ export default function GridmasterPortal() {
 
   const loadData = useCallback(async () => {
     try {
-      const [orgsData, statsData] = await Promise.all([
-        fetchAllOrganizations(),
-        fetchTenantStats(),
-      ]);
-      setOrganizations(orgsData);
+      const data = await fetchGridmasterDashboardData();
+      setOrganizations(data.organizations);
       const map = new Map<string, TenantStats>();
-      for (const s of statsData) map.set(s.orgId, s);
+      for (const s of data.stats) map.set(s.orgId, s);
       setStats(map);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load data");

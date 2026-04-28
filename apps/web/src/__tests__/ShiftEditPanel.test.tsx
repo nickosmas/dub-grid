@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import ShiftEditPanel from "@/components/ShiftEditPanel";
-import { supabase } from "@/lib/supabase";
+import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 import {
   AbsenceType,
   DraftKind,
@@ -17,6 +17,12 @@ import {
   AssignmentDefinition,
   ShiftDisplayMode,
 } from "@/types";
+
+vi.mock("@/features/schedule/client", () => ({
+  fetchRepeatOverwriteCount: vi.fn(),
+}));
+
+const fetchRepeatOverwriteCountMock = vi.mocked(fetchRepeatOverwriteCount);
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -363,21 +369,6 @@ function derivePanelSelection(
   };
 }
 
-function createSupabaseBuilder() {
-  const builder = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    gte: vi.fn(),
-    lte: vi.fn().mockResolvedValue({ data: [], error: null }),
-  };
-
-  builder.select.mockReturnValue(builder);
-  builder.eq.mockReturnValue(builder);
-  builder.gte.mockReturnValue(builder);
-
-  return builder as unknown as ReturnType<typeof supabase.from>;
-}
-
 function RepeatFlowPanel() {
   const [currentShift, setCurrentShift] = useState<string | null>("D");
   const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([1]);
@@ -530,7 +521,7 @@ function CustomTimeHarness() {
 
 describe("ShiftEditPanel", () => {
   beforeEach(() => {
-    vi.mocked(supabase.from).mockImplementation(() => createSupabaseBuilder());
+    fetchRepeatOverwriteCountMock.mockResolvedValue({ overwriteCount: 0 });
   });
 
   describe("Rendering", () => {

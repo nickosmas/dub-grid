@@ -6,7 +6,7 @@ import {
   fetchUnreadNotificationCount,
   markNotificationRead,
   markAllNotificationsRead,
-} from "@/lib/db";
+} from "@/features/notifications/client";
 import type { Notification } from "@/types";
 
 function formatRelativeTime(dateStr: string): string {

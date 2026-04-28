@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import nextPlugin from "./node_modules/eslint-config-next/node_modules/@next/eslint-plugin-next/dist/index.js";
+import reactHooks from "./node_modules/eslint-config-next/node_modules/eslint-plugin-react-hooks/index.js";
+import tseslint from "./node_modules/eslint-config-next/node_modules/typescript-eslint/dist/index.js";
 import {
   noHtmlTitleAttribute,
   noRawTooltipImport,
@@ -95,9 +96,15 @@ const featureLayerPatterns = [
   },
 ];
 
+const legacyBrowserSupabaseUiFiles = [];
+const nextCoreWebVitals = nextPlugin.configs["core-web-vitals"];
+
 const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
+  {
+    ...nextCoreWebVitals,
+    files: ["apps/web/**/*.{js,jsx,ts,tsx}"],
+  },
+  tseslint.configs.base,
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -105,6 +112,8 @@ const eslintConfig = defineConfig([
     "apps/web/.next/**",
     "out/**",
     "build/**",
+    "dist/**",
+    "packages/*/dist/**",
     "next-env.d.ts",
     "apps/web/next-env.d.ts",
   ]),
@@ -116,10 +125,31 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    plugins: { tooltip: tooltipPlugin },
+    plugins: { tooltip: tooltipPlugin, "react-hooks": reactHooks },
     rules: {
       "tooltip/no-html-title-attribute": "warn",
       "tooltip/no-raw-tooltip-import": "error",
+    },
+  },
+  {
+    files: ["packages/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*", "@/app/*", "@/components/*", "@/features/*"],
+              message: "Shared packages must not import from app-local aliases.",
+            },
+            {
+              group: ["next/*", "expo", "expo-*", "react-native"],
+              message:
+                "Platform-specific code must stay in app adapters, not shared packages.",
+            },
+          ],
+        },
+      ],
     },
   },
   {
@@ -128,6 +158,7 @@ const eslintConfig = defineConfig([
       "apps/web/src/**/*.test.ts",
       "apps/web/src/**/*.test.tsx",
       "apps/web/src/**/__tests__/**",
+      "apps/web/src/app/api/**",
     ],
     rules: {
       "no-restricted-imports": [
@@ -164,6 +195,18 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["apps/web/src/features/account/server/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: webFeaturePublicPaths,
+          patterns: [...webFeaturePrivatePatterns, ...featureLayerPatterns],
+        },
+      ],
+    },
+  },
+  {
     files: ["apps/web/src/features/permissions/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [
@@ -171,6 +214,80 @@ const eslintConfig = defineConfig([
         {
           paths: webFeaturePublicPaths,
           patterns: [...webFeaturePrivatePatterns, ...featureLayerPatterns],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "apps/web/src/app/**/*.{ts,tsx}",
+      "apps/web/src/components/**/*.{ts,tsx}",
+      "apps/web/src/hooks/**/*.{ts,tsx}",
+      "apps/mobile/src/**/*.{ts,tsx}",
+    ],
+    ignores: [
+      "apps/web/src/**/*.test.ts",
+      "apps/web/src/**/*.test.tsx",
+      "apps/web/src/**/__tests__/**",
+      "apps/web/src/app/api/**",
+      "apps/web/src/app/**/route.ts",
+      "apps/mobile/src/**/*.test.ts",
+      "apps/mobile/src/**/*.test.tsx",
+      "apps/mobile/src/**/__tests__/**",
+      "apps/mobile/src/shared/lib/supabase.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@supabase/supabase-js",
+              allowTypeImports: true,
+              message:
+                "UI layers should use typed app adapters instead of creating raw Supabase clients directly.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "apps/web/src/app/**/*.{ts,tsx}",
+      "apps/web/src/components/**/*.{ts,tsx}",
+      "apps/web/src/hooks/**/*.{ts,tsx}",
+    ],
+    ignores: [
+      "apps/web/src/**/*.test.ts",
+      "apps/web/src/**/*.test.tsx",
+      "apps/web/src/**/__tests__/**",
+      "apps/web/src/app/api/**",
+      ...legacyBrowserSupabaseUiFiles,
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "@/lib/db",
+              message:
+                "Browser UI should use typed feature/client adapters instead of importing database helpers.",
+            },
+            {
+              name: "@/lib/supabase",
+              message:
+                "Browser UI should use feature/server adapters instead of importing the raw Supabase browser client.",
+            },
+          ],
+          patterns: [
+            {
+              group: ["@/lib/db/*"],
+              message:
+                "Browser UI should use typed feature/client adapters instead of importing database helpers.",
+            },
+          ],
         },
       ],
     },

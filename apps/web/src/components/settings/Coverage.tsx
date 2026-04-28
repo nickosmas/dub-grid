@@ -10,7 +10,7 @@ import type {
   ShiftCategory,
   ShiftDisplayMode,
 } from "@/types";
-import { saveCoverageRequirements } from "@/lib/db";
+import { saveCoverageRequirements } from "@/features/settings/client";
 import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
 import { getJobPlacementShiftPool, resolveJobColorsForShift, resolveJobTimesForShift } from "@/lib/job-placement";
 import { toast } from "sonner";
@@ -18,7 +18,6 @@ import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
-import { ExplainerSection } from "@/components/ui/explainer-section";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -567,22 +566,6 @@ export default function CoverageRequirementsSettings({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <ExplainerSection
-        title="Coverage logic"
-        defaultOpen
-        storageKey="dg-explainer-coverage-settings"
-        points={[
-          {
-            title: "Each shift section lists only the jobs for that shift",
-            description: "Pick a focus area, open a shift section, and set minimum headcount per job. The shift itself is already implied by the section you are editing.",
-          },
-          {
-            title: "Coverage focuses on explicit jobs",
-            description: "Only the jobs you define are listed here, so coverage stays focused on the roles you intentionally want to staff and measure.",
-          },
-        ]}
-      />
-
       {activeFocusAreas.map((focusArea) => {
         const localOptions = optionsByFocusArea.get(focusArea.id) ?? [];
         const sections = sectionsByFocusArea.get(focusArea.id) ?? [];

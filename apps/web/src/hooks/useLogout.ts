@@ -1,30 +1,32 @@
 // src/hooks/useLogout.ts
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
 import { parseHost } from "@/lib/subdomain";
 import { clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "@/features/permissions/client";
+import {
+  clearLogoutCleanup,
+  getBrowserRealtimeChannels,
+  removeBrowserRealtimeChannel,
+  signOutFromBrowser,
+  untrackBrowserRealtimeChannel,
+} from "@/features/account/client";
 
 async function clearRealtimeChannels(): Promise<void> {
-  const channels =
-    typeof supabase.getChannels === "function"
-      ? (supabase.getChannels() as RealtimeChannel[])
-      : [];
+  const channels = getBrowserRealtimeChannels() as RealtimeChannel[];
 
   await Promise.allSettled(
     channels.map(async (channel) => {
       try {
         if (channel.state === "joined") {
-          await channel.untrack();
+          await untrackBrowserRealtimeChannel(channel);
         }
       } catch {
         // Logout should continue even if realtime cleanup fails.
       }
 
       try {
-        await supabase.removeChannel(channel);
+        await removeBrowserRealtimeChannel(channel);
       } catch {
         // Ignore channel teardown failures during logout.
       }
@@ -47,16 +49,11 @@ export function useLogout() {
 
     // Best-effort impersonation cleanup — fire-and-forget.
     // Sessions auto-expire after 30 min, so this is non-critical.
-    getVerifiedBrowserUser().then((user) => {
-      if (user?.id) {
-        supabase.from("impersonation_sessions").delete().eq("gridmaster_id", user.id);
-      }
-    }).catch(() => {});
+    void clearLogoutCleanup().catch(() => {});
 
     await clearRealtimeChannels();
 
-    const { error } = await supabase.auth.signOut({ scope: "local" });
-    if (error) throw error;
+    await signOutFromBrowser("local");
     sessionStorage.removeItem("dg_user_name");
 
     if (redirectTo) {
@@ -69,8 +66,7 @@ export function useLogout() {
   }
 
   async function signOutOthers(): Promise<void> {
-    const { error } = await supabase.auth.signOut({ scope: "others" });
-    if (error) throw error;
+    await signOutFromBrowser("others");
   }
 
   return { signOutLocal, signOutOthers };

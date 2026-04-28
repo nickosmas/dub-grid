@@ -2,26 +2,32 @@ import type {
   Department,
   DepartmentType,
   Employee,
-  Organization,
-  OrganizationUser,
   FocusArea,
-  ShiftCategory,
   AssignmentDefinition,
-  JobDefinition,
   AbsenceType,
-  IndicatorType,
   Invitation,
-  RecurringShift,
-  ShiftRequest,
-  NamedItem,
   CoverageRequirement,
+  IndicatorType,
+  JobDefinition,
+  NamedItem,
+  OrganizationUser,
+  RecurringShift,
   ResolvedSchedulePresentation,
   ScheduleCellInput,
   SeriesFrequency,
+  ShiftCategory,
   ShiftJobSegment,
+  ShiftRequest,
 } from "@/types";
 import type {
-  DbOrganization,
+  AdminPermissions,
+  AssignableOrganizationRole,
+  Organization,
+  OrganizationRole,
+  PlatformRole,
+  ShiftDisplayMode,
+} from "@dubgrid/domain";
+import type {
   DbFocusArea,
   DbDepartment,
   DbShiftCategory,
@@ -29,14 +35,17 @@ import type {
   DbCoverageRequirement,
   DbAssignmentDefinition,
   DbAbsenceType,
-  DbEmployee,
   DbIndicatorType,
   DbInvitation,
-  DbOrganizationMembership,
   DbRecurringShift,
-  DbShiftRequest,
   DbNamedItem,
 } from "./types";
+import type {
+  DbEmployee,
+  DbOrganization,
+  DbOrganizationMembership,
+  DbShiftRequest,
+} from "@dubgrid/db-types";
 import { trimTime, resolveCodeLabels, iterateDateRange, MAX_SERIES_OCCURRENCES } from "./shared";
 import {
   deriveAssignmentDefinitionIdsFromAssignments,
@@ -46,6 +55,12 @@ import {
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { normalizePresetBg } from "@/lib/colors";
+
+const EMPTY_SCHEDULED_JOB_STYLE = {
+  color: "",
+  border: "",
+  text: "",
+} as const;
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
 
@@ -71,7 +86,7 @@ export function rowToDepartment(row: DbDepartment): Department {
     type: row.type as DepartmentType,
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
-    permissions: (row.permissions as unknown as import("@/types").AdminPermissions) ?? null,
+    permissions: (row.permissions as unknown as AdminPermissions) ?? null,
   };
 }
 
@@ -107,7 +122,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     certificationLabel: row.certification_label ?? 'Certifications',
     roleLabel: row.role_label ?? 'Roles',
     departmentLabel: row.department_label ?? 'Scheduled Departments',
-    shiftDisplayMode: (row.shift_display_mode as import("@/types").ShiftDisplayMode) ?? 'code',
+    shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? 'code',
     timezone: row.timezone ?? null,
     payPeriodStartDate: row.pay_period_start_date ?? null,
     archivedAt: row.archived_at ?? null,
@@ -132,9 +147,9 @@ export function rowToOrganizationUser(
     email: (row.email as string | null) ?? null,
     firstName: (row.first_name as string | null) ?? null,
     lastName: (row.last_name as string | null) ?? null,
-    orgRole: (row.org_role as import("@/types").OrganizationRole) ?? "user",
-    platformRole: (row.platform_role as import("@/types").PlatformRole) ?? "none",
-    adminPermissions: (row.admin_permissions as import("@/types").AdminPermissions | null) ?? null,
+    orgRole: (row.org_role as OrganizationRole) ?? "user",
+    platformRole: (row.platform_role as PlatformRole) ?? "none",
+    adminPermissions: (row.admin_permissions as AdminPermissions | null) ?? null,
     createdAt: row.created_at as string,
     lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
     updatedAt: (row.updated_at as string | null) ?? null,
@@ -149,7 +164,7 @@ export function membershipRowToOrganizationUser(
     email?: string | null;
     firstName?: string | null;
     lastName?: string | null;
-    platformRole?: import("@/types").PlatformRole | null;
+    platformRole?: PlatformRole | null;
     createdAt?: string | null;
     lastSignInAt?: string | null;
   },
@@ -159,10 +174,10 @@ export function membershipRowToOrganizationUser(
     email: profile?.email ?? null,
     firstName: profile?.firstName ?? null,
     lastName: profile?.lastName ?? null,
-    orgRole: membership.org_role as import("@/types").OrganizationRole,
+    orgRole: membership.org_role as OrganizationRole,
     platformRole: profile?.platformRole ?? "none",
     adminPermissions:
-      (membership.admin_permissions as import("@/types").AdminPermissions | null) ?? null,
+      (membership.admin_permissions as AdminPermissions | null) ?? null,
     createdAt: profile?.createdAt ?? new Date(0).toISOString(),
     lastSignInAt: profile?.lastSignInAt ?? null,
     updatedAt: membership.updated_at ?? null,
@@ -177,7 +192,7 @@ export function rowToInvitation(row: DbInvitation): Invitation {
     orgId: row.org_id,
     invitedBy: row.invited_by ?? null,
     email: row.email,
-    roleToAssign: row.role_to_assign as import("@/types").AssignableOrganizationRole,
+    roleToAssign: row.role_to_assign as AssignableOrganizationRole,
     expiresAt: row.expires_at,
     acceptedAt: row.accepted_at ?? null,
     revokedAt: row.revoked_at ?? null,
@@ -221,6 +236,7 @@ export function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
 }
 
 export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
+  const assignmentMode = row.assignment_mode ?? "with_shift";
   const focusAreaIds = row.focus_area_ids ?? [];
   const shiftTimeOverrides = Object.fromEntries(
     Object.entries(row.shift_time_overrides ?? {})
@@ -237,13 +253,21 @@ export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
     Object.entries(row.shift_color_overrides ?? {})
       .filter(([shiftId, value]) => shiftId.trim().length > 0 && typeof value === "string" && value.trim().length > 0),
   );
+  const style =
+    assignmentMode === "shiftless"
+      ? {
+          color: row.color,
+          border: row.border_color,
+          text: row.text_color,
+        }
+      : EMPTY_SCHEDULED_JOB_STYLE;
   return {
     id: row.id,
     orgId: row.org_id,
     name: row.name,
     abbr: row.abbr,
     showOnGrid: row.show_on_grid,
-    assignmentMode: row.assignment_mode ?? "with_shift",
+    assignmentMode,
     eligibilityMode: row.eligibility_mode ?? "and",
     focusAreaId: focusAreaIds[0] ?? null,
     focusAreaIds,
@@ -251,9 +275,9 @@ export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
     applicableShiftIds: row.applicable_shift_ids ?? [],
     eligibleRoleIds: row.eligible_role_ids ?? [],
     requiredCertificationIds: row.required_certification_ids ?? [],
-    color: row.color,
-    border: row.border_color,
-    text: row.text_color,
+    color: style.color,
+    border: style.border,
+    text: style.text,
     shiftTimeOverrides,
     shiftColorOverrides,
     defaultStartTime: trimTime(row.default_start_time) ?? null,

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { getVerifiedBrowserUser } from "@/lib/browser-auth";
-import { fetchUserSessions, revokeUserSession } from "@/lib/db";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Monitor, Smartphone, Trash2 } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import {
+  fetchAccountSessions,
+  revokeAccountSession,
+} from "@/features/account/client";
 
 interface UserSession {
   id: string;
@@ -37,16 +40,26 @@ function formatRelative(dateStr: string): string {
 }
 
 export function SessionList() {
+  const { user, isLoading: authLoading } = useAuth();
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
   const loadSessions = useCallback(async () => {
-    try {
-      const user = await getVerifiedBrowserUser();
-      if (!user) return;
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
 
-      const rows = await fetchUserSessions() as Array<{ id: string; deviceLabel: string | null; ipAddress: string | null; lastActiveAt: string; refreshTokenHash: string }>;
+    setLoading(true);
+
+    try {
+      if (!user) {
+        setSessions([]);
+        return;
+      }
+
+      const rows = (await fetchAccountSessions()).sessions;
 
       // Match current session using the stable per-browser session ID (same as AuthProvider)
       let currentHash = "";
@@ -73,16 +86,16 @@ export function SessionList() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
   useEffect(() => {
-    loadSessions();
+    void loadSessions();
   }, [loadSessions]);
 
   async function handleRevoke(session: UserSession) {
     setRevokingId(session.id);
     try {
-      await revokeUserSession(session.refreshTokenHash);
+      await revokeAccountSession(session.refreshTokenHash);
       setSessions((prev) => prev.filter((s) => s.id !== session.id));
       toast.success("Session revoked");
     } catch {

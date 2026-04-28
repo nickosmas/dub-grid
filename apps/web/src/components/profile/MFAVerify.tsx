@@ -1,12 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { supabase } from "@/lib/supabase";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { ShieldCheck } from "lucide-react";
+import {
+  listBrowserMfaFactors,
+  verifyBrowserTotpEnrollment,
+} from "@/features/account/client";
 
 interface MFAVerifyProps {
   /** Called after successful MFA verification */
@@ -29,7 +32,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
   // Load the TOTP factor ID on mount
   useEffect(() => {
     async function loadFactors() {
-      const { data, error: listError } = await supabase.auth.mfa.listFactors();
+      const { data, error: listError } = await listBrowserMfaFactors();
       if (listError) {
         toast.error("Failed to load authentication factors.");
         return;
@@ -54,7 +57,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
     setError(null);
 
     try {
-      const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
+      const { error: verifyError } = await verifyBrowserTotpEnrollment({
         factorId,
         code,
       });

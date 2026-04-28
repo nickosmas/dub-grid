@@ -63,6 +63,7 @@ export interface ScheduleGridAccessors {
 
 export interface ScheduleGridOptions {
   highlightEmpIds?: Set<string>;
+  highlightScrollKey?: string;
   isCellInteractive: boolean;
   canDragShifts: boolean;
   shiftDisplayMode: ShiftDisplayMode;
@@ -181,6 +182,7 @@ export interface BuildScheduleGridModelInput {
   openShifts?: GridOpenShift[];
   activeFocusArea?: number | null;
   highlightEmpIds?: Set<string>;
+  highlightScrollKey?: string;
   isCellInteractive?: boolean;
   canDragShifts?: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
@@ -222,6 +224,7 @@ export function buildScheduleGridModel({
   openShifts = [],
   activeFocusArea = null,
   highlightEmpIds,
+  highlightScrollKey,
   isCellInteractive = true,
   canDragShifts = isCellInteractive,
   shiftDisplayMode = "code",
@@ -335,7 +338,8 @@ export function buildScheduleGridModel({
         employee.focusAreaIds.length > 0 &&
         !employee.focusAreaIds.includes(focusArea.id) &&
         allDates.some((date) => {
-          const codeIds = accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
+          const codeIds =
+            accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
           return codeIds.some((codeId) => exclusiveCodeIds.has(codeId));
         }),
     );
@@ -441,6 +445,7 @@ export function buildScheduleGridModel({
     accessors,
     options: {
       highlightEmpIds,
+      highlightScrollKey,
       isCellInteractive,
       canDragShifts,
       shiftDisplayMode,

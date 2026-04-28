@@ -3,11 +3,32 @@ import type {
   ScheduleCellSegment as ContractScheduleCellSegment,
   ScheduleCellState as ContractScheduleCellState,
 } from "@dubgrid/contracts";
+import type {
+  AdminPermissions,
+  AssignableOrganizationRole,
+  Employee,
+  EmployeeStatus,
+  Organization,
+  OrganizationRole,
+  PlatformRole,
+  ShiftDisplayMode,
+  ShiftRequestStatus,
+  ShiftRequestType,
+} from "@dubgrid/domain";
+export type {
+  AdminPermissions,
+  AssignableOrganizationRole,
+  Employee,
+  EmployeeStatus,
+  Organization,
+  OrganizationRole,
+  PlatformRole,
+  ShiftDisplayMode,
+  ShiftRequestStatus,
+  ShiftRequestType,
+} from "@dubgrid/domain";
 
 // ── App Domain Types ──────────────────────────────────────────────────────────
-
-/** Controls how shifts are displayed on the schedule grid. */
-export type ShiftDisplayMode = 'code' | 'name';
 
 /** A named entity with a full name and abbreviation (certifications & roles). */
 export interface NamedItem {
@@ -23,59 +44,6 @@ export interface NamedItem {
   /** Non-null when the item has been archived (soft-deleted). */
   archivedAt?: string | null;
 }
-
-export interface Organization {
-  id: string;
-  name: string;
-  slug: string | null;
-  /** Legacy composed address string retained for compatibility with existing consumers. */
-  address: string;
-  addressLine1: string;
-  addressLine2: string;
-  addressCity: string;
-  addressState: string;
-  addressPostalCode: string;
-  addressCountry: string;
-  phone: string;
-  employeeCount: number | null;
-  /** Custom display label for focus areas (e.g. "Wings", "Departments"). Defaults to "Focus Areas". */
-  focusAreaLabel: string;
-  /** Custom display label for certifications/skill levels (e.g. "Skill Levels"). Defaults to "Certifications". */
-  certificationLabel: string;
-  /** Custom display label for roles (e.g. "Responsibilities"). Defaults to "Roles". */
-  roleLabel: string;
-  /** Custom display label for scheduled departments (e.g. "Teams"). Defaults to "Scheduled Departments". */
-  departmentLabel: string;
-  /** Controls grid display: 'code' shows short labels (D, EVE), 'name' shows full names (Day Shift, Evening). */
-  shiftDisplayMode: ShiftDisplayMode;
-  /** IANA timezone for this organization, e.g. "America/New_York". Null = not set. */
-  timezone: string | null;
-  /** Optional biweekly pay-period anchor date in YYYY-MM-DD format. Null keeps 2-week views aligned to calendar weeks. */
-  payPeriodStartDate: string | null;
-  /** Non-null when the organization has been archived (soft-deleted). */
-  archivedAt?: string | null;
-  /** Non-null when the organization is suspended. Members are blocked from the app. */
-  suspendedAt?: string | null;
-  /** Reason for suspension, set by gridmaster. */
-  suspendedReason?: string | null;
-  /** When true, shift overlap warnings become blocking — save is disabled until conflicts are resolved. */
-  enforceConflictPrevention: boolean;
-  /** Stripe customer ID for billing. */
-  stripeCustomerId?: string | null;
-  /** Stripe subscription status: trialing, active, past_due, canceled, unpaid. */
-  subscriptionStatus?: string | null;
-  /** Trial expiry timestamp. */
-  trialEndsAt?: string | null;
-  /** Number of subscription seats from Stripe. */
-  subscriptionSeats?: number | null;
-  /** Number of days to retain archived/deleted data before permanent purge. */
-  dataRetentionDays: number;
-  /** Per-org feature flag overrides. Keys are flag names, values are booleans. */
-  featureOverrides: Record<string, boolean>;
-  /** Last update timestamp used for optimistic locking on sensitive org edits. */
-  updatedAt?: string | null;
-}
-
 
 export type DepartmentType = 'scheduled' | 'management';
 
@@ -362,36 +330,6 @@ export interface AbsenceType {
   archivedAt?: string | null;
 }
 
-export type EmployeeStatus = 'active' | 'benched' | 'terminated';
-
-export interface Employee {
-  id: string;
-  firstName: string;
-  lastName: string;
-  /** Current employment status: active (working), benched (temporarily away), terminated (left). */
-  status: EmployeeStatus;
-  /** When the status was last changed. */
-  statusChangedAt: string | null;
-  /** Optional note explaining the status (e.g. "On maternity leave until June"). */
-  statusNote: string;
-  certificationId: number | null;
-  roleIds: number[];
-  seniority: number;
-  focusAreaIds: number[];
-  phone: string;
-  email: string;
-  contactNotes: string;
-  archivedAt?: string | null;
-  /** Linked Supabase auth user ID. Null if no account linked. */
-  userId: string | null;
-  /** Scheduled department IDs for this employee record. */
-  departmentIds: number[];
-  /** Subset of departmentIds where this employee is a dept admin (gets dept permission template). */
-  deptAdminIds: number[];
-  /** Optimistic concurrency control version counter. */
-  version: number;
-}
-
 export type DraftKind = 'new' | 'modified' | 'deleted' | null;
 
 export interface PublishChange {
@@ -566,82 +504,6 @@ export interface ScheduleNote {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
-}
-
-// ── RBAC Types ────────────────────────────────────────────────────────────────
-
-export type PlatformRole = 'gridmaster' | 'none';
-/**
- * super_admin: organization owner — full org management
- * admin: configurable permissions assigned by super_admin
- * user: read-only staff
- */
-export type OrganizationRole = 'super_admin' | 'admin' | 'user';
-/** Roles assignable via invitation (super_admin assignable by gridmaster during org setup). */
-export type AssignableOrganizationRole = 'super_admin' | 'admin' | 'user';
-
-/**
- * Fine-grained permissions for admin users. Stored as JSONB in organization_memberships.admin_permissions.
- * super_admin and gridmaster always have all permissions regardless of this field.
- * Null/undefined = all false for admin users.
- */
-export interface AdminPermissions {
-  // Schedule
-  /** View the schedule grid (always true for all authenticated users) */
-  canViewSchedule: boolean;
-  /** Create / edit / delete shifts in the draft schedule */
-  canEditShifts: boolean;
-  /** Publish or discard the draft schedule */
-  canPublishSchedule: boolean;
-  /** Apply recurring shift templates to a date range */
-  canApplyRecurringSchedule: boolean;
-  // Notes & Indicators
-  /** Add / edit / delete schedule notes (indicators) */
-  canEditNotes: boolean;
-  // Recurring Shifts
-  /** View recurring shift templates (read-only). Implied by canManageRecurringShifts. */
-  canViewRecurringShifts: boolean;
-  /** Create / edit / delete recurring shift templates */
-  canManageRecurringShifts: boolean;
-  /** Create / edit / delete shift series */
-  canManageShiftSeries: boolean;
-  // Staff
-  /** View employee list and profiles (always true for all authenticated users) */
-  canViewStaff: boolean;
-  /** View employee detail panel — profile, contact info, certifications. Implied by canManageEmployees. */
-  canViewEmployeeDetails: boolean;
-  /** Add / edit / delete employee records */
-  canManageEmployees: boolean;
-  // Organization Configuration
-  /** View departments / focus areas settings (read-only). Implied by canManageFocusAreas. */
-  canViewFocusAreas: boolean;
-  /** Add / edit / delete focus areas (departments) */
-  canManageFocusAreas: boolean;
-  /** View schedule definitions like shifts, jobs, and absence types (read-only). Implied by canManageScheduleDefinitions. */
-  canViewScheduleDefinitions: boolean;
-  /** Add / edit / delete schedule definitions like shifts, jobs, and absence types. */
-  canManageScheduleDefinitions: boolean;
-  /** View indicator type configuration (read-only). Implied by canManageIndicatorTypes. */
-  canViewIndicatorTypes: boolean;
-  /** Add / edit / delete indicator / note type definitions */
-  canManageIndicatorTypes: boolean;
-  /** Edit organization name, address, phone, employee count, timezone (super_admin only) */
-  canManageOrgSettings: boolean;
-  /** View custom terminology labels (read-only). Implied by canManageOrgLabels. */
-  canViewOrgLabels: boolean;
-  /** Edit custom terminology labels — focus areas, certifications, roles (delegatable to admin) */
-  canManageOrgLabels: boolean;
-  // Coverage
-  /** View coverage requirements (read-only). Implied by canManageCoverageRequirements. */
-  canViewCoverageRequirements: boolean;
-  /** Create / edit / delete coverage requirements for shift staffing minimums */
-  canManageCoverageRequirements: boolean;
-  // Shift Requests
-  /** Approve or reject employee shift pickup/swap requests */
-  canApproveShiftRequests: boolean;
-  // Dashboard
-  /** View dashboard analytics and statistics cards */
-  canViewDashboardAnalytics: boolean;
 }
 
 export interface Profile {
@@ -972,11 +834,6 @@ export interface UserMembership {
   updatedAt: string | null;
   adminPermissions: AdminPermissions | null;
 }
-
-// ── Shift Requests ──────────────────────────────────────────────────────────
-
-export type ShiftRequestType = 'pickup' | 'swap' | 'calloff';
-export type ShiftRequestStatus = 'open' | 'pending_approval' | 'approved' | 'rejected' | 'cancelled' | 'expired';
 
 export interface ShiftRequest {
   id: string;

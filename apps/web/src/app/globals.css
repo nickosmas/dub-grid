@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./shadcn-tailwind.css";
 
 
 /*
@@ -25,57 +25,57 @@
   --font-sans: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), 'DM Mono', monospace;
 
-  /* DubGrid palette — mirrors :root tokens for Tailwind utility classes */
-  --color-bg: #F8FAFC;
-  --color-surface: #FFFFFF;
-  --color-bg-secondary: #F1F5F9;
-  --color-row-alt: #FAFBFC;
-  --color-border: #CBD5E1;
-  --color-border-light: #E2E8F0;
-  --color-border-focus: #3B82F6;
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #1E293B;
-  --color-text-muted: #475569;
-  --color-text-subtle: #64748B;
-  --color-text-faint: #718096;
-  --color-text-inverse: #FFFFFF;
-  --color-brand: #2563EB;
-  --color-brand-light: #3B82F6;
-  --color-brand-bg: #EFF6FF;
-  --color-brand-border: #BFDBFE;
-  --color-primary: #2563EB;
-  --color-link: #2563EB;
-  --color-accent-text: #2563EB;
-  --color-control-primary: #0F172A;
-  --color-control-primary-hover: #1E293B;
-  --color-control-primary-text: #FFFFFF;
-  --color-control-active-bg: #F1F5F9;
-  --color-control-active-border: #CBD5E1;
-  --color-control-active-text: #0F172A;
-  --color-control-active-hover: #E2E8F0;
-  --color-success: #16A34A;
-  --color-success-bg: #F0FDF4;
-  --color-success-text: #166534;
-  --color-success-border: #BBF7D0;
-  --color-warning: #F59E0B;
-  --color-warning-bg: #FFFBEB;
-  --color-warning-text: #92400E;
-  --color-warning-border: #FDE68A;
-  --color-danger: #EF4444;
-  --color-danger-bg: #FEF2F2;
-  --color-danger-text: #B91C1C;
-  --color-danger-border: #FECACA;
-  --color-danger-dark: #991B1B;
-  --color-info: #3B82F6;
-  --color-info-bg: #EFF6FF;
-  --color-info-text: #1D4ED8;
-  --color-info-border: #BFDBFE;
-  --color-dark: #0F172A;
-  --color-dark-elevated: #1E293B;
-  --color-today-bg: #EFF6FF;
-  --color-today-text: #1D4ED8;
-  --color-today-border: #93C5FD;
-  --color-row-hover: #F1F5F9;
+  /* DubGrid palette — sourced from @dubgrid/design-tokens runtime vars */
+  --color-bg: var(--dg-color-bg);
+  --color-surface: var(--dg-color-surface);
+  --color-bg-secondary: var(--dg-color-bg-secondary);
+  --color-row-alt: var(--dg-color-row-alt);
+  --color-border: var(--dg-color-border);
+  --color-border-light: var(--dg-color-border-light);
+  --color-border-focus: var(--dg-color-border-focus);
+  --color-text-primary: var(--dg-color-text-primary);
+  --color-text-secondary: var(--dg-color-text-secondary);
+  --color-text-muted: var(--dg-color-text-muted);
+  --color-text-subtle: var(--dg-color-text-subtle);
+  --color-text-faint: var(--dg-color-text-faint);
+  --color-text-inverse: var(--dg-color-text-inverse);
+  --color-brand: var(--dg-color-brand);
+  --color-brand-light: var(--dg-color-brand-light);
+  --color-brand-bg: var(--dg-color-brand-bg);
+  --color-brand-border: var(--dg-color-brand-border);
+  --color-primary: var(--dg-color-primary);
+  --color-link: var(--dg-color-link);
+  --color-accent-text: var(--dg-color-accent-text);
+  --color-control-primary: var(--dg-color-control-primary);
+  --color-control-primary-hover: var(--dg-color-control-primary-hover);
+  --color-control-primary-text: var(--dg-color-control-primary-text);
+  --color-control-active-bg: var(--dg-color-control-active-bg);
+  --color-control-active-border: var(--dg-color-control-active-border);
+  --color-control-active-text: var(--dg-color-control-active-text);
+  --color-control-active-hover: var(--dg-color-control-active-hover);
+  --color-success: var(--dg-color-success);
+  --color-success-bg: var(--dg-color-success-bg);
+  --color-success-text: var(--dg-color-success-text);
+  --color-success-border: var(--dg-color-success-border);
+  --color-warning: var(--dg-color-warning);
+  --color-warning-bg: var(--dg-color-warning-bg);
+  --color-warning-text: var(--dg-color-warning-text);
+  --color-warning-border: var(--dg-color-warning-border);
+  --color-danger: var(--dg-color-danger);
+  --color-danger-bg: var(--dg-color-danger-bg);
+  --color-danger-text: var(--dg-color-danger-text);
+  --color-danger-border: var(--dg-color-danger-border);
+  --color-danger-dark: var(--dg-color-danger-dark);
+  --color-info: var(--dg-color-info);
+  --color-info-bg: var(--dg-color-info-bg);
+  --color-info-text: var(--dg-color-info-text);
+  --color-info-border: var(--dg-color-info-border);
+  --color-dark: var(--dg-color-dark);
+  --color-dark-elevated: var(--dg-color-dark-elevated);
+  --color-today-bg: var(--dg-color-today-bg);
+  --color-today-text: var(--dg-color-today-text);
+  --color-today-border: var(--dg-color-today-border);
+  --color-row-hover: var(--dg-color-row-hover);
 }
 
 *,
@@ -88,221 +88,7 @@
    Design Tokens — Full Palette
    ============================================================ */
 :root {
-
-  /* ----------------------------------------------------------
-     Backgrounds
-  ---------------------------------------------------------- */
-  --color-bg:               #F8FAFC;
-  --color-surface:          #FFFFFF;
-  --color-bg-secondary:     #F1F5F9;
-
-  /* ----------------------------------------------------------
-     Borders
-  ---------------------------------------------------------- */
-  --color-border:           #CBD5E1;
-  --color-border-light:     #E2E8F0;
-  --color-border-focus:     #3B82F6;
-
-  /* ----------------------------------------------------------
-     Text
-  ---------------------------------------------------------- */
-  --color-text-primary:     #0F172A;
-  --color-text-secondary:   #1E293B;
-  --color-text-muted:       #475569;
-  --color-text-subtle:      #64748B;
-  --color-text-faint:       #718096;
-  --color-text-inverse:     #FFFFFF;
-
-  /* ----------------------------------------------------------
-     Brand / Accent — calm blue ramp
-  ---------------------------------------------------------- */
-  --color-brand:            #2563EB;
-  --color-brand-light:      #3B82F6;
-  --color-brand-bg:         #EFF6FF;
-  --color-brand-border:     #BFDBFE;
-  --color-primary:          #2563EB;
-  --color-link:             #2563EB;
-  --color-accent-text:      #2563EB;
-  --color-control-primary:  #0F172A;
-  --color-control-primary-hover: #1E293B;
-  --color-control-primary-text: #FFFFFF;
-  --color-control-active-bg: #F1F5F9;
-  --color-control-active-border: #CBD5E1;
-  --color-control-active-text: #0F172A;
-  --color-control-active-hover: #E2E8F0;
-
-  /* ----------------------------------------------------------
-     Success (semantic green)
-  ---------------------------------------------------------- */
-  --color-success:          #16A34A;
-  --color-success-bg:       #F0FDF4;
-  --color-success-text:     #166534;
-  --color-success-border:   #BBF7D0;
-
-  /* ----------------------------------------------------------
-     Warning
-  ---------------------------------------------------------- */
-  --color-warning:          #F59E0B;
-  --color-warning-bg:       #FFFBEB;
-  --color-warning-text:     #92400E;
-  --color-warning-border:   #FDE68A;
-
-  /* ----------------------------------------------------------
-     Danger
-  ---------------------------------------------------------- */
-  --color-danger:           #EF4444;
-  --color-danger-bg:        #FEF2F2;
-  --color-danger-text:      #B91C1C;
-  --color-danger-border:    #FECACA;
-  --color-danger-dark:      #991B1B;
-
-  /* ----------------------------------------------------------
-     Info
-  ---------------------------------------------------------- */
-  --color-info:             #3B82F6;
-  --color-info-bg:          #EFF6FF;
-  --color-info-text:        #1D4ED8;
-  --color-info-border:      #BFDBFE;
-
-  /* ----------------------------------------------------------
-     Dark / Elevated
-  ---------------------------------------------------------- */
-  --color-dark:             #0F172A;
-  --color-dark-elevated:    #1E293B;
-
-  /* ----------------------------------------------------------
-     Grid-specific
-  ---------------------------------------------------------- */
-  --color-today-bg:         #EFF6FF;
-  --color-today-text:       #1D4ED8;
-  --color-today-border:     #93C5FD;
-  --color-row-hover:        #F1F5F9;
-  --color-row-alt:          #FAFBFC;
-
-  /* Elevation shadows */
-  --shadow-raised: 0 1px 4px rgba(0, 0, 0, 0.06);
-  --shadow-float: 0 4px 16px rgba(0, 0, 0, 0.10);
-  --shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
-  --shadow-modal: 0 12px 48px rgba(0, 0, 0, 0.18);
-  --shadow-panel: -8px 0 40px rgba(0, 0, 0, 0.14);
-
-  /* Layout */
-  --header-height: 56px;
-  --dg-toolbar-h: 38px;
-
-  /* Button sizing */
-  --dg-btn-radius: 6px;
-  --dg-btn-h: 38px;
-  --dg-btn-h-sm: 34px;
-  --dg-btn-h-xs: 30px;
-  --dg-btn-h-lg: 44px;
-  --dg-btn-px: 16px;
-  --dg-btn-px-sm: 14px;
-  --dg-btn-px-xs: 10px;
-  --dg-btn-gap: 8px;
-  --dg-btn-icon: 14px;
-
-  /* Typography scale */
-  --dg-fs-page-title: 28px;
-  --dg-fs-section-title: 24px;
-  --dg-fs-card-title: 20px;
-  --dg-fs-heading: 18px;
-  --dg-fs-title: 16px;
-  --dg-fs-body: 15px;
-  --dg-fs-body-sm: 14px;
-  --dg-fs-label: 13px;
-  --dg-fs-caption: 12px;
-  --dg-fs-footnote: 11px;
-  --dg-fs-badge: 10px;
-  --dg-fs-micro: 9px;
-
-  /* Spacing scale */
-  --dg-space-xs: 4px;
-  --dg-space-sm: 8px;
-  --dg-space-md: 12px;
-  --dg-space-lg: 16px;
-  --dg-space-xl: 20px;
-  --dg-space-2xl: 24px;
-  --dg-space-3xl: 32px;
-  --dg-space-4xl: 40px;
-  --dg-space-5xl: 48px;
-
-  /* Line-height scale */
-  --dg-lh-tight: 1.1;
-  --dg-lh-normal: 1.4;
-  --dg-lh-loose: 1.6;
-
-  /* Grid layout */
-  --dg-grid-name-col: 220px;
-  --dg-grid-cell-height: 52px;
-  --dg-grid-col-min: 72px;
-
-  /* Drag elevation */
-  --shadow-drag: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
-
-  /* ----------------------------------------------------------
-     Tooltip tokens
-  ---------------------------------------------------------- */
-  --tooltip-font-size: var(--dg-fs-label);
-  --tooltip-border-radius: var(--dg-radius-sm);
-  --tooltip-shadow: 0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1);
-
-  /* ----------------------------------------------------------
-     Animation durations
-  ---------------------------------------------------------- */
-  --dg-duration-fast: 150ms;
-  --dg-duration-standard: 200ms;
-
-  /* ----------------------------------------------------------
-     Border radius scale
-  ---------------------------------------------------------- */
-  --dg-radius-sm: 6px;     /* inner chrome: menu items, tooltip shells, skeletons */
-  --dg-radius-md: 8px;     /* standard containers: cards, tables, inline alerts */
-  --dg-radius-lg: 10px;    /* elevated shells: menus, popovers, drawers, toasts */
-  --dg-radius-xl: 12px;    /* modal, auth, and setup hero shells */
-  --dg-tab-shell-radius: var(--dg-radius-md);
-  --dg-tab-shell-pad: 2px;
-  --dg-tab-inner-radius: calc(var(--dg-tab-shell-radius) - var(--dg-tab-shell-pad));
-
-  /* ----------------------------------------------------------
-     Overlay backgrounds
-  ---------------------------------------------------------- */
-  --dg-overlay: rgba(10, 20, 40, 0.45);
-  --dg-overlay-blur: 0px;
-
-  /* shadcn/ui tokens */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #2563EB;
-  --primary-foreground: #FFFFFF;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #3B82F6;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #2563EB;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EFF6FF;
-  --sidebar-accent-foreground: #2563EB;
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: #3B82F6;
+  /* Shared runtime tokens are injected from @dubgrid/design-tokens in layout.tsx. */
 }
 
 html,
@@ -531,7 +317,7 @@ textarea {
 
 .dg-input:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
 }
 
 .dg-input:disabled {
@@ -542,7 +328,7 @@ textarea {
 
 .dg-input-error {
   border-color: var(--color-danger);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 0 3px var(--dg-danger-ring);
 }
 
 /* ── Label System ──────────────────────────────────────── */
@@ -615,7 +401,7 @@ textarea {
   justify-content: center;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--dg-on-dark-muted);
   padding: 0 16px;
   font-size: var(--dg-fs-caption);
   font-weight: 600;
@@ -630,7 +416,7 @@ textarea {
 }
 
 .dg-span-tab:hover:not(.active) {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--dg-on-dark-secondary);
 }
 
 .dg-span-tab.active {
@@ -755,7 +541,7 @@ textarea {
 
 .dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron {
   background: var(--color-dark);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--dg-on-dark-subtle);
 }
 
 .dg-span-tabs:not(.dg-span-tabs--light) .dg-scroll-chevron:hover {
@@ -1350,7 +1136,7 @@ textarea {
   top: 46%;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  border: solid var(--color-text-inverse);
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
 }
@@ -1439,7 +1225,7 @@ textarea {
   height: 24px;
   border-radius: 6px;
   border: 1px solid var(--color-border);
-  background: #fff;
+  background: var(--color-surface);
   cursor: pointer;
   color: var(--color-text-muted);
   transition: background 120ms ease, color 120ms ease;
@@ -1472,7 +1258,7 @@ textarea {
   background: var(--color-surface);
   cursor: pointer;
   color: var(--color-text-muted);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: var(--dg-shadow-sidebar-toggle);
   transition: background 120ms ease, color 120ms ease;
   padding: 0;
 }
@@ -1523,7 +1309,7 @@ textarea {
   overflow: hidden;
   border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--dg-shadow-staff-detail);
   z-index: 10001;
   animation: staff-detail-in var(--dg-duration-standard) cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1759,7 +1545,7 @@ textarea {
 .dg-grid-cell[data-top-divider="warning"] .dg-grid-cell__chrome {
   background-image: repeating-linear-gradient(
     to right,
-    var(--color-warning-border, #F59E0B) 0 6px,
+    var(--color-warning-border) 0 6px,
     transparent 6px 10px
   );
   background-position: var(--dg-grid-divider-inset) 0;
@@ -1781,7 +1567,7 @@ textarea {
 .dg-grid-slot[data-bottom-divider="warning"] .dg-grid-slot__chrome {
   background-image: repeating-linear-gradient(
     to right,
-    var(--color-warning-border, #F59E0B) 0 6px,
+    var(--color-warning-border) 0 6px,
     transparent 6px 10px
   );
   background-position: var(--dg-grid-divider-inset) 100%;
@@ -1790,7 +1576,7 @@ textarea {
 }
 
 .dg-grid-cell[data-locked="true"] {
-  background: rgba(37, 99, 235, 0.08);
+  background: var(--dg-locked-bg);
 }
 
 .dg-grid-cell[data-drop-target="true"] {
@@ -2060,27 +1846,27 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 /* Toast type colors — vibrant solid backgrounds with white text */
 [data-sonner-toast][data-type="success"] {
-  background: #16A34A !important;
-  color: #FFFFFF !important;
-  border: 1px solid #166534 !important;
+  background: var(--dg-toast-success-bg) !important;
+  color: var(--color-text-inverse) !important;
+  border: 1px solid var(--dg-toast-success-border) !important;
 }
 
 [data-sonner-toast][data-type="error"] {
-  background: #DC2626 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #B91C1C !important;
+  background: var(--dg-toast-error-bg) !important;
+  color: var(--color-text-inverse) !important;
+  border: 1px solid var(--dg-toast-error-border) !important;
 }
 
 [data-sonner-toast][data-type="info"] {
-  background: #1D4ED8 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #1E3A8A !important;
+  background: var(--dg-toast-info-bg) !important;
+  color: var(--color-text-inverse) !important;
+  border: 1px solid var(--dg-toast-info-border) !important;
 }
 
 [data-sonner-toast][data-type="warning"] {
-  background: #D97706 !important;
-  color: #FFFFFF !important;
-  border: 1px solid #92400E !important;
+  background: var(--dg-toast-warning-bg) !important;
+  color: var(--color-text-inverse) !important;
+  border: 1px solid var(--dg-toast-warning-border) !important;
 }
 
 [data-sonner-toast] [data-title] {
@@ -2090,7 +1876,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 [data-sonner-toast] [data-description] {
-  color: rgba(255, 255, 255, 0.82) !important;
+  color: var(--dg-on-dark-description) !important;
   font-size: 13px !important;
   font-weight: 500 !important;
 }
@@ -2102,9 +1888,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   right: 10px !important;
   left: auto !important;
   transform: translateY(-50%) !important;
-  background: rgba(255, 255, 255, 0.18) !important;
-  color: #FFFFFF !important;
-  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  background: var(--dg-on-dark-control) !important;
+  color: var(--color-text-inverse) !important;
+  border: 1px solid var(--dg-on-dark-control-border) !important;
   opacity: 1 !important;
   padding: 0 !important;
   border-radius: 50% !important;
@@ -2118,20 +1904,20 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 [data-sonner-toast] [data-close-button]:hover {
-  background: rgba(255, 255, 255, 0.35) !important;
+  background: var(--dg-on-dark-control-hover) !important;
   transform: translateY(-50%) scale(1.1) !important;
 }
 
 [data-sonner-toast] [data-close-button] svg {
   width: 14px !important;
   height: 14px !important;
-  color: #FFFFFF !important;
+  color: var(--color-text-inverse) !important;
 }
 
 /* Action button — dark for universal contrast */
 [data-sonner-toast] [data-button] {
   background: var(--color-dark) !important;
-  color: #fff !important;
+  color: var(--color-text-inverse) !important;
   border: none !important;
   padding: 8px 16px !important;
   border-radius: 8px !important;
@@ -2217,10 +2003,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .print-legend__title {
   font-size: 16px;
   font-weight: 700;
-  color: #0F172A;
+  color: var(--color-text-primary);
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 2px solid #0F172A;
+  border-bottom: 2px solid var(--color-text-primary);
 }
 
 .print-legend__grid {
@@ -2247,7 +2033,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .print-legend__name {
   font-size: 12px;
-  color: #1E293B;
+  color: var(--color-text-secondary);
 }
 
 /* ── Auth Form System ──────────────────────────────────── */
@@ -2301,7 +2087,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-auth-input:focus {
   border-color: var(--color-border-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 0 0 3px var(--dg-focus-ring);
 }
 
 .dg-auth-submit {
@@ -2343,22 +2129,22 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   max-width: 440px;
   background: var(--color-surface);
   border-radius: var(--dg-radius-xl);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+  box-shadow: var(--dg-shadow-auth-card);
 }
 
 /* ── Responsive: Tablet ────────────────────────────────── */
 @media (min-width: 768px) and (max-width: 1024px) {
   :root {
-    --dg-grid-name-col: 180px;
-    --dg-grid-col-min: 64px;
+    --dg-grid-name-col: var(--dg-grid-name-col-tablet);
+    --dg-grid-col-min: var(--dg-grid-col-min-tablet);
   }
 }
 
 /* ── Responsive: Small Desktop ─────────────────────────── */
 @media (min-width: 768px) and (max-width: 1280px) {
   :root {
-    --dg-fs-page-title: 24px;
-    --dg-fs-section-title: 22px;
+    --dg-fs-page-title: var(--dg-fs-page-title-small-desktop);
+    --dg-fs-section-title: var(--dg-fs-section-title-small-desktop);
   }
 }
 
@@ -2371,15 +2157,15 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 @media (max-width: 767px) {
   /* Typography — responsive overrides */
   :root {
-    --dg-toolbar-h: var(--dg-btn-h-lg);
-    --dg-fs-page-title: 22px;
-    --dg-fs-section-title: 20px;
-    --dg-fs-card-title: 18px;
-    --dg-fs-heading: 16px;
-    --dg-fs-title: 15px;
-    --dg-fs-badge: 11px;
-    --dg-fs-micro: 10px;
-    --dg-grid-name-col: 160px;
+    --dg-toolbar-h: var(--dg-toolbar-h-mobile);
+    --dg-fs-page-title: var(--dg-fs-page-title-mobile);
+    --dg-fs-section-title: var(--dg-fs-section-title-mobile);
+    --dg-fs-card-title: var(--dg-fs-card-title-mobile);
+    --dg-fs-heading: var(--dg-fs-heading-mobile);
+    --dg-fs-title: var(--dg-fs-title-mobile);
+    --dg-fs-badge: var(--dg-fs-badge-mobile);
+    --dg-fs-micro: var(--dg-fs-micro-mobile);
+    --dg-grid-name-col: var(--dg-grid-name-col-mobile);
   }
 
   .dg-auth-card {
@@ -2828,7 +2614,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   html,
   body {
     overflow: visible !important;
-    background: #fff !important;
+    background: var(--color-surface) !important;
   }
 
   /* Fallback: direct Ctrl+P on the main schedule page */

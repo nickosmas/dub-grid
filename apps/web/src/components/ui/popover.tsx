@@ -93,6 +93,10 @@ type PopoverContentProps = PopoverPrimitive.Popup.Props &
       PopoverPrimitive.Positioner.State,
       string
     >
+    positionerStyle?: MaybeStateValue<
+      PopoverPrimitive.Positioner.State,
+      React.CSSProperties
+    >
     showArrow?: boolean
     arrowClassName?: MaybeStateValue<PopoverPrimitive.Arrow.State, string>
   }
@@ -111,6 +115,7 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
       collisionPadding = 8,
       positionMethod,
       positionerClassName,
+      positionerStyle,
       side = "bottom",
       sideOffset = 0,
       showArrow = false,
@@ -133,6 +138,10 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
           className={(state) =>
             cn("isolate z-50", resolveStateValue(positionerClassName, state))
           }
+          style={(state) => ({
+            zIndex: 10002,
+            ...resolveStateValue(positionerStyle, state),
+          })}
         >
           <PopoverPrimitive.Popup
             ref={ref}

@@ -159,9 +159,10 @@ export default function CustomSelect<T extends string | number>({
           minWidth: "var(--anchor-width)",
           width: "max-content",
           maxWidth: "min(350px, 90vw)",
-          maxHeight: "max(160px, var(--available-height))",
+          maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
           overflowY: "auto",
           overflowX: "hidden",
+          overscrollBehavior: "contain",
           scrollbarWidth: "none",
         }}
       >

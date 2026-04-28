@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { DubGridLogo } from "@/components/Logo";
-import { supabase } from "@/lib/supabase";
+import { fetchAccountIdentity } from "@/features/account/client";
 
 export default function OnboardingPage() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
@@ -38,12 +38,8 @@ export default function OnboardingPage() {
       }
       setChecking(true);
       try {
-        const { data } = await supabase
-          .from("organization_memberships")
-          .select("org_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        if (data?.org_id) {
+        const identity = await fetchAccountIdentity();
+        if (identity.hasOrganizationMembership) {
           if (pollRef.current) clearInterval(pollRef.current);
           window.location.reload();
           return;

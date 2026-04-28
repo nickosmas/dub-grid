@@ -3,24 +3,31 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 import {
-  assignOrgRoleByEmail,
-  createOrganization,
-  insertEmployee,
-} from "@/lib/db";
+  createGridmasterOrganizationSetup,
+} from "@/features/gridmaster/client";
+import { insertEmployee } from "@/features/employees/client";
 import type { Organization } from "@/types";
 
-vi.mock("@/lib/db", () => ({
-  createOrganization: vi.fn(),
-  assignOrgRoleByEmail: vi.fn(),
-  sendInvitation: vi.fn(),
+vi.mock("@/features/gridmaster/client", () => ({
+  createGridmasterOrganizationSetup: vi.fn(),
+}));
+
+vi.mock("@/features/employees/client", () => ({
   insertEmployee: vi.fn(),
+}));
+
+vi.mock("@/features/settings/client", () => ({
   upsertFocusArea: vi.fn(),
   saveCertifications: vi.fn(),
   saveOrganizationRoles: vi.fn(),
   saveDepartments: vi.fn(),
   upsertShiftCategory: vi.fn(),
-  upsertAssignmentDefinition: vi.fn(),
-  updateOrganization: vi.fn(),
+  upsertJobDefinition: vi.fn(),
+}));
+
+vi.mock("@/features/organization/client", () => ({
+  createOrganizationInvitation: vi.fn(),
+  updateOrganizationSettings: vi.fn(),
 }));
 
 vi.mock("@/lib/sentry", () => ({
@@ -72,14 +79,16 @@ function makeOrganization(): Organization {
 describe("OrganizationSetupWizard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(createOrganization).mockResolvedValue(makeOrganization());
+    vi.mocked(createGridmasterOrganizationSetup).mockResolvedValue({
+      org: makeOrganization(),
+      superAdmin: { kind: "assigned", displayName: "Jane Doe" },
+    });
     vi.mocked(insertEmployee).mockResolvedValue({
       id: "emp-1",
       firstName: "Jane",
       lastName: "Doe",
       email: "jane@example.com",
     } as Awaited<ReturnType<typeof insertEmployee>>);
-    vi.mocked(assignOrgRoleByEmail).mockResolvedValue(undefined);
     vi.stubGlobal("fetch", vi.fn(async () => ({
       json: async () => ({ valid: false }),
     })));

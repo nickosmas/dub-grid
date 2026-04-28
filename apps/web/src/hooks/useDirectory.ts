@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchOrgDirectory } from "@/lib/db";
+import { fetchOrganizationDirectory } from "@/features/organization/client";
 import { queryKeys } from "@/lib/query-keys";
 import type { DirectoryPerson } from "@/types";
 
@@ -12,7 +12,7 @@ export interface DirectoryData {
 export function useDirectory(orgId: string | null): DirectoryData {
   const query = useQuery({
     queryKey: queryKeys.org.directory(orgId!),
-    queryFn: () => fetchOrgDirectory(orgId!),
+    queryFn: async () => (await fetchOrganizationDirectory(orgId!)).directory,
     enabled: !!orgId,
     staleTime: 2 * 60_000,
   });

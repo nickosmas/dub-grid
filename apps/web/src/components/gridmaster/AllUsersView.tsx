@@ -2,14 +2,18 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
-import { fetchAllUsers, deactivateUser, reactivateUser } from "@/lib/db";
-import { supabase } from "@/lib/supabase";
 import type { PlatformUser, Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
 import { MaybeHint } from "@/components/ui/hint";
+import {
+  fetchGridmasterUserMemberships,
+  fetchGridmasterUsers,
+  forceLogoutGridmasterUser,
+  updateGridmasterUserActivation,
+} from "@/features/gridmaster/client";
 
 function RoleBadge({ role }: { role: string }) {
   const c = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
@@ -112,8 +116,8 @@ export default function AllUsersView({
 
   function reload() {
     setLoading(true);
-    fetchAllUsers()
-      .then((data) => setUsers(data))
+    fetchGridmasterUsers()
+      .then((data) => setUsers(data.users))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
@@ -138,11 +142,17 @@ export default function AllUsersView({
     setActionLoading(user.id);
     try {
       const isDeactivated = !!user.deactivatedAt;
+      if (!user.orgId) {
+        throw new Error("Missing organization for this user.");
+      }
+      await updateGridmasterUserActivation({
+        userId: user.id,
+        orgId: user.orgId,
+        deactivate: !isDeactivated,
+      });
       if (isDeactivated) {
-        await reactivateUser(user.id, user.orgId);
         toast.success("User reactivated");
       } else {
-        await deactivateUser(user.id, user.orgId);
         toast.success("User deactivated");
       }
       setDeactivateConfirm(null);
@@ -157,8 +167,7 @@ export default function AllUsersView({
   async function handleForceLogout(user: PlatformUser) {
     setActionLoading(user.id);
     try {
-      const { error: rpcError } = await supabase.rpc("force_logout_user", { p_target_user_id: user.id });
-      if (rpcError) throw rpcError;
+      await forceLogoutGridmasterUser(user.id);
       toast.success("User sessions terminated");
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
@@ -194,18 +203,13 @@ export default function AllUsersView({
     setSelectedUser(user);
     setMembershipsLoading(true);
     try {
-      const { data, error: queryError } = await supabase
-        .from("organization_memberships")
-        .select("org_id, org_role, joined_at, organizations(name)")
-        .eq("user_id", user.id)
-        .is("archived_at", null);
-      if (queryError) throw queryError;
+      const { memberships: data } = await fetchGridmasterUserMemberships(user.id);
       setMemberships(
-        (data ?? []).map((row: Record<string, unknown>) => ({
-          org_id: row.org_id as string,
-          org_role: row.org_role as string,
-          joined_at: row.joined_at as string,
-          org_name: ((row.organizations as Record<string, unknown> | null)?.name as string) ?? "Unknown",
+        (data ?? []).map((row) => ({
+          org_id: row.orgId,
+          org_role: row.orgRole,
+          joined_at: row.joinedAt,
+          org_name: row.orgName,
         })),
       );
     } catch {

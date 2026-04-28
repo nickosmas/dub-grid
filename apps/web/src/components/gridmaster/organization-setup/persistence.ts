@@ -1,18 +1,21 @@
 import {
-  assignOrgRoleByEmail,
-  createOrganization,
   insertEmployee,
+} from "@/features/employees/client";
+import {
+  createGridmasterOrganizationSetup,
+} from "@/features/gridmaster/client";
+import {
+  createOrganizationInvitation,
+  updateOrganizationSettings,
+} from "@/features/organization/client";
+import {
   saveCertifications,
   saveDepartments,
   saveOrganizationRoles,
-  sendInvitation,
-  updateOrganization,
   upsertFocusArea,
   upsertJobDefinition,
   upsertShiftCategory,
-} from "@/lib/db";
-import { withComposedOrganizationAddress } from "@/lib/organization-profile";
-import * as Sentry from "@/lib/sentry";
+} from "@/features/settings/client";
 import type {
   AssignableOrganizationRole,
   Organization,
@@ -76,120 +79,7 @@ export async function createOrganizationSetup(
   org: Organization;
   superAdmin: SuperAdminSetupResult;
 }> {
-  const org = await createOrganization({
-    name: input.name.trim(),
-    slug: input.slug.trim() || null,
-    ...withComposedOrganizationAddress({
-      addressLine1: input.addressLine1.trim(),
-      addressLine2: input.addressLine2.trim(),
-      addressCity: input.addressCity.trim(),
-      addressState: input.addressState.trim(),
-      addressPostalCode: input.addressPostalCode.trim(),
-      addressCountry: input.addressCountry.trim(),
-    }),
-    phone: input.phone.trim(),
-    employeeCount: null,
-    focusAreaLabel: input.focusAreaLabel.trim() || "Focus Areas",
-    certificationLabel: input.certificationLabel.trim() || "Certifications",
-    roleLabel: input.roleLabel.trim() || "Roles",
-    departmentLabel: "Scheduled Departments",
-    shiftDisplayMode: input.shiftDisplayMode,
-    timezone: input.timezone || null,
-    payPeriodStartDate: null,
-    enforceConflictPrevention: false,
-    dataRetentionDays: 365,
-    featureOverrides: {},
-  });
-
-  if (
-    !input.superAdminEmail.trim() ||
-    !input.superAdminFirstName.trim() ||
-    !input.superAdminLastName.trim()
-  ) {
-    return {
-      org,
-      superAdmin: { kind: "none" },
-    };
-  }
-
-  const email = input.superAdminEmail.trim();
-  const firstName = input.superAdminFirstName.trim();
-  const lastName = input.superAdminLastName.trim();
-  const phone = input.superAdminPhone.trim();
-  const displayName = `${firstName} ${lastName}`;
-
-  let employeeId: string | undefined;
-
-  try {
-    const employee = await insertEmployee(
-      {
-        firstName,
-        lastName,
-        email,
-        phone,
-        seniority: 0,
-        certificationId: null,
-        roleIds: [],
-        focusAreaIds: [],
-        contactNotes: "",
-        status: "active",
-        statusChangedAt: null,
-        statusNote: "",
-        userId: null,
-        departmentIds: [],
-        deptAdminIds: [],
-        version: 0,
-      },
-      org.id,
-    );
-    employeeId = employee.id;
-  } catch (err: unknown) {
-    Sentry.captureException(err);
-  }
-
-  try {
-    await assignOrgRoleByEmail(org.id, email, "super_admin");
-    return {
-      org,
-      superAdmin: {
-        kind: "assigned",
-        displayName,
-      },
-    };
-  } catch {
-    // Fall through to invitation flow.
-  }
-
-  try {
-    const invitation = await sendInvitation(
-      email,
-      "super_admin",
-      org.id,
-      employeeId,
-    );
-    return {
-      org,
-      superAdmin: {
-        kind: "pending-invite",
-        displayName,
-        pendingInvite: {
-          token: invitation.token,
-          email,
-          name: displayName,
-        },
-      },
-    };
-  } catch (err: unknown) {
-    return {
-      org,
-      superAdmin: {
-        kind: "invite-error",
-        displayName,
-        message:
-          err instanceof Error ? err.message : "Unknown invitation error",
-      },
-    };
-  }
+  return createGridmasterOrganizationSetup(input);
 }
 
 type SaveOrganizationConfigInput = {
@@ -216,7 +106,11 @@ export async function saveOrganizationSetupConfig({
   let savedCount = 0;
 
   if (shiftDisplayMode !== "code") {
-    await updateOrganization({ ...createdOrg, shiftDisplayMode });
+    await updateOrganizationSettings({
+      orgId: createdOrg.id,
+      expectedUpdatedAt: createdOrg.updatedAt ?? new Date(0).toISOString(),
+      shiftDisplayMode,
+    });
   }
 
   const validDepartments = departments.filter((department) =>
@@ -393,12 +287,12 @@ export async function sendOrganizationInvitations(
 
   for (const invitationRow of invitationRows) {
     try {
-      const result = await sendInvitation(
-        invitationRow.email,
-        invitationRow.role as AssignableOrganizationRole,
-        createdOrg.id,
-        invitationRow.employeeId,
-      );
+      const result = await createOrganizationInvitation({
+        email: invitationRow.email,
+        role: invitationRow.role as AssignableOrganizationRole,
+        orgId: createdOrg.id,
+        employeeId: invitationRow.employeeId,
+      });
       try {
         await sendInvitationEmail({
           token: result.token,

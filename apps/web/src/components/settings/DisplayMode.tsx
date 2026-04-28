@@ -10,10 +10,9 @@ import {
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
-} from "@/lib/db";
+} from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
-import { ExplainerSection } from "@/components/ui/explainer-section";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { resolveJobColorsForShift } from "@/lib/job-placement";
@@ -401,45 +400,9 @@ export default function DisplayMode({
   }, [organization.shiftDisplayMode]);
 
   const modes = DISPLAY_MODES;
-  const displayPoints = selected === "name"
-    ? [
-        {
-          title: "Grid cells show full shift names",
-          description: "This mode favors readability for teams that do not rely on internal shift abbreviations.",
-        },
-        {
-          title: "Short codes fade into the background",
-          description: "People creating and reading the schedule primarily work with full shift names across the app.",
-        },
-        {
-          title: "Best for descriptive schedules",
-          description: "Choose this when clarity matters more than fitting the shortest possible label into each schedule cell.",
-        },
-      ]
-    : [
-        {
-          title: "Grid cells stay compact with short codes",
-          description: "This mode keeps the schedule dense and easy to scan when your team already uses standard abbreviations.",
-        },
-        {
-          title: "Full names are still available when editing",
-          description: "People can still see the descriptive shift name while choosing or reviewing shifts.",
-        },
-        {
-          title: "Best for space-constrained views",
-          description: "Choose this when short labels make the week, two-week, and print views easier to fit and compare.",
-        },
-      ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <ExplainerSection
-        title="Display mode guide"
-        defaultOpen
-        storageKey="dg-explainer-display-mode"
-        points={displayPoints}
-      />
-
+    <div>
       <div
         style={{
           borderRadius: "var(--dg-radius-lg)",

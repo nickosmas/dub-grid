@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchEmployeeCount } from "@/lib/db";
+import { fetchOrganizationEmployeeCount } from "@/features/organization/client";
 import { queryKeys } from "@/lib/query-keys";
 
 export interface EmployeeCountData {
@@ -10,7 +10,7 @@ export interface EmployeeCountData {
 export function useEmployeeCount(orgId: string | null): EmployeeCountData {
   const countQuery = useQuery({
     queryKey: orgId ? queryKeys.org.employeeCount(orgId) : ["org", "employeeCount", "disabled"],
-    queryFn: () => fetchEmployeeCount(orgId!),
+    queryFn: async () => (await fetchOrganizationEmployeeCount(orgId!)).employeeCount,
     enabled: !!orgId,
     staleTime: 60_000,
   });

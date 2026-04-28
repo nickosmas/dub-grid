@@ -5,7 +5,6 @@ import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { createEmployeeFromOrgUser, reconcileEmployeeFromOrgUser } from "@/lib/db";
 import { NameMismatchError } from "@/lib/account-linking";
 import { validateEmail, validateRequired } from "@/components/FormField";
 import { toast } from "sonner";
@@ -13,6 +12,10 @@ import type { DirectoryPerson, Employee, FocusArea, NameMismatchDetails, NamedIt
 import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import {
+  createEmployeeFromOrgUser,
+  reconcileEmployeeFromOrgUser,
+} from "@/features/employees/client";
 
 interface AddManagementUserToScheduleModalProps {
   orgId: string;

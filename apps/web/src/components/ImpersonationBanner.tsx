@@ -8,7 +8,7 @@ import {
   clearImpersonationCookie,
   type ImpersonationData,
 } from "@/lib/impersonation";
-import { endImpersonation } from "@/lib/db";
+import { endGridmasterImpersonation } from "@/features/gridmaster/client";
 import { clearPermsCache } from "@/features/permissions/client";
 import { MaybeHint } from "@/components/ui/hint";
 
@@ -66,7 +66,11 @@ export default function ImpersonationBanner() {
     if (!imp || ending) return;
     setEnding(true);
     try {
-      await endImpersonation(imp.sessionId, "manual");
+      await endGridmasterImpersonation({
+        sessionId: imp.sessionId,
+        reason: "manual",
+        targetOrgId: imp.targetOrgId,
+      });
       // Best-effort email notification
       fetch("/api/notify-impersonation", {
         method: "POST",
