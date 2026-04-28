@@ -10,6 +10,10 @@ vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
 );
 
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
 vi.mock("../../../shared/components/Screen", async () =>
   createScreenModule(await import("react")),
 );
@@ -25,6 +29,8 @@ const usePushRegistration = vi.fn();
 const registerPushToken = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const handleExpiredMobileSession = vi.fn();
+const pushToast = vi.fn();
+const useNetworkStatus = vi.fn();
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
@@ -62,6 +68,16 @@ vi.mock("../../../shared/lib/query-client", () => ({
   },
 }));
 
+vi.mock("../../../shared/providers/ToastProvider", () => ({
+  useToast: () => ({
+    pushToast,
+  }),
+}));
+
+vi.mock("../../../shared/providers/NetworkStateProvider", () => ({
+  useNetworkStatus,
+}));
+
 let ProfileScreen: (typeof import("./ProfileScreen"))["default"];
 
 beforeAll(async () => {
@@ -77,8 +93,18 @@ describe("ProfileScreen", () => {
     registerPushToken.mockReset();
     loadStoredPushDevice.mockReset();
     handleExpiredMobileSession.mockReset();
+    pushToast.mockReset();
+    useNetworkStatus.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: true,
+      isOffline: false,
+    });
+    getSupabaseClient.mockReturnValue({
+      auth: {},
+    } as never);
     usePushRegistration.mockReturnValue({
       permissionState: "granted",
       isRegistering: false,
@@ -212,9 +238,101 @@ describe("ProfileScreen", () => {
     fireEvent.click(screen.getByText("Sign Out"));
 
     expect(
-      await screen.findByText("Remote sign-out failed"),
+      await screen.findByText(
+        "We couldn't sign you out right now. Try again in a moment.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+  });
+
+  it("shows push registration errors while online", async () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        user: {
+          firstName: "Mina",
+          lastName: "Diaz",
+          email: "mina@dubgrid.com",
+        },
+        currentOrg: {
+          name: "DubGrid Health",
+          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+          slug: "dubgrid-health",
+        },
+        effectiveRole: "admin",
+        memberships: [],
+        unreadNotificationCount: 0,
+        absenceTypes: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    usePushRegistration.mockReturnValue({
+      permissionState: "granted",
+      isRegistering: false,
+      error: new Error("Push registration failed"),
+      isSupported: true,
+      enablePush: vi.fn(),
+      disablePush: vi.fn(),
+      refreshPushRegistration: vi.fn(),
+    });
+
+    render(<ProfileScreen />);
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalledWith({
+        tone: "error",
+        title: "Could not update notifications",
+        message: "We couldn't update mobile notifications right now.",
+      });
+    });
+  });
+
+  it("suppresses push registration toasts while offline", async () => {
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: false,
+      isOffline: true,
+    });
+    useBootstrap.mockReturnValue({
+      data: {
+        user: {
+          firstName: "Mina",
+          lastName: "Diaz",
+          email: "mina@dubgrid.com",
+        },
+        currentOrg: {
+          name: "DubGrid Health",
+          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+          slug: "dubgrid-health",
+        },
+        effectiveRole: "admin",
+        memberships: [],
+        unreadNotificationCount: 0,
+        absenceTypes: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    usePushRegistration.mockReturnValue({
+      permissionState: "granted",
+      isRegistering: false,
+      error: new Error("Push registration failed"),
+      isSupported: true,
+      enablePush: vi.fn(),
+      disablePush: vi.fn(),
+      refreshPushRegistration: vi.fn(),
+    });
+
+    render(<ProfileScreen />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    });
+    expect(pushToast).not.toHaveBeenCalled();
   });
 
   it("resets the mobile session after a successful sign-out", async () => {

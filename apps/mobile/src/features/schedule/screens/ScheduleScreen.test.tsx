@@ -11,6 +11,7 @@ import {
 import {
   createQueryStateCardModule,
   createReactNativeModule,
+  createSafeAreaContextModule,
   createScreenModule,
 } from "../../../test/native";
 
@@ -20,9 +21,14 @@ const useQueryClient = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const routerPush = vi.fn();
+const pushToast = vi.fn();
 
 vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
+);
+
+vi.mock("react-native-safe-area-context", async () =>
+  createSafeAreaContextModule(await import("react")),
 );
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
@@ -30,6 +36,9 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  onlineManager: {
+    isOnline: () => true,
+  },
   useMutation,
   useQuery,
   useQueryClient,
@@ -57,15 +66,21 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
-let MeScheduleScreen: (typeof import("./ScheduleScreen"))["MeScheduleScreen"];
-let TeamScheduleScreen: (typeof import("./ScheduleScreen"))["TeamScheduleScreen"];
+vi.mock("../../../shared/providers/ToastProvider", () => ({
+  useToast: () => ({
+    pushToast,
+  }),
+}));
+
+let MeScheduleScreen: any;
+let TeamScheduleScreen: any;
 
 type QueryResult = {
   data: unknown;
   error: Error | null;
   isFetching: boolean;
   isLoading: boolean;
-  refetch: ReturnType<typeof vi.fn>;
+  refetch: any;
 };
 
 function createQueryResult(data: unknown): QueryResult {
@@ -212,12 +227,12 @@ beforeAll(async () => {
 });
 
 describe("ScheduleScreen", () => {
-  let mutationSpy: ReturnType<typeof vi.fn>;
-  let invalidateQueriesSpy: ReturnType<typeof vi.fn>;
-  let meScheduleEntries: ReturnType<typeof createScheduleEntry>[];
-  let teamScheduleEntries: ReturnType<typeof createScheduleEntry>[];
-  let shiftRequests: ReturnType<typeof createShiftRequest>[];
-  let openShifts: ReturnType<typeof createOpenShift>[];
+  let mutationSpy: any;
+  let invalidateQueriesSpy: any;
+  let meScheduleEntries: any[];
+  let teamScheduleEntries: any[];
+  let shiftRequests: any[];
+  let openShifts: any[];
 
   beforeEach(() => {
     vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
@@ -380,6 +395,7 @@ describe("ScheduleScreen", () => {
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     routerPush.mockReset();
+    pushToast.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
@@ -495,8 +511,15 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByText("17").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Evening Shift").length).toBeGreaterThan(0);
     expect(screen.getByText("Telemetry")).toBeInTheDocument();
-    expect(screen.getByText("Paid Time Off")).toBeInTheDocument();
-    expect(screen.getByText("Absence")).toBeInTheDocument();
+    expect(screen.getAllByText("Paid Time Off")).toHaveLength(1);
+    expect(screen.getAllByText("Absence").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Absence Paid Time Off").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Absence Paid Time Off")[0]).toHaveTextContent(
+      "Paid Time Off",
+    );
+    expect(screen.getAllByLabelText("Absence Paid Time Off")[0]).not.toHaveTextContent(
+      "Absence",
+    );
     expect(screen.queryByText("This Week's Hours")).not.toBeInTheDocument();
   });
 
@@ -511,7 +534,7 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("On Duty")).not.toBeInTheDocument();
   });
 
-  it("does not repeat a general shift name as a job pill on the top card", () => {
+  it("shows general shifts in the job pill section with a General shift label", () => {
     meScheduleEntries = [
       createScheduleEntry({
         shiftIds: [null],
@@ -544,8 +567,15 @@ describe("ScheduleScreen", () => {
 
     render(<MeScheduleScreen />);
 
-    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText("Job Admin")).toHaveLength(1);
+    expect(screen.getAllByText("Admin")).toHaveLength(2);
+    expect(screen.getAllByText("General shift").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("General shift Admin").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("General shift Admin")[0]).toHaveTextContent(
+      "Admin",
+    );
+    expect(screen.getAllByLabelText("General shift Admin")[0]).not.toHaveTextContent(
+      "General shift",
+    );
   });
 
   it("shows the first shift in the week on the top card after next-week navigation", () => {
@@ -753,6 +783,295 @@ describe("ScheduleScreen", () => {
     });
   });
 
+  it("shows Me open-shift opportunities in a date-grouped carousel", () => {
+    openShifts = [
+      createOpenShift({
+        id: "open-sunday",
+        date: "2026-04-19",
+        needed: 3,
+        presentation: {
+          label: "Sunday Open",
+          focusAreaId: 2,
+          focusAreaName: "Skilled Nursing",
+          displayFocusAreaName: "Skilled Nursing",
+          startTime: "15:00:00",
+          endTime: "23:00:00",
+          segments: [
+            {
+              shiftId: 1,
+              jobId: 20,
+              shiftName: "Sunday Open",
+              jobName: "Nurse",
+              startTime: "15:00:00",
+              endTime: "23:00:00",
+              displayFocusAreaName: "Skilled Nursing",
+            },
+          ],
+        },
+      }),
+    ];
+    shiftRequests = [
+      createShiftRequest({
+        id: "request-saturday-early",
+        requesterName: "Mina Diaz",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 3,
+            jobId: 21,
+            shiftName: "Saturday Pickup Early",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+      createShiftRequest({
+        id: "request-saturday-late",
+        requesterName: "Ivy Stone",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 4,
+            jobId: 22,
+            shiftName: "Saturday Pickup Late",
+            jobName: "Nurse",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+    ];
+
+    render(<MeScheduleScreen />);
+
+    expect(screen.getByLabelText("Open shifts carousel")).toBeInTheDocument();
+    expect(screen.getByLabelText("2 open shift cards")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 open shift card")).toBeInTheDocument();
+    expect(screen.getByText("Sat, Apr 18")).toBeInTheDocument();
+    expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
+    expect(screen.getByText("3 teammates needed")).toBeInTheDocument();
+
+    const content = document.body.textContent ?? "";
+    expect(content.indexOf("Sat, Apr 18")).toBeLessThan(
+      content.indexOf("Saturday Pickup Early"),
+    );
+    expect(content.indexOf("Saturday Pickup Late")).toBeLessThan(
+      content.indexOf("Sun, Apr 19"),
+    );
+  });
+
+  it("expands a stacked Me open-shift day to show the full list", () => {
+    openShifts = [];
+    shiftRequests = [
+      createShiftRequest({
+        id: "request-saturday-1",
+        requesterName: "Mina Diaz",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 3,
+            jobId: 21,
+            shiftName: "Saturday Pickup Early",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+      createShiftRequest({
+        id: "request-saturday-2",
+        requesterName: "Ivy Stone",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 4,
+            jobId: 22,
+            shiftName: "Saturday Pickup Mid",
+            jobName: "Nurse",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+      createShiftRequest({
+        id: "request-saturday-3",
+        requesterName: "Noah Wynn",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 5,
+            jobId: 23,
+            shiftName: "Saturday Pickup Late",
+            jobName: "Nurse",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+      createShiftRequest({
+        id: "request-saturday-4",
+        requesterName: "Tara Cole",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 6,
+            jobId: 24,
+            shiftName: "Saturday Pickup Overnight",
+            jobName: "Nurse",
+            startTime: "19:00:00",
+            endTime: "03:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+      createShiftRequest({
+        id: "request-saturday-5",
+        requesterName: "Elle Ray",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 7,
+            jobId: 25,
+            shiftName: "Saturday Pickup Extra",
+            jobName: "Nurse",
+            startTime: "23:00:00",
+            endTime: "07:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+    ];
+
+    render(<MeScheduleScreen />);
+
+    expect(screen.getByLabelText("5 open shift cards")).toBeInTheDocument();
+    expect(screen.queryByText("Saturday Pickup Extra")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("Expand open shifts for Sat, Apr 18"));
+
+    expect(screen.getByText("Saturday Pickup Extra")).toBeInTheDocument();
+    expect(screen.getByLabelText("Collapse open shifts for Sat, Apr 18")).toBeInTheDocument();
+  });
+
+  it("does not repeat absence and general-shift names in expanded bottom stacks", () => {
+    meScheduleEntries = [createScheduleEntry()];
+    teamScheduleEntries = [];
+    openShifts = [];
+    shiftRequests = [
+      createShiftRequest({
+        id: "request-absence",
+        requesterName: "Mina Diaz",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [],
+        requesterState: {
+          kind: "absence",
+          segments: [],
+          absenceTypeId: 1,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        requesterPresentation: {
+          label: "Paid Time Off",
+          shiftName: "Paid Time Off",
+          focusAreaId: null,
+          focusAreaName: null,
+          displayFocusAreaName: null,
+          startTime: null,
+          endTime: null,
+          segments: [],
+        },
+        absenceTypeId: 1,
+      }),
+      createShiftRequest({
+        id: "request-absence-normal",
+        requesterName: "Ivy Stone",
+        requesterShiftDate: "2026-04-18",
+        requesterSegments: [
+          {
+            shiftId: 4,
+            jobId: 22,
+            shiftName: "Saturday Pickup Mid",
+            jobName: "Nurse",
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+      createShiftRequest({
+        id: "request-general",
+        requesterName: "Noah Wynn",
+        requesterShiftDate: "2026-04-19",
+        requesterSegments: [],
+        requesterState: {
+          kind: "worked",
+          segments: [{ shiftId: null, jobId: 30, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        requesterPresentation: {
+          label: "Admin",
+          shiftName: "Admin",
+          focusAreaId: null,
+          focusAreaName: null,
+          displayFocusAreaName: null,
+          startTime: "09:00:00",
+          endTime: "17:00:00",
+          segments: [
+            {
+              shiftId: null,
+              jobId: 30,
+              shiftName: "Admin",
+              jobName: "Admin",
+              startTime: "09:00:00",
+              endTime: "17:00:00",
+              displayFocusAreaName: null,
+            },
+          ],
+        },
+      }),
+      createShiftRequest({
+        id: "request-general-normal",
+        requesterName: "Tara Cole",
+        requesterShiftDate: "2026-04-19",
+        requesterSegments: [
+          {
+            shiftId: 5,
+            jobId: 23,
+            shiftName: "Sunday Pickup Late",
+            jobName: "Nurse",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "Skilled Nursing",
+          },
+        ],
+      }),
+    ];
+
+    render(<MeScheduleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Expand open shifts for Sat, Apr 18"));
+    fireEvent.click(screen.getByLabelText("Expand open shifts for Sun, Apr 19"));
+
+    expect(screen.getAllByText("Paid Time Off")).toHaveLength(1);
+    expect(screen.getAllByText("Admin")).toHaveLength(1);
+    expect(screen.getAllByText("Absence").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("General shift").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Collapse open shifts for Sat, Apr 18")).toBeInTheDocument();
+    expect(screen.getByLabelText("Collapse open shifts for Sun, Apr 19")).toBeInTheDocument();
+  });
+
   it("volunteers for a coverage-gap open shift from Me", () => {
     shiftRequests = [];
     render(<MeScheduleScreen />);
@@ -841,8 +1160,24 @@ describe("ScheduleScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filter focus areas" }));
     fireEvent.click(screen.getByRole("button", { name: "Emergency" }));
 
+    expect(
+      screen.queryByLabelText("Focus area filter popup"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
+  });
+
+  it("dismisses schedule popups when tapping outside of them", () => {
+    render(<TeamScheduleScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open month calendar" }));
+    expect(screen.getByLabelText("Month calendar popup")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss schedule popup" }));
+
+    expect(
+      screen.queryByLabelText("Month calendar popup"),
+    ).not.toBeInTheDocument();
   });
 });

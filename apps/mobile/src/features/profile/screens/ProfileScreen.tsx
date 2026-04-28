@@ -1,15 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen } from "../../../shared/components/Screen";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { registerPushToken } from "../../../shared/lib/api";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
+import {
+  getErrorMessage,
+  getInlineErrorMessageOrToast,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
 import {
   getMobileQueryContentState,
   getQueryErrorMessage,
 } from "../../../shared/lib/query-state";
+import { useNetworkStatus } from "../../../shared/providers/NetworkStateProvider";
+import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   loadStoredPushDevice,
   saveLastWorkspaceSlug,
@@ -127,6 +137,7 @@ function normalizeNotificationPrefs(
 export default function ProfileScreen() {
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
+  const { pushToast } = useToast();
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
@@ -157,10 +168,18 @@ export default function ProfileScreen() {
   const [savedNotificationPrefs, setSavedNotificationPrefs] =
     useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [notificationPrefsLoaded, setNotificationPrefsLoaded] = useState(false);
+  const pushRegistrationErrorRef = useRef<string | null>(null);
+  const { isOffline } = useNetworkStatus();
   const pushRegistration = usePushRegistration(
     accessToken,
     bootstrapQuery.data?.currentOrg.id,
     { autoRegister: false },
+  );
+  const manualRefresh = useManualRefresh(() =>
+    Promise.all([
+      bootstrapQuery.refetch(),
+      pushRegistration.refreshPushRegistration(),
+    ]),
   );
   const summary = bootstrapQuery.data
     ? {
@@ -182,6 +201,7 @@ export default function ProfileScreen() {
     isLoading: bootstrapQuery.isLoading,
     error: bootstrapQuery.error,
   });
+  const pushRegistrationErrorMessage = getErrorMessage(pushRegistration.error);
   const hasNotificationPrefChanges = useMemo(
     () =>
       JSON.stringify(notificationPrefs) !== JSON.stringify(savedNotificationPrefs),
@@ -197,6 +217,28 @@ export default function ProfileScreen() {
     setEditLastName(summary.lastName);
     setEditEmail(summary.email);
   }, [summary]);
+
+  useEffect(() => {
+    if (!pushRegistration.error || !pushRegistrationErrorMessage) {
+      pushRegistrationErrorRef.current = null;
+      return;
+    }
+
+    if (pushRegistrationErrorRef.current === pushRegistrationErrorMessage) {
+      return;
+    }
+
+    pushRegistrationErrorRef.current = pushRegistrationErrorMessage;
+    if (isOffline) {
+      return;
+    }
+
+    pushClientFriendlyErrorToast(pushToast, {
+      error: pushRegistration.error,
+      title: "Could not update notifications",
+      fallbackMessage: "We couldn't update mobile notifications right now.",
+    });
+  }, [isOffline, pushRegistration.error, pushRegistrationErrorMessage, pushToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,7 +268,13 @@ export default function ProfileScreen() {
       }
 
       if (result.error) {
-        setNotificationPrefsError(result.error.message);
+        setNotificationPrefsError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error: result.error,
+            fallbackMessage:
+              "We couldn't load your notification preferences right now.",
+          }),
+        );
         setNotificationPrefsLoaded(true);
         return;
       }
@@ -264,15 +312,23 @@ export default function ProfileScreen() {
       });
 
       if (switchResult.error) {
-        setWorkspaceError(switchResult.error.message);
+        setWorkspaceError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error: switchResult.error,
+            fallbackMessage: "We couldn't switch workspaces right now.",
+          }),
+        );
         return;
       }
 
       const refreshResult = await supabase.auth.refreshSession();
       if (refreshResult.error || !refreshResult.data.session) {
         setWorkspaceError(
-          refreshResult.error?.message ??
-            "We couldn't refresh your session after switching workspaces.",
+          getInlineErrorMessageOrToast(pushToast, {
+            error: refreshResult.error,
+            fallbackMessage:
+              "We couldn't refresh your session after switching workspaces.",
+          }),
         );
         return;
       }
@@ -281,9 +337,10 @@ export default function ProfileScreen() {
       await queryClient.invalidateQueries({ queryKey: ["mobile"] });
     } catch (error) {
       setWorkspaceError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't switch workspaces right now.",
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't switch workspaces right now.",
+        }),
       );
     } finally {
       setSwitchingWorkspaceId(null);
@@ -311,13 +368,23 @@ export default function ProfileScreen() {
         scope: "local",
       });
       if (error) {
-        setLogoutError(error.message);
+        setLogoutError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error,
+            fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
+          }),
+        );
         return;
       }
 
       await handleExpiredMobileSession({ skipSignOut: true });
-    } catch {
-      setLogoutError("We couldn't sign you out right now. Try again in a moment.");
+    } catch (error) {
+      setLogoutError(
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
+        }),
+      );
     } finally {
       setIsSigningOut(false);
     }
@@ -347,7 +414,12 @@ export default function ProfileScreen() {
         .eq("id", summary.userId);
 
       if (profileResult.error) {
-        setAccountError(profileResult.error.message);
+        setAccountError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error: profileResult.error,
+            fallbackMessage: "We couldn't save your account details right now.",
+          }),
+        );
         return;
       }
 
@@ -366,7 +438,12 @@ export default function ProfileScreen() {
         });
 
         if (authUpdate.error) {
-          setAccountError(authUpdate.error.message);
+          setAccountError(
+            getInlineErrorMessageOrToast(pushToast, {
+              error: authUpdate.error,
+              fallbackMessage: "We couldn't save your account details right now.",
+            }),
+          );
           return;
         }
       }
@@ -376,9 +453,10 @@ export default function ProfileScreen() {
       await bootstrapQuery.refetch();
     } catch (error) {
       setAccountError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't save your account details right now.",
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't save your account details right now.",
+        }),
       );
     } finally {
       setIsSavingAccount(false);
@@ -406,7 +484,12 @@ export default function ProfileScreen() {
         password: newPassword,
       });
       if (result.error) {
-        setPasswordError(result.error.message);
+        setPasswordError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error: result.error,
+            fallbackMessage: "We couldn't update your password right now.",
+          }),
+        );
         return;
       }
 
@@ -414,9 +497,10 @@ export default function ProfileScreen() {
       setConfirmPassword("");
     } catch (error) {
       setPasswordError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't update your password right now.",
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't update your password right now.",
+        }),
       );
     } finally {
       setIsSavingPassword(false);
@@ -466,16 +550,22 @@ export default function ProfileScreen() {
         );
 
       if (result.error) {
-        setNotificationPrefsError(result.error.message);
+        setNotificationPrefsError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error: result.error,
+            fallbackMessage: "We couldn't save your notification preferences.",
+          }),
+        );
         return;
       }
 
       setSavedNotificationPrefs(notificationPrefs);
     } catch (error) {
       setNotificationPrefsError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't save your notification preferences.",
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't save your notification preferences.",
+        }),
       );
     } finally {
       setIsSavingNotificationPrefs(false);
@@ -493,7 +583,12 @@ export default function ProfileScreen() {
     try {
       const result = await getSupabaseClient().auth.signOut({ scope });
       if (result.error) {
-        setLogoutError(result.error.message);
+        setLogoutError(
+          getInlineErrorMessageOrToast(pushToast, {
+            error: result.error,
+            fallbackMessage: "We couldn't update your sessions right now.",
+          }),
+        );
         return;
       }
 
@@ -502,9 +597,10 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       setLogoutError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't update your sessions right now.",
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "We couldn't update your sessions right now.",
+        }),
       );
     } finally {
       setSessionScopeLoading(null);
@@ -513,39 +609,34 @@ export default function ProfileScreen() {
 
   return (
     <Screen
+      bottomPaddingMode="tabbed"
       title="Profile"
       subtitle="Profile"
-      refreshing={
-        bootstrapQuery.isFetching ||
-        pushRegistration.isRegistering ||
-        isSavingNotificationPrefs
-      }
-      onRefresh={() => {
-        void Promise.all([
-          bootstrapQuery.refetch(),
-          pushRegistration.refreshPushRegistration(),
-        ]);
-      }}
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
     >
       {contentState.kind === "loading" ? (
-        <QueryStateCard
-          title="Loading profile"
-          body="Restoring your account summary and organization context."
-        />
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading profile</Text>
+          <Text style={styles.loadingBody}>
+            Restoring your account summary and organization context.
+          </Text>
+          <DetailSkeleton sections={3} />
+        </View>
       ) : contentState.kind === "error" ? (
         <>
-          <QueryStateCard
-            title="Could not load profile"
-            body={contentState.message}
+          <StatusBanner
             actionLabel="Try Again"
+            body={contentState.message}
+            title="Could not load profile"
             onAction={() => {
               void bootstrapQuery.refetch();
             }}
           />
           {logoutError ? (
-            <QueryStateCard
-              title="Could not sign out"
+            <StatusBanner
               body={getQueryErrorMessage(logoutError, logoutError)}
+              title="Could not sign out"
             />
           ) : null}
           {accessToken ? (
@@ -560,9 +651,10 @@ export default function ProfileScreen() {
           ) : null}
         </>
       ) : contentState.kind === "empty" ? (
-        <Card
-          title="Profile unavailable"
+        <EmptyStateCard
           body="We couldn't build your account summary from the current mobile session."
+          iconName="person-circle-outline"
+          title="Profile unavailable"
         />
       ) : (
         (() => {
@@ -584,9 +676,9 @@ export default function ProfileScreen() {
               />
 
               {accountError ? (
-                <QueryStateCard
-                  title="Could not save account details"
+                <StatusBanner
                   body={accountError}
+                  title="Could not save account details"
                 />
               ) : null}
               <View style={styles.section}>
@@ -668,9 +760,9 @@ export default function ProfileScreen() {
               </View>
 
               {passwordError ? (
-                <QueryStateCard
-                  title="Could not update password"
+                <StatusBanner
                   body={passwordError}
+                  title="Could not update password"
                 />
               ) : null}
               <View style={styles.section}>
@@ -780,9 +872,9 @@ export default function ProfileScreen() {
               />
 
               {notificationPrefsError ? (
-                <QueryStateCard
-                  title="Could not save notification preferences"
+                <StatusBanner
                   body={notificationPrefsError}
+                  title="Could not save notification preferences"
                 />
               ) : null}
               <View style={styles.section}>
@@ -844,15 +936,9 @@ export default function ProfileScreen() {
               </View>
 
               {workspaceError ? (
-                <QueryStateCard
-                  title="Could not switch workspace"
+                <StatusBanner
                   body={workspaceError}
-                />
-              ) : null}
-              {pushRegistration.error ? (
-                <QueryStateCard
-                  title="Could not update notifications"
-                  body={pushRegistration.error}
+                  title="Could not switch workspace"
                 />
               ) : null}
               <View style={styles.section}>
@@ -896,9 +982,9 @@ export default function ProfileScreen() {
                 </View>
               </View>
               {logoutError ? (
-                <QueryStateCard
-                  title="Could not sign out"
+                <StatusBanner
                   body={getQueryErrorMessage(logoutError, logoutError)}
+                  title="Could not sign out"
                 />
               ) : null}
               <Button
@@ -955,6 +1041,19 @@ function ToggleChip({
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  loadingBody: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
   profileMeta: {
     color: mobileColors.brand,
     fontWeight: "700",

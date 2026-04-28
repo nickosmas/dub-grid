@@ -96,6 +96,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
       {
         id: 1,
         label: "Sick",
+        name: "Sick leave",
       },
     ]);
     fetchMobileFocusAreas.mockResolvedValue([
@@ -152,6 +153,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         {
           id: 1,
           label: "Sick",
+          name: "Sick leave",
         },
       ],
       focusAreas: [

@@ -17,8 +17,14 @@ import {
   mobileRadii,
   mobileSpacing,
 } from "../theme/tokens";
+import {
+  DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
+  getScreenBottomPadding,
+  type ScreenBottomPaddingMode,
+} from "./screen-layout";
 
 export type ScreenScrollHandle = ScrollView;
+export type { ScreenBottomPaddingMode } from "./screen-layout";
 
 export function Screen({
   title: _title,
@@ -29,6 +35,7 @@ export function Screen({
   children,
   refreshing = false,
   onRefresh,
+  bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
 }: PropsWithChildren<{
   title?: string;
   subtitle?: string;
@@ -37,10 +44,50 @@ export function Screen({
   scrollViewRef?: RefObject<ScreenScrollHandle | null>;
   refreshing?: boolean;
   onRefresh?: () => void;
+  bottomPaddingMode?: ScreenBottomPaddingMode;
 }>) {
   const insets = useSafeAreaInsets();
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
   const overlay = renderOverlay?.({ stickyHeaderHeight });
+  const useNativeContentInsets = !stickyHeader;
+  const scrollView = (
+    <ScrollView
+      ref={scrollViewRef}
+      automaticallyAdjustContentInsets={useNativeContentInsets}
+      automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
+      contentContainerStyle={{
+        paddingTop: stickyHeader ? stickyHeaderHeight : 0,
+        paddingBottom: getScreenBottomPadding(bottomPaddingMode, insets.bottom),
+      }}
+      contentInsetAdjustmentBehavior={
+        useNativeContentInsets ? "automatic" : "never"
+      }
+      keyboardShouldPersistTaps="handled"
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
+          />
+        ) : undefined
+      }
+      style={styles.scrollView}
+    >
+      <View
+        style={[
+          styles.content,
+          stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
+        ]}
+      >
+        {children}
+      </View>
+    </ScrollView>
+  );
+
+  if (!stickyHeader && !overlay) {
+    return scrollView;
+  }
 
   return (
     <View style={styles.root}>
@@ -61,34 +108,7 @@ export function Screen({
           {stickyHeader}
         </View>
       ) : null}
-      <ScrollView
-        ref={scrollViewRef}
-        contentContainerStyle={{
-          paddingTop: stickyHeader ? stickyHeaderHeight : 0,
-          paddingBottom: Math.max(insets.bottom, 16) + 20,
-        }}
-        contentInsetAdjustmentBehavior={stickyHeader ? "never" : "automatic"}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          onRefresh ? (
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
-            />
-          ) : undefined
-        }
-        style={styles.scrollView}
-      >
-        <View
-          style={[
-            styles.content,
-            stickyHeader ? styles.contentWithStickyHeader : styles.contentDefault,
-          ]}
-        >
-          {children}
-        </View>
-      </ScrollView>
+      {scrollView}
       {overlay ? <View style={styles.overlayLayer}>{overlay}</View> : null}
     </View>
   );
@@ -98,14 +118,23 @@ export function Card({
   title,
   body,
   detail,
+  headerAccessory,
 }: {
   title: string;
   body?: string;
   detail?: ReactNode;
+  headerAccessory?: ReactNode;
 }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardHeaderCopy}>
+          <Text style={styles.cardTitle}>{title}</Text>
+        </View>
+        {headerAccessory ? (
+          <View style={styles.cardHeaderAccessory}>{headerAccessory}</View>
+        ) : null}
+      </View>
       {body ? <Text style={styles.cardBody}>{body}</Text> : null}
       {detail}
     </View>
@@ -165,6 +194,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 20,
     elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  cardHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardHeaderAccessory: {
+    alignSelf: "flex-start",
   },
   cardTitle: {
     fontSize: 18,

@@ -14,19 +14,29 @@ type PushPermissionState =
   | "denied"
   | "granted";
 
+type NotificationPermissionSnapshot = {
+  canAskAgain?: boolean;
+  granted?: boolean;
+};
+
+function toPermissionSnapshot(
+  permissions: Notifications.NotificationPermissionsStatus,
+): NotificationPermissionSnapshot {
+  return permissions as unknown as NotificationPermissionSnapshot;
+}
+
 function resolvePermissionState(
-  status: Notifications.PermissionStatus | "unsupported",
+  permissions: NotificationPermissionSnapshot | "unsupported",
 ): PushPermissionState {
-  switch (status) {
-    case "granted":
-      return "granted";
-    case "denied":
-      return "denied";
-    case "undetermined":
-      return "undetermined";
-    default:
-      return "unsupported";
+  if (permissions === "unsupported") {
+    return "unsupported";
   }
+
+  if (permissions.granted) {
+    return "granted";
+  }
+
+  return permissions.canAskAgain ? "undetermined" : "denied";
 }
 
 async function getStoredOrFreshPushDevice(): Promise<StoredPushDevice> {
@@ -59,7 +69,7 @@ export function usePushRegistration(
       Platform.OS === "web" ? "unsupported" : "undetermined",
     );
   const [isRegistering, setIsRegistering] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
   const attemptedKeyRef = useRef<string | null>(null);
 
   async function refreshPushRegistration(options?: {
@@ -76,14 +86,13 @@ export function usePushRegistration(
 
     try {
       let permissions = await Notifications.getPermissionsAsync();
-      if (
-        permissions.status !== "granted" &&
-        options?.requestPermission
-      ) {
+      let permissionSnapshot = toPermissionSnapshot(permissions);
+      if (!permissionSnapshot.granted && options?.requestPermission) {
         permissions = await Notifications.requestPermissionsAsync();
+        permissionSnapshot = toPermissionSnapshot(permissions);
       }
 
-      const nextPermissionState = resolvePermissionState(permissions.status);
+      const nextPermissionState = resolvePermissionState(permissionSnapshot);
       setPermissionState(nextPermissionState);
 
       if (options?.disable) {
@@ -99,7 +108,7 @@ export function usePushRegistration(
         return;
       }
 
-      if (permissions.status !== "granted") {
+      if (!permissionSnapshot.granted) {
         return;
       }
 
@@ -107,11 +116,7 @@ export function usePushRegistration(
       await registerPushToken(accessToken, device);
       await saveStoredPushDevice(device);
     } catch (registrationError) {
-      setError(
-        registrationError instanceof Error
-          ? registrationError.message
-          : "We couldn't update mobile notifications right now.",
-      );
+      setError(registrationError);
     } finally {
       setIsRegistering(false);
     }

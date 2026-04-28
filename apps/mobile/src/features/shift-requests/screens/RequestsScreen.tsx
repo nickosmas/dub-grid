@@ -1,19 +1,43 @@
 import { useMemo, useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import type { MobileOpenShift, MobileShiftRequest } from "@dubgrid/contracts";
+import type {
+  MobileOpenShift,
+  MobileShiftRequest,
+} from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
-import { Card, Screen } from "../../../shared/components/Screen";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
-import { getShiftRequests, updateShiftRequest } from "../../../shared/lib/api";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { ListSkeleton } from "../../../shared/components/Skeleton";
+import { Screen } from "../../../shared/components/Screen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
+import {
+  getMySchedule,
+  getShiftRequests,
+  updateShiftRequest,
+} from "../../../shared/lib/api";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import {
   getMobileQueryContentState,
-  getQueryErrorMessage,
 } from "../../../shared/lib/query-state";
-import { mobileColors, mobileRadii } from "../../../shared/theme/tokens";
+import { useToast } from "../../../shared/providers/ToastProvider";
+import {
+  mobileBorderColorFromText,
+  mobileColors,
+  mobileRadii,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import {
+  addDaysToIsoDate,
+  buildAvailableOpenShiftFeed,
+  formatScheduleDayLabel,
+  formatScheduleTimeRange,
+  getIsoDateInTimeZone,
+} from "../../schedule/lib/schedule";
 
 const ACTIVE_REQUEST_STATUSES = new Set(["open", "pending_approval"]);
 
@@ -31,16 +55,206 @@ type RequestActionBody =
       state: MobileOpenShift["state"];
     };
 
+type ShiftPillColors = {
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+};
+type JobColorSource = {
+  jobColor?: string | null;
+  jobBorderColor?: string | null;
+  jobTextColor?: string | null;
+};
+type JobChipKind = "job" | "general";
+type JobChip = ShiftPillColors & {
+  kind: JobChipKind;
+  label: string;
+  eyebrowLabel?: string | null;
+};
+
+function readOptionalColor(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return value ?? null;
+  }
+
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0) {
+    return null;
+  }
+
+  return trimmedValue.toLowerCase() === "transparent" ? null : trimmedValue;
+}
+
+function getShiftPillColors(
+  presentation:
+    | MobileShiftRequest["requesterPresentation"]
+    | MobileOpenShift["presentation"]
+    | null
+    | undefined,
+): ShiftPillColors {
+  return {
+    backgroundColor: presentation?.shiftColor ?? mobileColors.brandSoft,
+    borderColor: presentation?.shiftBorderColor ?? mobileColors.brandBorder,
+    textColor: presentation?.shiftTextColor ?? mobileColors.brand,
+  };
+}
+
+function getRequestShiftLabel(request: MobileShiftRequest): string {
+  const primarySegment = request.requesterPresentation?.segments?.[0] ?? null;
+
+  return (
+    primarySegment?.shiftName ??
+    request.requesterPresentation?.shiftName ??
+    request.requesterPresentation?.label ??
+    "Shift"
+  );
+}
+
+function getOpenShiftLabel(openShift: MobileOpenShift): string {
+  const primarySegment = openShift.presentation.segments[0] ?? null;
+
+  return (
+    primarySegment?.shiftName ??
+    openShift.presentation.shiftName ??
+    openShift.presentation.label
+  );
+}
+
+function buildJobChip(
+  label: string | null | undefined,
+  colorSource?: JobColorSource | null,
+): JobChip | null {
+  const trimmedLabel = label?.trim() ?? "";
+  const jobColor = readOptionalColor(colorSource?.jobColor);
+  const jobBorderColor = readOptionalColor(colorSource?.jobBorderColor);
+  const jobTextColor = readOptionalColor(colorSource?.jobTextColor);
+
+  if (!trimmedLabel) {
+    return null;
+  }
+
+  if (jobColor || jobBorderColor || jobTextColor) {
+    return {
+      kind: "job",
+      label: trimmedLabel,
+      backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: jobBorderColor ?? mobileColors.border,
+      textColor: jobTextColor ?? mobileColors.textMuted,
+    };
+  }
+
+  const normalizedLabel = trimmedLabel.toLowerCase();
+  const tone =
+    normalizedLabel.includes("supervisor") ||
+    normalizedLabel.includes("lead") ||
+    normalizedLabel.includes("manager")
+      ? {
+          backgroundColor: "#FCE7F3",
+          borderColor: "#FBCFE8",
+          textColor: "#BE185D",
+        }
+      : normalizedLabel.includes("mentor") ||
+          normalizedLabel.includes("trainer")
+        ? {
+            backgroundColor: "#FFF7ED",
+            borderColor: "#FED7AA",
+            textColor: "#B45309",
+          }
+        : normalizedLabel.includes("nurse") ||
+            normalizedLabel.includes("rn") ||
+            normalizedLabel.includes("lpn")
+          ? {
+              backgroundColor: "#ECFEFF",
+              borderColor: "#A5F3FC",
+              textColor: "#0E7490",
+            }
+          : {
+              backgroundColor: mobileColors.surfaceSecondary,
+              borderColor: mobileColors.border,
+              textColor: mobileColors.textMuted,
+            };
+
+  return {
+    kind: "job",
+    label: trimmedLabel,
+    ...tone,
+  };
+}
+
+function buildGeneralShiftChip(
+  label: string | null | undefined,
+  colorSource?: JobColorSource | null,
+): JobChip | null {
+  const chip = buildJobChip(label, colorSource);
+
+  if (!chip) {
+    return null;
+  }
+
+  return {
+    ...chip,
+    kind: "general",
+    eyebrowLabel: "General shift",
+  };
+}
+
+function isGeneralShiftSegment(
+  segment: { shiftId?: number | null } | null | undefined,
+): boolean {
+  return (
+    segment != null &&
+    Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
+    segment.shiftId === null
+  );
+}
+
+function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+  const primarySegment = openShift.presentation.segments[0] ?? null;
+
+  if (isGeneralShiftSegment(primarySegment)) {
+    return buildGeneralShiftChip(getOpenShiftLabel(openShift), primarySegment);
+  }
+
+  const segment =
+    openShift.presentation.segments.find((item) => item.jobName) ?? null;
+
+  return buildJobChip(segment?.jobName ?? null, segment);
+}
+
+function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
+  return (
+    openShift.presentation.segments.find(
+      (segment) => segment.displayFocusAreaName,
+    )?.displayFocusAreaName ??
+    openShift.presentation.displayFocusAreaName ??
+    openShift.focusAreaName
+  );
+}
+
 function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
   const segment = openShift.presentation.segments.find(
     (item) => item.startTime && item.endTime,
   );
 
-  if (!segment?.startTime || !segment.endTime) {
+  if (segment?.startTime && segment.endTime) {
+    return formatScheduleTimeRange(segment.startTime, segment.endTime);
+  }
+
+  if (openShift.presentation.startTime && openShift.presentation.endTime) {
+    return formatScheduleTimeRange(
+      openShift.presentation.startTime,
+      openShift.presentation.endTime,
+    );
+  }
+
+  if (!openShift.state.customStartTime || !openShift.state.customEndTime) {
     return null;
   }
 
-  return `${segment.startTime.slice(0, 5)} - ${segment.endTime.slice(0, 5)}`;
+  return formatScheduleTimeRange(
+    openShift.state.customStartTime,
+    openShift.state.customEndTime,
+  );
 }
 
 function formatRequestStatus(status: MobileShiftRequest["status"]): string {
@@ -56,45 +270,99 @@ export default function RequestsScreen() {
   }>();
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
+  const { pushToast } = useToast();
+  const now = useRealtimeNow();
   const [selectedTab, setSelectedTab] = useState<RequestTab | null>(null);
+  const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
+  const timeZone = bootstrapQuery.data?.currentOrg.timezone;
+  const todayDate = useMemo(
+    () => getIsoDateInTimeZone(now, timeZone),
+    [now, timeZone],
+  );
+  const requestRange = useMemo(
+    () => ({
+      startDate: todayDate,
+      endDate: addDaysToIsoDate(todayDate, 13),
+    }),
+    [todayDate],
+  );
   const requestsQuery = useQuery({
-    queryKey: ["mobile", "requests", accessToken],
-    queryFn: () => getShiftRequests(accessToken!),
+    queryKey: [
+      "mobile",
+      "requests",
+      accessToken,
+      requestRange.startDate,
+      requestRange.endDate,
+    ],
+    queryFn: () => getShiftRequests(accessToken!, requestRange),
     enabled: Boolean(accessToken),
+  });
+  const availabilityScheduleQuery = useQuery({
+    queryKey: [
+      "mobile",
+      "requests",
+      "availability",
+      accessToken,
+      requestRange.startDate,
+      requestRange.endDate,
+    ],
+    queryFn: () => getMySchedule(accessToken!, requestRange),
+    enabled: Boolean(accessToken) && Boolean(linkedEmployeeId),
+  });
+  const manualRefresh = useManualRefresh(async () => {
+    const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
+
+    if (linkedEmployeeId) {
+      refreshes.push(availabilityScheduleQuery.refetch());
+    }
+
+    await Promise.all(refreshes);
   });
   const requestActionMutation = useMutation({
     mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
       updateShiftRequest(accessToken!, input.requestId, input.body),
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not update request",
+        fallbackMessage: "We couldn't update that shift request.",
+      });
+    },
     onSuccess: async () => {
-      await requestsQuery.refetch();
+      const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
+
+      if (linkedEmployeeId) {
+        refreshes.push(availabilityScheduleQuery.refetch());
+      }
+
+      await Promise.all(refreshes);
     },
   });
 
   const requests = requestsQuery.data?.requests ?? [];
   const openShifts = requestsQuery.data?.openShifts ?? [];
-  const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
+  const availabilityScheduleEntries =
+    availabilityScheduleQuery.data?.entries ?? [];
   const canApprove = Boolean(
     bootstrapQuery.data?.permissions.canApproveShiftRequests,
   );
-  const availableRequests = useMemo(
+  const availableOpenShiftFeed = useMemo(
     () =>
-      requests.filter(
-        (request) =>
-          (request.type === "pickup" &&
-            request.status === "open" &&
-            request.requesterEmpId !== linkedEmployeeId) ||
-          (linkedEmployeeId != null &&
-            request.targetEmpId === linkedEmployeeId &&
-            request.status === "open"),
-      ),
-    [linkedEmployeeId, requests],
+      buildAvailableOpenShiftFeed({
+        linkedEmployeeId,
+        scheduleEntries: availabilityScheduleEntries,
+        openShifts,
+        requests,
+      }),
+    [availabilityScheduleEntries, linkedEmployeeId, openShifts, requests],
   );
   const myRequests = useMemo(
     () =>
       linkedEmployeeId
         ? requests.filter(
             (request) =>
-              request.requesterEmpId === linkedEmployeeId &&
+              (request.requesterEmpId === linkedEmployeeId ||
+                request.targetEmpId === linkedEmployeeId) &&
               ACTIVE_REQUEST_STATUSES.has(request.status),
           )
         : [],
@@ -114,20 +382,20 @@ export default function RequestsScreen() {
   );
   const contentState = getMobileQueryContentState({
     hasData: requests.length > 0 || openShifts.length > 0,
-    isLoading: requestsQuery.isLoading || bootstrapQuery.isLoading,
-    error: requestsQuery.error ?? bootstrapQuery.error,
+    isLoading:
+      requestsQuery.isLoading ||
+      bootstrapQuery.isLoading ||
+      availabilityScheduleQuery.isLoading,
+    error:
+      requestsQuery.error ??
+      bootstrapQuery.error ??
+      availabilityScheduleQuery.error,
   });
-  const mutationError = requestActionMutation.error
-    ? getQueryErrorMessage(
-        requestActionMutation.error,
-        "We couldn't update that shift request.",
-      )
-    : null;
   const tabs = [
     {
       key: "available" as const,
       label: "Available",
-      count: openShifts.length + availableRequests.length,
+      count: availableOpenShiftFeed.totalCount,
       visible: true,
     },
     {
@@ -206,7 +474,7 @@ export default function RequestsScreen() {
     if (approvalRequests.length > 0) {
       return "approval";
     }
-    if (openShifts.length > 0 || availableRequests.length > 0) {
+    if (availableOpenShiftFeed.totalCount > 0) {
       return "available";
     }
     if (myRequests.length > 0) {
@@ -219,13 +487,12 @@ export default function RequestsScreen() {
     return "available";
   }, [
     approvalRequests.length,
-    availableRequests.length,
+    availableOpenShiftFeed.totalCount,
     canApprove,
     highlightedRequest,
     historyRequests.length,
     linkedEmployeeId,
     myRequests.length,
-    openShifts.length,
     routeTab,
     visibleTabs,
   ]);
@@ -233,12 +500,11 @@ export default function RequestsScreen() {
 
   return (
     <Screen
+      bottomPaddingMode="tabbed"
       title="Requests"
       subtitle="Requests"
-      refreshing={requestsQuery.isFetching || requestActionMutation.isPending}
-      onRefresh={() => {
-        void requestsQuery.refetch();
-      }}
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
     >
       <View style={styles.tabRow}>
         {visibleTabs.map((tab) => {
@@ -273,83 +539,89 @@ export default function RequestsScreen() {
         })}
       </View>
 
-      {mutationError ? (
-        <QueryStateCard
-          title="Could not update request"
-          body={mutationError}
-          actionLabel="Refresh"
-          onAction={() => {
-            void requestsQuery.refetch();
-          }}
-        />
-      ) : null}
       {contentState.kind === "loading" ? (
-        <QueryStateCard
-          title="Loading shift requests"
-          body="Bringing your active requests and history into the mobile app."
-        />
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading shift requests</Text>
+          <Text style={styles.loadingBody}>
+            Bringing your active requests and history into the mobile app.
+          </Text>
+          <ListSkeleton rows={4} showSectionHeader={false} />
+        </View>
       ) : contentState.kind === "error" ? (
-        <QueryStateCard
-          title="Could not load requests"
-          body={contentState.message}
+        <StatusBanner
           actionLabel="Try Again"
+          body={contentState.message}
+          title="Could not load requests"
           onAction={() => {
             void requestsQuery.refetch();
           }}
         />
       ) : contentState.kind === "empty" ? (
-        <Card
-          title="No request activity yet"
+        <EmptyStateCard
           body="Requests will appear here once someone asks for coverage or a shift pickup."
+          iconName="swap-horizontal-outline"
+          title="No request activity yet"
         />
       ) : activeTab === "available" ? (
         <View style={styles.section}>
-          {openShifts.length === 0 && availableRequests.length === 0 ? (
-            <Card
+          {availableOpenShiftFeed.totalCount === 0 ? (
+            <EmptyStateCard
+              body="Open shifts you can volunteer for or claim will show up here."
+              iconName="briefcase-outline"
               title="Nothing to pick up"
-              body="Open shifts and requests waiting on your response will show up here."
             />
           ) : (
-            <>
-              {openShifts.map((openShift) => (
-                <OpenShiftCard
-                  key={openShift.id}
-                  linkedEmployeeId={linkedEmployeeId}
-                  mutationPending={requestActionMutation.isPending}
-                  onAction={(body) =>
-                    requestActionMutation.mutate({
-                      requestId: openShift.id,
-                      body,
-                    })
-                  }
-                  openShift={openShift}
-                />
-              ))}
-              {availableRequests.map((request) => (
-                <RequestCard
-                  key={request.id}
-                  canApprove={false}
-                  linkedEmployeeId={linkedEmployeeId}
-                  mutationPending={requestActionMutation.isPending}
-                  onAction={(body) =>
-                    requestActionMutation.mutate({
-                      requestId: request.id,
-                      body,
-                    })
-                  }
-                  highlighted={highlightedRequestId === request.id}
-                  request={request}
-                />
-              ))}
-            </>
+            availableOpenShiftFeed.groups.map((group) => (
+              <View key={group.date} style={styles.dateGroup}>
+                <Text style={styles.dateGroupLabel}>
+                  {formatScheduleDayLabel(group.date, now, timeZone)}
+                </Text>
+                <View style={styles.dateGroupItems}>
+                  {group.items.map((item) =>
+                    item.kind === "open_shift" ? (
+                      <OpenShiftCard
+                        key={item.key}
+                        linkedEmployeeId={linkedEmployeeId}
+                        mutationPending={requestActionMutation.isPending}
+                        onAction={(body) =>
+                          requestActionMutation.mutate({
+                            requestId: item.openShift.id,
+                            body,
+                          })
+                        }
+                        openShift={item.openShift}
+                        showDate={false}
+                      />
+                    ) : (
+                      <RequestCard
+                        key={item.key}
+                        canApprove={false}
+                        linkedEmployeeId={linkedEmployeeId}
+                        mutationPending={requestActionMutation.isPending}
+                        onAction={(body) =>
+                          requestActionMutation.mutate({
+                            requestId: item.request.id,
+                            body,
+                          })
+                        }
+                        highlighted={highlightedRequestId === item.request.id}
+                        request={item.request}
+                        showDate={false}
+                      />
+                    ),
+                  )}
+                </View>
+              </View>
+            ))
           )}
         </View>
       ) : activeTab === "mine" ? (
         <View style={styles.section}>
           {myRequests.length === 0 ? (
-            <Card
-              title="No active requests"
+            <EmptyStateCard
               body="Requests you create stay here until they are resolved or canceled."
+              iconName="document-text-outline"
+              title="No active requests"
             />
           ) : (
             myRequests.map((request) => (
@@ -373,9 +645,10 @@ export default function RequestsScreen() {
       ) : activeTab === "approval" ? (
         <View style={styles.section}>
           {approvalRequests.length === 0 ? (
-            <Card
-              title="Nothing waiting for approval"
+            <EmptyStateCard
               body="Requests only appear here when a manager decision is needed."
+              iconName="checkmark-done-outline"
+              title="Nothing waiting for approval"
             />
           ) : (
             approvalRequests.map((request) => (
@@ -399,9 +672,10 @@ export default function RequestsScreen() {
       ) : (
         <View style={styles.section}>
           {historyRequests.length === 0 ? (
-            <Card
-              title="No request history"
+            <EmptyStateCard
               body="Approved, rejected, canceled, and expired requests stay here."
+              iconName="time-outline"
+              title="No request history"
             />
           ) : (
             historyRequests.map((request) => (
@@ -434,6 +708,7 @@ function RequestCard({
   highlighted,
   mutationPending,
   onAction,
+  showDate = true,
 }: {
   request: MobileShiftRequest;
   linkedEmployeeId: string | null;
@@ -441,14 +716,19 @@ function RequestCard({
   highlighted: boolean;
   mutationPending: boolean;
   onAction: (body: RequestActionBody) => void;
+  showDate?: boolean;
 }) {
+  const shiftLabel = getRequestShiftLabel(request);
+
   return (
     <View
       style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}
     >
       <View style={styles.requestHeaderRow}>
         <Text style={styles.requestTitle}>
-          {request.requesterName} • {request.requesterShiftDate}
+          {showDate
+            ? `${request.requesterName} • ${request.requesterShiftDate}`
+            : request.requesterName}
         </Text>
         <View style={styles.statusChip}>
           <Text style={styles.statusChipText}>
@@ -463,9 +743,12 @@ function RequestCard({
             ? "Swap request"
             : "Calloff request"}
       </Text>
-      <Text style={styles.metaText}>
-        Shift: {request.requesterPresentation?.label ?? "Shift"}
-      </Text>
+      <View style={styles.shiftPillRow}>
+        <ShiftPill
+          colors={getShiftPillColors(request.requesterPresentation)}
+          label={shiftLabel}
+        />
+      </View>
       {request.targetName ? (
         <Text style={styles.metaText}>Target: {request.targetName}</Text>
       ) : null}
@@ -561,29 +844,49 @@ function OpenShiftCard({
   linkedEmployeeId,
   mutationPending,
   onAction,
+  showDate = true,
 }: {
   openShift: MobileOpenShift;
   linkedEmployeeId: string | null;
   mutationPending: boolean;
   onAction: (body: RequestActionBody) => void;
+  showDate?: boolean;
 }) {
+  const shiftLabel = getOpenShiftLabel(openShift);
+  const focusAreaName = getOpenShiftFocusAreaName(openShift);
+  const jobChip = getOpenShiftJobChip(openShift);
   const timeRange = getOpenShiftTimeRange(openShift);
 
   return (
-    <View style={styles.requestCard}>
+    <View style={[styles.requestCard, styles.openShiftCard]}>
       <View style={styles.requestHeaderRow}>
-        <Text style={styles.requestTitle}>
-          {openShift.presentation.label} • {openShift.date}
-        </Text>
+        <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
         <View style={styles.statusChip}>
           <Text style={styles.statusChipText}>Open shift</Text>
         </View>
       </View>
+      {showDate ? <Text style={styles.metaText}>{openShift.date}</Text> : null}
+      {jobChip || focusAreaName ? (
+        <View style={styles.openShiftContextRow}>
+          <JobPill chip={jobChip} compact />
+          {focusAreaName ? (
+            <Text style={styles.openShiftContextText}>{focusAreaName}</Text>
+          ) : null}
+        </View>
+      ) : null}
       <Text style={styles.metaText}>
-        {openShift.focusAreaName ? `${openShift.focusAreaName} • ` : ""}
         {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
       </Text>
-      {timeRange ? <Text style={styles.metaText}>{timeRange}</Text> : null}
+      {timeRange ? (
+        <View style={styles.openShiftTimeRow}>
+          <Ionicons
+            color={mobileColors.textMuted}
+            name="time-outline"
+            size={18}
+          />
+          <Text style={styles.openShiftTimeText}>{timeRange}</Text>
+        </View>
+      ) : null}
       <View style={styles.actions}>
         {linkedEmployeeId ? (
           <Button
@@ -599,6 +902,7 @@ function OpenShiftCard({
                 state: openShift.state,
               });
             }}
+            tone="secondary"
           />
         ) : null}
       </View>
@@ -606,7 +910,112 @@ function OpenShiftCard({
   );
 }
 
+function JobPill({
+  chip,
+  compact,
+}: {
+  chip: JobChip | null;
+  compact?: boolean;
+}) {
+  if (!chip) {
+    return null;
+  }
+
+  const accessibilityLabel = chip.eyebrowLabel
+    ? `${chip.eyebrowLabel} ${chip.label}`
+    : `Job ${chip.label}`;
+  const pillBorderColor =
+    chip.kind === "general"
+      ? mobileBorderColorFromText(chip.textColor)
+      : chip.borderColor;
+
+  return (
+    <View
+      accessibilityLabel={accessibilityLabel}
+      style={[
+        styles.jobPill,
+        compact && styles.jobPillCompact,
+        {
+          backgroundColor: chip.backgroundColor,
+          borderColor: pillBorderColor,
+        },
+      ]}
+    >
+      {chip.eyebrowLabel ? (
+        <View style={styles.jobPillTextStack}>
+          <Text
+            style={[
+              styles.jobPillEyebrowText,
+              compact && styles.jobPillEyebrowTextCompact,
+              { color: chip.textColor },
+            ]}
+          >
+            {chip.eyebrowLabel}
+          </Text>
+          <Text
+            style={[
+              styles.jobPillValueText,
+              compact && styles.jobPillValueTextCompact,
+              { color: chip.textColor },
+            ]}
+          >
+            {chip.label}
+          </Text>
+        </View>
+      ) : (
+        <Text
+          style={[
+            styles.jobPillText,
+            compact && styles.jobPillTextCompact,
+            { color: chip.textColor },
+          ]}
+        >
+          {chip.label}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function ShiftPill({
+  colors,
+  label,
+}: {
+  colors: ShiftPillColors;
+  label: string;
+}) {
+  return (
+    <View
+      accessibilityLabel={`Shift ${label}`}
+      style={[
+        styles.shiftPill,
+        {
+          backgroundColor: colors.backgroundColor,
+          borderColor: colors.borderColor,
+        },
+      ]}
+    >
+      <Text style={[styles.shiftPillText, { color: colors.textColor }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  loadingBody: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
   tabRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -657,6 +1066,17 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
   },
+  dateGroup: {
+    gap: 10,
+  },
+  dateGroupLabel: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  dateGroupItems: {
+    gap: 10,
+  },
   requestCard: {
     backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,
@@ -665,6 +1085,18 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
   },
+  openShiftCard: {
+    gap: 12,
+    padding: 18,
+    shadowColor: mobileColors.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 2,
+  },
   requestCardHighlighted: {
     borderColor: mobileColors.brand,
     backgroundColor: mobileColors.brandSoft,
@@ -672,16 +1104,45 @@ const styles = StyleSheet.create({
   requestHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: 12,
+  },
+  requestHeaderContent: {
+    flex: 1,
+    gap: 10,
   },
   requestTitle: {
     color: mobileColors.textPrimary,
     fontSize: 16,
     fontWeight: "800",
+  },
+  openShiftTitle: {
     flex: 1,
+    color: mobileColors.textPrimary,
+    fontSize: 17,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  shiftPillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  shiftPill: {
+    borderRadius: mobileRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  shiftPillText: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
   statusChip: {
     borderRadius: mobileRadii.pill,
+    borderWidth: 1,
+    borderColor: mobileColors.border,
     backgroundColor: mobileColors.surfaceSecondary,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -695,6 +1156,68 @@ const styles = StyleSheet.create({
   metaText: {
     color: mobileColors.textMuted,
     lineHeight: 20,
+  },
+  openShiftContextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  openShiftContextText: {
+    color: mobileColors.textSecondary,
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+  openShiftTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  openShiftTimeText: {
+    color: mobileColors.textMuted,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  jobPill: {
+    alignSelf: "flex-start",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  jobPillCompact: {
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  jobPillTextStack: {
+    gap: 2,
+  },
+  jobPillEyebrowText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  jobPillEyebrowTextCompact: {
+    fontSize: 9,
+  },
+  jobPillText: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+  },
+  jobPillTextCompact: {
+    fontSize: 12,
+  },
+  jobPillValueText: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  jobPillValueTextCompact: {
+    fontSize: 12,
   },
   actions: {
     flexDirection: "row",

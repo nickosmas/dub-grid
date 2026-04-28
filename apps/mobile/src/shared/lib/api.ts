@@ -19,33 +19,16 @@ import {
   type MobileScheduleRange,
   type MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
+import {
+  appendQueryParams,
+  createHeaders,
+  createJsonApiRequest,
+  getRequestOrigin,
+} from "@dubgrid/api-client";
 import { getMobileEnvConfig } from "./env";
 
 function assertApiBaseUrl(): string {
   return getMobileEnvConfig().apiBaseUrl;
-}
-
-function createHeaders(
-  init: RequestInit,
-  extraHeaders: Record<string, string | undefined>,
-): Headers {
-  const headers = new Headers(init.headers);
-
-  for (const [key, value] of Object.entries(extraHeaders)) {
-    if (value !== undefined) {
-      headers.set(key, value);
-    }
-  }
-
-  return headers;
-}
-
-function getRequestOrigin(candidate: string): string {
-  try {
-    return new URL(candidate).origin;
-  } catch {
-    return candidate;
-  }
 }
 
 function createMobileTransportErrorMessage(
@@ -122,44 +105,19 @@ async function mobileRequest<T>(
   handleAuthFailure: boolean,
 ): Promise<T> {
   const baseUrl = assertApiBaseUrl();
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: init.headers,
-    });
-  } catch (error) {
-    throw new Error(createMobileTransportErrorMessage(baseUrl, error));
-  }
-
-  const contentType = response.headers?.get?.("content-type") ?? "";
-  const payload = await response.json().catch(() => null);
-  const isJsonResponse =
-    contentType.includes("application/json") || payload !== null;
-  if (!response.ok) {
-    if (!isJsonResponse) {
-      throw new Error(createNonJsonApiErrorMessage(baseUrl, path, response));
-    }
-
-    const message =
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error: unknown }).error)
-        : "Request failed";
-
-    if (
-      handleAuthFailure &&
-      (response.status === 401 ||
-        message === "Invalid session" ||
-        message === "Unauthenticated")
-    ) {
+  return createJsonApiRequest({
+    baseUrl,
+    path,
+    init,
+    parse,
+    handleAuthFailure,
+    onAuthFailure: async () => {
       const { handleExpiredMobileSession } = await import("./auth-reset");
       await handleExpiredMobileSession();
-    }
-
-    throw new Error(message);
-  }
-
-  return parse(payload);
+    },
+    onTransportErrorMessage: createMobileTransportErrorMessage,
+    onNonJsonErrorMessage: createNonJsonApiErrorMessage,
+  });
 }
 
 function withQuery(
@@ -169,18 +127,7 @@ function withQuery(
     endDate?: string;
   },
 ): string {
-  if (!query?.startDate && !query?.endDate) {
-    return path;
-  }
-
-  const searchParams = new URLSearchParams();
-  if (query.startDate) {
-    searchParams.set("startDate", query.startDate);
-  }
-  if (query.endDate) {
-    searchParams.set("endDate", query.endDate);
-  }
-  return `${path}?${searchParams.toString()}`;
+  return appendQueryParams(path, query);
 }
 
 export function getBootstrap(

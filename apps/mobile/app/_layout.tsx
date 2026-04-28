@@ -8,6 +8,8 @@ import { ConfigurationScreen } from "../src/shared/components/ConfigurationScree
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
 import { AuthSessionProvider } from "../src/shared/providers/AuthSessionProvider";
+import { NetworkStateProvider } from "../src/shared/providers/NetworkStateProvider";
+import { ToastProvider } from "../src/shared/providers/ToastProvider";
 import {
   commonStackOptions,
   createDetailStackOptions,
@@ -25,29 +27,33 @@ export default function RootLayout() {
           <ConfigurationScreen validation={envValidation} />
         ) : (
           <ThemeProvider value={dubGridNavigationTheme}>
-            <QueryClientProvider client={queryClient}>
-              <AuthSessionProvider>
-                <Stack screenOptions={commonStackOptions}>
-                  <Stack.Screen name="index" options={{ headerShown: false }} />
-                  <Stack.Screen
-                    name="(auth)/login"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="(tabs)"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen
-                    name="alerts"
-                    options={createDetailStackOptions("Alerts")}
-                  />
-                  <Stack.Screen
-                    name="shift/[employeeId]/[date]"
-                    options={createDetailStackOptions("Shift Detail")}
-                  />
-                </Stack>
-              </AuthSessionProvider>
-            </QueryClientProvider>
+            <NetworkStateProvider>
+              <ToastProvider>
+                <QueryClientProvider client={queryClient}>
+                  <AuthSessionProvider>
+                    <Stack screenOptions={commonStackOptions}>
+                      <Stack.Screen name="index" options={{ headerShown: false }} />
+                      <Stack.Screen
+                        name="(auth)/login"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="(tabs)"
+                        options={{ headerShown: false }}
+                      />
+                      <Stack.Screen
+                        name="alerts"
+                        options={createDetailStackOptions("Alerts")}
+                      />
+                      <Stack.Screen
+                        name="shift/[employeeId]/[date]"
+                        options={createDetailStackOptions("Shift Detail")}
+                      />
+                    </Stack>
+                  </AuthSessionProvider>
+                </QueryClientProvider>
+              </ToastProvider>
+            </NetworkStateProvider>
           </ThemeProvider>
         )}
       </GestureHandlerRootView>

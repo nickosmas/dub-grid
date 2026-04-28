@@ -1,16 +1,29 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
 import { mobileColors, mobileRadii } from "../theme/tokens";
+import { getScreenBottomPadding } from "./screen-layout";
 
 export function ConfigurationScreen({
   validation,
 }: {
   validation: Extract<MobileEnvValidation, { status: "invalid" }>;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingBottom: getScreenBottomPadding("stack", insets.bottom),
+          },
+        ]}
+      >
         <View style={styles.card}>
           <Text style={styles.eyebrow}>DubGrid Mobile Setup</Text>
           <Text style={styles.title}>Mobile configuration needs attention</Text>
@@ -46,6 +59,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     padding: 20,
+    paddingBottom: 20,
     gap: 16,
   },
   card: {

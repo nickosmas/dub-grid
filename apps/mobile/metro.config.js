@@ -14,7 +14,9 @@ function resolveModulePath(moduleName) {
   );
 }
 
-config.watchFolders = [workspaceRoot];
+config.watchFolders = Array.from(
+  new Set([...(config.watchFolders ?? []), workspaceRoot]),
+);
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),

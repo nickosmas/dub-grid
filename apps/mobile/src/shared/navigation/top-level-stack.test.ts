@@ -14,10 +14,14 @@ describe("top-level stack options", () => {
     expect(createDetailStackOptions("Shift Detail")).toMatchObject({
       headerBackButtonDisplayMode: "minimal",
       headerBackVisible: true,
+      headerLargeTitle: false,
+      headerLargeTitleEnabled: false,
     });
     expect(createTopLevelStackOptions("Schedule")).toMatchObject({
       headerBackButtonDisplayMode: "minimal",
       headerBackVisible: true,
+      headerLargeTitle: expect.any(Boolean),
+      headerLargeTitleEnabled: expect.any(Boolean),
     });
   });
 });

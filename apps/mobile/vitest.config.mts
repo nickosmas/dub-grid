@@ -1,23 +1,21 @@
 import path from "path";
-import react from "@vitejs/plugin-react";
 import { defineConfig, mergeConfig } from "vitest/config";
 import { sharedVitestConfig } from "../../vitest.shared";
 
-export default mergeConfig(
-  sharedVitestConfig,
-  defineConfig({
+export default defineConfig(async () => {
+  const { default: react } = await import("@vitejs/plugin-react");
+
+  return mergeConfig(
+    sharedVitestConfig,
+    {
     plugins: [react()],
     resolve: {
       dedupe: ["react", "react-dom"],
       alias: [
         {
-          find: "@dubgrid/contracts",
-          replacement: path.resolve(
-            __dirname,
-            "../../packages/contracts/src/index.ts",
-          ),
-        },
-        {
+          // Keep Vitest on a single React/ReactDOM pair for the jsdom renderer.
+          // Pointing at apps/mobile/node_modules caused duplicate-runtime hook failures
+          // with the current Expo + Testing Library stack.
           find: /^react$/,
           replacement: path.resolve(
             __dirname,
@@ -65,5 +63,6 @@ export default mergeConfig(
       environment: "jsdom",
       setupFiles: [path.resolve(__dirname, "./src/test/setup.ts")],
     },
-  }),
-);
+    },
+  );
+});

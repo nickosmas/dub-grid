@@ -3,6 +3,7 @@ import {
   mobileNotificationsQuerySchema,
   mobileNotificationsResponseSchema,
 } from "@dubgrid/contracts";
+import { loadMobileNotificationsPayload } from "@dubgrid/mobile-api-core";
 import {
   fetchMobileNotifications,
   requireMobileAuth,
@@ -21,10 +22,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const payload = await fetchMobileNotifications(auth.userClient, {
-    limit: queryResult.data.limit ?? 20,
-    offset: queryResult.data.offset ?? 0,
-  });
+  try {
+    const payload = await loadMobileNotificationsPayload(auth, queryResult.data, {
+      fetchMobileNotifications,
+    });
 
-  return NextResponse.json(mobileNotificationsResponseSchema.parse(payload));
+    return NextResponse.json(mobileNotificationsResponseSchema.parse(payload));
+  } catch {
+    return NextResponse.json(
+      { error: "We couldn't load your mobile notifications right now." },
+      { status: 500 },
+    );
+  }
 }

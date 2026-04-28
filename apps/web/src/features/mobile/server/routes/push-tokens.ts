@@ -3,6 +3,7 @@ import {
   mobilePushTokenBodySchema,
   mobilePushTokenResponseSchema,
 } from "@dubgrid/contracts";
+import { registerMobilePushToken } from "@dubgrid/mobile-api-core";
 import { requireMobileAuth, upsertMobilePushToken } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
@@ -23,17 +24,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  await upsertMobilePushToken({
-    userId: auth.user.id,
-    orgId: auth.currentOrg.id,
-    platform: parsed.data.platform,
-    expoPushToken: parsed.data.expoPushToken,
-    disabled: parsed.data.disabled,
+  const payload = await registerMobilePushToken(auth, parsed.data, {
+    upsertMobilePushToken,
   });
 
   return NextResponse.json(
-    mobilePushTokenResponseSchema.parse({
-      success: true,
-    }),
+    mobilePushTokenResponseSchema.parse(payload),
   );
 }

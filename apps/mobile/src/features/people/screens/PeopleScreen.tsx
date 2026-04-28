@@ -2,16 +2,20 @@ import { useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "../../../shared/components/Button";
-import { Card, Screen } from "../../../shared/components/Screen";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { ListSkeleton } from "../../../shared/components/Skeleton";
+import { Screen } from "../../../shared/components/Screen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getPeople,
   updateMobilePersonStatus,
 } from "../../../shared/lib/api";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import {
   getMobileQueryContentState,
-  getQueryErrorMessage,
 } from "../../../shared/lib/query-state";
+import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileColors, mobileRadii } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -33,6 +37,7 @@ function formatStatusSinceLabel(value: string | null): string | null {
 export default function PeopleScreen() {
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
+  const { pushToast } = useToast();
   const [searchValue, setSearchValue] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
@@ -41,6 +46,9 @@ export default function PeopleScreen() {
     queryFn: () => getPeople(accessToken!),
     enabled: Boolean(accessToken),
   });
+  const manualRefresh = useManualRefresh(() =>
+    Promise.all([peopleQuery.refetch(), bootstrapQuery.refetch()]),
+  );
   const statusMutation = useMutation({
     mutationFn: async (input: {
       personId: string;
@@ -51,6 +59,13 @@ export default function PeopleScreen() {
         action: input.action,
         expectedVersion: input.expectedVersion,
       }),
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not update teammate",
+        fallbackMessage: "We couldn't update that teammate right now.",
+      });
+    },
     onSuccess: async () => {
       await peopleQuery.refetch();
     },
@@ -93,28 +108,22 @@ export default function PeopleScreen() {
   const canManageEmployees = Boolean(
     bootstrapQuery.data?.permissions.canManageEmployees,
   );
+  const peopleError = peopleQuery.error ?? bootstrapQuery.error;
   const contentState = getMobileQueryContentState({
     hasData: peopleQuery.data !== undefined,
     isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
-    error: peopleQuery.error ?? bootstrapQuery.error,
+    error: peopleError,
   });
-  const mutationError = statusMutation.error
-    ? getQueryErrorMessage(
-        statusMutation.error,
-        "We couldn't update that teammate right now.",
-      )
-    : null;
   const activeCount = people.filter((person) => person.status === "active").length;
   const inactiveCount = people.length - activeCount;
 
   return (
     <Screen
+      bottomPaddingMode="tabbed"
       title="People"
       subtitle="People"
-      refreshing={peopleQuery.isFetching || statusMutation.isPending}
-      onRefresh={() => {
-        void Promise.all([peopleQuery.refetch(), bootstrapQuery.refetch()]);
-      }}
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
     >
       <View style={styles.searchCard}>
         <TextInput
@@ -149,46 +158,41 @@ export default function PeopleScreen() {
         </Text>
       </View>
 
-      {mutationError ? (
-        <QueryStateCard
-          title="Could not update teammate"
-          body={mutationError}
-          actionLabel="Refresh"
-          onAction={() => {
-            void peopleQuery.refetch();
-          }}
-        />
-      ) : null}
-
       {contentState.kind === "loading" ? (
-        <QueryStateCard
-          title="Loading directory"
-          body="Pulling the latest staff list for mobile lookup."
-        />
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading directory</Text>
+          <Text style={styles.loadingBody}>
+            Pulling the latest staff list for mobile lookup.
+          </Text>
+          <ListSkeleton rows={4} showSectionHeader={false} />
+        </View>
       ) : contentState.kind === "error" &&
-        contentState.message === "Unauthorized" ? (
-        <Card
-          title="Directory unavailable"
+        contentState.reason === "unauthorized" ? (
+        <StatusBanner
           body="Your current role does not include mobile staff visibility for this workspace."
+          tone="warning"
+          title="Directory unavailable"
         />
       ) : contentState.kind === "error" ? (
-        <QueryStateCard
-          title="Could not load people"
-          body={contentState.message}
+        <StatusBanner
           actionLabel="Try Again"
+          body={contentState.message}
+          title="Could not load people"
           onAction={() => {
             void peopleQuery.refetch();
           }}
         />
       ) : people.length === 0 ? (
-        <Card
-          title="No teammates yet"
+        <EmptyStateCard
           body="No teammates are available in this workspace yet."
+          iconName="people-outline"
+          title="No teammates yet"
         />
       ) : filteredPeople.length === 0 ? (
-        <Card
-          title="No matches"
+        <EmptyStateCard
           body="Try a different name, email, phone number, or status filter."
+          iconName="search-outline"
+          title="No matches"
         />
       ) : (
         filteredPeople.map((person) => {
@@ -371,6 +375,19 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  loadingBody: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
   searchCard: {
     backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,

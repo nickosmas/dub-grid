@@ -27,10 +27,14 @@ export const commonStackOptions: NativeStackNavigationOptions = {
 export function createTopLevelStackOptions(
   title: string,
 ): NativeStackNavigationOptions {
+  const useLargeTitle = Platform.OS === "ios";
+
   return {
     ...commonStackOptions,
     title,
-    headerLargeTitle: Platform.OS === "ios",
+    headerLargeTitle: useLargeTitle,
+    headerLargeTitleEnabled: useLargeTitle,
+    headerStyle: useLargeTitle ? undefined : commonStackOptions.headerStyle,
   };
 }
 
@@ -41,5 +45,6 @@ export function createDetailStackOptions(
     ...commonStackOptions,
     title,
     headerLargeTitle: false,
+    headerLargeTitleEnabled: false,
   };
 }

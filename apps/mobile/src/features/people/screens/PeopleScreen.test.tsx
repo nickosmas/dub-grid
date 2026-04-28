@@ -10,12 +10,20 @@ const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
+const pushToast = vi.fn();
 
 vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
 );
 
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
 vi.mock("@tanstack/react-query", () => ({
+  onlineManager: {
+    isOnline: () => true,
+  },
   useMutation,
   useQuery,
 }));
@@ -36,6 +44,12 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
+vi.mock("../../../shared/providers/ToastProvider", () => ({
+  useToast: () => ({
+    pushToast,
+  }),
+}));
+
 let PeopleScreen: (typeof import("./PeopleScreen"))["default"];
 
 beforeAll(async () => {
@@ -48,6 +62,7 @@ describe("PeopleScreen", () => {
     useQuery.mockReset();
     useAccessToken.mockReset();
     useBootstrap.mockReset();
+    pushToast.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({

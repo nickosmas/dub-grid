@@ -15,6 +15,7 @@ function createThenableQuery(result: { data: unknown; error: unknown }) {
     is: vi.fn(() => query),
     or: vi.fn(() => query),
     order: vi.fn(() => query),
+    limit: vi.fn(() => query),
     then: (
       onFulfilled?: (value: typeof result) => unknown,
       onRejected?: (error: unknown) => unknown,
@@ -259,6 +260,27 @@ function createServiceClientForSchedule(
     })),
     error: null,
   });
+  const publishHistoryQuery = createThenableQuery({
+    data: [
+      {
+        published_by: "user-1",
+        start_date: "2026-04-16",
+        end_date: "2026-04-22",
+        published_at: "2026-04-15T18:30:00.000Z",
+      },
+    ],
+    error: null,
+  });
+  const profilesQuery = createThenableQuery({
+    data: [
+      {
+        id: "user-1",
+        first_name: "Mina",
+        last_name: "Diaz",
+      },
+    ],
+    error: null,
+  });
   const scheduleCellsQuery = createThenableQuery({
     data: [
       {
@@ -340,6 +362,12 @@ function createServiceClientForSchedule(
       if (table === "certifications") {
         return certificationsQuery;
       }
+      if (table === "publish_history") {
+        return publishHistoryQuery;
+      }
+      if (table === "profiles") {
+        return profilesQuery;
+      }
       if (table === "schedule_cells") {
         return scheduleCellsQuery;
       }
@@ -347,20 +375,6 @@ function createServiceClientForSchedule(
       throw new Error(`Unexpected table ${table}`);
     }),
     rpc: vi.fn((fn: string) => {
-      if (fn === "get_publish_history") {
-        return Promise.resolve({
-          data: [
-            {
-              start_date: "2026-04-16",
-              end_date: "2026-04-22",
-              published_at: "2026-04-15T18:30:00.000Z",
-              published_by_name: "Mina Diaz",
-            },
-          ],
-          error: null,
-        });
-      }
-
       throw new Error(`Unexpected rpc ${fn}`);
     }),
   };
@@ -544,6 +558,27 @@ function createServiceClientForOpenShifts() {
     data: [],
     error: null,
   });
+  const publishHistoryQuery = createThenableQuery({
+    data: [
+      {
+        published_by: "user-1",
+        start_date: "2026-04-16",
+        end_date: "2026-04-16",
+        published_at: "2026-04-15T18:30:00.000Z",
+      },
+    ],
+    error: null,
+  });
+  const profilesQuery = createThenableQuery({
+    data: [
+      {
+        id: "user-1",
+        first_name: "Mina",
+        last_name: "Diaz",
+      },
+    ],
+    error: null,
+  });
   const coverageRequirementsQuery = createThenableQuery({
     data: [
       {
@@ -603,6 +638,12 @@ function createServiceClientForOpenShifts() {
       if (table === "organization_roles" || table === "certifications") {
         return namedItemsQuery;
       }
+      if (table === "publish_history") {
+        return publishHistoryQuery;
+      }
+      if (table === "profiles") {
+        return profilesQuery;
+      }
       if (table === "coverage_requirements") {
         return coverageRequirementsQuery;
       }
@@ -616,20 +657,6 @@ function createServiceClientForOpenShifts() {
       throw new Error(`Unexpected table ${table}`);
     }),
     rpc: vi.fn((fn: string) => {
-      if (fn === "get_publish_history") {
-        return Promise.resolve({
-          data: [
-            {
-              start_date: "2026-04-16",
-              end_date: "2026-04-16",
-              published_at: "2026-04-15T18:30:00.000Z",
-              published_by_name: "Mina Diaz",
-            },
-          ],
-          error: null,
-        });
-      }
-
       throw new Error(`Unexpected rpc ${fn}`);
     }),
   };
@@ -1121,7 +1148,7 @@ describe("fetchMobileShiftRequests", () => {
 });
 
 describe("fetchMobileOpenShifts", () => {
-  it("returns published coverage gaps even when the linked employee is not role-qualified", async () => {
+  it("hides published coverage gaps that the linked employee is not qualified to cover", async () => {
     const serviceClient = createServiceClientForOpenShifts();
 
     const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
@@ -1135,22 +1162,6 @@ describe("fetchMobileOpenShifts", () => {
       endDate: "2026-04-16",
     });
 
-    expect(openShifts).toHaveLength(1);
-    expect(openShifts[0]).toEqual(
-      expect.objectContaining({
-        date: "2026-04-16",
-        focusAreaId: 12,
-        focusAreaName: "Skilled Nursing",
-        needed: 1,
-      }),
-    );
-    expect(openShifts[0]?.presentation.segments[0]).toEqual(
-      expect.objectContaining({
-        shiftId: 101,
-        jobId: 91,
-        shiftName: "Day Shift",
-        jobName: "Charge Nurse",
-      }),
-    );
+    expect(openShifts).toEqual([]);
   });
 });

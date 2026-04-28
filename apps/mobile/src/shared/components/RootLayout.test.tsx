@@ -37,6 +37,9 @@ vi.mock("@tanstack/react-query", async () => {
 
   return {
     QueryClient: class QueryClient {},
+    onlineManager: {
+      isOnline: () => true,
+    },
     QueryClientProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", { "data-testid": "query-provider" }, children),
   };
@@ -48,6 +51,24 @@ vi.mock("../providers/AuthSessionProvider", async () => {
   return {
     AuthSessionProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", { "data-testid": "auth-provider" }, children),
+  };
+});
+
+vi.mock("../providers/ToastProvider", async () => {
+  const React = await import("react");
+
+  return {
+    ToastProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement("div", { "data-testid": "toast-provider" }, children),
+  };
+});
+
+vi.mock("../providers/NetworkStateProvider", async () => {
+  const React = await import("react");
+
+  return {
+    NetworkStateProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement("div", { "data-testid": "network-provider" }, children),
   };
 });
 

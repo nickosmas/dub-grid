@@ -13,6 +13,10 @@ vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
 );
 
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
 const routerReplace = vi.fn();
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
@@ -20,6 +24,7 @@ const loginToWorkspace = vi.fn();
 const lookupWorkspace = vi.fn();
 const loadLastWorkspaceSlug = vi.fn();
 const saveLastWorkspaceSlug = vi.fn();
+const pushToast = vi.fn();
 
 vi.mock("expo-router", async () => {
   const React = await import("react");
@@ -35,6 +40,12 @@ vi.mock("expo-router", async () => {
 
 vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
   useSessionState,
+}));
+
+vi.mock("../../../shared/providers/ToastProvider", () => ({
+  useToast: () => ({
+    pushToast,
+  }),
 }));
 
 vi.mock("../../../shared/lib/supabase", () => ({
@@ -70,6 +81,7 @@ describe("LoginScreen", () => {
     lookupWorkspace.mockReset();
     loadLastWorkspaceSlug.mockReset();
     saveLastWorkspaceSlug.mockReset();
+    pushToast.mockReset();
 
     useSessionState.mockReturnValue({
       session: null,
@@ -205,7 +217,7 @@ describe("LoginScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
 
     expect(
-      await screen.findByText("Invalid email or password"),
+      await screen.findByText("Check your email and password and try again."),
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
   });
@@ -221,8 +233,48 @@ describe("LoginScreen", () => {
     fireEvent.click(screen.getByText("Continue"));
 
     expect(
-      await screen.findByText("No workspace matched that slug."),
+      await screen.findByText(
+        "We couldn't find that workspace. Check the subdomain and try again.",
+      ),
     ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("shows a persistent network toast instead of an inline login error", async () => {
+    lookupWorkspace.mockResolvedValue({
+      workspace: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
+    loginToWorkspace.mockRejectedValue(new Error("Network request failed"));
+
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "wrong-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalledWith({
+        tone: "error",
+        title: "Network connection issue",
+        message: "Check your internet connection and try again.",
+        durationMs: null,
+        dedupeKey: "network-connection-error",
+      });
+    });
+    expect(screen.queryByText("Could not sign in")).not.toBeInTheDocument();
   });
 });

@@ -4,15 +4,20 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "../../../shared/components/Button";
-import { Card, Screen } from "../../../shared/components/Screen";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { ListSkeleton } from "../../../shared/components/Skeleton";
+import { Screen } from "../../../shared/components/Screen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from "../../../shared/lib/api";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileColors, mobileRadii } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 
@@ -20,6 +25,24 @@ type NotificationDestination =
   | "/(tabs)/me"
   | "/(tabs)/requests"
   | "/(tabs)/profile";
+
+type MobileNotificationRecord = {
+  id: string;
+  type: string;
+  channel: "in_app" | "email";
+  category: string | null;
+  title: string;
+  message: string;
+  metadata: Record<string, unknown>;
+  readAt: string | null;
+  createdAt: string;
+};
+
+type MobileNotificationsFeed = {
+  unreadCount: number;
+  notifications: MobileNotificationRecord[];
+};
+
 type NotificationNavigationTarget =
   | NotificationDestination
   | {
@@ -122,18 +145,23 @@ function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
   return "notifications-outline";
 }
 
+function getNotificationsQueryKey(accessToken: string | null) {
+  return ["mobile", "notifications", accessToken] as const;
+}
+
 export default function NotificationsScreen() {
   const accessToken = useAccessToken();
-  const [actionError, setActionError] = useState<string | null>(null);
   const [updatingNotificationId, setUpdatingNotificationId] = useState<
     string | null
   >(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const { pushToast } = useToast();
   const notificationsQuery = useQuery({
-    queryKey: ["mobile", "notifications", accessToken],
+    queryKey: getNotificationsQueryKey(accessToken),
     queryFn: () => getNotifications(accessToken!),
     enabled: Boolean(accessToken),
   });
+  const manualRefresh = useManualRefresh(() => notificationsQuery.refetch());
   const notifications = notificationsQuery.data?.notifications ?? [];
   const unreadNotifications = useMemo(
     () => notifications.filter((notification) => !notification.readAt),
@@ -162,25 +190,75 @@ export default function NotificationsScreen() {
     );
   }
 
+  function syncNotificationsInBackground() {
+    void notificationsQuery.refetch().catch(() => {});
+  }
+
+  function markNotificationReadInCache(notificationId: string, unreadCount: number) {
+    if (!accessToken) {
+      return;
+    }
+
+    const readAt = new Date().toISOString();
+    queryClient.setQueryData(
+      getNotificationsQueryKey(accessToken),
+      (current: MobileNotificationsFeed | undefined) =>
+        current
+          ? {
+              ...current,
+              unreadCount,
+              notifications: current.notifications.map((notification) =>
+                notification.id === notificationId && !notification.readAt
+                  ? { ...notification, readAt }
+                  : notification,
+              ),
+            }
+          : current,
+    );
+  }
+
+  function markAllNotificationsReadInCache(unreadCount: number) {
+    if (!accessToken) {
+      return;
+    }
+
+    const readAt = new Date().toISOString();
+    queryClient.setQueryData(
+      getNotificationsQueryKey(accessToken),
+      (current: MobileNotificationsFeed | undefined) =>
+        current
+          ? {
+              ...current,
+              unreadCount,
+              notifications: current.notifications.map((notification) =>
+                notification.readAt
+                  ? notification
+                  : { ...notification, readAt }
+              ),
+            }
+          : current,
+    );
+  }
+
   async function handleMarkRead(notificationId: string) {
     if (!accessToken || updatingNotificationId || markingAll) {
       return false;
     }
 
     setUpdatingNotificationId(notificationId);
-    setActionError(null);
 
     try {
       const response = await markNotificationRead(accessToken, notificationId);
+      markNotificationReadInCache(notificationId, response.unreadCount);
       syncUnreadCount(response.unreadCount);
-      await notificationsQuery.refetch();
+      syncNotificationsInBackground();
       return true;
     } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't update that alert.",
-      );
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not update alerts",
+        fallbackMessage: "We couldn't update that alert.",
+      });
       return false;
     } finally {
       setUpdatingNotificationId(null);
@@ -194,7 +272,10 @@ export default function NotificationsScreen() {
     type: string;
   }) {
     if (!input.readAt) {
-      await handleMarkRead(input.id);
+      const didMarkRead = await handleMarkRead(input.id);
+      if (!didMarkRead) {
+        return;
+      }
     }
 
     router.push(
@@ -211,18 +292,18 @@ export default function NotificationsScreen() {
     }
 
     setMarkingAll(true);
-    setActionError(null);
 
     try {
       const response = await markAllNotificationsRead(accessToken);
+      markAllNotificationsReadInCache(response.unreadCount);
       syncUnreadCount(response.unreadCount);
-      await notificationsQuery.refetch();
+      syncNotificationsInBackground();
     } catch (error) {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : "We couldn't update your alerts.",
-      );
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not update alerts",
+        fallbackMessage: "We couldn't update your alerts.",
+      });
     } finally {
       setMarkingAll(false);
     }
@@ -230,12 +311,11 @@ export default function NotificationsScreen() {
 
   return (
     <Screen
+      bottomPaddingMode="stack"
       title="Alerts"
       subtitle="Alerts"
-      refreshing={notificationsQuery.isFetching || markingAll}
-      onRefresh={() => {
-        void notificationsQuery.refetch();
-      }}
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
     >
       {unreadNotifications.length > 0 ? (
         <View style={styles.actionRow}>
@@ -254,35 +334,28 @@ export default function NotificationsScreen() {
         </View>
       ) : null}
 
-      {actionError ? (
-        <QueryStateCard
-          title="Could not update alerts"
-          body={actionError}
-          actionLabel="Try Again"
-          onAction={() => {
-            void notificationsQuery.refetch();
-          }}
-        />
-      ) : null}
-
       {contentState.kind === "loading" ? (
-        <QueryStateCard
-          title="Loading alerts"
-          body="Pulling the latest schedule and request activity into mobile."
-        />
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading alerts</Text>
+          <Text style={styles.loadingBody}>
+            Pulling the latest schedule and request activity into mobile.
+          </Text>
+          <ListSkeleton rows={4} showSectionHeader={false} />
+        </View>
       ) : contentState.kind === "error" ? (
-        <QueryStateCard
-          title="Could not load alerts"
-          body={contentState.message}
+        <StatusBanner
           actionLabel="Try Again"
+          body={contentState.message}
+          title="Could not load alerts"
           onAction={() => {
             void notificationsQuery.refetch();
           }}
         />
       ) : contentState.kind === "empty" ? (
-        <Card
-          title="No alerts yet"
+        <EmptyStateCard
           body="Schedule publishes and request approvals will show up here."
+          iconName="notifications-outline"
+          title="No alerts yet"
         />
       ) : (
         <>
@@ -362,6 +435,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+  },
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  loadingBody: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
   },
   actionCopy: {
     color: mobileColors.textPrimary,

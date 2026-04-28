@@ -4,6 +4,10 @@ import {
   mobileScheduleQuerySchema,
 } from "@dubgrid/contracts";
 import {
+  loadMobileOrgSchedulePayload,
+  MobileApiAuthorizationError,
+} from "@dubgrid/mobile-api-core";
+import {
   fetchMobileScheduleEntries,
   resolveMobileDateRange,
   requireMobileAuth,
@@ -15,25 +19,11 @@ const CORS_METHODS = ["GET", "OPTIONS"] as const;
 
 export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
 
-function canViewOrgSchedule(
-  level: number,
-  permissions: {
-    canApproveShiftRequests: boolean;
-    canManageEmployees: boolean;
-  },
-) {
-  return level >= 2 || permissions.canApproveShiftRequests || permissions.canManageEmployees;
-}
-
 export async function GET(req: NextRequest) {
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return withMobileCors(req, auth.response, CORS_METHODS);
-
-  if (!canViewOrgSchedule(auth.permissions.level, auth.permissions)) {
-    return json({ error: "Unauthorized" }, { status: 403 });
-  }
 
   const queryResult = mobileScheduleQuerySchema.safeParse(
     Object.fromEntries(req.nextUrl.searchParams.entries()),
@@ -43,15 +33,16 @@ export async function GET(req: NextRequest) {
   }
 
   const range = resolveMobileDateRange(queryResult.data);
-  const entries = await fetchMobileScheduleEntries(auth.serviceClient, {
-    orgId: auth.currentOrg.id,
-    ...range,
-  });
+  try {
+    const payload = await loadMobileOrgSchedulePayload(auth, range, {
+      fetchMobileScheduleEntries,
+    });
+    return json(mobileOrgScheduleResponseSchema.parse(payload));
+  } catch (error) {
+    if (error instanceof MobileApiAuthorizationError) {
+      return json({ error: "Unauthorized" }, { status: 403 });
+    }
 
-  return json(
-    mobileOrgScheduleResponseSchema.parse({
-      range,
-      entries,
-    }),
-  );
+    throw error;
+  }
 }

@@ -14,6 +14,7 @@ const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 const routerReplace = vi.fn();
 const alertMock = vi.fn();
+const pushToast = vi.fn();
 
 vi.mock("react-native", async () => ({
   ...createReactNativeModule(await import("react")),
@@ -22,7 +23,14 @@ vi.mock("react-native", async () => ({
   },
 }));
 
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
 vi.mock("@tanstack/react-query", () => ({
+  onlineManager: {
+    isOnline: () => true,
+  },
   useMutation,
   useQuery,
   useQueryClient,
@@ -51,6 +59,12 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
+vi.mock("../../../shared/providers/ToastProvider", () => ({
+  useToast: () => ({
+    pushToast,
+  }),
+}));
+
 let ShiftDetailScreen: (typeof import("./ShiftDetailScreen"))["default"];
 
 beforeAll(async () => {
@@ -72,6 +86,7 @@ describe("ShiftDetailScreen", () => {
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
+    pushToast.mockReset();
     routerReplace.mockReset();
     alertMock.mockReset();
 
@@ -278,6 +293,10 @@ describe("ShiftDetailScreen", () => {
 
     render(<ShiftDetailScreen />);
 
+    expect(screen.getByLabelText("Thu, Apr 16")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Thursday, April 16, 2026"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText("Published Apr 15, 2026, 11:30 AM by Mina Diaz"),
     ).toBeInTheDocument();
@@ -288,10 +307,144 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Supervisor")).toBeInTheDocument();
     expect(screen.getByText("Emergency")).toBeInTheDocument();
     expect(screen.getByText("Bri Shaw").closest("article")).toBeNull();
+    const detailCardText = screen
+      .getByText("Published Apr 15, 2026, 11:30 AM by Mina Diaz")
+      .closest("article")?.textContent;
+    expect(detailCardText).toBeDefined();
+    expect(detailCardText!.indexOf("ICU")).toBeLessThan(
+      detailCardText!.indexOf("Mentor"),
+    );
+    expect(detailCardText!.indexOf("Mentor")).toBeLessThan(
+      detailCardText!.indexOf("7:00 AM - 3:00 PM"),
+    );
     expect(screen.queryByText("Published by")).not.toBeInTheDocument();
     expect(screen.queryByText("Focus Areas")).not.toBeInTheDocument();
     expect(screen.queryByText("Employee")).not.toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
+  });
+
+  it("shows only the shiftmate job name for general shifts", () => {
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[1] === "requests") {
+        return {
+          data: {
+            requests: [],
+            openShifts: [],
+          },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      if (queryKey[2] === "team") {
+        return {
+          data: {
+            entries: [
+              {
+                employeeId: "emp-2",
+                employeeName: "Bri Shaw",
+                date: "2026-04-16",
+                assignmentIds: [30],
+                shiftLabel: "ADM",
+                assignmentLabel: "ADM",
+                shiftName: "Admin",
+                absenceTypeId: null,
+                focusAreaId: null,
+                focusAreaName: null,
+                displayFocusAreaName: null,
+                startTime: "09:00:00",
+                endTime: "17:00:00",
+                customStartTime: null,
+                customEndTime: null,
+                segments: [
+                  {
+                    shiftId: null,
+                    jobId: 30,
+                    label: "ADM",
+                    shiftName: "Admin",
+                    jobName: "Admin",
+                    shiftStartTime: null,
+                    shiftEndTime: null,
+                    startTime: "09:00:00",
+                    endTime: "17:00:00",
+                    displayFocusAreaName: null,
+                  },
+                ],
+                publishedAt: "2026-04-15T18:30:00.000Z",
+                publishedByName: "Mina Diaz",
+              },
+            ],
+          },
+          error: null,
+          isFetching: false,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: {
+          entries: [
+            {
+              employeeId: "emp-1",
+              employeeName: "Alex Kim",
+              date: "2026-04-16",
+              assignmentIds: [30],
+              shiftLabel: "ADM",
+              assignmentLabel: "ADM",
+              shiftName: "Admin",
+              absenceTypeId: null,
+              focusAreaId: null,
+              focusAreaName: null,
+              displayFocusAreaName: null,
+              startTime: "09:00:00",
+              endTime: "17:00:00",
+              customStartTime: null,
+              customEndTime: null,
+              segments: [
+                {
+                  shiftId: null,
+                  jobId: 30,
+                  label: "ADM",
+                  shiftName: "Admin",
+                  jobName: "Admin",
+                  shiftStartTime: null,
+                  shiftEndTime: null,
+                  startTime: "09:00:00",
+                  endTime: "17:00:00",
+                  displayFocusAreaName: null,
+                },
+              ],
+              publishedAt: "2026-04-15T18:30:00.000Z",
+              publishedByName: "Mina Diaz",
+            },
+          ],
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
+
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    const shiftmateHeader = screen.getByText("Bri Shaw").parentElement;
+
+    expect(
+      shiftmateHeader?.querySelector('[aria-label="General shift Admin"]'),
+    ).not.toBeNull();
+    expect(shiftmateHeader).toHaveTextContent("Bri Shaw");
+    expect(shiftmateHeader).toHaveTextContent("Admin");
+    expect(shiftmateHeader).not.toHaveTextContent("General shift");
   });
 
   it("shows another employee with plain time in the detail summary", () => {
@@ -376,7 +529,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("ICU")).toBeInTheDocument();
   });
 
-  it("omits the focus area row for general or off-day entries", () => {
+  it("promotes absence labels into the detail card heading", () => {
     useQuery.mockImplementation(() => ({
       data: {
         entries: [
@@ -424,6 +577,86 @@ describe("ShiftDetailScreen", () => {
     expect(
       screen.queryByText("Custom times unavailable"),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Absence" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Off Day" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Absence Off Day")).toBeInTheDocument();
+    expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent(
+      "Off Day",
+    );
+    expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent(
+      "Absence",
+    );
+  });
+
+  it("promotes general shift labels into the detail card heading", () => {
+    useQuery.mockImplementation(() => ({
+      data: {
+        entries: [
+          {
+            employeeId: "emp-1",
+            employeeName: "Alex Kim",
+            date: "2026-04-16",
+            assignmentIds: [30],
+            shiftLabel: "ADM",
+            assignmentLabel: "ADM",
+            shiftName: "Admin",
+            absenceTypeId: null,
+            focusAreaId: null,
+            focusAreaName: null,
+            startTime: "09:00:00",
+            endTime: "17:00:00",
+            customStartTime: null,
+            customEndTime: null,
+            segments: [
+              {
+                shiftId: null,
+                jobId: 30,
+                label: "ADM",
+                shiftName: "Admin",
+                jobName: "Admin",
+                shiftStartTime: null,
+                shiftEndTime: null,
+                startTime: "09:00:00",
+                endTime: "17:00:00",
+                displayFocusAreaName: null,
+              },
+            ],
+            publishedAt: "2026-04-15T18:30:00.000Z",
+            publishedByName: "Mina Diaz",
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    }));
+
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate: vi.fn(),
+    });
+
+    render(<ShiftDetailScreen />);
+
+    expect(
+      screen.getByRole("heading", { name: "General shift" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Admin" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("General shift Admin")).toBeInTheDocument();
+    expect(screen.getByLabelText("General shift Admin")).toHaveTextContent(
+      "Admin",
+    );
+    expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent(
+      "General shift",
+    );
   });
 
   it("organizes swap options under eligible teammates", () => {
@@ -802,6 +1035,72 @@ describe("ShiftDetailScreen", () => {
       targetShiftDate: undefined,
       absenceTypeId: 1,
     });
+  });
+
+  it("spells out absence reasons when the absence type has a full name", () => {
+    const mutate = vi.fn();
+    useBootstrap.mockReturnValue({
+      data: {
+        linkedEmployee: {
+          id: "emp-1",
+          firstName: "Alex",
+          lastName: "Kim",
+          status: "active",
+          focusAreaIds: [2],
+        },
+        currentOrg: {
+          timezone: "America/Los_Angeles",
+          shiftDisplayMode: "code",
+          labels: {
+            focusArea: "Focus Areas",
+          },
+        },
+        focusAreas: [
+          {
+            id: 1,
+            name: "Emergency",
+          },
+          {
+            id: 2,
+            name: "ICU",
+          },
+        ],
+        effectiveRole: "admin",
+        permissions: {
+          canApproveShiftRequests: true,
+          canManageEmployees: true,
+        },
+        absenceTypes: [
+          {
+            id: 1,
+            label: "PTO",
+            name: "Paid time off",
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate,
+    });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Drop shift"));
+    fireEvent.click(screen.getByText("Call off"));
+    fireEvent.click(screen.getByText("Paid time off"));
+
+    expect(alertMock).toHaveBeenCalledWith(
+      "Submit call off request?",
+      expect.stringContaining("Submit a Paid time off absence request"),
+      expect.any(Array),
+      { cancelable: true },
+    );
   });
 
   it("confirms before submitting a swap request", () => {

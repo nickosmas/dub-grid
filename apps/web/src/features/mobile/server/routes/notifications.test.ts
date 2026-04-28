@@ -65,4 +65,21 @@ describe("mobile notifications route", () => {
     expect(payload.unreadCount).toBe(3);
     expect(payload.notifications).toHaveLength(1);
   });
+
+  it("returns a client-friendly error when loading notifications fails", async () => {
+    requireMobileAuth.mockResolvedValue({
+      userClient: {},
+    });
+    fetchMobileNotifications.mockRejectedValue(new Error("rpc failure"));
+
+    const { GET } = await import("./notifications");
+    const response = await GET({
+      nextUrl: new URL("http://localhost/api/mobile/v1/notifications"),
+    } as never);
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: "We couldn't load your mobile notifications right now.",
+    });
+  });
 });

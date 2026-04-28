@@ -1,5 +1,14 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -8,24 +17,35 @@ import type {
   MobileShiftRequest,
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { DetailSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen } from "../../../shared/components/Screen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   createShiftRequest,
   getMySchedule,
   getOrgSchedule,
   getShiftRequests,
 } from "../../../shared/lib/api";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import {
   getMobileQueryContentState,
   getQueryErrorMessage,
 } from "../../../shared/lib/query-state";
-import { mobileColors, mobileRadii } from "../../../shared/theme/tokens";
+import { useToast } from "../../../shared/providers/ToastProvider";
+import {
+  mobileBorderColorFromText,
+  mobileColors,
+  mobileRadii,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   buildScheduleSections,
   buildScheduleShiftGroups,
+  formatCompactScheduleDate,
+  getCompactScheduleDateParts,
   getScheduleEntrySegmentTimeRange,
   getScheduleEntrySegments,
   getScheduleEntryCategoryKey,
@@ -51,6 +71,26 @@ type ChipTone = {
   borderColor: string;
   textColor: string;
 };
+type DetailChipKind = "job" | "general" | "absence";
+type DetailChip = ChipTone & {
+  kind: DetailChipKind;
+  label: string;
+  eyebrowLabel?: string | null;
+};
+type EyebrowDisplay = "inside" | "outside";
+
+function readOptionalColor(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return value ?? null;
+  }
+
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0) {
+    return null;
+  }
+
+  return trimmedValue.toLowerCase() === "transparent" ? null : trimmedValue;
+}
 
 function readParam(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) {
@@ -120,6 +160,39 @@ function formatShiftRequestType(type: MobileShiftRequest["type"]): string {
   }
 
   return "Calloff";
+}
+
+function getRequestModeTitle(mode: RequestMode): string {
+  if (mode === "coverage") {
+    return "Drop shift";
+  }
+
+  if (mode === "swap") {
+    return "Swap";
+  }
+
+  return "Shift action";
+}
+
+function getRequestModalPresentationStyle(mode: RequestMode) {
+  if (Platform.OS !== "ios") {
+    return "fullScreen" as const;
+  }
+
+  if (mode === "coverage") {
+    return "formSheet" as const;
+  }
+
+  return "pageSheet" as const;
+}
+
+function getAbsenceTypeOptionLabel(absenceType: {
+  label: string;
+  name?: string | null;
+}) {
+  const trimmedName = absenceType.name?.trim() ?? "";
+
+  return trimmedName.length > 0 ? trimmedName : absenceType.label;
 }
 
 function getEntryTimeRanges(entry: MobileScheduleEntry): ShiftTimeRange[] {
@@ -239,18 +312,94 @@ function getAvatarTone(seed: string): ChipTone {
   };
 }
 
-function getEntryJobChip(entry: MobileScheduleEntry):
-  | (ChipTone & {
-      label: string;
-    })
-  | null {
+function buildDetailJobChip(
+  label: string | null | undefined,
+  colorSource?: {
+    jobColor?: string | null;
+    jobBorderColor?: string | null;
+    jobTextColor?: string | null;
+  } | null,
+): DetailChip | null {
+  const trimmedLabel = label?.trim() ?? "";
+  const jobColor = readOptionalColor(colorSource?.jobColor);
+  const jobBorderColor = readOptionalColor(colorSource?.jobBorderColor);
+  const jobTextColor = readOptionalColor(colorSource?.jobTextColor);
+
+  if (!trimmedLabel) {
+    return null;
+  }
+
+  return {
+    kind: "job",
+    label: trimmedLabel,
+    backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
+    borderColor: jobBorderColor ?? mobileColors.border,
+    textColor: jobTextColor ?? mobileColors.textMuted,
+  };
+}
+
+function buildDetailGeneralShiftChip(
+  label: string | null | undefined,
+  colorSource?: {
+    jobColor?: string | null;
+    jobBorderColor?: string | null;
+    jobTextColor?: string | null;
+  } | null,
+): DetailChip | null {
+  const chip = buildDetailJobChip(label, colorSource);
+
+  if (!chip) {
+    return null;
+  }
+
+  return {
+    ...chip,
+    kind: "general",
+    eyebrowLabel: "General shift",
+  };
+}
+
+function buildDetailAbsenceChip(
+  label: string | null | undefined,
+): DetailChip | null {
+  const trimmedLabel = label?.trim() ?? "";
+
+  if (!trimmedLabel) {
+    return null;
+  }
+
+  return {
+    kind: "absence",
+    label: trimmedLabel,
+    eyebrowLabel: "Absence",
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
+  };
+}
+
+function isGeneralDetailSegment(
+  segment: { shiftId?: number | null } | null | undefined,
+): boolean {
+  return (
+    segment != null &&
+    Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
+    segment.shiftId === null
+  );
+}
+
+function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return {
-      label: "Absence",
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.border,
-      textColor: mobileColors.textMuted,
-    };
+    return buildDetailAbsenceChip(getScheduleEntryTitle(entry));
+  }
+
+  const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
+
+  if (isGeneralDetailSegment(primarySegment)) {
+    return buildDetailGeneralShiftChip(
+      getScheduleEntryTitle(entry),
+      primarySegment,
+    );
   }
 
   const segment =
@@ -261,49 +410,24 @@ function getEntryJobChip(entry: MobileScheduleEntry):
     return null;
   }
 
-  if (segment?.jobColor || segment?.jobBorderColor || segment?.jobTextColor) {
-    return {
-      label,
-      backgroundColor: segment.jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: segment.jobBorderColor ?? mobileColors.border,
-      textColor: segment.jobTextColor ?? mobileColors.textMuted,
-    };
-  }
-
-  return {
-    label,
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textMuted,
-  };
+  return buildDetailJobChip(label, segment);
 }
 
-function buildSegmentJobChip(segment: MobileScheduleEntrySegment):
-  | (ChipTone & {
-      label: string;
-    })
-  | null {
+function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | null {
+  if (isGeneralDetailSegment(segment)) {
+    return buildDetailGeneralShiftChip(
+      segment.shiftName ?? segment.label ?? null,
+      segment,
+    );
+  }
+
   const label = segment.jobName?.trim() ?? "";
 
   if (!label) {
     return null;
   }
 
-  if (segment.jobColor || segment.jobBorderColor || segment.jobTextColor) {
-    return {
-      label,
-      backgroundColor: segment.jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: segment.jobBorderColor ?? mobileColors.border,
-      textColor: segment.jobTextColor ?? mobileColors.textMuted,
-    };
-  }
-
-  return {
-    label,
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textMuted,
-  };
+  return buildDetailJobChip(label, segment);
 }
 
 export default function ShiftDetailScreen() {
@@ -317,6 +441,7 @@ export default function ShiftDetailScreen() {
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const [requestMode, setRequestMode] = useState<RequestMode>(null);
   const [coverageRequestType, setCoverageRequestType] =
     useState<CoverageRequestType>(null);
@@ -324,7 +449,6 @@ export default function ShiftDetailScreen() {
     employeeId: string;
     date: string;
   } | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const employeeId = readParam(params.employeeId);
   const shiftDate = readParam(params.date);
@@ -400,14 +524,24 @@ export default function ShiftDetailScreen() {
       targetShiftDate?: string;
       absenceTypeId?: number;
     }) => createShiftRequest(accessToken!, input),
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not create request",
+        fallbackMessage: "We couldn't create that request.",
+      });
+    },
     onSuccess: async (_, variables) => {
-      setSuccessMessage(
-        variables.type === "calloff"
-          ? "Calloff request sent."
-          : variables.type === "swap"
-            ? "Swap request sent."
-            : "Pickup request sent.",
-      );
+      pushToast({
+        tone: "success",
+        title: "Request sent",
+        message:
+          variables.type === "calloff"
+            ? "Calloff request sent."
+            : variables.type === "swap"
+              ? "Swap request sent."
+              : "Pickup request sent.",
+      });
       setRequestMode(null);
       setCoverageRequestType(null);
       setSelectedTargetShift(null);
@@ -569,12 +703,6 @@ export default function ShiftDetailScreen() {
     requestMode === "swap" &&
     selectedTargetEntry,
   );
-  const createError = createRequestMutation.error
-    ? getQueryErrorMessage(
-        createRequestMutation.error,
-        "We couldn't create that request.",
-      )
-    : null;
   const contentState = getMobileQueryContentState({
     hasData: Boolean(shiftEntry) && Boolean(bootstrapQuery.data),
     isLoading:
@@ -603,6 +731,17 @@ export default function ShiftDetailScreen() {
     ? getScheduleEntryDisplayFocusAreaName(shiftEntry)
     : null;
   const jobChip = shiftEntry ? getEntryJobChip(shiftEntry) : null;
+  const shouldPromoteTypeLabel =
+    !hasMultipleSegments && Boolean(jobChip?.eyebrowLabel);
+  let detailCardTitle = shiftEntry ? getScheduleEntryTitle(shiftEntry) : "";
+
+  if (hasMultipleSegments) {
+    detailCardTitle = "Shifts";
+  }
+
+  if (shouldPromoteTypeLabel && jobChip?.eyebrowLabel) {
+    detailCardTitle = jobChip.eyebrowLabel;
+  }
   const shouldShowEmployeeSummary = Boolean(
     shiftEntry && shiftEntry.employeeId !== linkedEmployeeId,
   );
@@ -618,12 +757,19 @@ export default function ShiftDetailScreen() {
       shiftmates.length > 0),
   );
   const activeAbsenceTypes = absenceTypes;
+  const manualRefresh = useManualRefresh(() =>
+    Promise.all([
+      bootstrapQuery.refetch(),
+      myScheduleQuery.refetch(),
+      teamScheduleQuery.refetch(),
+      requestsQuery.refetch(),
+    ]),
+  );
 
   function resetRequestMode(nextMode: RequestMode) {
     setRequestMode(nextMode);
     setCoverageRequestType(null);
     setSelectedTargetShift(null);
-    setSuccessMessage(null);
   }
 
   function submitSwapRequest() {
@@ -726,33 +872,25 @@ export default function ShiftDetailScreen() {
 
   return (
     <Screen
+      bottomPaddingMode="stack"
       title="Shift Detail"
       subtitle="Shift Detail"
-      refreshing={
-        bootstrapQuery.isFetching ||
-        myScheduleQuery.isFetching ||
-        teamScheduleQuery.isFetching ||
-        requestsQuery.isFetching
-      }
-      onRefresh={() => {
-        void Promise.all([
-          bootstrapQuery.refetch(),
-          myScheduleQuery.refetch(),
-          teamScheduleQuery.refetch(),
-          requestsQuery.refetch(),
-        ]);
-      }}
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
     >
       {contentState.kind === "loading" ? (
-        <QueryStateCard
-          title="Loading shift"
-          body="Pulling the latest published shift details into the mobile app."
-        />
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading shift</Text>
+          <Text style={styles.loadingBody}>
+            Pulling the latest published shift details into the mobile app.
+          </Text>
+          <DetailSkeleton sections={2} />
+        </View>
       ) : contentState.kind === "error" ? (
-        <QueryStateCard
-          title="Could not load shift"
-          body={contentState.message}
+        <StatusBanner
           actionLabel="Try Again"
+          body={contentState.message}
+          title="Could not load shift"
           onAction={() => {
             void Promise.all([
               bootstrapQuery.refetch(),
@@ -762,43 +900,67 @@ export default function ShiftDetailScreen() {
           }}
         />
       ) : !employeeId || !shiftDate || !shiftEntry ? (
-        <Card
-          title="Shift unavailable"
+        <EmptyStateCard
           body="We could not find that published shift in the selected schedule range."
+          iconName="calendar-clear-outline"
+          title="Shift unavailable"
         />
       ) : (
         <>
           <Card
-            title={
-              hasMultipleSegments ? "Shifts" : getScheduleEntryTitle(shiftEntry)
-            }
-            body={formatShiftDate(shiftEntry.date)}
+            title={detailCardTitle}
+            headerAccessory={<DetailDateTile date={shiftEntry.date} />}
             detail={
-              <View style={styles.detailGroup}>
-                {shouldShowEmployeeSummary ? (
-                  <EmployeeSummary
-                    name={shiftEntry.employeeName}
-                    subtitle={
-                      hasMultipleSegments
-                        ? undefined
-                        : (primarySegmentTimeRange ?? timeRange ?? undefined)
-                    }
-                  />
-                ) : null}
-                {!shouldShowEmployeeSummary &&
-                !hasMultipleSegments &&
-                timeRange ? (
-                  <Text style={styles.detailSummaryText}>{timeRange}</Text>
-                ) : null}
-                {hasMultipleSegments ? (
-                  <ShiftEntrySegmentList entry={shiftEntry} variant="detail" />
-                ) : null}
-                {!hasMultipleSegments ? <DetailJobPill chip={jobChip} /> : null}
-                {!hasMultipleSegments && focusAreaName ? (
-                  <Text style={styles.detailMetaText}>{focusAreaName}</Text>
-                ) : null}
+              <View style={styles.detailCardContent}>
+                <View style={styles.detailGroup}>
+                  {shouldShowEmployeeSummary ? (
+                    <EmployeeSummary
+                      name={shiftEntry.employeeName}
+                      subtitle={undefined}
+                    />
+                  ) : null}
+                  {hasMultipleSegments ? (
+                    <ShiftEntrySegmentList entry={shiftEntry} variant="detail" />
+                  ) : null}
+                  {!hasMultipleSegments && focusAreaName ? (
+                    <Text style={styles.detailMetaText}>{focusAreaName}</Text>
+                  ) : null}
+                  {!hasMultipleSegments ? (
+                    <DetailJobPill
+                      chip={jobChip}
+                      eyebrowDisplay={shouldPromoteTypeLabel ? "outside" : "inside"}
+                    />
+                  ) : null}
+                  {!hasMultipleSegments && timeRange ? (
+                    <Text style={styles.detailSummaryText}>{timeRange}</Text>
+                  ) : null}
+                </View>
                 {publishedSummary ? (
                   <Text style={styles.detailFootnote}>{publishedSummary}</Text>
+                ) : null}
+                {canCreateRequestsForShift ? (
+                  <View style={styles.detailActionsBlock}>
+                    <View style={styles.detailActionsRow}>
+                      <View style={styles.detailActionButton}>
+                        <Button
+                          compact
+                          disabled={createRequestMutation.isPending}
+                          label="Drop shift"
+                          onPress={() => resetRequestMode("coverage")}
+                          tone="neutral"
+                        />
+                      </View>
+                      <View style={styles.detailActionButton}>
+                        <Button
+                          compact
+                          disabled={createRequestMutation.isPending}
+                          label="Swap"
+                          onPress={() => resetRequestMode("swap")}
+                          tone="secondary"
+                        />
+                      </View>
+                    </View>
+                  </View>
                 ) : null}
               </View>
             }
@@ -808,14 +970,15 @@ export default function ShiftDetailScreen() {
             <View style={styles.sectionBlock}>
               <Text style={styles.sectionTitle}>Shiftmates</Text>
               {teamScheduleQuery.isLoading ? (
-                <Text style={styles.sectionBody}>Loading shiftmates.</Text>
+                <ListSkeleton rows={2} showSectionHeader={false} />
               ) : teamScheduleQuery.error ? (
-                <Text style={styles.sectionBody}>
-                  {getQueryErrorMessage(
+                <StatusBanner
+                  body={getQueryErrorMessage(
                     teamScheduleQuery.error,
                     "We couldn't load shiftmates right now.",
                   )}
-                </Text>
+                  title="Could not load shiftmates"
+                />
               ) : (
                 <View style={styles.shiftmatesList}>
                   {shiftmates.map((entry, index) => (
@@ -832,25 +995,11 @@ export default function ShiftDetailScreen() {
             </View>
           ) : null}
 
-          {successMessage ? (
-            <Card title="Request sent" body={successMessage} />
-          ) : null}
-          {createError ? (
-            <QueryStateCard
-              title="Could not create request"
-              body={createError}
-              actionLabel="Refresh"
-              onAction={() => {
-                void queryClient.invalidateQueries({
-                  queryKey: ["mobile", "requests"],
-                });
-              }}
-            />
-          ) : null}
           {isCheckingExistingRequests ? (
-            <Card
-              title="Checking existing requests"
+            <StatusBanner
               body="Making sure this shift does not already have a request in progress."
+              tone="info"
+              title="Checking existing requests"
             />
           ) : null}
           {activeShiftRequest ? (
@@ -867,110 +1016,130 @@ export default function ShiftDetailScreen() {
             />
           ) : null}
           {shiftRequestCheckError ? (
-            <QueryStateCard
-              title="Could not verify existing requests"
-              body={shiftRequestCheckError}
+            <StatusBanner
               actionLabel="Refresh"
+              body={shiftRequestCheckError}
+              title="Could not verify existing requests"
               onAction={() => {
                 void requestsQuery.refetch();
               }}
             />
           ) : null}
 
-          {canCreateRequestsForShift ? (
-            <View style={styles.actionsPanel}>
-              <Text style={styles.sectionTitle}>Shift actions</Text>
-              <View style={styles.requestTypeRow}>
-                <RequestTypeChip
-                  active={requestMode === "coverage"}
-                  label="Drop shift"
-                  onPress={() => resetRequestMode("coverage")}
-                />
-                <RequestTypeChip
-                  active={requestMode === "swap"}
-                  label="Swap"
-                  onPress={() => resetRequestMode("swap")}
-                />
+        </>
+      )}
+      <Modal
+        animationType="slide"
+        allowSwipeDismissal
+        onRequestClose={() => resetRequestMode(null)}
+        presentationStyle={getRequestModalPresentationStyle(requestMode)}
+        visible={requestMode != null}
+      >
+        <Screen bottomPaddingMode="modal">
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderCopy}>
+                <Text style={styles.modalTitle}>
+                  {getRequestModeTitle(requestMode)}
+                </Text>
               </View>
-
-              {requestMode === "coverage" ? (
-                <View style={styles.subsection}>
-                  <Text style={styles.subsectionLabel}>Drop shift</Text>
-                  <Text style={styles.subsectionBody}>
-                    Choose how you want to drop this shift.
+              <Pressable
+                accessibilityLabel="Close"
+                accessibilityRole="button"
+                disabled={createRequestMutation.isPending}
+                onPress={() => resetRequestMode(null)}
+                style={({ pressed }) => [
+                  styles.modalCloseButton,
+                  pressed && styles.modalCloseButtonPressed,
+                  createRequestMutation.isPending && styles.modalCloseButtonDisabled,
+                ]}
+              >
+                <Ionicons
+                  color={mobileColors.textSecondary}
+                  name="close"
+                  size={18}
+                />
+              </Pressable>
+            </View>
+            {requestMode === "coverage" ? (
+              <View style={styles.subsection}>
+                <Text style={styles.subsectionBody}>
+                  Choose how you want to drop this shift.
+                </Text>
+                <View style={styles.coverageOptionList}>
+                  <CoverageOptionCard
+                    body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
+                    disabled={createRequestMutation.isPending}
+                    onPress={() => confirmCoverageRequest("pickup")}
+                    title="Offer for pickup"
+                    tone="neutral"
+                  />
+                  <CoverageOptionCard
+                    active={coverageRequestType === "calloff"}
+                    body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
+                    disabled={
+                      createRequestMutation.isPending ||
+                      activeAbsenceTypes.length === 0
+                    }
+                    onPress={() => setCoverageRequestType("calloff")}
+                    title="Call off"
+                    tone="danger"
+                  />
+                </View>
+                {activeAbsenceTypes.length === 0 ? (
+                  <Text style={styles.coverageNotice}>
+                    Call off is unavailable until at least one active absence
+                    type is set up.
                   </Text>
-                  <View style={styles.coverageOptionList}>
-                    <CoverageOptionCard
-                      body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
-                      disabled={createRequestMutation.isPending}
-                      onPress={() => confirmCoverageRequest("pickup")}
-                      title="Offer for pickup"
-                      tone="neutral"
-                    />
-                    <CoverageOptionCard
-                      active={coverageRequestType === "calloff"}
-                      body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
-                      disabled={
-                        createRequestMutation.isPending ||
-                        activeAbsenceTypes.length === 0
-                      }
-                      onPress={() => setCoverageRequestType("calloff")}
-                      title="Call off"
-                      tone="danger"
-                    />
-                  </View>
-                  {activeAbsenceTypes.length === 0 ? (
-                    <Text style={styles.coverageNotice}>
-                      Call off is unavailable until at least one active absence
-                      type is set up.
+                ) : null}
+                {coverageRequestType === "calloff" ? (
+                  <View style={styles.modalInlinePanel}>
+                    <Text style={styles.subsectionLabel}>
+                      Select absence reason
                     </Text>
-                  ) : null}
-                  {coverageRequestType === "calloff" ? (
-                    <View style={styles.subsection}>
-                      <Text style={styles.subsectionLabel}>
-                        Select absence reason
-                      </Text>
-                      <View style={styles.selectorWrap}>
-                        {activeAbsenceTypes.map((absenceType) => (
-                          <SelectorChip
-                            key={absenceType.id}
-                            active={false}
-                            disabled={createRequestMutation.isPending}
-                            label={absenceType.label}
-                            onPress={() =>
-                              confirmCoverageRequest("calloff", {
-                                absenceTypeId: absenceType.id,
-                                absenceTypeLabel: absenceType.label,
-                              })
-                            }
-                          />
-                        ))}
-                      </View>
+                    <View style={styles.selectorWrap}>
+                      {activeAbsenceTypes.map((absenceType) => (
+                        <SelectorChip
+                          key={absenceType.id}
+                          active={false}
+                          disabled={createRequestMutation.isPending}
+                          label={getAbsenceTypeOptionLabel(absenceType)}
+                          onPress={() =>
+                            confirmCoverageRequest("calloff", {
+                              absenceTypeId: absenceType.id,
+                              absenceTypeLabel:
+                                getAbsenceTypeOptionLabel(absenceType),
+                            })
+                          }
+                        />
+                      ))}
                     </View>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {requestMode === "swap" ? (
+              <View style={styles.subsection}>
+                <Text style={styles.subsectionBody}>
+                  {selectedTargetEntry
+                    ? "Review the trade below, then submit your swap request."
+                    : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
+                </Text>
+                <View style={styles.swapSummaryList}>
+                  <SwapSummaryCard
+                    entry={shiftEntry!}
+                    label={selectedTargetEntry ? "You give" : "Your shift"}
+                  />
+                  {selectedTargetEntry ? (
+                    <SwapSummaryCard
+                      entry={selectedTargetEntry}
+                      label="You get"
+                      summaryNote={`From ${selectedTargetEntry.employeeName}`}
+                    />
                   ) : null}
                 </View>
-              ) : null}
-
-              {requestMode === "swap" ? (
-                <View style={styles.subsection}>
-                  <Text style={styles.subsectionBody}>
-                    {selectedTargetEntry
-                      ? "Review the trade below, then submit your swap request."
-                      : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
-                  </Text>
-                  <View style={styles.swapSummaryList}>
-                    <SwapSummaryCard
-                      entry={shiftEntry}
-                      label={selectedTargetEntry ? "You give" : "Your shift"}
-                    />
-                    {selectedTargetEntry ? (
-                      <SwapSummaryCard
-                        entry={selectedTargetEntry}
-                        label="You get"
-                        summaryNote={`From ${selectedTargetEntry.employeeName}`}
-                      />
-                    ) : null}
-                  </View>
+                <View style={styles.modalInlinePanel}>
                   <Text style={styles.subsectionLabel}>Eligible teammates</Text>
                   {!canViewTeamSchedule ? (
                     <Text style={styles.subsectionBody}>
@@ -1024,44 +1193,23 @@ export default function ShiftDetailScreen() {
                     </View>
                   )}
                 </View>
-              ) : null}
+              </View>
+            ) : null}
 
-              {requestMode === "swap" ? (
-                <View style={styles.actionButtons}>
-                  <Button
-                    disabled={
-                      !canSubmitRequest || createRequestMutation.isPending
-                    }
-                    label={
-                      createRequestMutation.isPending
-                        ? "Submitting..."
-                        : "Submit"
-                    }
-                    onPress={handleSubmitRequest}
-                  />
-                  <Button
-                    disabled={createRequestMutation.isPending}
-                    label="Cancel"
-                    onPress={() => resetRequestMode(null)}
-                    tone="neutral"
-                  />
-                </View>
-              ) : null}
-
-              {requestMode === "coverage" ? (
-                <View style={styles.actionButtons}>
-                  <Button
-                    disabled={createRequestMutation.isPending}
-                    label="Cancel"
-                    onPress={() => resetRequestMode(null)}
-                    tone="neutral"
-                  />
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </>
-      )}
+            {requestMode === "swap" ? (
+              <View style={styles.modalActionButtons}>
+                <Button
+                  disabled={!canSubmitRequest || createRequestMutation.isPending}
+                  label={
+                    createRequestMutation.isPending ? "Submitting..." : "Submit"
+                  }
+                  onPress={handleSubmitRequest}
+                />
+              </View>
+            ) : null}
+          </View>
+        </Screen>
+      </Modal>
     </Screen>
   );
 }
@@ -1083,32 +1231,75 @@ function EmployeeSummary({
   );
 }
 
+function DetailDateTile({ date }: { date: string }) {
+  const dateLabel = formatCompactScheduleDate(date);
+  const dateParts = getCompactScheduleDateParts(date);
+
+  return (
+    <View accessibilityLabel={dateLabel} style={styles.detailDateTile}>
+      <Text style={styles.detailDateWeekday}>{dateParts.weekdayLabel}</Text>
+      <Text style={styles.detailDateDay}>{dateParts.dayLabel}</Text>
+    </View>
+  );
+}
+
 function DetailJobPill({
   chip,
+  eyebrowDisplay = "inside",
 }: {
-  chip:
-    | (ChipTone & {
-        label: string;
-      })
-    | null;
+  chip: DetailChip | null;
+  eyebrowDisplay?: EyebrowDisplay;
 }) {
   if (!chip) {
     return null;
   }
 
+  const accessibilityLabel = chip.eyebrowLabel
+    ? `${chip.eyebrowLabel} ${chip.label}`
+    : `Job ${chip.label}`;
+  const shouldRenderEyebrowInsidePill =
+    eyebrowDisplay === "inside" && chip.eyebrowLabel;
+  const shouldRenderSingleLinePill =
+    !chip.eyebrowLabel || eyebrowDisplay === "outside";
+  const chipBorderColor =
+    chip.kind === "general"
+      ? mobileBorderColorFromText(chip.textColor)
+      : chip.borderColor;
+
   return (
     <View
+      accessibilityLabel={accessibilityLabel}
       style={[
         styles.detailJobChip,
         {
           backgroundColor: chip.backgroundColor,
-          borderColor: chip.borderColor,
+          borderColor: chipBorderColor,
         },
       ]}
     >
-      <Text style={[styles.detailJobChipText, { color: chip.textColor }]}>
-        {chip.label}
-      </Text>
+      {shouldRenderSingleLinePill ? (
+        <Text style={[styles.detailJobChipText, { color: chip.textColor }]}>
+          {chip.label}
+        </Text>
+      ) : (
+        <View style={styles.detailJobChipTextStack}>
+          {shouldRenderEyebrowInsidePill ? (
+            <Text
+              style={[
+                styles.detailJobChipEyebrowText,
+                { color: chip.textColor },
+              ]}
+            >
+              {chip.eyebrowLabel}
+            </Text>
+          ) : null}
+          <Text
+            style={[styles.detailJobChipValueText, { color: chip.textColor }]}
+          >
+            {chip.label}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -1130,6 +1321,10 @@ function ShiftmateRow({
   const entryFocusAreaName = getScheduleEntryDisplayFocusAreaName(entry);
   const segments = getScheduleEntrySegments(entry);
   const shouldShowSegments = segments.length > 1;
+  const jobChipBorderColor =
+    jobChip?.kind === "general"
+      ? mobileBorderColorFromText(jobChip.textColor)
+      : jobChip?.borderColor ?? mobileColors.border;
   const metaItems = [
     entryTimeRange && entryTimeRange !== groupTimeRange ? entryTimeRange : null,
     entryFocusAreaName && entryFocusAreaName !== groupFocusAreaName
@@ -1159,16 +1354,24 @@ function ShiftmateRow({
           <Text style={styles.shiftmateName}>{entry.employeeName}</Text>
           {jobChip ? (
             <View
+              accessibilityLabel={
+                jobChip.eyebrowLabel
+                  ? `${jobChip.eyebrowLabel} ${jobChip.label}`
+                  : `Job ${jobChip.label}`
+              }
               style={[
                 styles.shiftmateChip,
                 {
                   backgroundColor: jobChip.backgroundColor,
-                  borderColor: jobChip.borderColor,
+                  borderColor: jobChipBorderColor,
                 },
               ]}
             >
               <Text
-                style={[styles.detailJobChipText, { color: jobChip.textColor }]}
+                style={[
+                  styles.detailJobChipText,
+                  { color: jobChip.textColor },
+                ]}
               >
                 {jobChip.label}
               </Text>
@@ -1182,32 +1385,6 @@ function ShiftmateRow({
         ) : null}
       </View>
     </View>
-  );
-}
-
-function RequestTypeChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.requestTypeChip, active && styles.requestTypeChipActive]}
-    >
-      <Text
-        style={[
-          styles.requestTypeChipText,
-          active && styles.requestTypeChipTextActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -1413,11 +1590,64 @@ function ShiftEntrySegmentList({
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  loadingBody: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  detailCardContent: {
+    gap: 14,
+    paddingTop: 2,
+  },
+  detailActionsBlock: {
+    paddingTop: 4,
+  },
+  detailActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  detailActionButton: {
+    flex: 1,
+  },
   detailGroup: {
-    gap: 12,
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  detailDateTile: {
+    minWidth: 58,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  detailDateWeekday: {
+    color: mobileColors.textSubtle,
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  detailDateDay: {
+    color: mobileColors.textSecondary,
+    fontSize: 24,
+    fontWeight: "800",
+    lineHeight: 28,
   },
   employeeSummary: {
-    gap: 4,
+    gap: 6,
+    alignSelf: "stretch",
   },
   employeeSummaryName: {
     color: mobileColors.textPrimary,
@@ -1433,17 +1663,20 @@ const styles = StyleSheet.create({
     color: mobileColors.textMuted,
     fontSize: 14,
     fontWeight: "600",
+    lineHeight: 20,
   },
   detailMetaText: {
     color: mobileColors.textSecondary,
     fontSize: 14,
     fontWeight: "700",
+    lineHeight: 20,
   },
   detailFootnote: {
     color: mobileColors.textSubtle,
     fontSize: 12,
     fontWeight: "600",
     lineHeight: 18,
+    paddingTop: 2,
   },
   detailJobChip: {
     alignSelf: "flex-start",
@@ -1452,11 +1685,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
+  detailJobChipTextStack: {
+    gap: 2,
+  },
+  detailJobChipEyebrowText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
   detailJobChipText: {
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 0.8,
     textTransform: "uppercase",
+  },
+  detailJobChipValueText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
   detailSegmentList: {
     gap: 12,
@@ -1479,9 +1725,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  actionsPanel: {
-    gap: 12,
-  },
   sectionBlock: {
     gap: 12,
   },
@@ -1490,17 +1733,13 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   shiftmatesList: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    overflow: "hidden",
+    gap: 0,
   },
   shiftmateRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 0,
     paddingVertical: 13,
   },
   shiftmateRowBorder: {
@@ -1575,32 +1814,48 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
-  requestTypeRow: {
+  modalHeader: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  requestTypeChip: {
+  modalHeaderCopy: {
     flex: 1,
-    borderRadius: mobileRadii.control,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    minWidth: 0,
+    paddingTop: 2,
+  },
+  modalTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 19,
+    fontWeight: "800",
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
     backgroundColor: mobileColors.surfaceSecondary,
     alignItems: "center",
+    justifyContent: "center",
   },
-  requestTypeChipActive: {
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
+  modalCloseButtonPressed: {
+    transform: [{ scale: 0.96 }],
   },
-  requestTypeChipText: {
-    color: mobileColors.textMuted,
-    fontWeight: "700",
+  modalCloseButtonDisabled: {
+    opacity: 0.5,
   },
-  requestTypeChipTextActive: {
-    color: mobileColors.brand,
+  modalContent: {
+    gap: 18,
+    paddingTop: 20,
+  },
+  modalActionButtons: {
+    gap: 10,
+    paddingTop: 2,
   },
   subsection: {
-    gap: 10,
+    gap: 14,
   },
   subsectionLabel: {
     color: mobileColors.textPrimary,
@@ -1610,6 +1865,14 @@ const styles = StyleSheet.create({
   subsectionBody: {
     color: mobileColors.textMuted,
     lineHeight: 21,
+  },
+  modalInlinePanel: {
+    gap: 12,
+    padding: 16,
+    borderRadius: mobileRadii.card,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.surface,
   },
   swapSummaryList: {
     gap: 10,
@@ -1752,8 +2015,5 @@ const styles = StyleSheet.create({
     color: mobileColors.textPrimary,
     fontWeight: "800",
     flex: 1,
-  },
-  actionButtons: {
-    gap: 10,
   },
 });

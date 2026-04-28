@@ -1,23 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mobileNotificationReadResponseSchema } from "@dubgrid/contracts";
+import {
+  markAllMobileNotificationsRead,
+  markMobileNotificationRead,
+  MobileApiRefreshError,
+} from "@dubgrid/mobile-api-core";
 import { requireMobileAuth } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
-
-async function readUnreadCount(auth: Awaited<ReturnType<typeof requireMobileAuth>>) {
-  if ("response" in auth) {
-    throw new Error("Authentication response passed to readUnreadCount");
-  }
-
-  const unreadCountResult = await auth.userClient.rpc(
-    "get_unread_notification_count",
-  );
-  if (unreadCountResult.error) {
-    throw unreadCountResult.error;
-  }
-
-  return (unreadCountResult.data as number | null) ?? 0;
-}
 
 export async function PATCH(
   req: NextRequest,
@@ -26,46 +16,69 @@ export async function PATCH(
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  const { id } = await context.params;
-  const markReadResult = await auth.userClient.rpc("mark_notification_read", {
-    p_notification_id: id,
-  });
+  try {
+    const { id } = await context.params;
+    try {
+      const payload = await markMobileNotificationRead(auth, id);
 
-  if (markReadResult.error) {
+      return NextResponse.json(
+        mobileNotificationReadResponseSchema.parse(payload),
+      );
+    } catch (error) {
+      if (error instanceof MobileApiRefreshError) {
+        return NextResponse.json(
+          {
+            error:
+              "We updated that notification, but we couldn't refresh your mobile alerts right now.",
+          },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json(
+        { error: "We could not update that notification." },
+        { status: 400 },
+      );
+    }
+  } catch {
     return NextResponse.json(
       { error: "We could not update that notification." },
-      { status: 400 },
+      { status: 500 },
     );
   }
-
-  const unreadCount = await readUnreadCount(auth);
-
-  return NextResponse.json(
-    mobileNotificationReadResponseSchema.parse({
-      success: true,
-      unreadCount,
-    }),
-  );
 }
 
 export async function POST(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  const markAllResult = await auth.userClient.rpc("mark_all_notifications_read");
-  if (markAllResult.error) {
+  try {
+    try {
+      const payload = await markAllMobileNotificationsRead(auth);
+
+      return NextResponse.json(
+        mobileNotificationReadResponseSchema.parse(payload),
+      );
+    } catch (error) {
+      if (error instanceof MobileApiRefreshError) {
+        return NextResponse.json(
+          {
+            error:
+              "We updated your notifications, but we couldn't refresh your mobile alerts right now.",
+          },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json(
+        { error: "We could not update your notifications." },
+        { status: 400 },
+      );
+    }
+  } catch {
     return NextResponse.json(
       { error: "We could not update your notifications." },
-      { status: 400 },
+      { status: 500 },
     );
   }
-
-  const unreadCount = await readUnreadCount(auth);
-
-  return NextResponse.json(
-    mobileNotificationReadResponseSchema.parse({
-      success: true,
-      unreadCount,
-    }),
-  );
 }

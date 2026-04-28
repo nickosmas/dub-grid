@@ -7,39 +7,39 @@ import {
   rowToShiftCategory,
   rowToShiftRequest,
 } from "@/lib/db/mappers";
+import type { MobilePublishedScheduleRow } from "@dubgrid/data-access";
 import {
-  FOCUS_AREA_COLS,
-  COVERAGE_REQ_COLS,
-  EMPLOYEE_COLS,
-  JOB_COLS,
-  NAMED_ITEM_COLS,
-  ORG_ROLE_COLS,
-  SHIFT_CATEGORY_COLS,
-} from "@/lib/db/shared";
-import type {
-  DbCoverageRequirement,
-  DbFocusArea,
-  DbJobDefinition,
-  DbNamedItem,
-  DbScheduleCell,
-  DbScheduleCellSnapshot,
-  DbShiftCategory,
-  DbShiftRequest,
-} from "@/lib/db/types";
+  fetchLinkedEmployeeRowForUser,
+  fetchMobileAbsenceTypeRows,
+  fetchMobileAssignmentSeedRows,
+  fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
+  fetchMobileJobNameRows,
+  fetchMobileNotificationsPage as fetchMobileNotificationsPageData,
+  fetchMobileOpenShiftContextRows as fetchMobileOpenShiftContextRowsData,
+  fetchMobilePeopleRows as fetchMobilePeopleRowsData,
+  fetchMobilePublishHistoryRows,
+  fetchMobileShiftRequestRows as fetchMobileShiftRequestRowsData,
+  fetchMobileUnreadNotificationCount as fetchMobileUnreadNotificationCountData,
+  fetchProfileNameRowsByIds as fetchProfileNameRowsByIdsData,
+  fetchPublishedMobileScheduleRows as fetchPublishedMobileScheduleRowsData,
+} from "@dubgrid/data-access";
+import type { DbShiftRequest } from "@dubgrid/db-types";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import type {
+  AssignmentDefinition,
   FocusArea,
   JobDefinition,
-  Organization,
   Employee,
   NamedItem,
   ShiftCategory,
 } from "@/types";
+import type { Organization } from "@dubgrid/domain";
 import {
   buildScheduleAssignmentOptions,
   buildShiftDisplayParts,
   formatAssignableShiftOptionLabel,
   getQualificationSeniorityRank,
+  isEmployeeQualifiedForAssignmentDefinition,
 } from "@/lib/assignable-shifts";
 import {
   getJobPlacementShiftPool,
@@ -54,12 +54,13 @@ import type {
   MobileScheduleEntry,
   MobileScheduleEntrySegment,
   MobileShiftRequest,
-  ScheduleCellState,
 } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildAssignmentDefinitionIdsByFocusArea,
   computeCoverageGaps,
+  timesOverlap,
+  type TimeRange,
 } from "@/lib/schedule-logic";
 
 type EmbeddedEmployee = {
@@ -104,19 +105,6 @@ type MobilePublishHistoryEntry = {
   endDate: string;
   publishedAt: string;
   publishedByName: string | null;
-};
-
-type LoadedMobileScheduleRow = {
-  emp_id: string;
-  date: string;
-  focus_area_id: number | null;
-  state: ScheduleCellState;
-  employees: unknown;
-};
-
-type MobileScheduleCellRow = DbScheduleCell & {
-  employees: unknown;
-  snapshots?: DbScheduleCellSnapshot[] | null;
 };
 
 type MobilePeopleRow = Pick<
@@ -188,82 +176,25 @@ export async function fetchLinkedEmployeeForUser(
   orgId: string,
   userId: string,
 ): Promise<Employee | null> {
-  const { data, error } = await serviceClient
-    .from("employees")
-    .select(
-      "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version",
-    )
-    .eq("org_id", orgId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error || !data) return null;
-  return rowToEmployee(data);
+  const row = await fetchLinkedEmployeeRowForUser(serviceClient, orgId, userId);
+  return row ? rowToEmployee(row) : null;
 }
 
 async function fetchAssignmentDetailsMap(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<Map<string, MobileAssignmentDetails>> {
-  const [
-    focusAreaResult,
-    shiftResult,
-    jobResult,
-    roleResult,
-    certificationResult,
-  ] = await Promise.all([
-    serviceClient
-      .from("focus_areas")
-      .select(FOCUS_AREA_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-    serviceClient
-      .from("shift_categories")
-      .select(SHIFT_CATEGORY_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("jobs")
-      .select(JOB_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("organization_roles")
-      .select(ORG_ROLE_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("certifications")
-      .select(NAMED_ITEM_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-  ]);
-
-  if (focusAreaResult.error) throw focusAreaResult.error;
-  if (shiftResult.error) throw shiftResult.error;
-  if (jobResult.error) throw jobResult.error;
-  if (roleResult.error) throw roleResult.error;
-  if (certificationResult.error) throw certificationResult.error;
-
-  const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(
-    rowToFocusArea,
+  const assignmentSeed = await fetchMobileAssignmentSeedRows(
+    serviceClient,
+    orgId,
   );
-  const shiftCategories = ((shiftResult.data ?? []) as DbShiftCategory[]).map(
+  const focusAreas = assignmentSeed.focusAreaRows.map(rowToFocusArea);
+  const shiftCategories = assignmentSeed.shiftCategoryRows.map(
     rowToShiftCategory,
   );
-  const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(
-    rowToJobDefinition,
-  );
-  const orgRoles = ((roleResult.data ?? []) as DbNamedItem[]).map(
-    rowToNamedItem,
-  );
-  const certifications = (
-    (certificationResult.data ?? []) as DbNamedItem[]
-  ).map(rowToNamedItem);
+  const jobs = assignmentSeed.jobRows.map(rowToJobDefinition);
+  const orgRoles = assignmentSeed.organizationRoleRows.map(rowToNamedItem);
+  const certifications = assignmentSeed.certificationRows.map(rowToNamedItem);
   const jobSortOrderById = new Map(
     jobs
       .filter((job) => job.systemKey !== "regular_staff")
@@ -341,21 +272,17 @@ async function fetchAbsenceLabelMap(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<Map<number, MobileAbsenceDetails>> {
-  const { data } = await serviceClient
-    .from("absence_types")
-    .select("id, label, name, color, border_color, text_color")
-    .eq("org_id", orgId)
-    .is("archived_at", null);
+  const rows = await fetchMobileAbsenceTypeRows(serviceClient, orgId);
 
   return new Map(
-    (data ?? []).map((row) => [
+    rows.map((row) => [
       row.id as number,
       {
-        label: row.label as string,
-        name: (row.name as string | null) ?? (row.label as string),
-        color: (row.color as string | null) ?? null,
-        borderColor: (row.border_color as string | null) ?? null,
-        textColor: (row.text_color as string | null) ?? null,
+        label: row.label,
+        name: row.name ?? row.label,
+        color: row.color ?? null,
+        borderColor: row.border_color ?? null,
+        textColor: row.text_color ?? null,
       },
     ]),
   );
@@ -365,33 +292,19 @@ async function fetchJobNameMap(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<Map<number, string>> {
-  const { data } = await serviceClient
-    .from("jobs")
-    .select("id, name")
-    .eq("org_id", orgId)
-    .is("archived_at", null);
-
-  return new Map(
-    (data ?? []).map((row) => [row.id as number, row.name as string]),
-  );
+  const rows = await fetchMobileJobNameRows(serviceClient, orgId);
+  return new Map(rows.map((row) => [row.id, row.name]));
 }
 
 export async function fetchMobileAbsenceTypes(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileAbsenceType[]> {
-  const { data, error } = await serviceClient
-    .from("absence_types")
-    .select("id, label")
-    .eq("org_id", orgId)
-    .is("archived_at", null)
-    .order("label", { ascending: true });
-
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
-    id: row.id as number,
-    label: row.label as string,
+  const rows = await fetchMobileAbsenceTypeRows(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    name: row.name ?? undefined,
   }));
 }
 
@@ -399,18 +312,10 @@ export async function fetchMobileFocusAreas(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileFocusArea[]> {
-  const { data, error } = await serviceClient
-    .from("focus_areas")
-    .select("id, name")
-    .eq("org_id", orgId)
-    .is("archived_at", null)
-    .order("sort_order", { ascending: true });
-
-  if (error) throw error;
-
-  return (data ?? []).map((row) => ({
-    id: row.id as number,
-    name: row.name as string,
+  const rows = await fetchMobileFocusAreaRowsData(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
   }));
 }
 
@@ -418,7 +323,7 @@ async function fetchFocusAreaNameMap(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<Map<number, string>> {
-  const focusAreas = await fetchMobileFocusAreas(serviceClient, orgId);
+  const focusAreas = await fetchMobileFocusAreaRowsData(serviceClient, orgId);
   return new Map(focusAreas.map((focusArea) => [focusArea.id, focusArea.name]));
 }
 
@@ -426,163 +331,40 @@ async function fetchMobilePublishHistory(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobilePublishHistoryEntry[]> {
-  const { data, error } = await serviceClient.rpc("get_publish_history", {
-    p_org_id: orgId,
-    p_limit: 100,
-    p_offset: 0,
-  });
-
-  if (error || !data) {
+  const rows = await fetchMobilePublishHistoryRows(serviceClient, orgId);
+  if (rows.length === 0) {
     return [];
   }
 
-  return (data as Record<string, unknown>[]).map((row) => ({
-    startDate: row.start_date as string,
-    endDate: row.end_date as string,
-    publishedAt: row.published_at as string,
-    publishedByName: (row.published_by_name as string | null) ?? null,
+  const publisherIds = [
+    ...new Set(
+      rows
+        .map((row) => row.published_by)
+        .filter((value): value is string => typeof value === "string"),
+    ),
+  ];
+  const publisherNameMap = new Map<string, string | null>();
+
+  if (publisherIds.length > 0) {
+    const profiles = await fetchProfileNameRowsByIdsData(
+      serviceClient,
+      publisherIds,
+    );
+    for (const profile of profiles ?? []) {
+      const firstName = profile.first_name ?? "";
+      const lastName = profile.last_name ?? "";
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      publisherNameMap.set(profile.id, fullName || null);
+    }
+  }
+
+  return rows.map((row) => ({
+    startDate: row.start_date,
+    endDate: row.end_date,
+    publishedAt: row.published_at,
+    publishedByName: (row.published_by && publisherNameMap.get(row.published_by)) ?? null,
   }));
-}
-
-function normalizeEmbeddedEmployee(value: unknown): EmbeddedEmployee | null {
-  if (Array.isArray(value)) {
-    return normalizeEmbeddedEmployee(value[0] ?? null);
-  }
-
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const candidate = value as Partial<EmbeddedEmployee>;
-  if (
-    typeof candidate.id !== "string" ||
-    typeof candidate.first_name !== "string" ||
-    typeof candidate.last_name !== "string" ||
-    typeof candidate.org_id !== "string"
-  ) {
-    return null;
-  }
-
-  return {
-    id: candidate.id,
-    first_name: candidate.first_name,
-    last_name: candidate.last_name,
-    org_id: candidate.org_id,
-    seniority:
-      typeof candidate.seniority === "number" ? candidate.seniority : null,
-    focus_area_ids: Array.isArray(candidate.focus_area_ids)
-      ? candidate.focus_area_ids.filter(
-          (value): value is number => typeof value === "number",
-        )
-      : [],
-  };
-}
-
-function normalizePublishedSnapshotRow(
-  row: MobileScheduleCellRow,
-): LoadedMobileScheduleRow | null {
-  const publishedSnapshot = (row.snapshots ?? []).find(
-    (snapshot) => snapshot.snapshot_kind === "published",
-  );
-  if (!publishedSnapshot) return null;
-
-  const orderedSegments = [...(publishedSnapshot.segments ?? [])].sort(
-    (left, right) => left.position - right.position,
-  );
-
-  return {
-    emp_id: row.emp_id,
-    date: row.date,
-    focus_area_id: row.focus_area_id ?? null,
-    state:
-      publishedSnapshot.state_kind === "absence"
-        ? {
-            kind: "absence",
-            segments: [],
-            absenceTypeId: publishedSnapshot.absence_type_id ?? null,
-            customStartTime: null,
-            customEndTime: null,
-            seriesId: null,
-            fromRecurring: false,
-          }
-        : {
-            kind: "worked",
-            segments: orderedSegments.map((segment) => ({
-              shiftId: segment.shift_id ?? null,
-              jobId: segment.job_id,
-              position: segment.position,
-            })),
-            absenceTypeId: null,
-            customStartTime: publishedSnapshot.custom_start_time ?? null,
-            customEndTime: publishedSnapshot.custom_end_time ?? null,
-            seriesId: null,
-            fromRecurring: false,
-          },
-    employees: row.employees,
-  };
-}
-
-async function loadMobileScheduleRows(
-  serviceClient: SupabaseClient,
-  input: {
-    orgId: string;
-    startDate: string;
-    endDate: string;
-    employeeId?: string;
-  },
-): Promise<LoadedMobileScheduleRow[]> {
-  let normalizedQuery = serviceClient
-    .from("schedule_cells")
-    .select(
-      `
-        id,
-        emp_id,
-        date,
-        org_id,
-        focus_area_id,
-        version,
-        series_id,
-        from_recurring,
-        created_by,
-        updated_by,
-        created_at,
-        updated_at,
-        snapshots:schedule_cell_snapshots(
-          id,
-          cell_id,
-          org_id,
-          snapshot_kind,
-          state_kind,
-          absence_type_id,
-          custom_start_time,
-          custom_end_time,
-          segments:schedule_cell_segments(
-            id,
-            snapshot_id,
-            org_id,
-            position,
-            shift_id,
-            job_id
-          )
-        ),
-        employees!inner(id, first_name, last_name, org_id, seniority, focus_area_ids)
-      `,
-    )
-    .eq("org_id", input.orgId)
-    .gte("date", input.startDate)
-    .lte("date", input.endDate)
-    .order("date", { ascending: true });
-
-  if (input.employeeId) {
-    normalizedQuery = normalizedQuery.eq("emp_id", input.employeeId);
-  }
-
-  const { data, error } = await normalizedQuery;
-  if (error) throw error;
-
-  return ((data ?? []) as MobileScheduleCellRow[])
-    .map((row) => normalizePublishedSnapshotRow(row))
-    .filter((row): row is LoadedMobileScheduleRow => row != null);
 }
 
 function getAssignmentDetailsForPair(
@@ -866,6 +648,75 @@ function buildMobileShiftRequestSegments(input: {
   ];
 }
 
+function normalizeMobileTimeValue(value: string | null | undefined): string | null {
+  return value ? value.slice(0, 5) : null;
+}
+
+function toMobileTimeRange(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): TimeRange | null {
+  const normalizedStart = normalizeMobileTimeValue(start);
+  const normalizedEnd = normalizeMobileTimeValue(end);
+
+  if (!normalizedStart || !normalizedEnd) {
+    return null;
+  }
+
+  return {
+    start: normalizedStart,
+    end: normalizedEnd,
+  };
+}
+
+function getMobileSegmentTimeRanges(
+  segments: ReadonlyArray<MobileScheduleEntrySegment>,
+): TimeRange[] {
+  return segments.flatMap((segment) => {
+    const range = toMobileTimeRange(
+      segment.startTime ?? segment.shiftStartTime ?? null,
+      segment.endTime ?? segment.shiftEndTime ?? null,
+    );
+    return range ? [range] : [];
+  });
+}
+
+function getScheduleRowTimeRanges(input: {
+  row: MobilePublishedScheduleRow;
+  assignmentDetailsByPair: Map<string, MobileAssignmentDetails>;
+  focusAreaNameMap: Map<number, string>;
+  jobNameMap: Map<number, string>;
+}): TimeRange[] {
+  if (input.row.state.kind !== "worked") {
+    return [];
+  }
+
+  const segments = buildMobileShiftRequestSegments({
+    customStartTime: input.row.state.customStartTime ?? null,
+    customEndTime: input.row.state.customEndTime ?? null,
+    fallbackShiftName: null,
+    focusAreaId: input.row.focus_area_id,
+    focusAreaNameMap: input.focusAreaNameMap,
+    jobIds: input.row.state.segments.map((segment) => segment.jobId),
+    jobNameMap: input.jobNameMap,
+    assignmentDetailsByPair: input.assignmentDetailsByPair,
+    shiftIds: input.row.state.segments.map((segment) => segment.shiftId ?? null),
+  });
+
+  return getMobileSegmentTimeRanges(segments);
+}
+
+function getAssignmentDefinitionTimeRanges(
+  assignment: Pick<AssignmentDefinition, "defaultStartTime" | "defaultEndTime">,
+): TimeRange[] {
+  const range = toMobileTimeRange(
+    assignment.defaultStartTime,
+    assignment.defaultEndTime,
+  );
+
+  return range ? [range] : [];
+}
+
 function findPublishHistoryEntryForDate(
   history: MobilePublishHistoryEntry[],
   date: string,
@@ -898,7 +749,7 @@ export async function fetchMobileScheduleEntries(
     fetchJobNameMap(serviceClient, input.orgId),
     fetchMobilePublishHistory(serviceClient, input.orgId),
   ]);
-  const data = await loadMobileScheduleRows(serviceClient, input);
+  const data = await fetchPublishedMobileScheduleRowsData(serviceClient, input);
 
   const entries: MobileScheduleEntry[] = [];
 
@@ -914,11 +765,6 @@ export async function fetchMobileScheduleEntries(
         : [];
     const absenceTypeId = state.kind === "absence" ? state.absenceTypeId : null;
     if (shiftIds.length === 0 && jobIds.length === 0 && absenceTypeId == null) {
-      continue;
-    }
-
-    const employee = normalizeEmbeddedEmployee(row.employees);
-    if (!employee) {
       continue;
     }
 
@@ -1005,9 +851,9 @@ export async function fetchMobileScheduleEntries(
     };
 
     entries.push({
-      employeeId: employee.id,
-      employeeName: `${employee.first_name} ${employee.last_name}`.trim(),
-      employeeSeniority: employee.seniority ?? null,
+      employeeId: row.employees.id,
+      employeeName: `${row.employees.first_name} ${row.employees.last_name}`.trim(),
+      employeeSeniority: row.employees.seniority ?? null,
       date: row.date as string,
       state,
       presentation,
@@ -1060,75 +906,18 @@ async function fetchMobileOpenShiftContext(
   serviceClient: SupabaseClient,
   orgId: string,
 ) {
-  const [
-    focusAreaResult,
-    shiftResult,
-    jobResult,
-    roleResult,
-    coverageResult,
-    employeeResult,
-  ] = await Promise.all([
-    serviceClient
-      .from("focus_areas")
-      .select(FOCUS_AREA_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("shift_categories")
-      .select(SHIFT_CATEGORY_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("jobs")
-      .select(JOB_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("organization_roles")
-      .select(ORG_ROLE_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("coverage_requirements")
-      .select(COVERAGE_REQ_COLS)
-      .eq("org_id", orgId),
-    serviceClient
-      .from("employees")
-      .select(EMPLOYEE_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .eq("status", "active"),
-  ]);
-
-  if (focusAreaResult.error) throw focusAreaResult.error;
-  if (shiftResult.error) throw shiftResult.error;
-  if (jobResult.error) throw jobResult.error;
-  if (roleResult.error) throw roleResult.error;
-  if (coverageResult.error) throw coverageResult.error;
-  if (employeeResult.error) throw employeeResult.error;
-
-  const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(
-    rowToFocusArea,
+  const contextRows = await fetchMobileOpenShiftContextRowsData(
+    serviceClient,
+    orgId,
   );
-  const shiftCategories = ((shiftResult.data ?? []) as DbShiftCategory[]).map(
-    rowToShiftCategory,
+  const focusAreas = contextRows.focusAreaRows.map(rowToFocusArea);
+  const shiftCategories = contextRows.shiftCategoryRows.map(rowToShiftCategory);
+  const jobs = contextRows.jobRows.map(rowToJobDefinition);
+  const orgRoles = contextRows.organizationRoleRows.map(rowToNamedItem);
+  const coverageRequirements = contextRows.coverageRequirementRows.map(
+    rowToCoverageRequirement,
   );
-  const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(
-    rowToJobDefinition,
-  );
-  const orgRoles = ((roleResult.data ?? []) as DbNamedItem[]).map(
-    rowToNamedItem,
-  );
-  const coverageRequirements = (
-    (coverageResult.data ?? []) as DbCoverageRequirement[]
-  ).map(rowToCoverageRequirement);
-  const employees = (
-    (employeeResult.data ?? []) as Parameters<typeof rowToEmployee>[0][]
-  )
+  const employees = contextRows.employeeRows
     .map((row) => rowToEmployee(row))
     .filter((employee) => employee.status === "active");
   const assignments = buildScheduleAssignmentOptions({
@@ -1173,7 +962,7 @@ export async function fetchMobileOpenShifts(
     fetchFocusAreaNameMap(serviceClient, input.orgId),
     fetchMobilePublishHistory(serviceClient, input.orgId),
     fetchMobileOpenShiftContext(serviceClient, input.orgId),
-    loadMobileScheduleRows(serviceClient, {
+    fetchPublishedMobileScheduleRowsData(serviceClient, {
       orgId: input.orgId,
       startDate: range.startDate,
       endDate: range.endDate,
@@ -1256,11 +1045,39 @@ export async function fetchMobileOpenShifts(
         (assignment): assignment is (typeof context.assignments)[number] =>
           Boolean(assignment),
       );
+    const qualifiedAssignments = openAssignments.filter((assignment) =>
+      isEmployeeQualifiedForAssignmentDefinition(input.employee, {
+        assignment,
+        shiftCategories: context.shiftCategories,
+        jobs: context.jobs,
+        orgRoles: context.orgRoles,
+      }),
+    );
+    const employeeScheduleRow = rowByEmployeeDate.get(
+      `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
+    );
+    const employeeTimeRanges = employeeScheduleRow
+      ? getScheduleRowTimeRanges({
+          row: employeeScheduleRow,
+          assignmentDetailsByPair,
+          focusAreaNameMap,
+          jobNameMap,
+        })
+      : [];
+    const conflictFreeAssignments = qualifiedAssignments.filter((assignment) => {
+      const assignmentRanges = getAssignmentDefinitionTimeRanges(assignment);
+
+      if (employeeTimeRanges.length === 0 || assignmentRanges.length === 0) {
+        return true;
+      }
+
+      return !timesOverlap(employeeTimeRanges, assignmentRanges);
+    });
     const assignment =
-      openAssignments.find(
+      conflictFreeAssignments.find(
         (item) => item.id === gap.preferredOpenAssignmentDefinitionId,
       ) ??
-      openAssignments[0] ??
+      conflictFreeAssignments[0] ??
       null;
 
     if (!assignment || assignment.jobId == null) {
@@ -1337,85 +1154,32 @@ export async function fetchMobileShiftRequests(
       fetchFocusAreaNameMap(serviceClient, input.orgId),
       fetchJobNameMap(serviceClient, input.orgId),
     ]);
-
-  let query = serviceClient
-    .from("shift_requests")
-    .select(
-      `*,
-       requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
-       target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
-    )
-    .eq("org_id", input.orgId)
-    .order("created_at", { ascending: false });
-
-  if (input.employeeId) {
-    const filters = [
-      `requester_emp_id.eq.${input.employeeId}`,
-      `target_emp_id.eq.${input.employeeId}`,
-    ];
-
-    if (input.includeOpenPickupRequests) {
-      filters.push("and(status.eq.open,type.eq.pickup)");
-    }
-
-    query = query.or(filters.join(","));
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  const rows = (data ?? []).filter((row) => {
-    if (!input.startDate && !input.endDate) {
-      return true;
-    }
-
-    const requesterDate = String(row.requester_shift_date ?? "");
-    const targetDate =
-      row.target_shift_date == null ? null : String(row.target_shift_date);
-    const dateValues = [requesterDate, targetDate].filter(
-      (value): value is string => value != null && value.length > 0,
-    );
-
-    return dateValues.some((dateValue) => {
-      if (input.startDate && dateValue < input.startDate) {
-        return false;
-      }
-      if (input.endDate && dateValue > input.endDate) {
-        return false;
-      }
-      return true;
-    });
-  });
+  const rows = await fetchMobileShiftRequestRowsData(serviceClient, input);
 
   return rows.map((row) => {
-    const requester = row.requester as {
-      first_name: string;
-      last_name: string;
-    } | null;
-    const target = row.target as {
-      first_name: string;
-      last_name: string;
-    } | null;
+    const requester = Array.isArray(row.requester)
+      ? (row.requester[0] ?? null)
+      : row.requester;
+    const target = Array.isArray(row.target) ? (row.target[0] ?? null) : row.target;
     const mapped: DbShiftRequest = {
-      id: row.id as string,
-      org_id: row.org_id as string,
+      id: row.id,
+      org_id: row.org_id,
       type: row.type as DbShiftRequest["type"],
       status: row.status as DbShiftRequest["status"],
-      requester_emp_id: row.requester_emp_id as string,
-      requester_shift_date: row.requester_shift_date as string,
+      requester_emp_id: row.requester_emp_id,
+      requester_shift_date: row.requester_shift_date,
       requester_state: row.requester_state as DbShiftRequest["requester_state"],
-      target_emp_id: (row.target_emp_id as string | null) ?? null,
-      target_shift_date: (row.target_shift_date as string | null) ?? null,
-      target_state:
-        (row.target_state as DbShiftRequest["target_state"]) ?? null,
-      absence_type_id: (row.absence_type_id as number | null) ?? null,
-      parent_request_id: (row.parent_request_id as string | null) ?? null,
-      admin_user_id: (row.admin_user_id as string | null) ?? null,
-      admin_note: (row.admin_note as string | null) ?? null,
-      expires_at: row.expires_at as string,
-      resolved_at: (row.resolved_at as string | null) ?? null,
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
+      target_emp_id: row.target_emp_id ?? null,
+      target_shift_date: row.target_shift_date ?? null,
+      target_state: row.target_state ?? null,
+      absence_type_id: row.absence_type_id ?? null,
+      parent_request_id: row.parent_request_id ?? null,
+      admin_user_id: row.admin_user_id ?? null,
+      admin_note: row.admin_note ?? null,
+      expires_at: row.expires_at,
+      resolved_at: row.resolved_at ?? null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
       requester_first_name: requester?.first_name,
       requester_last_name: requester?.last_name,
       target_first_name: target?.first_name ?? null,
@@ -1538,20 +1302,12 @@ export async function fetchMobilePeople(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobilePeopleRow[]> {
-  const { data, error } = await serviceClient
-    .from("employees")
-    .select(
-      "id, first_name, last_name, status, status_changed_at, status_note, focus_area_ids, phone, email, contact_notes, version",
-    )
-    .eq("org_id", orgId)
-    .order("first_name", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
+  const rows = await fetchMobilePeopleRowsData(serviceClient, orgId);
+  return rows.map((row) => ({
     id: row.id,
     firstName: row.first_name,
     lastName: row.last_name,
-    status: row.status ?? "active",
+    status: (row.status as Employee["status"] | null) ?? "active",
     statusChangedAt: row.status_changed_at ?? null,
     statusNote: row.status_note ?? "",
     focusAreaIds: row.focus_area_ids ?? [],
@@ -1565,49 +1321,14 @@ export async function fetchMobilePeople(
 export async function fetchMobileUnreadNotificationCount(
   userClient: SupabaseClient,
 ): Promise<number> {
-  const { data, error } = await userClient.rpc(
-    "get_unread_notification_count",
-  );
-
-  if (error) throw error;
-
-  return (data as number) ?? 0;
+  return fetchMobileUnreadNotificationCountData(userClient);
 }
 
 export async function fetchMobileNotifications(
   userClient: SupabaseClient,
   input: { limit: number; offset: number },
 ): Promise<{ unreadCount: number; notifications: MobileNotification[] }> {
-  const [
-    { data: notifications, error: notificationError },
-    { data: unreadCount, error: unreadError },
-  ] = await Promise.all([
-    userClient.rpc("get_notifications", {
-      p_limit: input.limit,
-      p_offset: input.offset,
-    }),
-    userClient.rpc("get_unread_notification_count"),
-  ]);
-
-  if (notificationError) throw notificationError;
-  if (unreadError) throw unreadError;
-
-  return {
-    unreadCount: (unreadCount as number) ?? 0,
-    notifications: (notifications ?? []).map(
-      (row: Record<string, unknown>) => ({
-        id: row.id as string,
-        type: row.type as MobileNotification["type"],
-        channel: (row.channel as "in_app" | "email") ?? "in_app",
-        category: (row.category as string | null) ?? null,
-        title: row.title as string,
-        message: row.message as string,
-        metadata: (row.metadata ?? {}) as Record<string, unknown>,
-        readAt: (row.read_at as string | null) ?? null,
-        createdAt: row.created_at as string,
-      }),
-    ),
-  };
+  return fetchMobileNotificationsPageData(userClient, input);
 }
 
 export function mapOrganizationToMobileConfig(org: Organization) {

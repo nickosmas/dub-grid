@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mobilePeopleResponseSchema } from "@dubgrid/contracts";
+import {
+  loadMobilePeoplePayload,
+  MobileApiAuthorizationError,
+} from "@dubgrid/mobile-api-core";
 import { fetchMobilePeople, requireMobileAuth } from "@/features/mobile/server";
 import type { Employee } from "@/types";
 
@@ -40,15 +44,18 @@ export async function GET(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  if (!auth.permissions.canViewStaff) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  try {
+    const payload = await loadMobilePeoplePayload(auth, {
+      fetchMobilePeople,
+      mapEmployeeToMobilePerson,
+    });
+
+    return NextResponse.json(mobilePeopleResponseSchema.parse(payload));
+  } catch (error) {
+    if (error instanceof MobileApiAuthorizationError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    throw error;
   }
-
-  const people = await fetchMobilePeople(auth.serviceClient, auth.currentOrg.id);
-
-  return NextResponse.json(
-    mobilePeopleResponseSchema.parse({
-      people: people.map(mapEmployeeToMobilePerson),
-    }),
-  );
 }

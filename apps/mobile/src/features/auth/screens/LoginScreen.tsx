@@ -12,16 +12,23 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { LoadingScreen } from "../../../shared/components/LoadingScreen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import { loginToWorkspace, lookupWorkspace } from "../../../shared/lib/api";
+import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import {
   loadLastWorkspaceSlug,
   saveLastWorkspaceSlug,
 } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
-import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { useToast } from "../../../shared/providers/ToastProvider";
 
 const LOGO_CELL_OPACITY = [
   1,
@@ -69,6 +76,7 @@ function getBackendHostLabel(apiBaseUrl: string) {
 
 export default function LoginScreen() {
   const { accessToken, isLoading } = useSessionState();
+  const insets = useSafeAreaInsets();
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const [workspaceSlug, setWorkspaceSlug] = useState("");
@@ -80,6 +88,7 @@ export default function LoginScreen() {
   const [showWorkspaceHelp, setShowWorkspaceHelp] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const workspaceSuffix = getWorkspaceSuffixLabel(apiBaseUrl);
   const backendHost = getBackendHostLabel(apiBaseUrl);
@@ -138,11 +147,12 @@ export default function LoginScreen() {
         emailInputRef.current?.focus();
       }, 0);
     } catch (workspaceError) {
-      setError(
-        workspaceError instanceof Error
-          ? workspaceError.message
-          : "We couldn't verify that workspace right now.",
-      );
+      const nextError = getInlineErrorMessageOrToast(pushToast, {
+        error: workspaceError,
+        fallbackMessage:
+          "We couldn't verify that workspace. Check the subdomain and try again.",
+      });
+      setError(nextError);
     } finally {
       setWorkspaceLoading(false);
     }
@@ -170,17 +180,21 @@ export default function LoginScreen() {
       });
 
       if (sessionError) {
-        setError(sessionError.message);
+        const nextError = getInlineErrorMessageOrToast(pushToast, {
+          error: sessionError,
+          fallbackMessage: "We couldn't finish signing you in right now.",
+        });
+        setError(nextError);
         return;
       }
 
       router.replace("/(tabs)/me");
     } catch (loginError) {
-      setError(
-        loginError instanceof Error
-          ? loginError.message
-          : "We couldn't sign you in right now. Check your connection and try again.",
-      );
+      const nextError = getInlineErrorMessageOrToast(pushToast, {
+        error: loginError,
+        fallbackMessage: "We couldn't sign you in right now. Try again in a moment.",
+      });
+      setError(nextError);
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +207,12 @@ export default function LoginScreen() {
         style={styles.keyboardArea}
       >
         <ScrollView
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[
+            styles.container,
+            {
+              paddingBottom: getScreenBottomPadding("stack", insets.bottom),
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.logoBlock}>
@@ -249,9 +268,11 @@ export default function LoginScreen() {
                 </View>
 
                 {error ? (
-                  <View style={styles.errorBox}>
-                    <Text style={styles.errorText}>{error}</Text>
-                  </View>
+                  <StatusBanner
+                    body={error}
+                    title="Workspace sign-in issue"
+                    tone="error"
+                  />
                 ) : null}
 
                 <Pressable
@@ -353,9 +374,11 @@ export default function LoginScreen() {
                 </View>
 
                 {error ? (
-                  <View style={styles.errorBox}>
-                    <Text style={styles.errorText}>{error}</Text>
-                  </View>
+                  <StatusBanner
+                    body={error}
+                    title="Could not sign in"
+                    tone="error"
+                  />
                 ) : null}
 
                 <Pressable
@@ -418,7 +441,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingVertical: 32,
+    paddingTop: 32,
+    paddingBottom: 32,
     gap: 20,
   },
   logoBlock: {
@@ -524,20 +548,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#111827",
     backgroundColor: "#ffffff",
-  },
-  errorBox: {
-    borderRadius: 12,
-    backgroundColor: "#fef2f2",
-    borderWidth: 1,
-    borderColor: "#fecaca",
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  errorText: {
-    color: "#b42318",
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600",
   },
   button: {
     borderRadius: 999,

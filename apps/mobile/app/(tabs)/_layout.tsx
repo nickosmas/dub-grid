@@ -79,12 +79,7 @@ export default function TabsLayout() {
       shadowColor={mobileColors.shadow}
       tintColor={mobileColors.brand}
     >
-      <NativeTabs.Trigger
-        name="me"
-        options={{
-          title: "Me",
-        }}
-      >
+      <NativeTabs.Trigger name="me">
         <Label>Me</Label>
         <Icon
           androidSrc={{
@@ -95,12 +90,7 @@ export default function TabsLayout() {
         />
       </NativeTabs.Trigger>
       {canViewTeamSchedule ? (
-        <NativeTabs.Trigger
-          name="team"
-          options={{
-            title: "Schedule",
-          }}
-        >
+        <NativeTabs.Trigger name="team">
           <Label>Schedule</Label>
           <Icon
             androidSrc={{
@@ -111,12 +101,7 @@ export default function TabsLayout() {
           />
         </NativeTabs.Trigger>
       ) : null}
-      <NativeTabs.Trigger
-        name="requests"
-        options={{
-          title: "Requests",
-        }}
-      >
+      <NativeTabs.Trigger name="requests">
         <Label>Requests</Label>
         <Icon
           androidSrc={{
@@ -126,12 +111,7 @@ export default function TabsLayout() {
           sf={{ default: "arrow.left.arrow.right", selected: "arrow.left.arrow.right.circle.fill" }}
         />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger
-        name="people"
-        options={{
-          title: "People",
-        }}
-      >
+      <NativeTabs.Trigger name="people">
         <Label>People</Label>
         <Icon
           androidSrc={{
@@ -141,12 +121,7 @@ export default function TabsLayout() {
           sf={{ default: "person.2", selected: "person.2.fill" }}
         />
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger
-        name="profile"
-        options={{
-          title: "Profile",
-        }}
-      >
+      <NativeTabs.Trigger name="profile">
         <Label>Profile</Label>
         <Icon
           androidSrc={{

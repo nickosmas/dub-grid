@@ -22,10 +22,18 @@ function pickDomProps(input: Record<string, any>) {
       key === "refreshControl" ||
       key === "style" ||
       key === "hitSlop" ||
+      key === "animationType" ||
+      key === "allowSwipeDismissal" ||
+      key === "presentationStyle" ||
+      key === "transparent" ||
+      key === "visible" ||
+      key === "onRequestClose" ||
       key === "horizontal" ||
       key === "showsHorizontalScrollIndicator" ||
       key === "showsVerticalScrollIndicator" ||
       key === "contentInsetAdjustmentBehavior" ||
+      key === "automaticallyAdjustContentInsets" ||
+      key === "automaticallyAdjustsScrollIndicatorInsets" ||
       key === "stickyHeaderIndices" ||
       key === "onStartShouldSetResponder" ||
       key === "onLayout" ||
@@ -43,6 +51,11 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "accessibilityRole") {
       output.role = value;
+      continue;
+    }
+
+    if (key === "testID") {
+      output["data-testid"] = value;
       continue;
     }
 
@@ -156,6 +169,18 @@ export function createReactNativeModule(React: ReactModule) {
       ...domProps,
     });
   });
+  const Modal = ({
+    children,
+    visible = true,
+    ...props
+  }: Record<string, any>) =>
+    visible
+      ? React.createElement(
+          "div",
+          pickDomProps(props),
+          children as ReactType.ReactNode,
+        )
+      : null;
 
   return {
     ActivityIndicator: (props: Record<string, any>) =>
@@ -169,9 +194,16 @@ export function createReactNativeModule(React: ReactModule) {
       }),
     },
     KeyboardAvoidingView,
+    LayoutAnimation: {
+      configureNext: () => undefined,
+      Presets: {
+        easeInEaseOut: {},
+      },
+    },
     Linking: {
       openURL: () => Promise.resolve(),
     },
+    Modal,
     Platform: {
       OS: "ios",
       select: (value: Record<string, any>) =>
@@ -186,6 +218,9 @@ export function createReactNativeModule(React: ReactModule) {
     },
     Text,
     TextInput,
+    UIManager: {
+      setLayoutAnimationEnabledExperimental: () => undefined,
+    },
     View,
   };
 }
@@ -221,15 +256,22 @@ export function createScreenModule(React: ReactModule) {
       title,
       body,
       detail,
+      headerAccessory,
     }: {
       title: string;
       body?: string;
       detail?: ReactType.ReactNode;
+      headerAccessory?: ReactType.ReactNode;
     }) =>
       React.createElement(
         "article",
         {},
-        React.createElement("h2", {}, title),
+        React.createElement(
+          "div",
+          {},
+          React.createElement("h2", {}, title),
+          headerAccessory ?? null,
+        ),
         body ? React.createElement("p", {}, body) : null,
         detail ?? null,
       ),

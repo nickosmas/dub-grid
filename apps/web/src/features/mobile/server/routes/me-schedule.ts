@@ -3,6 +3,7 @@ import {
   mobileMeScheduleResponseSchema,
   mobileScheduleQuerySchema,
 } from "@dubgrid/contracts";
+import { loadMobileMeSchedulePayload } from "@dubgrid/mobile-api-core";
 import {
   fetchLinkedEmployeeForUser,
   fetchMobileScheduleEntries,
@@ -29,40 +30,10 @@ export async function GET(req: NextRequest) {
     return json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const linkedEmployee = await fetchLinkedEmployeeForUser(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    auth.user.id,
-  );
   const range = resolveMobileDateRange(queryResult.data);
-
-  if (!linkedEmployee) {
-    return json(
-      mobileMeScheduleResponseSchema.parse({
-        employee: null,
-        range,
-        entries: [],
-      }),
-    );
-  }
-
-  const entries = await fetchMobileScheduleEntries(auth.serviceClient, {
-    orgId: auth.currentOrg.id,
-    employeeId: linkedEmployee.id,
-    ...range,
+  const payload = await loadMobileMeSchedulePayload(auth, range, {
+    fetchLinkedEmployeeForUser,
+    fetchMobileScheduleEntries,
   });
-
-  return json(
-    mobileMeScheduleResponseSchema.parse({
-      employee: {
-        id: linkedEmployee.id,
-        firstName: linkedEmployee.firstName,
-        lastName: linkedEmployee.lastName,
-        status: linkedEmployee.status,
-        focusAreaIds: linkedEmployee.focusAreaIds,
-      },
-      range,
-      entries,
-    }),
-  );
+  return json(mobileMeScheduleResponseSchema.parse(payload));
 }

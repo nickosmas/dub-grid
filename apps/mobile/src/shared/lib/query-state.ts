@@ -1,8 +1,15 @@
+import { onlineManager } from "@tanstack/react-query";
+import {
+  getClientFriendlyErrorMessage,
+  isAuthorizationError,
+  isNetworkConnectionError,
+} from "./errors";
+
 export function getQueryErrorMessage(
   error: unknown,
   fallback = "We couldn't load this right now.",
 ): string {
-  return error instanceof Error ? error.message : fallback;
+  return getClientFriendlyErrorMessage(error, fallback);
 }
 
 export function getMobileQueryContentState(input: {
@@ -10,6 +17,14 @@ export function getMobileQueryContentState(input: {
   isLoading: boolean;
   error: unknown;
 }) {
+  if (!input.hasData && onlineManager.isOnline() === false) {
+    return {
+      kind: "error",
+      message: "You're offline. Check your internet connection and try again.",
+      reason: "network",
+    } as const;
+  }
+
   if (input.isLoading && !input.hasData) {
     return { kind: "loading" } as const;
   }
@@ -18,6 +33,11 @@ export function getMobileQueryContentState(input: {
     return {
       kind: "error",
       message: getQueryErrorMessage(input.error),
+      reason: isAuthorizationError(input.error)
+        ? "unauthorized"
+        : isNetworkConnectionError(input.error)
+          ? "network"
+          : "generic",
     } as const;
   }
 

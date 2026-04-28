@@ -9,39 +9,55 @@ import {
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   AppState,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
   type AppStateStatus,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AnchoredPopupSurface } from "../../../shared/components/AnchoredPopupSurface";
 import { Button } from "../../../shared/components/Button";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import {
+  HeroSkeleton,
+  ListSkeleton,
+} from "../../../shared/components/Skeleton";
 import {
   Card,
   Screen,
   type ScreenScrollHandle,
 } from "../../../shared/components/Screen";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   getMySchedule,
   getOrgSchedule,
   getShiftRequests,
   updateShiftRequest,
 } from "../../../shared/lib/api";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileColors,
+  mobileBorderColorFromText,
   mobileRadii,
   mobileSpacing,
 } from "../../../shared/theme/tokens";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
   addDaysToIsoDate,
   addMonthsToIsoDate,
+  buildAvailableOpenShiftFeed,
   buildMeShiftRequestSections,
   buildScheduleMonthDays,
   buildScheduleShiftGroups,
@@ -51,11 +67,13 @@ import {
   buildTeamScheduleFocusAreaTabs,
   filterScheduleEntriesByDate,
   filterTeamScheduleEntriesByFocusArea,
+  formatCompactScheduleDate,
   formatScheduleDayLabel,
   formatScheduleMonthLabel,
   formatScheduleRange,
   formatScheduleTimeRange,
   getFeaturedMeScheduleSegment,
+  getCompactScheduleDateParts,
   getScheduleEntryBaseTimeRange,
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryCategoryKey,
@@ -74,6 +92,7 @@ import {
   getScheduleShiftGroupTimeRange,
   getIsoDateInTimeZone,
   sortScheduleEntries,
+  type AvailableShiftFeedItem,
   type FeaturedMeScheduleSegment,
   type MobileScheduleMonthDay,
   type MobileScheduleWeekDay,
@@ -86,11 +105,24 @@ import type {
 } from "@dubgrid/contracts";
 
 const SWIPE_THRESHOLD = 40;
-const MINUTE_IN_MS = 60 * 1000;
 const SCHEDULE_CONTENT_REFRESH_INTERVAL_MS = 15 * 1000;
+const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
+const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
+const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
+const OPEN_SHIFT_STACK_PEEK_HEIGHT = 10;
+const OPEN_SHIFT_STACK_SIDE_INSET = 6;
+const SCHEDULE_CALENDAR_POPUP_RIGHT_OFFSET = 52;
+const SCHEDULE_FILTER_POPUP_RIGHT_OFFSET = 104;
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ME_HERO_CARD_BACKGROUND = "#2946C7";
 const ME_HERO_COLLABORATOR_BACKGROUND = "#3A55CB";
+
+if (
+  Platform.OS === "android" &&
+  typeof UIManager.setLayoutAnimationEnabledExperimental === "function"
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type ScheduleScope = "mine" | "team";
 type ShiftTimeRange = {
@@ -173,61 +205,6 @@ function getCurrentTimeValue(value: Date, timeZone?: string | null): string {
   const parts = getTimePartsInTimeZone(value, timeZone);
 
   return `${`${parts.hour}`.padStart(2, "0")}:${`${parts.minute}`.padStart(2, "0")}:${`${parts.second}`.padStart(2, "0")}`;
-}
-
-function getMillisecondsUntilNextMinute(value: Date): number {
-  const millisecondsIntoMinute =
-    value.getSeconds() * 1000 + value.getMilliseconds();
-
-  return millisecondsIntoMinute === 0
-    ? MINUTE_IN_MS
-    : MINUTE_IN_MS - millisecondsIntoMinute;
-}
-
-function useRealtimeNow(): Date {
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-
-    function clearScheduledTick() {
-      if (timeout != null) {
-        clearTimeout(timeout);
-        timeout = null;
-      }
-    }
-
-    function scheduleNextTick() {
-      clearScheduledTick();
-      timeout = setTimeout(() => {
-        setNow(new Date());
-        scheduleNextTick();
-      }, getMillisecondsUntilNextMinute(new Date()));
-    }
-
-    function syncNow() {
-      setNow(new Date());
-      scheduleNextTick();
-    }
-
-    scheduleNextTick();
-
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState: AppStateStatus) => {
-        if (nextState === "active") {
-          syncNow();
-        }
-      },
-    );
-
-    return () => {
-      clearScheduledTick();
-      subscription.remove();
-    };
-  }, []);
-
-  return now;
 }
 
 function getMinutesSinceMidnight(value: string): number | null {
@@ -315,33 +292,6 @@ function getHeroProgress(
   };
 }
 
-function formatCompactScheduleDate(value: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00.000Z`));
-}
-
-function getCompactScheduleDateParts(value: string): {
-  weekdayLabel: string;
-  dayLabel: string;
-} {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).formatToParts(new Date(`${value}T00:00:00.000Z`));
-
-  return {
-    weekdayLabel: (
-      parts.find((part) => part.type === "weekday")?.value ?? ""
-    ).toUpperCase(),
-    dayLabel: parts.find((part) => part.type === "day")?.value ?? "",
-  };
-}
-
 function formatHoursValue(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
@@ -386,6 +336,19 @@ function getRequestShiftName(
   return which === "requester"
     ? (request.requesterPresentation?.label ?? "Shift")
     : (request.targetPresentation?.label ?? "Shift");
+}
+
+function getRequestAbsenceTypeId(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): number | null {
+  const state = which === "requester" ? request.requesterState : request.targetState;
+
+  if (state?.kind === "absence") {
+    return state.absenceTypeId ?? null;
+  }
+
+  return which === "requester" ? request.absenceTypeId ?? null : null;
 }
 
 function getRequestJobName(
@@ -452,10 +415,30 @@ function getOpenShiftShiftName(openShift: MobileOpenShift): string {
   );
 }
 
+function getOpenShiftAbsenceTypeId(openShift: MobileOpenShift): number | null {
+  return openShift.state.kind === "absence"
+    ? openShift.state.absenceTypeId ?? null
+    : null;
+}
+
 function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+  if (getOpenShiftAbsenceTypeId(openShift) != null) {
+    return buildAbsenceChip(getOpenShiftShiftName(openShift));
+  }
+
+  const primarySegment = getOpenShiftPrimarySegment(openShift);
+
+  if (isGeneralShiftSegment(primarySegment)) {
+    return buildGeneralShiftChip(getOpenShiftShiftName(openShift), primarySegment);
+  }
+
   const segment = openShift.presentation.segments.find((item) => item.jobName);
 
   return buildJobChip(segment?.jobName ?? null, segment ?? null);
+}
+
+function formatOpenShiftCardCountLabel(count: number): string {
+  return `${count} open shift card${count === 1 ? "" : "s"}`;
 }
 
 function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
@@ -490,6 +473,8 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
+  const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
   const now = useRealtimeNow();
   const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<
@@ -497,7 +482,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   >(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [selectedDateOverride, setSelectedDateOverride] = useState<
     string | null
   >(null);
@@ -589,14 +573,23 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     canLoadMeTeamSchedule,
     canLoadRequests,
     canLoadSchedule,
+    isTeamScope,
     refetchBootstrap,
     refetchMeTeamSchedule,
     refetchRequests,
     refetchSchedule,
   ]);
+  const manualRefresh = useManualRefresh(refetchScreenContent);
   const requestActionMutation = useMutation({
     mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
       updateShiftRequest(accessToken!, input.requestId, input.body),
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not update request",
+        fallbackMessage: "We couldn't update that shift request right now.",
+      });
+    },
     onSuccess: async () => {
       await Promise.all([
         refetchScreenContent(),
@@ -881,11 +874,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     selectedDate,
   ]);
 
+  function closeAnchoredPopups() {
+    setIsFilterOpen(false);
+    setIsCalendarOpen(false);
+  }
+
   function handleSelectDate(nextDate: string) {
     setSelectedDateOverride(nextDate);
     setCalendarMonthAnchor(getScheduleMonthStartDate(nextDate));
-    setIsCalendarOpen(false);
-    setIsFilterOpen(false);
+    closeAnchoredPopups();
   }
 
   function handleOpenShiftDetail(entry: MobileScheduleEntry) {
@@ -913,36 +910,25 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       return;
     }
 
-    setIsFilterOpen(false);
-    setIsCalendarOpen(false);
+    closeAnchoredPopups();
     setSelectedDateOverride(
       addDaysToIsoDate(selectedDate, deltaX < 0 ? 7 : -7),
     );
   }
 
   function handlePreviousWeek() {
-    setIsFilterOpen(false);
-    setIsCalendarOpen(false);
+    closeAnchoredPopups();
     setSelectedDateOverride(addDaysToIsoDate(selectedDate, -7));
   }
 
   function handleNextWeek() {
-    setIsFilterOpen(false);
-    setIsCalendarOpen(false);
+    closeAnchoredPopups();
     setSelectedDateOverride(addDaysToIsoDate(selectedDate, 7));
   }
 
   function handleGoToToday() {
-    setIsFilterOpen(false);
-    setIsCalendarOpen(false);
+    closeAnchoredPopups();
     setSelectedDateOverride(null);
-  }
-
-  function handleManualRefresh() {
-    setIsManualRefreshing(true);
-    void refetchScreenContent().finally(() => {
-      setIsManualRefreshing(false);
-    });
   }
 
   function handleToggleCalendar() {
@@ -981,7 +967,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       }
     }
 
-    setIsFilterOpen(false);
+    closeAnchoredPopups();
   }
 
   function handlePreviousMonth() {
@@ -1045,39 +1031,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 iconName="funnel-outline"
                 onPress={handleToggleFilter}
               />
-              {!isBlockedTeamView && isFilterOpen ? (
-                <View style={styles.filterPopup}>
-                  <Text style={styles.filterSheetLabel}>
-                    Browse by {focusAreaLabel.toLowerCase()}
-                  </Text>
-                  {teamFocusAreaTabs.map((tab) => {
-                    const isActive = tab.key === activeTeamFocusAreaKey;
-
-                    return (
-                      <Pressable
-                        key={tab.key}
-                        accessibilityRole="button"
-                        onPress={() => {
-                          handleSelectFocusArea(tab.key);
-                        }}
-                        style={[
-                          styles.filterOption,
-                          isActive && styles.filterOptionActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.filterOptionText,
-                            isActive && styles.filterOptionTextActive,
-                          ]}
-                        >
-                          {tab.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
             </View>
           ) : null}
           <View style={styles.calendarMenuAnchor}>
@@ -1087,17 +1040,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               iconSize={10}
               onPress={handleToggleCalendar}
             />
-            {isCalendarOpen ? (
-              <View style={styles.monthCalendarPopup}>
-                <MonthCalendar
-                  monthLabel={monthCalendarLabel}
-                  weeks={monthWeeks}
-                  onNextMonth={handleNextMonth}
-                  onPreviousMonth={handlePreviousMonth}
-                  onSelectDate={handleSelectDate}
-                />
-              </View>
-            ) : null}
           </View>
           <AlertsChromeButton unreadCount={unreadNotificationCount} />
         </View>
@@ -1127,36 +1069,128 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     meStickyHeader
   );
 
+  const activePopupTop = Math.max(insets.top, 8) + 52;
+  const renderAnchoredPopupOverlay =
+    isTeamScope && (isFilterOpen || isCalendarOpen)
+      ? () => (
+          <View style={styles.popupOverlayRoot}>
+            <Pressable
+              accessibilityLabel="Dismiss schedule popup"
+              accessibilityRole="button"
+              onPress={closeAnchoredPopups}
+              style={styles.popupDismissLayer}
+            />
+            {!isBlockedTeamView && isFilterOpen ? (
+              <AnchoredPopupSurface
+                accessibilityLabel="Focus area filter popup"
+                style={[
+                  styles.filterPopupSurface,
+                  {
+                    right: SCHEDULE_FILTER_POPUP_RIGHT_OFFSET,
+                    top: activePopupTop,
+                  },
+                ]}
+              >
+                <Text style={styles.filterSheetLabel}>
+                  Browse by {focusAreaLabel.toLowerCase()}
+                </Text>
+                {teamFocusAreaTabs.map((tab) => {
+                  const isActive = tab.key === activeTeamFocusAreaKey;
+
+                  return (
+                    <Pressable
+                      key={tab.key}
+                      accessibilityRole="button"
+                      onPress={() => {
+                        handleSelectFocusArea(tab.key);
+                      }}
+                      style={[
+                        styles.filterOption,
+                        isActive && styles.filterOptionActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.filterOptionText,
+                          isActive && styles.filterOptionTextActive,
+                        ]}
+                      >
+                        {tab.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </AnchoredPopupSurface>
+            ) : null}
+            {isCalendarOpen ? (
+              <AnchoredPopupSurface
+                accessibilityLabel="Month calendar popup"
+                style={[
+                  styles.monthCalendarPopupSurface,
+                  {
+                    right: SCHEDULE_CALENDAR_POPUP_RIGHT_OFFSET,
+                    top: activePopupTop,
+                  },
+                ]}
+              >
+                <MonthCalendar
+                  monthLabel={monthCalendarLabel}
+                  weeks={monthWeeks}
+                  onNextMonth={handleNextMonth}
+                  onPreviousMonth={handlePreviousMonth}
+                  onSelectDate={handleSelectDate}
+                />
+              </AnchoredPopupSurface>
+            ) : null}
+          </View>
+        )
+      : undefined;
+
   return (
     <Screen
-      refreshing={isManualRefreshing || requestActionMutation.isPending}
-      onRefresh={handleManualRefresh}
+      bottomPaddingMode="tabbed"
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
+      renderOverlay={renderAnchoredPopupOverlay}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
     >
       {contentState.kind === "loading" ? (
-        <QueryStateCard
-          title="Loading schedule"
-          body="Pulling the latest published schedule into mobile."
-        />
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading schedule</Text>
+          <Text style={styles.loadingBody}>
+            Pulling the latest published schedule into mobile.
+          </Text>
+          {!isTeamScope ? (
+            <>
+              <HeroSkeleton />
+              <ListSkeleton rows={2} />
+              <ListSkeleton rows={2} />
+            </>
+          ) : (
+            <ListSkeleton rows={4} showSectionHeader={false} />
+          )}
+        </View>
       ) : contentState.kind === "error" ? (
-        <QueryStateCard
-          title="Could not load schedule"
-          body={contentState.message}
+        <StatusBanner
           actionLabel="Try Again"
+          body={contentState.message}
+          title="Could not load schedule"
           onAction={() => {
             void refetchScreenContent();
           }}
         />
       ) : isBlockedTeamView ? (
-        <Card
-          title="Team schedule unavailable"
+        <EmptyStateCard
           body="This mobile account does not have permission to view the team-wide schedule."
+          iconName="lock-closed-outline"
+          title="Team schedule unavailable"
         />
       ) : !isTeamScope && !linkedEmployee ? (
-        <Card
-          title="No linked staff profile"
+        <EmptyStateCard
           body="This account is not connected to a staff profile yet. Use the web app to finish account linking, then refresh mobile."
+          iconName="person-add-outline"
+          title="No linked staff profile"
         />
       ) : !isTeamScope ? (
         <View style={styles.mePage}>
@@ -1229,18 +1263,20 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             openShifts={meOpenShifts}
             requests={meRequestSections.openShiftRequests}
             requestsError={requestsQuery.error}
+            scheduleEntries={scheduleEntries}
           />
           <UpcomingShiftsSection
             items={meUpcomingItems}
             onPressEntry={handleOpenShiftDetail}
             summary={meWeeklyHours}
           />
-          {requestActionMutation.error ? (
-            <SectionStateCard body="We couldn't update that shift request right now." />
-          ) : null}
         </View>
       ) : shiftGroups.length === 0 ? (
-        <Card title={emptyStateTitle} body={emptyStateBody} />
+        <EmptyStateCard
+          body={emptyStateBody}
+          iconName="calendar-clear-outline"
+          title={emptyStateTitle}
+        />
       ) : (
         <View style={styles.shiftGroupsList}>
           {shiftGroups.map((group, index) => {
@@ -1402,7 +1438,7 @@ function IconControlButton({
   onPress,
 }: {
   accessibilityLabel: string;
-  iconName: ComponentProps<typeof Ionicons>["name"];
+  iconName: React.ComponentProps<typeof Ionicons>["name"];
   iconSize?: number;
   onPress: () => void;
 }) {
@@ -1509,36 +1545,99 @@ type JobColorSource = {
   jobTextColor?: string | null;
 };
 
+type JobChipKind = "job" | "general" | "absence";
+
 type JobChip = AvatarTone & {
+  kind: JobChipKind;
   label: string;
+  eyebrowLabel?: string | null;
 };
+
+function readOptionalColor(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return value ?? null;
+  }
+
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0) {
+    return null;
+  }
+
+  return trimmedValue.toLowerCase() === "transparent" ? null : trimmedValue;
+}
 
 function normalizeScheduleLabel(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function buildAbsenceChip(label: string | null | undefined): JobChip | null {
+  const trimmedLabel = label?.trim() ?? "";
+
+  if (!trimmedLabel) {
+    return null;
+  }
+
+  return {
+    kind: "absence",
+    eyebrowLabel: "Absence",
+    label: trimmedLabel,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
+  };
+}
+
+function buildGeneralShiftChip(
+  label: string | null | undefined,
+  colorSource?: JobColorSource | null,
+): JobChip | null {
+  const chip = buildJobChip(label, colorSource);
+
+  if (!chip) {
+    return null;
+  }
+
+  return {
+    ...chip,
+    kind: "general",
+    eyebrowLabel: "General shift",
+  };
+}
+
+function isGeneralShiftSegment(
+  segment: { shiftId?: number | null } | null | undefined,
+): boolean {
+  return (
+    segment != null &&
+    Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
+    segment.shiftId === null
+  );
 }
 
 function buildJobChip(
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
-  if (!label) {
+  const trimmedLabel = label?.trim() ?? "";
+  const jobColor = readOptionalColor(colorSource?.jobColor);
+  const jobBorderColor = readOptionalColor(colorSource?.jobBorderColor);
+  const jobTextColor = readOptionalColor(colorSource?.jobTextColor);
+
+  if (!trimmedLabel) {
     return null;
   }
 
-  if (
-    colorSource?.jobColor ||
-    colorSource?.jobBorderColor ||
-    colorSource?.jobTextColor
-  ) {
+  if (jobColor || jobBorderColor || jobTextColor) {
     return {
-      label,
-      backgroundColor: colorSource.jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: colorSource.jobBorderColor ?? mobileColors.border,
-      textColor: colorSource.jobTextColor ?? mobileColors.textMuted,
+      kind: "job",
+      label: trimmedLabel,
+      backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: jobBorderColor ?? mobileColors.border,
+      textColor: jobTextColor ?? mobileColors.textMuted,
     };
   }
 
-  const normalizedLabel = label.trim().toLowerCase();
+  const normalizedLabel = trimmedLabel.toLowerCase();
   const tone =
     normalizedLabel.includes("supervisor") ||
     normalizedLabel.includes("lead") ||
@@ -1570,7 +1669,8 @@ function buildJobChip(
             };
 
   return {
-    label,
+    kind: "job",
+    label: trimmedLabel,
     ...tone,
   };
 }
@@ -1582,6 +1682,14 @@ function getScheduleItemJobChip(
     return null;
   }
 
+  if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
+    return buildAbsenceChip(getScheduleItemShiftName(item));
+  }
+
+  if (isGeneralShiftSegment(item.segment)) {
+    return buildGeneralShiftChip(getScheduleItemShiftName(item), item.segment);
+  }
+
   const jobName = getScheduleItemJobName(item);
   return buildJobChip(jobName, item.segment);
 }
@@ -1589,19 +1697,6 @@ function getScheduleItemJobChip(
 function getScheduleItemTypeChip(
   item: FeaturedMeScheduleSegment["item"],
 ): JobChip | null {
-  if (!item) {
-    return null;
-  }
-
-  if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
-    return {
-      label: "Absence",
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.border,
-      textColor: mobileColors.textMuted,
-    };
-  }
-
   return getScheduleItemJobChip(item);
 }
 
@@ -1611,6 +1706,10 @@ function getVisibleScheduleItemTypeChip(
   const typeChip = getScheduleItemTypeChip(item);
 
   if (!item || !typeChip) {
+    return typeChip;
+  }
+
+  if (typeChip.kind !== "job") {
     return typeChip;
   }
 
@@ -1625,6 +1724,17 @@ function getVisibleScheduleItemTypeChip(
   return chipLabel.length > 0 && shiftLabels.includes(chipLabel)
     ? null
     : typeChip;
+}
+
+function shouldShowMePrimaryTitle(
+  title: string | null | undefined,
+  chip: JobChip | null,
+): boolean {
+  if (!chip?.eyebrowLabel) {
+    return true;
+  }
+
+  return normalizeScheduleLabel(title) !== normalizeScheduleLabel(chip.label);
 }
 
 function getScheduleItemTimeRange(
@@ -1680,18 +1790,20 @@ function getRequestJobChip(
   request: MobileShiftRequest,
   which: "requester" | "target",
 ): JobChip | null {
+  if (getRequestAbsenceTypeId(request, which) != null) {
+    return buildAbsenceChip(getRequestShiftName(request, which));
+  }
+
+  const primarySegment = getRequestPrimarySegment(request, which);
+
+  if (isGeneralShiftSegment(primarySegment)) {
+    return buildGeneralShiftChip(getRequestShiftName(request, which), primarySegment);
+  }
+
   const segment =
     getRequestSegments(request, which).find((item) => item.jobName) ?? null;
   const jobName = getRequestJobName(request, which);
   return buildJobChip(jobName, segment);
-}
-
-function SectionStateCard({ body }: { body: string }) {
-  return (
-    <View style={styles.meSurfaceCard}>
-      <Text style={styles.meSectionBody}>{body}</Text>
-    </View>
-  );
 }
 
 function MeSectionHeader({
@@ -1720,35 +1832,112 @@ function MeSectionHeader({
 function JobPill({
   chip,
   compact,
+  eyebrowDisplay = "inside",
 }: {
   chip: JobChip | null;
   compact?: boolean;
+  eyebrowDisplay?: "inside" | "outside";
 }) {
   if (!chip) {
     return null;
   }
 
+  const accessibilityLabel = chip.eyebrowLabel
+    ? `${chip.eyebrowLabel} ${chip.label}`
+    : `Job ${chip.label}`;
+  const showsLabeledValue = chip.eyebrowLabel != null;
+  const shouldRenderEyebrowInsidePill =
+    eyebrowDisplay === "inside" && chip.eyebrowLabel;
+  const shouldRenderSingleLinePill =
+    !showsLabeledValue || eyebrowDisplay === "outside";
+  const pillBorderColor =
+    chip.kind === "general"
+      ? mobileBorderColorFromText(chip.textColor)
+      : chip.borderColor;
+
   return (
     <View
-      accessibilityLabel={`Job ${chip.label}`}
+      accessibilityLabel={accessibilityLabel}
       style={[
         styles.jobPill,
         compact && styles.jobPillCompact,
         {
           backgroundColor: chip.backgroundColor,
-          borderColor: chip.borderColor,
+          borderColor: pillBorderColor,
         },
       ]}
     >
+      {shouldRenderSingleLinePill ? (
+        <Text
+          style={[
+            styles.jobPillText,
+            compact && styles.jobPillTextCompact,
+            { color: chip.textColor },
+          ]}
+        >
+          {chip.label}
+        </Text>
+      ) : (
+        <View style={styles.jobPillTextStack}>
+          {shouldRenderEyebrowInsidePill ? (
+            <Text
+              style={[
+                styles.jobPillEyebrowText,
+                compact && styles.jobPillEyebrowTextCompact,
+                { color: chip.textColor },
+              ]}
+            >
+              {chip.eyebrowLabel}
+            </Text>
+          ) : null}
+          <Text
+            style={[
+              styles.jobPillValueText,
+              compact && styles.jobPillValueTextCompact,
+              { color: chip.textColor },
+            ]}
+          >
+            {chip.label}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function MeTypePill({
+  chip,
+  compact,
+  inverseLabel,
+  titleScale = "row",
+}: {
+  chip: JobChip | null;
+  compact?: boolean;
+  inverseLabel?: boolean;
+  titleScale?: "hero" | "row";
+}) {
+  if (!chip) {
+    return null;
+  }
+
+  if (!chip.eyebrowLabel) {
+    return <JobPill chip={chip} compact={compact} />;
+  }
+
+  return (
+    <View style={styles.meTypePillStack}>
       <Text
         style={[
-          styles.jobPillText,
-          compact && styles.jobPillTextCompact,
-          { color: chip.textColor },
+          styles.meTypePillLabel,
+          titleScale === "hero"
+            ? styles.meTypePillLabelHero
+            : styles.meTypePillLabelRow,
+          inverseLabel && styles.meTypePillLabelInverse,
         ]}
       >
-        {chip.label}
+        {chip.eyebrowLabel}
       </Text>
+      <JobPill chip={chip} compact={compact} eyebrowDisplay="outside" />
     </View>
   );
 }
@@ -1855,6 +2044,7 @@ function MeHeroCard({
     : null;
   const shiftName = getScheduleItemShiftName(featuredItem);
   const typeChip = getVisibleScheduleItemTypeChip(featuredItem);
+  const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
   const focusAreaName = getScheduleItemFocusArea(featuredItem);
   const timeRange = getScheduleItemTimeRange(featuredItem);
   const badgeDotStyle =
@@ -1905,10 +2095,12 @@ function MeHeroCard({
               <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
             </View>
           ) : null}
-          <Text style={styles.meHeroTitle}>{shiftName}</Text>
+          {shouldShowShiftName ? (
+            <Text style={styles.meHeroTitle}>{shiftName}</Text>
+          ) : null}
           {typeChip ? (
             <View style={styles.meHeroRoleRow}>
-              <JobPill chip={typeChip} compact />
+              <MeTypePill chip={typeChip} compact inverseLabel titleScale="hero" />
             </View>
           ) : null}
           {timeRange ? (
@@ -1969,7 +2161,7 @@ function UpcomingShiftsSection({
   onPressEntry,
   summary,
 }: {
-  items: ReturnType<typeof buildUpcomingMeScheduleItems>;
+  items: Array<NonNullable<FeaturedMeScheduleSegment["item"]>>;
   onPressEntry: (entry: MobileScheduleEntry) => void;
   summary: WeeklyHoursSummary | null;
 }) {
@@ -1997,6 +2189,11 @@ function UpcomingShiftsSection({
         {items.map((item, index) => {
           const dateParts = getCompactScheduleDateParts(item.date);
           const typeChip = getScheduleItemTypeChip(item);
+          const shiftName = getScheduleItemShiftName(item);
+          const shouldShowShiftName = shouldShowMePrimaryTitle(
+            shiftName,
+            typeChip,
+          );
           const focusAreaName = getScheduleItemFocusArea(item);
           const timeRange = getScheduleItemTimeRange(item);
 
@@ -2018,13 +2215,13 @@ function UpcomingShiftsSection({
               </View>
 
               <View style={styles.upcomingShiftCopy}>
-                <Text style={styles.upcomingShiftTitle}>
-                  {getScheduleItemShiftName(item)}
-                </Text>
+                {shouldShowShiftName ? (
+                  <Text style={styles.upcomingShiftTitle}>{shiftName}</Text>
+                ) : null}
                 {focusAreaName ? (
                   <Text style={styles.upcomingShiftArea}>{focusAreaName}</Text>
                 ) : null}
-                <JobPill chip={typeChip} compact />
+                <MeTypePill chip={typeChip} compact />
                 {timeRange ? (
                   <View style={styles.upcomingShiftTime}>
                     <Ionicons
@@ -2057,6 +2254,7 @@ function UpcomingShiftsSection({
 function OpenShiftsSection({
   requests,
   openShifts,
+  scheduleEntries,
   linkedEmployeeId,
   isLoading,
   mutationPending,
@@ -2067,6 +2265,7 @@ function OpenShiftsSection({
 }: {
   requests: MobileShiftRequest[];
   openShifts: MobileOpenShift[];
+  scheduleEntries: MobileScheduleEntry[];
   linkedEmployeeId: string | null;
   isLoading: boolean;
   mutationPending: boolean;
@@ -2075,12 +2274,223 @@ function OpenShiftsSection({
   onVolunteer: (openShift: MobileOpenShift) => void;
   onSeeAll: () => void;
 }) {
-  if (
-    !isLoading &&
-    !requestsError &&
-    requests.length === 0 &&
-    openShifts.length === 0
-  ) {
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [stackCardHeights, setStackCardHeights] = useState<
+    Record<string, number>
+  >({});
+  const availableOpenShiftFeed = useMemo(
+    () =>
+      buildAvailableOpenShiftFeed({
+        linkedEmployeeId,
+        scheduleEntries,
+        openShifts,
+        requests,
+      }),
+    [linkedEmployeeId, openShifts, requests, scheduleEntries],
+  );
+  const dateGroups = availableOpenShiftFeed.groups;
+  const noteStackCardHeight = useCallback((date: string, height: number) => {
+    setStackCardHeights((currentHeights) => {
+      if (currentHeights[date] === height) {
+        return currentHeights;
+      }
+
+      return {
+        ...currentHeights,
+        [date]: height,
+      };
+    });
+  }, []);
+  const toggleExpandedDate = useCallback((date: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedDates((currentDates) => ({
+      ...currentDates,
+      [date]: !currentDates[date],
+    }));
+  }, []);
+  const renderFeedCard = (
+    item: AvailableShiftFeedItem,
+    options?: {
+      accessibilityLabel?: string;
+      onToggle?: () => void;
+    },
+  ) => {
+    const cardSurfaceProps =
+      options?.onToggle != null
+        ? {
+            accessibilityLabel: options.accessibilityLabel,
+            onPress: options.onToggle,
+          }
+        : null;
+
+    if (item.kind === "open_shift") {
+      const jobChip = getOpenShiftJobChip(item.openShift);
+      const shiftName = getOpenShiftShiftName(item.openShift);
+      const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
+      const focusAreaName = getOpenShiftFocusAreaName(item.openShift);
+      const timeRange = getOpenShiftTimeRange(item.openShift);
+      const cardSurface = cardSurfaceProps ? (
+        <Pressable
+          accessibilityLabel={cardSurfaceProps.accessibilityLabel}
+          onPress={cardSurfaceProps.onPress}
+          style={styles.openShiftCardSurface}
+        >
+          {shouldShowShiftName ? (
+            <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
+          ) : null}
+          {jobChip || focusAreaName ? (
+            <View style={styles.scheduleRowContext}>
+              <MeTypePill chip={jobChip} compact />
+              {focusAreaName ? (
+                <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
+              ) : null}
+            </View>
+          ) : null}
+          <Text style={styles.scheduleRowMeta}>
+            {item.openShift.needed} teammate
+            {item.openShift.needed === 1 ? "" : "s"} needed
+          </Text>
+          {timeRange ? (
+            <View style={styles.scheduleRowTime}>
+              <Ionicons
+                color={mobileColors.textMuted}
+                name="time-outline"
+                size={18}
+              />
+              <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : (
+        <View style={styles.openShiftCardSurface}>
+          {shouldShowShiftName ? (
+            <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
+          ) : null}
+          {jobChip || focusAreaName ? (
+            <View style={styles.scheduleRowContext}>
+              <MeTypePill chip={jobChip} compact />
+              {focusAreaName ? (
+                <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
+              ) : null}
+            </View>
+          ) : null}
+          <Text style={styles.scheduleRowMeta}>
+            {item.openShift.needed} teammate
+            {item.openShift.needed === 1 ? "" : "s"} needed
+          </Text>
+          {timeRange ? (
+            <View style={styles.scheduleRowTime}>
+              <Ionicons
+                color={mobileColors.textMuted}
+                name="time-outline"
+                size={18}
+              />
+              <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+            </View>
+          ) : null}
+        </View>
+      );
+
+      return (
+        <View key={item.key} style={styles.openShiftCard}>
+          {cardSurface}
+          <Button
+            disabled={mutationPending || !linkedEmployeeId}
+            label="Volunteer"
+            leadingAccessory={
+              <Ionicons
+                color={mobileColors.brand}
+                name="add-circle-outline"
+                size={18}
+              />
+            }
+            onPress={() => onVolunteer(item.openShift)}
+            tone="secondary"
+          />
+        </View>
+      );
+    }
+
+    const jobChip = getRequestJobChip(item.request, "requester");
+    const shiftName = getRequestShiftName(item.request, "requester");
+    const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
+    const focusAreaName = getRequestFocusAreaName(item.request, "requester");
+    const timeRange = getRequestTimeRange(item.request, "requester");
+    const cardSurface = cardSurfaceProps ? (
+      <Pressable
+        accessibilityLabel={cardSurfaceProps.accessibilityLabel}
+        onPress={cardSurfaceProps.onPress}
+        style={styles.openShiftCardSurface}
+      >
+        {shouldShowShiftName ? (
+          <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
+        ) : null}
+        {jobChip || focusAreaName ? (
+          <View style={styles.scheduleRowContext}>
+            <MeTypePill chip={jobChip} compact />
+            {focusAreaName ? (
+              <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
+            ) : null}
+          </View>
+        ) : null}
+        {timeRange ? (
+          <View style={styles.scheduleRowTime}>
+            <Ionicons
+              color={mobileColors.textMuted}
+              name="time-outline"
+              size={18}
+            />
+            <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    ) : (
+      <View style={styles.openShiftCardSurface}>
+        {shouldShowShiftName ? (
+          <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
+        ) : null}
+        {jobChip || focusAreaName ? (
+          <View style={styles.scheduleRowContext}>
+            <MeTypePill chip={jobChip} compact />
+            {focusAreaName ? (
+              <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
+            ) : null}
+          </View>
+        ) : null}
+        {timeRange ? (
+          <View style={styles.scheduleRowTime}>
+            <Ionicons
+              color={mobileColors.textMuted}
+              name="time-outline"
+              size={18}
+            />
+            <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+
+    return (
+      <View key={item.key} style={styles.openShiftCard}>
+        {cardSurface}
+        <Button
+          disabled={mutationPending || !linkedEmployeeId}
+          label="Claim Shift"
+          leadingAccessory={
+            <Ionicons
+              color={mobileColors.brand}
+              name="add-circle-outline"
+              size={18}
+            />
+          }
+          onPress={() => onClaim(item.request.id)}
+          tone="secondary"
+        />
+      </View>
+    );
+  };
+
+  if (!isLoading && !requestsError && availableOpenShiftFeed.totalCount === 0) {
     return null;
   }
 
@@ -2093,110 +2503,116 @@ function OpenShiftsSection({
       />
 
       {isLoading ? (
-        <SectionStateCard body="Loading open shifts you can claim." />
+        <ListSkeleton rows={2} showSectionHeader={false} />
       ) : requestsError ? (
-        <SectionStateCard body="We couldn't load open shifts right now." />
+        <StatusBanner
+          body="We couldn't load open shifts right now."
+          title="Could not load open shifts"
+        />
       ) : (
         <ScrollView
+          accessibilityLabel="Open shifts carousel"
           horizontal
-          contentContainerStyle={styles.openShiftScrollContent}
+          style={styles.openShiftCarousel}
+          contentContainerStyle={styles.openShiftCarouselContent}
           showsHorizontalScrollIndicator={false}
         >
-          {openShifts.map((openShift) => {
-            const jobChip = getOpenShiftJobChip(openShift);
-            const focusAreaName = getOpenShiftFocusAreaName(openShift);
-            const timeRange = getOpenShiftTimeRange(openShift);
+          {dateGroups.map((group) => {
+            const dateLabel = formatCompactScheduleDate(group.date);
+            const isExpandedDay = expandedDates[group.date] === true;
+            const isExpandableDay = group.items.length > 1;
+            const visibleItems = isExpandedDay
+              ? group.items
+              : group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
+            const isCollapsedStack = !isExpandedDay && visibleItems.length > 1;
+            const hiddenStackCount = isCollapsedStack
+              ? visibleItems.length - 1
+              : 0;
+            const stackedDeckHeight =
+              hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT +
+              OPEN_SHIFT_CARD_SHADOW_ALLOWANCE;
+            const stackCardHeight =
+              stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
+            const cardToggleLabel = isExpandedDay
+              ? `Collapse open shifts for ${dateLabel}`
+              : `Expand open shifts for ${dateLabel}`;
 
             return (
-              <View key={openShift.id} style={styles.openShiftCard}>
-                <Text style={styles.scheduleRowDate}>
-                  {formatCompactScheduleDate(openShift.date)}
-                </Text>
-                <Text style={styles.scheduleRowTitle}>
-                  {getOpenShiftShiftName(openShift)}
-                </Text>
-                {jobChip || focusAreaName ? (
-                  <View style={styles.scheduleRowContext}>
-                    <JobPill chip={jobChip} compact />
-                    {focusAreaName ? (
-                      <Text style={styles.scheduleRowMeta}>
-                        {focusAreaName}
-                      </Text>
-                    ) : null}
+              <View key={group.date} style={styles.openShiftDateCard}>
+                <View style={styles.openShiftDateHeader}>
+                  <Text style={styles.scheduleRowDate}>{dateLabel}</Text>
+                  <View
+                    accessibilityLabel={formatOpenShiftCardCountLabel(
+                      group.itemCount,
+                    )}
+                    style={styles.openShiftCountBadge}
+                  >
+                    <Text style={styles.openShiftCountBadgeText}>
+                      {group.itemCount}
+                    </Text>
                   </View>
-                ) : null}
-                {timeRange ? (
-                  <View style={styles.scheduleRowTime}>
-                    <Ionicons
-                      color={mobileColors.textMuted}
-                      name="time-outline"
-                      size={18}
-                    />
-                    <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
-                  </View>
-                ) : null}
-                <Button
-                  disabled={mutationPending || !linkedEmployeeId}
-                  label="Volunteer"
-                  leadingAccessory={
-                    <Ionicons
-                      color={mobileColors.brand}
-                      name="add-circle-outline"
-                      size={18}
-                    />
-                  }
-                  onPress={() => onVolunteer(openShift)}
-                  tone="secondary"
-                />
-              </View>
-            );
-          })}
-          {requests.map((request) => {
-            const jobChip = getRequestJobChip(request, "requester");
-            const focusAreaName = getRequestFocusAreaName(request, "requester");
-            const timeRange = getRequestTimeRange(request, "requester");
+                </View>
+                <View
+                  style={[
+                    styles.openShiftDateCardItems,
+                    isCollapsedStack && styles.openShiftDateCardItemsStacked,
+                    isCollapsedStack && {
+                      minHeight: stackCardHeight,
+                      paddingBottom: stackedDeckHeight,
+                    },
+                  ]}
+                >
+                  {isCollapsedStack ? (
+                    <>
+                      {visibleItems.slice(1).map((item, index) => {
+                        const stackIndex = index + 1;
+                        const top = stackIndex * OPEN_SHIFT_STACK_PEEK_HEIGHT;
+                        const inset = stackIndex * OPEN_SHIFT_STACK_SIDE_INSET;
 
-            return (
-              <View key={request.id} style={styles.openShiftCard}>
-                <Text style={styles.scheduleRowDate}>
-                  {getRequestDateLabel(request)}
-                </Text>
-                <Text style={styles.scheduleRowTitle}>
-                  {getRequestShiftName(request, "requester")}
-                </Text>
-                {jobChip || focusAreaName ? (
-                  <View style={styles.scheduleRowContext}>
-                    <JobPill chip={jobChip} compact />
-                    {focusAreaName ? (
-                      <Text style={styles.scheduleRowMeta}>
-                        {focusAreaName}
-                      </Text>
-                    ) : null}
-                  </View>
-                ) : null}
-                {timeRange ? (
-                  <View style={styles.scheduleRowTime}>
-                    <Ionicons
-                      color={mobileColors.textMuted}
-                      name="time-outline"
-                      size={18}
-                    />
-                    <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
-                  </View>
-                ) : null}
-                <Button
-                  disabled={mutationPending || !linkedEmployeeId}
-                  label="Claim Shift"
-                  leadingAccessory={
-                    <Ionicons
-                      color={mobileColors.brand}
-                      name="add-circle-outline"
-                      size={18}
-                    />
-                  }
-                  onPress={() => onClaim(request.id)}
-                  tone="secondary"
-                />
+                        return (
+                          <View
+                            key={`${item.key}-stacked`}
+                            pointerEvents="none"
+                            style={[
+                              styles.openShiftCard,
+                              styles.openShiftCardStacked,
+                              {
+                                height: stackCardHeight,
+                                left: inset,
+                                right: inset,
+                                top,
+                                zIndex: visibleItems.length - stackIndex,
+                              },
+                            ]}
+                          />
+                        );
+                      })}
+                      <View
+                        onLayout={(event) => {
+                          noteStackCardHeight(
+                            group.date,
+                            event.nativeEvent.layout.height,
+                          );
+                        }}
+                        style={styles.openShiftCardLead}
+                      >
+                        {renderFeedCard(visibleItems[0] as AvailableShiftFeedItem, {
+                          accessibilityLabel: cardToggleLabel,
+                          onToggle: () => toggleExpandedDate(group.date),
+                        })}
+                      </View>
+                    </>
+                  ) : (
+                    visibleItems.map((item, index) =>
+                      renderFeedCard(item, isExpandableDay && index === 0
+                        ? {
+                            accessibilityLabel: cardToggleLabel,
+                            onToggle: () => toggleExpandedDate(group.date),
+                          }
+                        : undefined),
+                    )
+                  )}
+                </View>
               </View>
             );
           })}
@@ -2230,14 +2646,22 @@ function ShiftCoverRequestsSection({
       <MeSectionHeader title="Needs Your Response" />
 
       {isLoading ? (
-        <SectionStateCard body="Loading shift cover requests." />
+        <ListSkeleton rows={2} showSectionHeader={false} />
       ) : requestsError ? (
-        <SectionStateCard body="We couldn't load cover requests right now." />
+        <StatusBanner
+          body="We couldn't load cover requests right now."
+          title="Could not load requests"
+        />
       ) : (
         <View style={styles.requestList}>
           {requests.map((request) => {
             const avatarTone = getAvatarTone(request.requesterEmpId);
             const jobChip = getRequestJobChip(request, "requester");
+            const shiftName = getRequestShiftName(request, "requester");
+            const shouldShowShiftName = shouldShowMePrimaryTitle(
+              shiftName,
+              jobChip,
+            );
             const focusAreaName = getRequestFocusAreaName(request, "requester");
             const timeRange = getRequestTimeRange(request, "requester");
 
@@ -2277,12 +2701,12 @@ function ShiftCoverRequestsSection({
                   </Text>
                 </View>
 
-                <Text style={styles.scheduleRowTitle}>
-                  {getRequestShiftName(request, "requester")}
-                </Text>
+                {shouldShowShiftName ? (
+                  <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
+                ) : null}
                 {jobChip || focusAreaName ? (
                   <View style={styles.scheduleRowContext}>
-                    <JobPill chip={jobChip} compact />
+                    <MeTypePill chip={jobChip} compact />
                     {focusAreaName ? (
                       <Text style={styles.scheduleRowMeta}>
                         {focusAreaName}
@@ -2371,6 +2795,11 @@ function TeamShiftMemberRow({
         </View>
         {roleChip ? (
           <View
+            accessibilityLabel={
+              roleChip.eyebrowLabel
+                ? `${roleChip.eyebrowLabel} ${roleChip.label}`
+                : `Job ${roleChip.label}`
+            }
             style={[
               styles.teamMemberRoleChip,
               {
@@ -2379,14 +2808,35 @@ function TeamShiftMemberRow({
               },
             ]}
           >
-            <Text
-              style={[
-                styles.teamMemberRoleChipText,
-                { color: roleChip.textColor },
-              ]}
-            >
-              {roleChip.label}
-            </Text>
+            {roleChip.eyebrowLabel ? (
+              <View style={styles.teamMemberRoleChipTextStack}>
+                <Text
+                  style={[
+                    styles.teamMemberRoleChipEyebrowText,
+                    { color: roleChip.textColor },
+                  ]}
+                >
+                  {roleChip.eyebrowLabel}
+                </Text>
+                <Text
+                  style={[
+                    styles.teamMemberRoleChipValueText,
+                    { color: roleChip.textColor },
+                  ]}
+                >
+                  {roleChip.label}
+                </Text>
+              </View>
+            ) : (
+              <Text
+                style={[
+                  styles.teamMemberRoleChipText,
+                  { color: roleChip.textColor },
+                ]}
+              >
+                {roleChip.label}
+              </Text>
+            )}
           </View>
         ) : null}
       </View>
@@ -2397,31 +2847,39 @@ function TeamShiftMemberRow({
 function getTeamMemberRoleChip(entry: MobileScheduleEntry):
   | (AvatarTone & {
       label: string;
+      kind: JobChipKind;
+      eyebrowLabel?: string | null;
     })
   | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return {
-      label: "Absence",
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.border,
-      textColor: mobileColors.textMuted,
-    };
+    return buildAbsenceChip(getScheduleEntryTitle(entry));
   }
 
-  const segment =
-    getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
-  const label = segment?.jobName ?? null;
+  const segment = getScheduleEntrySegments(entry)[0] ?? null;
 
-  if (!segment || !label) {
+  if (isGeneralShiftSegment(segment)) {
+    return buildGeneralShiftChip(getScheduleEntryTitle(entry), segment);
+  }
+
+  const jobSegment =
+    getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
+  const label = jobSegment?.jobName ?? null;
+
+  if (!jobSegment || !label) {
     return null;
   }
 
-  if (segment.jobColor || segment.jobBorderColor || segment.jobTextColor) {
+  if (
+    jobSegment.jobColor ||
+    jobSegment.jobBorderColor ||
+    jobSegment.jobTextColor
+  ) {
     return {
+      kind: "job",
       label,
-      backgroundColor: segment.jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: segment.jobBorderColor ?? mobileColors.border,
-      textColor: segment.jobTextColor ?? mobileColors.textMuted,
+      backgroundColor: jobSegment.jobColor ?? mobileColors.surfaceSecondary,
+      borderColor: jobSegment.jobBorderColor ?? mobileColors.border,
+      textColor: jobSegment.jobTextColor ?? mobileColors.textMuted,
     };
   }
 
@@ -2457,6 +2915,7 @@ function getTeamMemberRoleChip(entry: MobileScheduleEntry):
             };
 
   return {
+    kind: "job",
     label,
     ...tone,
   };
@@ -2500,6 +2959,19 @@ function getAvatarTone(seed: string): AvatarTone {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    color: mobileColors.textPrimary,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  loadingBody: {
+    color: mobileColors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+  },
   stickyControlsSection: {
     gap: 16,
   },
@@ -2755,8 +3227,27 @@ const styles = StyleSheet.create({
   },
   meHeroRoleRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
+  },
+  meTypePillStack: {
+    alignSelf: "flex-start",
+    gap: 4,
+  },
+  meTypePillLabel: {
+    color: mobileColors.textMuted,
+    fontWeight: "800",
+  },
+  meTypePillLabelRow: {
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  meTypePillLabelHero: {
+    fontSize: 24,
+    lineHeight: 30,
+  },
+  meTypePillLabelInverse: {
+    color: "rgba(255, 255, 255, 0.82)",
   },
   meHeroScheduleRow: {
     flexDirection: "row",
@@ -3157,12 +3648,53 @@ const styles = StyleSheet.create({
     borderColor: mobileColors.borderSubtle,
     backgroundColor: mobileColors.surfaceSecondary,
   },
-  openShiftScrollContent: {
+  openShiftCarousel: {
+    marginHorizontal: -OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+  },
+  openShiftCarouselContent: {
     gap: 14,
-    paddingRight: 4,
+    paddingHorizontal: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+    paddingTop: 4,
+    paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+    paddingRight: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE + 4,
+  },
+  openShiftDateCard: {
+    width: 320,
+    gap: 12,
+  },
+  openShiftDateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  openShiftDateCardItems: {
+    gap: 14,
+    paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+  },
+  openShiftDateCardItemsStacked: {
+    gap: 0,
+    minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
+    position: "relative",
+  },
+  openShiftCountBadge: {
+    minWidth: 28,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: mobileRadii.pill,
+    borderWidth: 1,
+    borderColor: mobileColors.brandBorder,
+    backgroundColor: mobileColors.brandSoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  openShiftCountBadgeText: {
+    color: mobileColors.brand,
+    fontSize: 12,
+    fontWeight: "800",
   },
   openShiftCard: {
-    width: 296,
+    minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
     gap: 12,
     backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,
@@ -3177,6 +3709,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 1,
     shadowRadius: 18,
     elevation: 2,
+  },
+  openShiftCardSurface: {
+    gap: 12,
+  },
+  openShiftCardLead: {
+    zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
+  },
+  openShiftCardStacked: {
+    position: "absolute",
+    shadowRadius: 14,
   },
   requestList: {
     gap: 14,
@@ -3258,6 +3800,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
+  jobPillTextStack: {
+    gap: 2,
+  },
+  jobPillEyebrowText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  jobPillEyebrowTextCompact: {
+    fontSize: 9,
+  },
   jobPillText: {
     fontSize: 13,
     fontWeight: "800",
@@ -3265,6 +3818,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   jobPillTextCompact: {
+    fontSize: 12,
+  },
+  jobPillValueText: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
+  jobPillValueTextCompact: {
     fontSize: 12,
   },
   meCollaboratorList: {
@@ -3464,20 +4025,8 @@ const styles = StyleSheet.create({
     color: mobileColors.textInverse,
   },
   monthCalendar: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
     padding: 16,
     gap: 14,
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 3,
   },
   monthCalendarHeader: {
     flexDirection: "row",
@@ -3549,32 +4098,19 @@ const styles = StyleSheet.create({
     position: "relative",
     zIndex: 10,
   },
-  monthCalendarPopup: {
-    position: "absolute",
-    top: 50,
-    right: 0,
-    width: 320,
-    zIndex: 12,
+  popupOverlayRoot: {
+    ...StyleSheet.absoluteFillObject,
   },
-  filterPopup: {
-    position: "absolute",
-    top: 50,
-    right: 0,
+  popupDismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  monthCalendarPopupSurface: {
+    width: 320,
+  },
+  filterPopupSurface: {
     width: 220,
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
     padding: 14,
     gap: 8,
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 6,
   },
   filterSheetLabel: {
     color: mobileColors.textSubtle,
@@ -3750,11 +4286,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
+  teamMemberRoleChipTextStack: {
+    gap: 2,
+  },
+  teamMemberRoleChipEyebrowText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
   teamMemberRoleChipText: {
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 1.5,
     textTransform: "uppercase",
+  },
+  teamMemberRoleChipValueText: {
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 0.2,
   },
   compactSegmentList: {
     gap: 8,
