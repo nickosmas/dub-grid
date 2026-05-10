@@ -58,6 +58,7 @@ export const CacheKey = {
   mwMembership: (userId: string, slug: string) =>
     `dg:mw:membership:${userId}:${slug}`,
   mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
+  mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
 } as const;
 
 // ── Typed Cache Operations ──────────────────────────────────────────────

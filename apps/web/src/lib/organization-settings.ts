@@ -17,6 +17,7 @@ export type OrganizationSettingsKey =
   | "departmentLabel"
   | "shiftDisplayMode"
   | "enforceConflictPrevention"
+  | "coverageRuleConfig"
   | "payPeriodStartDate"
   | "dataRetentionDays"
   | "featureOverrides";
@@ -26,7 +27,8 @@ type OrganizationSettingsValue =
   | number
   | boolean
   | null
-  | Record<string, boolean>;
+  | { mentoredCoverageCreditPercent: number }
+  | Record<string, boolean | number>;
 
 export type OrganizationSettingsEditable = Pick<
   Organization,
@@ -94,6 +96,14 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     sensitive: true,
     format: (value) => (value ? "Enabled" : "Disabled"),
   },
+  coverageRuleConfig: {
+    label: "Coverage Rules",
+    sensitive: true,
+    format: (value) =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? `Mentored coverage: ${Number(value.mentoredCoverageCreditPercent ?? 100)}%`
+        : DEFAULT_EMPTY,
+  },
   dataRetentionDays: {
     label: "Data Retention",
     sensitive: true,
@@ -101,7 +111,7 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
       typeof value === "number" ? `${value} days` : DEFAULT_EMPTY,
   },
   featureOverrides: {
-    label: "Feature Flags",
+    label: "Runtime Controls",
     sensitive: true,
     format: (value) => formatFeatureOverrides(value),
   },
@@ -130,6 +140,8 @@ export function pickOrganizationSettings(
     departmentLabel: organization.departmentLabel,
     shiftDisplayMode: organization.shiftDisplayMode,
     enforceConflictPrevention: organization.enforceConflictPrevention,
+    coverageRuleConfig:
+      organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
     payPeriodStartDate: organization.payPeriodStartDate,
     dataRetentionDays: organization.dataRetentionDays,
     featureOverrides: organization.featureOverrides ?? {},
@@ -143,9 +155,11 @@ function normalizeValue(value: OrganizationSettingsValue): OrganizationSettingsV
   }
   if (value && typeof value === "object" && !Array.isArray(value)) {
     return Object.fromEntries(
-      Object.keys(value)
+      Object.entries(value)
         .sort()
-        .map((key) => [key, !!value[key]]),
+        .map(([key, entry]) => {
+          return [key, typeof entry === "number" ? entry : Boolean(entry)];
+        }),
     );
   }
   return value ?? null;
@@ -202,8 +216,8 @@ export function buildOrganizationSettingsChanges(
   next: OrganizationSettingsEditable,
 ): OrganizationSettingsChange[] {
   return EDITABLE_KEYS.flatMap((key) => {
-    const previousValue = normalizeValue(previous[key]);
-    const nextValue = normalizeValue(next[key]);
+    const previousValue = normalizeValue(previous[key] ?? null);
+    const nextValue = normalizeValue(next[key] ?? null);
 
     if (valuesEqual(previousValue, nextValue)) return [];
 

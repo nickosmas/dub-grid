@@ -147,10 +147,12 @@ export async function removeBrowserRealtimeChannel(
   await supabase.removeChannel(channel);
 }
 
+export const BROWSER_TOTP_FRIENDLY_NAME = "DubGrid Authenticator";
+
 export async function startBrowserTotpEnrollment() {
   return supabase.auth.mfa.enroll({
     factorType: "totp",
-    friendlyName: "DubGrid Authenticator",
+    friendlyName: BROWSER_TOTP_FRIENDLY_NAME,
   });
 }
 

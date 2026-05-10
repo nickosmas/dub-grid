@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
@@ -9,6 +9,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     id: "emp-1",
     firstName: "Alice",
     lastName: "Smith",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -48,7 +49,7 @@ describe("EmployeeStatusActions", () => {
       screen.getByPlaceholderText(/Reason \(optional\)/),
       "  On leave until June  ",
     );
-    await user.click(screen.getByRole("button", { name: "Confirm Bench" }));
+    await user.click(screen.getByRole("button", { name: "Bench" }));
 
     expect(onBench).toHaveBeenCalledWith("emp-1", "On leave until June");
   });
@@ -72,7 +73,7 @@ describe("EmployeeStatusActions", () => {
 
     await user.click(screen.getByRole("button", { name: "Terminate" }));
     await user.click(screen.getByRole("checkbox", { name: /also revoke app access/i }));
-    await user.click(screen.getByRole("button", { name: "Confirm Termination" }));
+    await user.click(screen.getByRole("button", { name: "Terminate" }));
 
     expect(onTerminate).toHaveBeenCalledWith("emp-1");
     expect(onRevokeAccess).toHaveBeenCalledWith("user-1");
@@ -93,10 +94,12 @@ describe("EmployeeStatusActions", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Activate" }));
-
-    expect(onActivate).toHaveBeenCalledWith("emp-1");
     expect(screen.getByRole("button", { name: "Activate" })).toHaveClass("dg-btn-sm");
+
+    await user.click(screen.getByRole("button", { name: "Activate" }));
+    const dialog = screen.getByRole("dialog", { name: "Activate Staff Member?" });
+    await user.click(within(dialog).getByRole("button", { name: "Activate" }));
+    expect(onActivate).toHaveBeenCalledWith("emp-1");
   });
 
   it("uses the shared filled warning and danger button treatments for status actions", () => {

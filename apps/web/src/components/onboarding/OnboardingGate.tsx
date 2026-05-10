@@ -1,10 +1,14 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
+import { fetchOrganizationBilling } from "@/features/billing/client";
+import { useBillingRealtimeInvalidation } from "@/features/billing/useBillingRealtimeInvalidation";
 import { fetchOnboardingStatus } from "@/features/onboarding/client";
+import { queryKeys } from "@/lib/query-keys";
 
 /** Routes where the onboarding gate should never intercept. */
 const PUBLIC_ROUTES = [
@@ -29,6 +33,22 @@ function isPublicRoute(pathname: string): boolean {
   );
 }
 
+function isSetupCompletionRoute(pathname: string): boolean {
+  return (
+    pathname === "/setup" ||
+    pathname === "/people" ||
+    pathname === "/settings" ||
+    pathname.startsWith("/settings/")
+  );
+}
+
+function isBillingRecoveryRoute(
+  pathname: string,
+  section: string | null,
+): boolean {
+  return pathname === "/settings" && section === "org-billing";
+}
+
 export default function OnboardingGate({
   children,
 }: {
@@ -37,6 +57,7 @@ export default function OnboardingGate({
   const { user, isLoading: authLoading } = useAuth();
   const perms = usePermissions();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   // Pass through for: loading, unauthenticated, public routes,
   // gridmaster, no org, impersonating
@@ -55,6 +76,8 @@ export default function OnboardingGate({
       role={perms.role}
       isSuperAdmin={perms.isSuperAdmin}
       canManageOrg={perms.canManageOrg}
+      pathname={pathname}
+      section={searchParams.get("section")}
     >
       {children}
     </OnboardingCheck>
@@ -69,12 +92,34 @@ export default function OnboardingGate({
 import OnboardingWizard from "./OnboardingWizard";
 import SetupPendingScreen from "./SetupPendingScreen";
 
+function SetupRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/setup");
+  }, [router]);
+
+  return null;
+}
+
+function BillingRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/settings?section=org-billing");
+  }, [router]);
+
+  return null;
+}
+
 function OnboardingCheck({
   userId,
   orgId,
   role,
   isSuperAdmin,
   canManageOrg,
+  pathname,
+  section,
   children,
 }: {
   userId: string;
@@ -82,32 +127,59 @@ function OnboardingCheck({
   role: string;
   isSuperAdmin: boolean;
   canManageOrg: boolean;
+  pathname: string;
+  section: string | null;
   children: React.ReactNode;
 }) {
+  useBillingRealtimeInvalidation(orgId);
+  const canRecoverBilling = isSuperAdmin;
+  const { data: billing, isLoading: billingLoading } = useQuery({
+    queryKey: queryKeys.org.billing(orgId),
+    queryFn: () => fetchOrganizationBilling(orgId),
+    enabled: canRecoverBilling,
+    staleTime: 30_000,
+  });
+  const shouldCheckWorkspace = !canRecoverBilling || Boolean(billing);
   const { data: onboardingStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["onboarding-status", userId, orgId],
     queryFn: () => fetchOnboardingStatus(orgId),
+    enabled: shouldCheckWorkspace && billing?.billingAccess.isLocked !== true,
     staleTime: 30_000,
   });
 
   const { setupStatus, loading: orgLoading } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
+    enabled: shouldCheckWorkspace && billing?.billingAccess.isLocked !== true,
   });
-  const { employees, loading: empLoading } = useEmployees(orgId);
+  const { employees, loading: empLoading } = useEmployees(
+    shouldCheckWorkspace && billing?.billingAccess.isLocked !== true ? orgId : null,
+  );
 
-  // Still loading — render children to avoid flash
-  if (statusLoading || orgLoading || empLoading) return <>{children}</>;
+  if (billingLoading) return null;
 
-  // Already completed onboarding
-  if (onboardingStatus?.completed) return <>{children}</>;
-
-  // Regular user on an org that isn't fully set up — show waiting screen
-  const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
-  const isRegularUser = !isSuperAdmin && !canManageOrg;
-
-  if (isRegularUser && !isOrgSetupComplete) {
-    return <SetupPendingScreen />;
+  if (billing?.billingAccess.isLocked) {
+    if (isBillingRecoveryRoute(pathname, section)) {
+      return <>{children}</>;
+    }
+    return <BillingRedirect />;
   }
+
+  if (statusLoading || orgLoading || empLoading) return null;
+
+  const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
+  const canCompleteSetup = isSuperAdmin || canManageOrg || role === "admin";
+
+  if (!isOrgSetupComplete) {
+    if (!canCompleteSetup) {
+      return <SetupPendingScreen />;
+    }
+    if (!isSetupCompletionRoute(pathname)) {
+      return <SetupRedirect />;
+    }
+    return <>{children}</>;
+  }
+
+  if (onboardingStatus?.completed) return <>{children}</>;
 
   // Show onboarding wizard
   return (

@@ -493,6 +493,27 @@ describe("computeCoverageStatus", () => {
     expect(result.actual).toBe(2);
     expect(result.isMet).toBe(true);
   });
+
+  it("applies partial coverage credit for matching mentored assignments", () => {
+    const emp1 = makeEmployee({ id: "emp-1" });
+    const emp2 = makeEmployee({ id: "emp-2" });
+    const idsForKey = (empId: string) => (empId === "emp-1" ? [10] : [10]);
+    const creditForKey = (empId: string) => (empId === "emp-1" ? 0.5 : 1);
+
+    const result = computeCoverageStatus(
+      [emp1, emp2],
+      date,
+      idsForKey,
+      new Set([10]),
+      [10],
+      { minStaff: 2 },
+      creditForKey,
+    );
+
+    expect(result.actual).toBe(1.5);
+    expect(result.required).toBe(2);
+    expect(result.isMet).toBe(false);
+  });
 });
 
 // ── computeCoverageGaps ──────────────────────────────────────────────────────

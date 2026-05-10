@@ -6,7 +6,12 @@ import CustomSelect from "./CustomSelect";
 import { Employee, OrganizationUser, NamedItem, Department, NameMismatchDetails } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
-import { validateEmail, validateRequired } from "@/components/FormField";
+import {
+  formatClientErrorMessage,
+  formatOrganizationRoleLabel,
+} from "@/lib/client-facing";
+import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
+import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
@@ -140,6 +145,7 @@ export default function InviteEmployeeModal({
     !requiredEmailError &&
     (!isManagementInvite || (!!firstName.trim() && !!lastName.trim())) &&
     (!isManagementInvite || managementDepts.length === 0 || departmentIds.length > 0) &&
+    (!isManagementInvite || !validatePhone(phone)) &&
     !sending &&
     !sent;
 
@@ -158,6 +164,8 @@ export default function InviteEmployeeModal({
           ? validateRequired(lastName, "Last name")
           : null,
       email: touched.email ? requiredEmailError : null,
+      phone:
+        isManagementInvite && touched.phone ? validatePhone(phone) : null,
       departmentIds:
         isManagementInvite && managementDepts.length > 0 && touched.departmentIds && departmentIds.length === 0
           ? "Select at least one management department"
@@ -169,6 +177,7 @@ export default function InviteEmployeeModal({
       isManagementInvite,
       lastName,
       managementDepts.length,
+      phone,
       requiredEmailError,
       touched,
     ],
@@ -193,8 +202,7 @@ export default function InviteEmployeeModal({
         setNameMismatch(err.details);
         return;
       }
-      const message = err instanceof Error ? err.message : "Failed to link user";
-      setError(message);
+      setError(formatClientErrorMessage(err, "Failed to link user"));
     } finally {
       setSending(false);
     }
@@ -217,8 +225,7 @@ export default function InviteEmployeeModal({
       await onInvited(updatedEmployee);
       onClose();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to reconcile and link user";
-      setError(message);
+      setError(formatClientErrorMessage(err, "Failed to reconcile and link user"));
     } finally {
       setSending(false);
     }
@@ -232,6 +239,7 @@ export default function InviteEmployeeModal({
         ...(isManagementInvite
           ? { firstName: true, lastName: true, departmentIds: true }
           : {}),
+        ...(isManagementInvite ? { phone: true } : {}),
       }));
       return;
     }
@@ -246,7 +254,9 @@ export default function InviteEmployeeModal({
         employeeId: employee?.id,
         firstName: isManagementInvite ? firstName.trim() : undefined,
         lastName: isManagementInvite ? lastName.trim() : undefined,
-        phone: isManagementInvite ? (phone.trim() || undefined) : undefined,
+        phone: isManagementInvite
+          ? normalizeOptionalUsPhone(phone) || undefined
+          : undefined,
         departmentIds:
           isManagementInvite && departmentIds.length > 0
             ? departmentIds
@@ -262,13 +272,18 @@ export default function InviteEmployeeModal({
       if (!res.ok) {
         // Invitation was saved to DB but email failed — tell the user clearly
         const text = await res.text().catch(() => "");
-        let detail = "Failed to send invitation email";
-        try { detail = JSON.parse(text).error || detail; } catch { /* non-JSON response */ }
-        throw new Error(`Invitation created but email failed: ${detail}`);
+        let detail = "We couldn't send the invitation email.";
+        try {
+          detail = formatClientErrorMessage(
+            JSON.parse(text).error,
+            "We couldn't send the invitation email.",
+          );
+        } catch { /* non-JSON response */ }
+        throw new Error(`Invitation was created, but ${detail}`);
       }
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error || "Failed to send invitation email");
+        throw new Error(formatClientErrorMessage(data.error, "We couldn't send the invitation email."));
       }
 
       toast.success(`Invitation email sent to ${trimmedEmail}`);
@@ -331,7 +346,7 @@ export default function InviteEmployeeModal({
             </p>
             <p style={{ margin: "8px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-info-text)" }}>
               <strong>{userName}</strong> ({matchedUser.email}) is already a member of this
-              organization as <strong>{matchedUser.orgRole.replace("_", " ")}</strong>.
+              organization as <strong>{formatOrganizationRoleLabel(matchedUser.orgRole)}</strong>.
               You can link them directly — no invitation needed.
             </p>
           </div>
@@ -476,9 +491,31 @@ export default function InviteEmployeeModal({
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                onBlur={() => {
+                  markTouched("phone");
+                  if (!validatePhone(phone)) {
+                    setPhone(normalizeOptionalUsPhone(phone));
+                  }
+                }}
                 placeholder="+1 555-123-4567"
-                style={inputStyle}
+                style={
+                  fieldErrors.phone
+                    ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                    : inputStyle
+                }
               />
+              {fieldErrors.phone && (
+                <div
+                  style={{
+                    color: "var(--color-danger)",
+                    fontSize: "var(--dg-fs-footnote)",
+                    marginTop: 4,
+                  }}
+                  role="alert"
+                >
+                  {fieldErrors.phone}
+                </div>
+              )}
             </div>
           )}
 

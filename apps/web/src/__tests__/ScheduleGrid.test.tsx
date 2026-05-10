@@ -77,6 +77,7 @@ const employees: Employee[] = [
     id: "emp-1",
     firstName: "Alex",
     lastName: "Taylor",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -223,6 +224,11 @@ interface RenderGridOptions {
   spanWeeks?: 1 | 2;
   shiftForKey?: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
+  publishedSegmentsForKey?: (
+    empId: string,
+    date: Date,
+  ) => ScheduleCellState["segments"];
   getShiftStyle?: (type: string, focusAreaName?: string) => AssignmentDefinition;
   today?: Date;
   highlightEmpIds?: Set<string>;
@@ -305,12 +311,18 @@ interface RenderGridOptions {
   activeCellId?: GridCellId | null;
   contextMenuCellId?: GridCellId | null;
   hasClipboard?: boolean;
+  bulkDeleteMode?: boolean;
+  bulkSelectedCellKeys?: Set<string>;
+  bulkSelectableCellKeys?: Set<string>;
   onActivateCell?: ScheduleGridHandlers["onActivateCell"];
   onOpenCellMenu?: NonNullable<ScheduleGridHandlers["onOpenCellMenu"]>;
   onMoveEntry?: NonNullable<ScheduleGridHandlers["onMoveEntry"]>;
   onCopyCell?: NonNullable<ScheduleGridHandlers["onCopyCell"]>;
   onPasteCell?: NonNullable<ScheduleGridHandlers["onPasteCell"]>;
   onClearCell?: NonNullable<ScheduleGridHandlers["onClearCell"]>;
+  onToggleBulkDeleteCell?: NonNullable<
+    ScheduleGridHandlers["onToggleBulkDeleteCell"]
+  >;
   onClaimOpenShift?: NonNullable<ScheduleGridHandlers["onClaimOpenShift"]>;
 }
 
@@ -351,6 +363,8 @@ function renderGrid(options: RenderGridOptions = {}) {
     accessors: {
       shiftForKey: options.shiftForKey ?? (() => "D"),
       assignmentIdsForKey: options.assignmentIdsForKey ?? (() => [1]),
+      segmentsForKey: options.segmentsForKey,
+      publishedSegmentsForKey: options.publishedSegmentsForKey,
       getShiftStyle:
         options.getShiftStyle ??
         getShiftStyleFromCodes(resolvedAssignmentDefinitions),
@@ -372,6 +386,9 @@ function renderGrid(options: RenderGridOptions = {}) {
     activeCellId: options.activeCellId ?? null,
     contextMenuCellId: options.contextMenuCellId ?? null,
     hasClipboard: options.hasClipboard ?? false,
+    bulkDeleteMode: options.bulkDeleteMode,
+    bulkSelectedCellKeys: options.bulkSelectedCellKeys,
+    bulkSelectableCellKeys: options.bulkSelectableCellKeys,
   };
 
   const handlers: ScheduleGridHandlers = {
@@ -381,6 +398,7 @@ function renderGrid(options: RenderGridOptions = {}) {
     onCopyCell: options.onCopyCell,
     onPasteCell: options.onPasteCell,
     onClearCell: options.onClearCell,
+    onToggleBulkDeleteCell: options.onToggleBulkDeleteCell,
     onClaimOpenShift: options.onClaimOpenShift,
   };
 
@@ -439,6 +457,91 @@ describe("ScheduleGrid", () => {
     expect(draggable?.style.right).toBe("0px");
     expect(draggable?.style.bottom).toBe("0px");
     expect(draggable?.style.left).toBe("0px");
+  });
+
+  it("marks mentored single-shift pills without changing the shift label", () => {
+    const localAssignments: AssignmentDefinition[] = [
+      {
+        ...assignments[0],
+        jobId: 101,
+      },
+    ];
+
+    renderGrid({
+      assignments: localAssignments,
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: true },
+      ],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector(
+      '[data-shift-pill="single"]',
+    ) as HTMLElement | null;
+    const badge = firstCell.querySelector(
+      '[data-mentored-badge="true"]',
+    ) as HTMLElement | null;
+
+    expect(pill).not.toBeNull();
+    expect(within(firstCell).getByText("D")).toBeInTheDocument();
+    expect(badge).not.toBeNull();
+    expect(badge).toHaveTextContent("M");
+    expect(badge?.getAttribute("aria-label")).toBe("Mentored assignment");
+    expect(badge?.style.width).toBe("16px");
+    expect(badge?.style.height).toBe("16px");
+    expect(badge?.style.borderRadius).toBe("999px");
+    expect(badge?.style.top).toBe("0.5px");
+    expect(badge?.style.right).toBe("0.5px");
+    expect(pill?.style.paddingLeft).toBe(pill?.style.paddingRight);
+  });
+
+  it("marks only the mentored pill in a split shift", () => {
+    const localAssignments: AssignmentDefinition[] = [
+      {
+        ...assignments[0],
+        jobId: 101,
+      },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      assignments: localAssignments,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: true },
+      ],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+    const badges = firstCell.querySelectorAll('[data-mentored-badge="true"]');
+
+    expect(pills).toHaveLength(2);
+    expect(badges).toHaveLength(1);
+    expect(pills[0].querySelector('[data-mentored-badge="true"]')).toBeNull();
+    expect(pills[1].querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+    expect((badges[0] as HTMLElement).style.width).toBe("15px");
+    expect((badges[0] as HTMLElement).style.height).toBe("15px");
+    expect((badges[0] as HTMLElement).style.borderRadius).toBe("999px");
+    expect((badges[0] as HTMLElement).style.top).toBe("0.5px");
+    expect((badges[0] as HTMLElement).style.right).toBe("0.5px");
+    expect(pills[1].style.paddingLeft).toBe(pills[1].style.paddingRight);
   });
 
   it("keeps all staff rows visible and visibly highlights matches when a staff search highlight set is active", async () => {
@@ -880,7 +983,7 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.borderColor).toBe("rgb(217, 119, 6)");
   });
 
-  it("keeps mixed draft border colors when show changes is off", () => {
+  it("keeps only the added second shift dashed when show changes is off", () => {
     observedWidth = 1600;
 
     const localAssignmentDefinitions: AssignmentDefinition[] = [
@@ -923,15 +1026,76 @@ describe("ScheduleGrid", () => {
     expect(pills.length).toBe(2);
     expect(badge).toBeNull();
     expect(pills[0]).toHaveStyle({
-      borderStyle: "dashed",
-      borderWidth: "2px",
+      borderStyle: "solid",
+      borderWidth: "1px",
     });
-    expect(pills[0]?.style.borderColor).toBe("rgb(217, 119, 6)");
     expect(pills[1]).toHaveStyle({
       borderStyle: "dashed",
       borderWidth: "2px",
     });
     expect(pills[1]?.style.borderColor).toBe("rgb(22, 163, 74)");
+  });
+
+  it("keeps only the newly mentored split-shift pill dashed when show changes is off", () => {
+    observedWidth = 1600;
+
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      {
+        ...assignments[0],
+        jobId: 101,
+      },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      assignments: localAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: true },
+      ],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1, 2],
+      publishedSegmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      publishedLabelForKey: () => "D/N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
+    const badge = firstCell.querySelector("[data-draft-badge]") as
+      | HTMLElement
+      | null;
+
+    expect(pills).toHaveLength(2);
+    expect(badge).toBeNull();
+    expect(pills[0]).toHaveStyle({
+      borderStyle: "solid",
+      borderWidth: "1px",
+    });
+    expect(pills[1]).toHaveStyle({
+      borderStyle: "dashed",
+      borderWidth: "2px",
+    });
+    expect(pills[1]?.style.borderColor).toBe("rgb(217, 119, 6)");
+    expect(pills[1].querySelector('[data-mentored-badge="true"]')).not.toBeNull();
   });
 
   it("uses the combined published shift label for draft replacement badges", () => {
@@ -1127,6 +1291,57 @@ describe("ScheduleGrid", () => {
     expect(within(firstCell).queryByText("Sheltered Care")).toBeNull();
   });
 
+  it("keeps cross-focus split draft pills on the white shift surface when show changes is on", () => {
+    observedWidth = 1600;
+
+    const localFocusAreas: FocusArea[] = [
+      focusAreas[0],
+      {
+        ...focusAreas[1],
+        name: "Sheltered Care",
+        color: "#FECACA",
+      },
+    ];
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      assignments[0],
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "XT",
+        name: "External Shift",
+        color: "#DBEAFE",
+        border: "#2563EB",
+        text: "#1E3A8A",
+        categoryId: 1,
+        focusAreaId: 2,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      focusAreas: localFocusAreas,
+      assignments: localAssignmentDefinitions,
+      shiftForKey: () => "D/XT",
+      assignmentIdsForKey: () => [1, 2],
+      showDiffOverlay: true,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1],
+      publishedLabelForKey: () => "D",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
+    const crossPill = initialsBadge.closest(
+      '[data-shift-pill="multi"]',
+    ) as HTMLElement | null;
+
+    expect(crossPill?.style.background).toBe("var(--color-surface)");
+    expect(crossPill).toHaveStyle({
+      borderStyle: "dashed",
+      borderWidth: "2px",
+    });
+  });
+
   it("keeps cross-focus name-mode text in the card body with separate lines", () => {
     observedWidth = 1600;
 
@@ -1293,9 +1508,16 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.color).not.toBe("rgb(248, 250, 252)");
   });
 
-  it("keeps cross-focus draft new cells on the shift color instead of gray", () => {
+  it("keeps cross-focus draft new cells on the white shift surface when show changes is on", () => {
     observedWidth = 1600;
 
+    const localFocusAreas: FocusArea[] = [
+      focusAreas[0],
+      {
+        ...focusAreas[1],
+        name: "Sheltered Care",
+      },
+    ];
     const localAssignmentDefinitions: AssignmentDefinition[] = [
       assignments[0],
       {
@@ -1313,6 +1535,7 @@ describe("ScheduleGrid", () => {
     ];
 
     renderGrid({
+      focusAreas: localFocusAreas,
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "S",
       assignmentIdsForKey: () => [2],
@@ -1329,7 +1552,59 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
 
     expect(badge).toBeNull();
-    expect(pill?.style.background).toBe("rgb(219, 234, 254)");
+    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(within(firstCell).getByText("SC").style.background).toBe(
+      "rgb(219, 234, 254)",
+    );
+  });
+
+  it("keeps cross-focus draft modified cells on the white shift surface when show changes is on", () => {
+    observedWidth = 1600;
+
+    const localFocusAreas: FocusArea[] = [
+      focusAreas[0],
+      {
+        ...focusAreas[1],
+        name: "Sheltered Care",
+      },
+    ];
+    const localAssignmentDefinitions: AssignmentDefinition[] = [
+      assignments[0],
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "S",
+        name: "South Shift",
+        color: "#DBEAFE",
+        border: "#2563EB",
+        text: "#1E3A8A",
+        categoryId: 1,
+        focusAreaId: 2,
+        sortOrder: 2,
+      },
+    ];
+
+    renderGrid({
+      focusAreas: localFocusAreas,
+      assignments: localAssignmentDefinitions,
+      shiftForKey: () => "S",
+      assignmentIdsForKey: () => [2],
+      showDiffOverlay: true,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1],
+      publishedLabelForKey: () => "D",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector(
+      '[data-shift-pill="single"]',
+    ) as HTMLElement | null;
+    const badge = firstCell.querySelector(
+      '[data-draft-badge="modified"]',
+    ) as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Was D");
+    expect(pill?.style.background).toBe("var(--color-surface)");
   });
 
   it("keeps a brand-new shift with custom time badge-free", () => {
@@ -1352,7 +1627,7 @@ describe("ScheduleGrid", () => {
     expect(badge).toBeNull();
   });
 
-  it("keeps cross-focus published edited cells on the shift color instead of gray", () => {
+  it("keeps cross-focus published edited cells on the white shift surface", () => {
     observedWidth = 1600;
 
     const localAssignmentDefinitions: AssignmentDefinition[] = [
@@ -1397,7 +1672,7 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
-    expect(pill?.style.background).toBe("rgb(219, 234, 254)");
+    expect(pill?.style.background).toBe("var(--color-surface)");
   });
 
   it("uses segment labels for publish replacement badges when they include job text", () => {
@@ -1458,9 +1733,16 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
-  it("keeps draft new cells on historical shift colors when the active code list no longer includes them", () => {
+  it("keeps draft new historical cross-focus cells on the white shift surface when show changes is on", () => {
     observedWidth = 1600;
 
+    const localFocusAreas: FocusArea[] = [
+      focusAreas[0],
+      {
+        ...focusAreas[1],
+        name: "Sheltered Care",
+      },
+    ];
     const historicalAssignmentDefinition: AssignmentDefinition = {
       id: 2,
       orgId: "org-1",
@@ -1477,6 +1759,7 @@ describe("ScheduleGrid", () => {
     renderGrid({
       assignments,
       historicalAssignments: [historicalAssignmentDefinition],
+      focusAreas: localFocusAreas,
       shiftForKey: () => "S",
       assignmentIdsForKey: () => [2],
       getShiftStyle: (type) =>
@@ -1499,10 +1782,13 @@ describe("ScheduleGrid", () => {
       '[data-shift-pill="single"]',
     ) as HTMLElement | null;
 
-    expect(pill?.style.background).toBe("rgb(219, 234, 254)");
+    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(within(firstCell).getByText("SC").style.background).toBe(
+      "rgb(219, 234, 254)",
+    );
   });
 
-  it("keeps published edited cells on historical shift colors when the active code list no longer includes them", () => {
+  it("keeps historical cross-focus published edited cells on the white shift surface", () => {
     observedWidth = 1600;
 
     const historicalAssignmentDefinition: AssignmentDefinition = {
@@ -1556,7 +1842,7 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
-    expect(pill?.style.background).toBe("rgb(219, 234, 254)");
+    expect(pill?.style.background).toBe("var(--color-surface)");
   });
 
   it("keeps published edited shift rings orange when a modified entry replaces an absence", () => {
@@ -1895,6 +2181,78 @@ describe("ScheduleGrid", () => {
     expect((openShiftButtons[0] as HTMLElement).style.width).toBe("100%");
   });
 
+  it("renders open shift chips with the same shift and job labels as schedule pills", () => {
+    observedWidth = 1200;
+    const localAssignment: AssignmentDefinition = {
+      id: 11,
+      orgId: "org-1",
+      label: "DSSTA",
+      name: "Day Staff",
+      color: "#E5F3E8",
+      border: "#2E9930",
+      text: "#1A3D1B",
+      categoryId: 1,
+      focusAreaId: 1,
+      jobId: 101,
+      sortOrder: 1,
+    };
+    const jobs: JobDefinition[] = [
+      {
+        id: 101,
+        orgId: "org-1",
+        name: "Staff",
+        abbr: "STA",
+        showOnGrid: true,
+        assignmentMode: "with_shift",
+        eligibilityMode: "and",
+        focusAreaId: null,
+        focusAreaIds: [],
+        departmentIds: [],
+        applicableShiftIds: [],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E5F3E8",
+        border: "#2E9930",
+        text: "#1A3D1B",
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: 1,
+        systemKey: null,
+        archivedAt: null,
+      },
+    ];
+    const { container } = renderGrid({
+      assignments: [localAssignment],
+      jobs,
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      openShifts: [
+        {
+          id: "open-job-pill",
+          source: "coverage_gap",
+          focusAreaId: 1,
+          date: "2024-01-07",
+          assignmentIds: [11],
+          assignmentLabel: "DSSTA",
+          segments: [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+          customStartTime: null,
+          customEndTime: null,
+          needed: 1,
+        },
+      ],
+    });
+
+    const openShiftButton = container.querySelector(".dg-open-shift-btn") as HTMLElement;
+    expect(openShiftButton).not.toBeNull();
+    expect(within(openShiftButton).getByText("D")).toBeInTheDocument();
+    expect(within(openShiftButton).getByText("STA")).toBeInTheDocument();
+    expect(openShiftButton.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+  });
+
   it("invokes the context-menu handler from Shift+F10 on the focused cell", () => {
     const onOpenCellMenu = vi.fn();
     renderGrid({ onOpenCellMenu });
@@ -1946,6 +2304,108 @@ describe("ScheduleGrid", () => {
     );
 
     expect(activeCells).toHaveLength(1);
+  });
+
+  it("toggles selectable cells in bulk delete mode instead of opening the editor", () => {
+    const onActivateCell = vi.fn();
+    const onToggleBulkDeleteCell = vi.fn();
+    renderGrid({
+      bulkDeleteMode: true,
+      bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
+      onActivateCell,
+      onToggleBulkDeleteCell,
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    fireEvent.click(firstCell);
+
+    expect(onActivateCell).not.toHaveBeenCalled();
+    expect(onToggleBulkDeleteCell).toHaveBeenCalledWith({
+      empId: "emp-1",
+      dateKey: "2024-01-07",
+      sectionId: 1,
+    });
+  });
+
+  it("marks selected bulk delete cells and leaves empty cells unselectable", () => {
+    const onActivateCell = vi.fn();
+    const onToggleBulkDeleteCell = vi.fn();
+    renderGrid({
+      shiftForKey: (_empId, date) =>
+        formatDateKey(date) === "2024-01-07" ? "D" : null,
+      assignmentIdsForKey: (_empId, date) =>
+        formatDateKey(date) === "2024-01-07" ? [1] : [],
+      bulkDeleteMode: true,
+      bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
+      bulkSelectedCellKeys: new Set(["emp-1_2024-01-07"]),
+      onActivateCell,
+      onToggleBulkDeleteCell,
+    });
+
+    const [selectedCell, emptyCell] = screen.getAllByRole("gridcell") as [
+      HTMLElement,
+      HTMLElement,
+    ];
+
+    expect(selectedCell.dataset.bulkSelected).toBe("true");
+    expect(selectedCell).toHaveAttribute("aria-selected", "true");
+    expect(
+      selectedCell.querySelector('[data-bulk-selection-indicator="true"]'),
+    ).not.toBeNull();
+    const selectionRing = selectedCell.querySelector(
+      '[data-bulk-selection-ring="true"]',
+    ) as HTMLElement | null;
+    expect(selectionRing).not.toBeNull();
+    expect(selectionRing?.style.top).toBe("3px");
+    expect(selectionRing?.style.right).toBe("2px");
+    expect(selectionRing?.style.bottom).toBe("2px");
+    expect(selectionRing?.style.left).toBe("2px");
+    expect(selectionRing?.style.borderRadius).toBe("10px");
+    expect(emptyCell.dataset.bulkSelectable).toBeUndefined();
+
+    fireEvent.click(emptyCell);
+
+    expect(onActivateCell).not.toHaveBeenCalled();
+    expect(onToggleBulkDeleteCell).not.toHaveBeenCalled();
+  });
+
+  it("does not select locked cells in bulk delete mode", () => {
+    const onToggleBulkDeleteCell = vi.fn();
+    renderGrid({
+      bulkDeleteMode: true,
+      bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
+      cellLocks: new Map([["emp-1_2024-01-07", { userName: "Sam" }]]),
+      onToggleBulkDeleteCell,
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    fireEvent.click(firstCell);
+
+    expect(firstCell.dataset.locked).toBe("true");
+    expect(firstCell.dataset.bulkSelectable).toBeUndefined();
+    expect(onToggleBulkDeleteCell).not.toHaveBeenCalled();
+  });
+
+  it("suppresses context menus and keyboard activation in bulk delete mode", () => {
+    const onActivateCell = vi.fn();
+    const onOpenCellMenu = vi.fn();
+    const onToggleBulkDeleteCell = vi.fn();
+    renderGrid({
+      bulkDeleteMode: true,
+      bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
+      onActivateCell,
+      onOpenCellMenu,
+      onToggleBulkDeleteCell,
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    fireEvent.keyDown(firstCell, { key: "Enter" });
+    fireEvent.keyDown(firstCell, { key: "F10", shiftKey: true });
+    fireEvent.contextMenu(firstCell);
+
+    expect(onActivateCell).not.toHaveBeenCalled();
+    expect(onOpenCellMenu).not.toHaveBeenCalled();
+    expect(onToggleBulkDeleteCell).toHaveBeenCalledTimes(1);
   });
 
   it("uses the context-menu cell before the focused cell for keyboard copy", () => {

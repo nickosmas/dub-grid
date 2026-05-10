@@ -1,6 +1,6 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { mobileColors } from "../theme/tokens";
+import { mobileColors, mobileText } from "../theme/tokens";
 
 export function LoadingScreen({
   title,
@@ -33,14 +33,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "800",
+    ...mobileText.heroMetric,
     color: mobileColors.textPrimary,
   },
   body: {
+    ...mobileText.body,
     textAlign: "center",
     color: mobileColors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
   },
 });

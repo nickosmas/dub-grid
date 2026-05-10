@@ -112,7 +112,9 @@ export async function createShiftRequest(
   requesterShiftDate: string,
   targetEmpId?: string,
   targetShiftDate?: string,
-  absenceTypeId?: number
+  absenceTypeId?: number,
+  requesterSegmentIndex?: number,
+  targetSegmentIndex?: number
 ): Promise<string> {
   const { data, error } = await supabase.rpc("create_shift_request", {
     p_org_id: orgId,
@@ -122,6 +124,8 @@ export async function createShiftRequest(
     p_target_emp_id: targetEmpId ?? null,
     p_target_shift_date: targetShiftDate ?? null,
     p_absence_type_id: absenceTypeId ?? null,
+    p_requester_segment_index: requesterSegmentIndex ?? null,
+    p_target_segment_index: targetSegmentIndex ?? null,
   });
   if (error) throw error;
   void logAudit("shift_request.created", "shift_request", data as string, { type, requesterEmpId, requesterShiftDate, targetEmpId, targetShiftDate }, orgId);
@@ -158,6 +162,9 @@ export async function volunteerForOpenShift(
     p_shift_date: shiftDate,
     p_shift_ids: input.segments.map((segment) => segment.shiftId),
     p_job_ids: input.segments.map((segment) => segment.jobId),
+    p_is_mentored_flags: input.segments.map(
+      (segment) => segment.isMentored ?? false,
+    ),
     p_focus_area_id: focusAreaId,
     p_custom_start_time: input.customStartTime ?? null,
     p_custom_end_time: input.customEndTime ?? null,

@@ -24,7 +24,7 @@ export default function ShiftsStep({ onNext, onBack }: ShiftsStepProps) {
   return (
     <StepLayout
       title="Shifts"
-      description="Define your core shift blocks per focus area. Shifts capture shared timing and visual language like Day, Evening, and Night."
+      description="Define your core shift blocks inside each focus area. Shifts capture shared timing and visual language like Day, Evening, and Night."
       onNext={onNext}
       onBack={onBack}
       nextDisabled={!hasCategories}

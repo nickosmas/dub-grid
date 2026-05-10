@@ -34,6 +34,7 @@ export interface OrganizationLocationFormValue
 interface OrganizationLocationFieldsProps {
   value: OrganizationLocationFormValue;
   onChange: (patch: Partial<OrganizationLocationFormValue>) => void;
+  phoneError?: string | null;
   employeeCount?: number | null;
   employeeCountLoading?: boolean;
   showEmployeeCount?: boolean;
@@ -459,6 +460,7 @@ function AddressLine1Input({
 export default function OrganizationLocationFields({
   value,
   onChange,
+  phoneError = null,
   employeeCount,
   employeeCountLoading,
   showEmployeeCount = true,
@@ -481,6 +483,18 @@ export default function OrganizationLocationFields({
           autoComplete="tel"
           maxLength={20}
         />
+        {phoneError ? (
+          <p
+            role="alert"
+            style={{
+              margin: "6px 0 0",
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--color-danger)",
+            }}
+          >
+            {phoneError}
+          </p>
+        ) : null}
       </div>
       {showEmployeeCount && (
         <div>

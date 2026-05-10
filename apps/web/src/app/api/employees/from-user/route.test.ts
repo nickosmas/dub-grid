@@ -46,12 +46,16 @@ vi.mock("@/lib/supabase-service", () => ({
 import { POST as createFromUser } from "@/app/api/employees/from-user/route";
 import { POST as reconcileFromUser } from "@/app/api/employees/from-user/reconcile/route";
 
-function makeSelectBuilder(result: unknown, finalMethod: "maybeSingle" | "single" | "limit" = "maybeSingle") {
+function makeSelectBuilder(
+  result: unknown,
+  finalMethod: "maybeSingle" | "single" | "limit" = "maybeSingle",
+) {
   const response = { data: result, error: null };
   const chain = {
     ...response,
     select: vi.fn(() => chain),
     eq: vi.fn(() => chain),
+    in: vi.fn(() => chain),
     is: vi.fn(() => chain),
     order: vi.fn(() => chain),
     limit: vi.fn(() => chain),
@@ -90,7 +94,10 @@ function makeAuditInsertBuilder() {
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/employees/from-user", {
     method: "POST",
-    headers: { origin: "http://localhost:3000", "content-type": "application/json" },
+    headers: {
+      origin: "http://localhost:3000",
+      "content-type": "application/json",
+    },
     body: JSON.stringify(body),
   });
 }
@@ -101,11 +108,17 @@ const requestBody = {
   firstName: "Alyce",
   lastName: "Smyth",
   email: "alice@example.com",
-  phone: "555-0100",
+  phone: "(415) 425-3334",
   certificationId: null,
   focusAreaIds: [1],
   roleIds: [7],
   contactNotes: "Internal note",
+};
+
+const activeBillingRow = {
+  suspended_at: null,
+  subscription_status: "active",
+  trial_ends_at: null,
 };
 
 describe("POST /api/employees/from-user", () => {
@@ -124,26 +137,42 @@ describe("POST /api/employees/from-user", () => {
 
   it("returns NAME_MISMATCH when the submitted name differs from the account name", async () => {
     from
-      .mockImplementationOnce(() => makeSelectBuilder({ org_role: "admin", admin_permissions: { canManageEmployees: true } }))
-      .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"))
-      .mockImplementationOnce(() => makeSelectBuilder({ user_id: requestBody.userId }))
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({
+          org_role: "admin",
+          admin_permissions: { canManageEmployees: true },
+        }),
+      )
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({ platform_role: "none" }, "single"),
+      )
+      .mockImplementationOnce(() => makeSelectBuilder(activeBillingRow))
+      .mockImplementationOnce(() => makeSelectBuilder([{ id: 1 }]))
+      .mockImplementationOnce(() => makeSelectBuilder([{ id: 7 }]))
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({ user_id: requestBody.userId }),
+      )
       .mockImplementationOnce(() => makeSelectBuilder([], "limit"))
       .mockImplementationOnce(() => makeSelectBuilder({ seniority: 4 }))
-      .mockImplementationOnce(() => makeSelectBuilder({ first_name: "Alice", last_name: "Smith" }));
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({ first_name: "Alice", last_name: "Smith" }),
+      );
 
     const response = await createFromUser(makeRequest(requestBody));
 
     expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual(expect.objectContaining({
-      code: "NAME_MISMATCH",
-      details: expect.objectContaining({
-        employeeId: null,
-        employeeFirstName: "Alyce",
-        employeeLastName: "Smyth",
-        accountFirstName: "Alice",
-        accountLastName: "Smith",
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        code: "NAME_MISMATCH",
+        details: expect.objectContaining({
+          employeeId: null,
+          employeeFirstName: "Alyce",
+          employeeLastName: "Smyth",
+          accountFirstName: "Alice",
+          accountLastName: "Smith",
+        }),
       }),
-    }));
+    );
   });
 });
 
@@ -174,7 +203,7 @@ describe("POST /api/employees/from-user/reconcile", () => {
       role_ids: [7],
       seniority: 5,
       focus_area_ids: [1],
-      phone: "555-0100",
+      phone: "(415) 425-3334",
       email: "alice@example.com",
       contact_notes: "Internal note",
       archived_at: null,
@@ -186,38 +215,58 @@ describe("POST /api/employees/from-user/reconcile", () => {
     const auditBuilder = makeAuditInsertBuilder();
 
     from
-      .mockImplementationOnce(() => makeSelectBuilder({ org_role: "admin", admin_permissions: { canManageEmployees: true } }))
-      .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"))
-      .mockImplementationOnce(() => makeSelectBuilder({ user_id: requestBody.userId }))
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({
+          org_role: "admin",
+          admin_permissions: { canManageEmployees: true },
+        }),
+      )
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({ platform_role: "none" }, "single"),
+      )
+      .mockImplementationOnce(() => makeSelectBuilder(activeBillingRow))
+      .mockImplementationOnce(() => makeSelectBuilder([{ id: 1 }]))
+      .mockImplementationOnce(() => makeSelectBuilder([{ id: 7 }]))
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({ user_id: requestBody.userId }),
+      )
       .mockImplementationOnce(() => makeSelectBuilder([], "limit"))
       .mockImplementationOnce(() => makeSelectBuilder({ seniority: 4 }))
-      .mockImplementationOnce(() => makeSelectBuilder({ first_name: "Alice", last_name: "Smith" }))
+      .mockImplementationOnce(() =>
+        makeSelectBuilder({ first_name: "Alice", last_name: "Smith" }),
+      )
       .mockImplementationOnce(() => insertBuilder)
       .mockImplementationOnce(() => auditBuilder);
 
     const response = await reconcileFromUser(makeRequest(requestBody));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual(expect.objectContaining({
-      employee: expect.objectContaining({
-        firstName: "Alice",
-        lastName: "Smith",
-        userId: requestBody.userId,
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        employee: expect.objectContaining({
+          firstName: "Alice",
+          lastName: "Smith",
+          userId: requestBody.userId,
+        }),
       }),
-    }));
-    expect(insertBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
-      first_name: "Alice",
-      last_name: "Smith",
-      user_id: requestBody.userId,
-    }));
-    expect(auditBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
-      details: expect.objectContaining({
-        nameReconciled: true,
-        resolution: "use_account_name",
-        submittedFirstName: "Alyce",
-        submittedLastName: "Smyth",
+    );
+    expect(insertBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_name: "Alice",
+        last_name: "Smith",
+        user_id: requestBody.userId,
       }),
-    }));
+    );
+    expect(auditBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          nameReconciled: true,
+          resolution: "use_account_name",
+          submittedFirstName: "Alyce",
+          submittedLastName: "Smyth",
+        }),
+      }),
+    );
     expect(cacheDel).toHaveBeenCalled();
   });
 });

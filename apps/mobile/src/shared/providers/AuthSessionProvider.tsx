@@ -2,10 +2,12 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type PropsWithChildren,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { registerMobileSessionPresence } from "../lib/api";
 import { getSupabaseClient } from "../lib/supabase";
 
 type AuthSessionContextValue = {
@@ -14,10 +16,17 @@ type AuthSessionContextValue = {
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
+const SESSION_RESTORE_TIMEOUT_MS = 4000;
 let activeSessionWriter: ((session: Session | null) => void) | null = null;
 
 export function replaceAuthSession(session: Session | null) {
   activeSessionWriter?.(session);
+}
+
+function shouldClearLocalAuthForRestoreError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return /invalid refresh token|refresh token not found/i.test(message);
 }
 
 export function AuthSessionProvider({ children }: PropsWithChildren) {
@@ -25,11 +34,20 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     session: null,
     isLoading: true,
   });
+  const lastTrackedAccessTokenRef = useRef<string | null>(null);
   const supabase = getSupabaseClient();
 
   useEffect(() => {
     let isMounted = true;
+    let startupReleased = false;
     const writeSession = (session: Session | null) => {
+      if (!session?.access_token) {
+        lastTrackedAccessTokenRef.current = null;
+      } else if (lastTrackedAccessTokenRef.current !== session.access_token) {
+        lastTrackedAccessTokenRef.current = session.access_token;
+        registerMobileSessionPresence(session.access_token).catch(() => {});
+      }
+
       setValue({
         session,
         isLoading: false,
@@ -38,17 +56,35 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
 
     activeSessionWriter = writeSession;
 
+    const releaseStartup = (session: Session | null) => {
+      startupReleased = true;
+      writeSession(session);
+    };
+
+    const sessionRestoreTimeout = setTimeout(() => {
+      if (!isMounted || startupReleased) {
+        return;
+      }
+
+      releaseStartup(null);
+    }, SESSION_RESTORE_TIMEOUT_MS);
+
     void supabase.auth
       .getSession()
       .then(({ data }) => {
+        clearTimeout(sessionRestoreTimeout);
         if (!isMounted) return;
         writeSession(data.session ?? null);
       })
-      .catch(async () => {
-        try {
-          await supabase.auth.signOut({ scope: "local" });
-        } catch {
-          // Ignore cleanup failures; the provider still needs to recover locally.
+      .catch(async (error) => {
+        clearTimeout(sessionRestoreTimeout);
+
+        if (shouldClearLocalAuthForRestoreError(error)) {
+          try {
+            await supabase.auth.signOut({ scope: "local" });
+          } catch {
+            // Ignore cleanup failures; the provider still needs to recover locally.
+          }
         }
 
         if (!isMounted) return;
@@ -66,6 +102,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
       if (activeSessionWriter === writeSession) {
         activeSessionWriter = null;
       }
+      clearTimeout(sessionRestoreTimeout);
       subscription.unsubscribe();
     };
   }, []);

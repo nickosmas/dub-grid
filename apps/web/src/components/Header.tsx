@@ -1,16 +1,22 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FileBarChart2 } from "lucide-react";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useLogout, usePermissions, setUserViewActive, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
+import { fetchOrganizationBilling } from "@/features/billing/client";
 import MobileNavSheet from "@/components/MobileNavSheet";
+import { queryKeys } from "@/lib/query-keys";
+import { getAvatarInitials } from "@/lib/utils";
 import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
+import type { OrganizationBillingSummary } from "@/types";
 
 
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
@@ -81,6 +87,12 @@ const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNo
     ),
   },
   {
+    id: "reports",
+    href: "/reports",
+    label: "Reports",
+    icon: <FileBarChart2 size={13} strokeWidth={2.2} />,
+  },
+  {
     id: "settings",
     href: "/settings",
     label: "Settings",
@@ -110,6 +122,122 @@ const ROLE_LABELS: Record<string, string> = {
   supervisor: "Supervisor",
   user: "User",
 };
+
+function formatHeaderBillingNotice(
+  billing: OrganizationBillingSummary,
+): { label: string; ariaLabel: string; tone: "warning" | "danger" } | null {
+  const { billingAccess } = billing;
+
+  if (billingAccess.isLocked) {
+    return {
+      label: "Billing locked",
+      ariaLabel: "Billing locked",
+      tone: "danger",
+    };
+  }
+
+  if (billingAccess.state === "payment_attention_required") {
+    return {
+      label: "Billing attention",
+      ariaLabel: "Billing attention required",
+      tone: "warning",
+    };
+  }
+
+  if (billingAccess.state === "trial_grace") {
+    return {
+      label: "Trial grace",
+      ariaLabel: "Trial is in grace period",
+      tone: "warning",
+    };
+  }
+
+  const days = billingAccess.daysUntilTrialEnd;
+  if (days == null) {
+    if (billing.status === "trialing" || !billing.status) {
+      return {
+        label: "Trial not set",
+        ariaLabel: "Trial end date is not set",
+        tone: "warning",
+      };
+    }
+    return null;
+  }
+
+  if (days <= 0) {
+    return {
+      label: "Trial ends today",
+      ariaLabel: "Trial ends today",
+      tone: "warning",
+    };
+  }
+
+  return {
+    label: days === 1 ? "Trial 1d" : `Trial ${days}d`,
+    ariaLabel: days === 1 ? "Trial time left: 1 day" : `Trial time left: ${days} days`,
+    tone: "warning",
+  };
+}
+
+function HeaderBillingNotice({
+  orgId,
+  compact = false,
+}: {
+  orgId: string;
+  compact?: boolean;
+}) {
+  const billingQuery = useQuery({
+    queryKey: queryKeys.org.billing(orgId),
+    queryFn: () => fetchOrganizationBilling(orgId),
+    staleTime: 30_000,
+  });
+  const notice = billingQuery.data
+    ? formatHeaderBillingNotice(billingQuery.data)
+    : null;
+
+  if (!notice) return null;
+
+  const colors =
+    notice.tone === "danger"
+      ? {
+          bg: "var(--color-danger-bg)",
+          border: "var(--color-danger-border)",
+          text: "var(--color-danger)",
+        }
+      : {
+          bg: "var(--color-warning-bg)",
+          border: "var(--color-warning-border)",
+          text: "var(--color-warning)",
+        };
+
+  return (
+    <Link
+      href="/settings?section=org-billing"
+      aria-label={notice.ariaLabel}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: compact ? 28 : 30,
+        maxWidth: compact ? 112 : undefined,
+        padding: compact ? "0 8px" : "0 10px",
+        borderRadius: "9999px",
+        border: `1px solid ${colors.border}`,
+        background: colors.bg,
+        color: colors.text,
+        fontSize: "var(--dg-fs-caption)",
+        fontWeight: 800,
+        lineHeight: 1,
+        textDecoration: "none",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+    >
+      {notice.label}
+    </Link>
+  );
+}
 
 /* ── Nav icons for mobile drawer ─────────────────────────── */
 const NAV_ICONS: Record<string, React.ReactNode> = {
@@ -143,6 +271,7 @@ const NAV_ICONS: Record<string, React.ReactNode> = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
+  reports: <FileBarChart2 size={18} strokeWidth={2.2} />,
 };
 
 /* ── Hamburger Icon ──────────────────────────────────────── */
@@ -183,7 +312,7 @@ export default function Header({ orgName }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOutLocal } = useLogout();
-  const { isGridmaster, role, canViewStaff, canAccessSettings, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
+  const { orgId, isGridmaster, role, canViewStaff, canAccessSettings, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -191,6 +320,8 @@ export default function Header({ orgName }: HeaderProps) {
     ? "dashboard"
     : pathname.startsWith("/people")
       ? "people"
+      : pathname.startsWith("/reports")
+        ? "reports"
       : pathname.startsWith("/settings")
         ? "settings"
         : "schedule";
@@ -199,7 +330,12 @@ export default function Header({ orgName }: HeaderProps) {
     if (item.id === "dashboard") return true;
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
-    if (item.id === "settings") return canAccessSettings || isSuperAdmin || isGridmaster;
+    if (item.id === "reports") {
+      return !isUserViewActive && (role === "admin" || isSuperAdmin === true);
+    }
+    if (item.id === "settings") {
+      return isGridmaster || isSuperAdmin || (role === "admin" && canAccessSettings);
+    }
     return false;
   });
 
@@ -250,10 +386,13 @@ export default function Header({ orgName }: HeaderProps) {
   }, [menuOpen]);
 
   const displayName = userName || "Account";
-  const initials = userName
-    ? userName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
-    : "?";
+  const initials = getAvatarInitials(userName, "?");
   const roleLabel = ROLE_LABELS[role] ?? "User";
+  const canShowBillingNotice =
+    Boolean(orgId) &&
+    !isUserViewActive &&
+    !isImpersonating &&
+    (isSuperAdmin || isGridmaster);
 
   const handleSignOut = useCallback(() => {
     signOutLocal().catch((err) => Sentry.captureException(err));
@@ -300,6 +439,10 @@ export default function Header({ orgName }: HeaderProps) {
               </>
             )}
           </div>
+
+          {canShowBillingNotice && orgId && (
+            <HeaderBillingNotice orgId={orgId} compact />
+          )}
 
           {/* Hamburger */}
           <button
@@ -451,8 +594,16 @@ export default function Header({ orgName }: HeaderProps) {
 
       {/* Notifications */}
       {!isGridmaster && (
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {canShowBillingNotice && orgId && (
+            <HeaderBillingNotice orgId={orgId} />
+          )}
           <NotificationBell />
+        </div>
+      )}
+      {isGridmaster && canShowBillingNotice && orgId && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <HeaderBillingNotice orgId={orgId} />
         </div>
       )}
       <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>

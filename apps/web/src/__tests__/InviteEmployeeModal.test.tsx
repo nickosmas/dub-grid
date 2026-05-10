@@ -35,13 +35,18 @@ vi.mock("sonner", () => ({
 
 const fetchOrganizationUsersMock = vi.mocked(fetchOrganizationUsers);
 const linkEmployeeToUserMock = vi.mocked(linkEmployeeToUser);
-const reconcileEmployeeNameAndLinkUserMock = vi.mocked(reconcileEmployeeNameAndLinkUser);
-const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
+const reconcileEmployeeNameAndLinkUserMock = vi.mocked(
+  reconcileEmployeeNameAndLinkUser,
+);
+const createOrganizationInvitationMock = vi.mocked(
+  createOrganizationInvitation,
+);
 
 const employee: Employee = {
   id: "emp-1",
   firstName: "Alice",
   lastName: "Smith",
+  employmentType: "full_time",
   status: "active",
   statusChangedAt: null,
   statusNote: "",
@@ -49,7 +54,7 @@ const employee: Employee = {
   roleIds: [],
   seniority: 1,
   focusAreaIds: [1],
-  phone: "",
+  phone: "(415) 425-3334",
   email: "alice@example.com",
   contactNotes: "",
   userId: null,
@@ -85,7 +90,9 @@ describe("InviteEmployeeModal", () => {
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
     linkEmployeeToUserMock.mockResolvedValue({ status: "linked" });
-    reconcileEmployeeNameAndLinkUserMock.mockResolvedValue({ status: "linked" });
+    reconcileEmployeeNameAndLinkUserMock.mockResolvedValue({
+      status: "linked",
+    });
     fetchOrganizationUsersMock.mockResolvedValue([]);
     vi.stubGlobal(
       "fetch",
@@ -118,7 +125,9 @@ describe("InviteEmployeeModal", () => {
       />,
     );
 
-    const sendButton = await screen.findByRole("button", { name: /send invitation/i });
+    const sendButton = await screen.findByRole("button", {
+      name: /send invitation/i,
+    });
     const firstNameInput = screen.getByPlaceholderText("Jane");
     const lastNameInput = screen.getByPlaceholderText("Smith");
     const emailInput = screen.getByPlaceholderText("employee@example.com");
@@ -156,7 +165,9 @@ describe("InviteEmployeeModal", () => {
       />,
     );
 
-    const sendButton = await screen.findByRole("button", { name: /send invitation/i });
+    const sendButton = await screen.findByRole("button", {
+      name: /send invitation/i,
+    });
     const firstNameInput = screen.getByPlaceholderText("Jane");
     const lastNameInput = screen.getByPlaceholderText("Smith");
     const emailInput = screen.getByPlaceholderText("employee@example.com");
@@ -196,7 +207,9 @@ describe("InviteEmployeeModal", () => {
       />,
     );
 
-    const sendButton = await screen.findByRole("button", { name: /send invitation/i });
+    const sendButton = await screen.findByRole("button", {
+      name: /send invitation/i,
+    });
     const firstNameInput = screen.getByPlaceholderText("Jane");
     const lastNameInput = screen.getByPlaceholderText("Smith");
     const emailInput = screen.getByPlaceholderText("employee@example.com");
@@ -227,6 +240,37 @@ describe("InviteEmployeeModal", () => {
     });
   });
 
+  it("shows a phone validation error for management invites", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <InviteEmployeeModal
+        employee={null}
+        orgId="org-1"
+        orgName="Test Org"
+        onClose={vi.fn()}
+        onInvited={vi.fn()}
+      />,
+    );
+
+    await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
+    await user.type(screen.getByPlaceholderText("Smith"), "Lee");
+    await user.type(
+      screen.getByPlaceholderText("employee@example.com"),
+      "manager@example.com",
+    );
+    const phoneInput = screen.getByPlaceholderText("+1 555-123-4567");
+    await user.type(phoneInput, "123");
+    fireEvent.blur(phoneInput);
+
+    expect(
+      screen.getByText("Enter a 10-digit US phone number"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /send invitation/i }),
+    ).toBeDisabled();
+  });
+
   it("keeps employee invite mode sendable without separate name fields", async () => {
     const user = userEvent.setup();
 
@@ -240,7 +284,9 @@ describe("InviteEmployeeModal", () => {
       />,
     );
 
-    const sendButton = await screen.findByRole("button", { name: /send invitation/i });
+    const sendButton = await screen.findByRole("button", {
+      name: /send invitation/i,
+    });
 
     expect(screen.queryByPlaceholderText("Jane")).not.toBeInTheDocument();
     expect(sendButton).toBeEnabled();
@@ -310,10 +356,16 @@ describe("InviteEmployeeModal", () => {
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Alicia Smith")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Use Account Name and Link" }));
+    await user.click(
+      screen.getByRole("button", { name: "Use Account Name and Link" }),
+    );
 
     await waitFor(() => {
-      expect(reconcileEmployeeNameAndLinkUserMock).toHaveBeenCalledWith("emp-1", "user-1", "org-1");
+      expect(reconcileEmployeeNameAndLinkUserMock).toHaveBeenCalledWith(
+        "emp-1",
+        "user-1",
+        "org-1",
+      );
       expect(onInvited).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
     });

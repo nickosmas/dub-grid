@@ -1,9 +1,15 @@
 "use client";
 import CustomSelect from "@/components/CustomSelect";
+import {
+  BillingConfirmDialog,
+  ExtendTrialDialog,
+  type BillingConfirmAction,
+} from "@/components/gridmaster/BillingActionDialogs";
 import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { useEmployeeCount } from "@/hooks";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getOrganizationAddressFields,
   withComposedOrganizationAddress,
@@ -41,6 +47,7 @@ import { fetchEmployees } from "@/features/employees/client";
 import { fetchOrganizationUsers } from "@/features/organization/client";
 import { queueNotification } from "@/lib/notify";
 import type { TenantStats } from "@/features/gridmaster/client";
+import { queryKeys } from "@/lib/query-keys";
 import type {
   Organization,
   OrganizationUser,
@@ -53,6 +60,7 @@ import type {
   AdminPermissions,
   OrganizationRole,
   JobDefinition,
+  GridmasterBillingOrgSummary,
 } from "@/types";
 import { buildMembershipAccessChanges } from "@/lib/access-management";
 
@@ -74,29 +82,50 @@ interface InvitationRow {
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
+import {
+  formatBillingStatusLabel,
+  formatClientLabel,
+  formatClientErrorMessage,
+  formatOrganizationRoleLabel,
+} from "@/lib/client-facing";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import ReadOnlyScheduleView from "@/components/gridmaster/ReadOnlyScheduleView";
 import FeatureFlagsEditor from "@/components/gridmaster/FeatureFlagsEditor";
 import {
   archiveGridmasterOrganization,
   assignGridmasterOrgRoleByEmail,
+  fetchGridmasterBilling,
   fetchGridmasterInvitations,
+  fetchGridmasterOrgHealth,
   restoreGridmasterOrganization,
+  syncGridmasterBilling,
   suspendGridmasterOrganization,
   unsuspendGridmasterOrganization,
+  updateGridmasterSubscription,
 } from "@/features/gridmaster/client";
 
-type Tab = "overview" | "users" | "employees" | "config" | "activity" | "invitations" | "schedule" | "features";
+export type OrganizationDetailTab = "overview" | "billing" | "users" | "employees" | "config" | "activity" | "invitations" | "schedule" | "features";
 
-const TABS: { id: Tab; label: string }[] = [
+const BILLING_STATUSES = [
+  "trialing",
+  "active",
+  "past_due",
+  "unpaid",
+  "canceled",
+  "incomplete",
+  "incomplete_expired",
+] as const;
+
+const TABS: { id: OrganizationDetailTab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "billing", label: "Billing" },
   { id: "users", label: "Users" },
   { id: "employees", label: "Employees" },
   { id: "config", label: "Configuration" },
   { id: "activity", label: "Activity" },
   { id: "invitations", label: "Invitations" },
   { id: "schedule", label: "Schedule" },
-  { id: "features", label: "Features" },
+  { id: "features", label: "Runtime" },
 ];
 
 function StatusDot({ status }: { status: string }) {
@@ -142,113 +171,496 @@ function MiniStat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function formatBillingDate(value: string | null) {
+  return value ? new Date(value).toLocaleDateString() : "—";
+}
+
+function billingStatusTone(status: string | null) {
+  if (status === "active" || status === "trialing") return "var(--color-success)";
+  if (status === "past_due" || status === "incomplete") return "var(--color-warning)";
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") return "var(--color-danger)";
+  return "var(--color-text-muted)";
+}
+
+function BillingMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: "neutral" | "good" | "warning" | "danger";
+}) {
+  const color =
+    tone === "good"
+      ? "var(--color-success)"
+      : tone === "warning"
+        ? "var(--color-warning)"
+        : tone === "danger"
+          ? "var(--color-danger)"
+          : "var(--color-text-primary)";
+
+  return (
+    <div style={{ ...sectionStyle, padding: "14px 16px" }}>
+      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 800, color, fontFamily: "var(--font-dm-mono), monospace" }}>
+        {value}
+      </div>
+      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", marginTop: 2 }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function BillingTab({ organization }: { organization: Organization }) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("active");
+  const [confirmAction, setConfirmAction] = useState<BillingConfirmAction | null>(null);
+  const [extendTrialOrg, setExtendTrialOrg] = useState<GridmasterBillingOrgSummary | null>(null);
+  const [trialDays, setTrialDays] = useState("14");
+  const billingQuery = useQuery({
+    queryKey: queryKeys.gridmaster.billing(),
+    queryFn: fetchGridmasterBilling,
+    staleTime: 30_000,
+  });
+  const billingOrg = billingQuery.data?.organizations.find((org) => org.orgId === organization.id) ?? null;
+
+  useEffect(() => {
+    if (!billingOrg?.status) return;
+    setStatus(
+      BILLING_STATUSES.includes(billingOrg.status as (typeof BILLING_STATUSES)[number])
+        ? billingOrg.status
+        : "active",
+    );
+  }, [billingOrg?.status]);
+
+  function invalidateBilling() {
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.billing() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.overview() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.dashboard() });
+  }
+
+  const syncMutation = useMutation({
+    mutationFn: syncGridmasterBilling,
+    onSuccess: () => {
+      toast.success("Billing synced");
+      invalidateBilling();
+    },
+    onError: (error) => {
+      toast.error(formatClientErrorMessage(error, "Failed to sync billing"));
+    },
+    onSettled: () => {
+      setBusy(false);
+      setConfirmAction(null);
+    },
+  });
+
+  const subscriptionMutation = useMutation({
+    mutationFn: updateGridmasterSubscription,
+    onSuccess: (_result, input) => {
+      toast.success(
+        input.action === "extend_trial"
+          ? "Trial extended"
+          : input.action === "cancel"
+            ? "Subscription canceled"
+            : input.action === "cancel_at_period_end"
+              ? "Cancellation scheduled"
+              : input.action === "sync_seats"
+                ? "Seats synced"
+                : "Billing status overridden",
+      );
+      invalidateBilling();
+    },
+    onError: (error) => {
+      toast.error(formatClientErrorMessage(error, "Billing action failed"));
+    },
+    onSettled: () => {
+      setBusy(false);
+      setConfirmAction(null);
+      setExtendTrialOrg(null);
+    },
+  });
+
+  function handleExtendTrial(org: GridmasterBillingOrgSummary) {
+    setTrialDays("14");
+    setExtendTrialOrg(org);
+  }
+
+  function handleConfirmExtendTrial() {
+    if (!extendTrialOrg) return;
+
+    const days = Number.parseInt(trialDays, 10);
+    if (!Number.isFinite(days) || days < 1) {
+      toast.error("Trial extension must be at least 1 day");
+      return;
+    }
+    setBusy(true);
+    subscriptionMutation.mutate({
+      orgId: extendTrialOrg.orgId,
+      action: "extend_trial",
+      trialDays: days,
+    });
+  }
+
+  function handleSync(org: GridmasterBillingOrgSummary) {
+    setConfirmAction({ kind: "sync_billing", org });
+  }
+
+  function handleSyncSeats(org: GridmasterBillingOrgSummary) {
+    setConfirmAction({ kind: "sync_seats", org });
+  }
+
+  function handleCancelAtPeriodEnd(org: GridmasterBillingOrgSummary) {
+    setConfirmAction({ kind: "cancel_at_period_end", org });
+  }
+
+  function handleCancel(org: GridmasterBillingOrgSummary) {
+    setConfirmAction({ kind: "cancel", org });
+  }
+
+  function handleOverrideStatus(org: GridmasterBillingOrgSummary) {
+    setConfirmAction({ kind: "override_status", org, status });
+  }
+
+  function handleConfirmAction() {
+    if (!confirmAction) return;
+
+    setBusy(true);
+    switch (confirmAction.kind) {
+      case "sync_billing":
+        syncMutation.mutate(confirmAction.org.orgId);
+        break;
+      case "sync_seats":
+        subscriptionMutation.mutate({ orgId: confirmAction.org.orgId, action: "sync_seats" });
+        break;
+      case "cancel_at_period_end":
+        subscriptionMutation.mutate({
+          orgId: confirmAction.org.orgId,
+          action: "cancel_at_period_end",
+        });
+        break;
+      case "cancel":
+        subscriptionMutation.mutate({ orgId: confirmAction.org.orgId, action: "cancel" });
+        break;
+      case "override_status":
+        subscriptionMutation.mutate({
+          orgId: confirmAction.org.orgId,
+          action: "override_status",
+          status: confirmAction.status,
+        });
+        break;
+    }
+  }
+
+  if (billingQuery.isLoading) {
+    return (
+      <div style={sectionStyle}>
+        <div style={{ padding: 24, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+          Loading billing…
+        </div>
+      </div>
+    );
+  }
+
+  if (billingQuery.error instanceof Error) {
+    return (
+      <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600 }}>
+        {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
+      </div>
+    );
+  }
+
+  if (!billingOrg) {
+    return (
+      <div style={sectionStyle}>
+        <div style={{ padding: 24 }}>
+          <h3 style={{ margin: "0 0 6px", fontSize: "var(--dg-fs-section-title)", color: "var(--color-text-primary)" }}>
+            Billing summary unavailable
+          </h3>
+          <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            Refresh billing oversight to rebuild this organization&apos;s billing snapshot.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const deltaTone = billingOrg.seatDelta == null
+    ? "neutral"
+    : billingOrg.seatDelta < 0
+      ? "danger"
+      : billingOrg.seatDelta > 0
+        ? "warning"
+        : "good";
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+            Billing
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", fontWeight: 600 }}>
+            Manage this organization&apos;s Stripe status, trial timing, cancellation state, and billable app-user seat count.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="dg-btn dg-btn-secondary dg-btn-sm"
+          onClick={() => billingQuery.refetch()}
+          disabled={billingQuery.isFetching}
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+        <BillingMetric label="Stripe seats" value={billingOrg.seats ?? "—"} />
+        <BillingMetric label="App users" value={billingOrg.appUsers} />
+        <BillingMetric label="Seat delta" value={billingOrg.seatDelta ?? "—"} tone={deltaTone} />
+        <BillingMetric label="Employees" value={billingOrg.employeeCount} />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
+        <div style={sectionStyle}>
+          <div style={sectionHeaderStyle}>Subscription State</div>
+          <div style={sectionBodyStyle}>
+            <InfoRow
+              label="Status"
+              value={<span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 800 }}>{formatBillingStatusLabel(billingOrg.status)}</span>}
+            />
+            <InfoRow label="Trial ends" value={formatBillingDate(billingOrg.trialEndsAt)} />
+            <InfoRow label="Period end" value={formatBillingDate(billingOrg.currentPeriodEnd)} />
+            <InfoRow label="Cancel at" value={formatBillingDate(billingOrg.cancelAt)} />
+            <InfoRow label="Canceled at" value={formatBillingDate(billingOrg.canceledAt)} />
+            <InfoRow label="Updated" value={formatBillingDate(billingOrg.updatedAt)} />
+          </div>
+        </div>
+
+        <div style={sectionStyle}>
+          <div style={sectionHeaderStyle}>Stripe Links</div>
+          <div style={sectionBodyStyle}>
+            <InfoRow
+              label="Customer"
+              value={
+                billingOrg.stripeCustomerId ? (
+                  <a
+                    href={`https://dashboard.stripe.com/customers/${billingOrg.stripeCustomerId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--color-brand)", fontWeight: 700 }}
+                  >
+                    {billingOrg.stripeCustomerId}
+                  </a>
+                ) : "Not connected"
+              }
+            />
+            <InfoRow label="Subscription" value={billingOrg.stripeSubscriptionId ?? "Not connected"} />
+            <InfoRow label="Org slug" value={billingOrg.orgSlug ?? "—"} />
+          </div>
+        </div>
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>Billing Actions</div>
+        <div style={{ ...sectionBodyStyle, display: "grid", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              disabled={busy || !billingOrg.stripeCustomerId}
+              onClick={() => handleSync(billingOrg)}
+            >
+              Sync Stripe
+            </button>
+            <button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              disabled={busy || !billingOrg.stripeSubscriptionId || billingOrg.seats === billingOrg.appUsers}
+              onClick={() => handleSyncSeats(billingOrg)}
+            >
+              True up seats
+            </button>
+            <button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              disabled={busy}
+              onClick={() => handleExtendTrial(billingOrg)}
+            >
+              Extend trial
+            </button>
+            <button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+              disabled={busy || !billingOrg.stripeSubscriptionId || billingOrg.status === "canceled" || !!billingOrg.cancelAt}
+              onClick={() => handleCancelAtPeriodEnd(billingOrg)}
+            >
+              End period
+            </button>
+            <button
+              type="button"
+              className="dg-btn dg-btn-danger dg-btn-sm"
+              disabled={busy || billingOrg.status === "canceled"}
+              onClick={() => handleCancel(billingOrg)}
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <CustomSelect
+              ariaLabel={`Billing status for ${billingOrg.orgName}`}
+              value={status}
+              disabled={busy}
+              onChange={setStatus}
+              options={BILLING_STATUSES.map((nextStatus) => ({
+                value: nextStatus,
+                label: formatBillingStatusLabel(nextStatus),
+              }))}
+              style={{ width: 180 }}
+              height={34}
+              fontSize="var(--dg-fs-label)"
+            />
+            <button
+              type="button"
+              className="dg-btn dg-btn-primary dg-btn-sm"
+              disabled={busy || status === billingOrg.status}
+              onClick={() => handleOverrideStatus(billingOrg)}
+            >
+              Override status
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <AuditLogView orgId={organization.id} title="Billing Activity" initialActionFilter="billing." />
+      <BillingConfirmDialog
+        action={confirmAction}
+        isLoading={subscriptionMutation.isPending || syncMutation.isPending}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <ExtendTrialDialog
+        org={extendTrialOrg}
+        days={trialDays}
+        isLoading={subscriptionMutation.isPending}
+        onDaysChange={setTrialDays}
+        onConfirm={handleConfirmExtendTrial}
+        onCancel={() => setExtendTrialOrg(null)}
+      />
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export default function OrganizationDetail({
   organization,
   stats,
+  initialTab,
   onOrgUpdated,
   onImpersonate,
 }: {
   organization: Organization;
   stats: TenantStats | undefined;
+  initialTab?: OrganizationDetailTab;
   onOrgUpdated?: (updated: Organization) => void;
   onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
-  const [tab, setTab] = useState<Tab>("overview");
-
-  // Lazy-loaded data for each tab
-  const [users, setUsers] = useState<OrganizationUser[] | null>(null);
-  const [employees, setEmployees] = useState<Employee[] | null>(null);
-  const [benchedEmployees, setBenchedEmployees] = useState<Employee[] | null>(null);
-  const [terminatedEmployees, setTerminatedEmployees] = useState<Employee[] | null>(null);
-  const [focusAreas, setFocusAreas] = useState<FocusArea[] | null>(null);
-  const [shiftCategories, setShiftCategories] = useState<ShiftCategory[] | null>(null);
-  const [jobs, setJobs] = useState<JobDefinition[] | null>(null);
-  const [certifications, setCertifications] = useState<NamedItem[] | null>(null);
-  const [orgRoles, setOrgRoles] = useState<NamedItem[] | null>(null);
-  const [indicatorTypes, setIndicatorTypes] = useState<IndicatorType[] | null>(null);
-  const [absenceTypes, setAbsenceTypes] = useState<AbsenceType[] | null>(null);
-  const [invitations, setInvitations] = useState<InvitationRow[] | null>(null);
-  const [tabLoading, setTabLoading] = useState(false);
-  const [tabError, setTabError] = useState<string | null>(null);
+  const [tab, setTab] = useState<OrganizationDetailTab>(initialTab ?? "overview");
+  const queryClient = useQueryClient();
 
   // Reset state when organization changes
   useEffect(() => {
-    setTab("overview");
-    setUsers(null);
-    setEmployees(null);
-    setBenchedEmployees(null);
-    setTerminatedEmployees(null);
-    setFocusAreas(null);
-    setShiftCategories(null);
-    setJobs(null);
-    setCertifications(null);
-    setOrgRoles(null);
-    setIndicatorTypes(null);
-    setAbsenceTypes(null);
-    setInvitations(null);
-    setTabError(null);
-  }, [organization.id]);
+    setTab(initialTab ?? "overview");
+  }, [initialTab, organization.id]);
 
-  // Lazy-load data when tab changes
-  useEffect(() => {
-    let cancelled = false;
+  const usersQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgUsers(organization.id),
+    queryFn: () => fetchOrganizationUsers(organization.id),
+    enabled: tab === "users",
+    staleTime: 30_000,
+  });
+  const employeesQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgEmployees(organization.id),
+    queryFn: async () => {
+      const [active, benched, terminated] = await Promise.all([
+        fetchEmployees(organization.id, ["active"]),
+        fetchEmployees(organization.id, ["benched"]),
+        fetchEmployees(organization.id, ["terminated"]),
+      ]);
+      return { active, benched, terminated };
+    },
+    enabled: tab === "employees",
+    staleTime: 30_000,
+  });
+  const invitationsQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgInvitations(organization.id),
+    queryFn: async () => {
+      const data = await fetchGridmasterInvitations(organization.id);
+      return data.invitations ?? [];
+    },
+    enabled: tab === "invitations",
+    staleTime: 30_000,
+  });
+  const configQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgConfig(organization.id),
+    queryFn: async () => {
+      const [
+        focusAreas,
+        shiftCategories,
+        jobs,
+        certifications,
+        orgRoles,
+        indicatorTypes,
+        absenceTypes,
+      ] = await Promise.all([
+        fetchFocusAreas(organization.id, true),
+        fetchShiftCategories(organization.id, true),
+        fetchJobDefinitions(organization.id, true),
+        fetchCertifications(organization.id, true),
+        fetchOrganizationRoles(organization.id, true),
+        fetchIndicatorTypes(organization.id, true),
+        fetchAbsenceTypes(organization.id, true),
+      ]);
+      return {
+        focusAreas,
+        shiftCategories,
+        jobs,
+        certifications,
+        orgRoles,
+        indicatorTypes,
+        absenceTypes,
+      };
+    },
+    enabled: tab === "config",
+    staleTime: 30_000,
+  });
+  const orgHealthQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgHealth(organization.id),
+    queryFn: async () => {
+      const data = await fetchGridmasterOrgHealth({ orgId: organization.id });
+      return data.organizations[0] ?? null;
+    },
+    staleTime: 30_000,
+  });
 
-    async function load() {
-      setTabLoading(true);
-      setTabError(null);
-      try {
-        if (tab === "users" && users === null) {
-          const data = await fetchOrganizationUsers(organization.id);
-          if (!cancelled) setUsers(data);
-        }
-        if (tab === "employees" && employees === null) {
-          const [active, benched, terminated] = await Promise.all([
-            fetchEmployees(organization.id, ["active"]),
-            fetchEmployees(organization.id, ["benched"]),
-            fetchEmployees(organization.id, ["terminated"]),
-          ]);
-          if (!cancelled) {
-            setEmployees(active);
-            setBenchedEmployees(benched);
-            setTerminatedEmployees(terminated);
-          }
-        }
-        if (tab === "invitations" && invitations === null) {
-          const { invitations: data } = await fetchGridmasterInvitations(organization.id);
-          if (!cancelled) setInvitations(data ?? []);
-        }
-        if (tab === "config" && focusAreas === null) {
-          const [fa, shifts, jobDefs, certs, roles, ind, abs] = await Promise.all([
-            fetchFocusAreas(organization.id, true),
-            fetchShiftCategories(organization.id, true),
-            fetchJobDefinitions(organization.id, true),
-            fetchCertifications(organization.id, true),
-            fetchOrganizationRoles(organization.id, true),
-            fetchIndicatorTypes(organization.id, true),
-            fetchAbsenceTypes(organization.id, true),
-          ]);
-          if (!cancelled) {
-            setFocusAreas(fa);
-            setShiftCategories(shifts);
-            setJobs(jobDefs);
-            setCertifications(certs);
-            setOrgRoles(roles);
-            setIndicatorTypes(ind);
-            setAbsenceTypes(abs);
-          }
-        }
-      } catch (err: unknown) {
-        if (!cancelled) setTabError((err instanceof Error ? err.message : null) ?? "Failed to load data");
-      } finally {
-        if (!cancelled) setTabLoading(false);
-      }
-    }
-
-    if (tab !== "overview" && tab !== "activity") load();
-    return () => { cancelled = true; };
-  }, [tab, organization.id, users, employees, focusAreas, invitations]);
+  const activeTabQuery =
+    tab === "users"
+      ? usersQuery
+      : tab === "employees"
+        ? employeesQuery
+        : tab === "invitations"
+          ? invitationsQuery
+          : tab === "config"
+            ? configQuery
+            : null;
+  const tabLoading = activeTabQuery?.isLoading ?? false;
+  const tabError =
+    activeTabQuery?.error
+      ? formatClientErrorMessage(activeTabQuery.error, "Failed to load this section")
+      : null;
 
   return (
     <div>
@@ -305,6 +717,35 @@ export default function OrganizationDetail({
       {organization.timezone && (
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 20 }}>
           {formatTimezoneLabel(organization.timezone)} · {organization.timezone}
+        </div>
+      )}
+
+      {orgHealthQuery.data && (
+        <div style={{ display: "grid", gap: 16, marginBottom: 20 }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <MiniStat label="Oversight" value={orgHealthQuery.data.oversightScore} />
+            <MiniStat label="Active users 30d" value={orgHealthQuery.data.supportSnapshot.activeUsers30d} />
+            <MiniStat label="Sessions" value={orgHealthQuery.data.supportSnapshot.activeSessions} />
+            <MiniStat label="Open Requests" value={orgHealthQuery.data.supportSnapshot.openShiftRequests} />
+            <MiniStat label="Pending Invites" value={orgHealthQuery.data.supportSnapshot.pendingInvitations} />
+            <MiniStat label="Mobile Devices" value={orgHealthQuery.data.supportSnapshot.mobileDevices} />
+          </div>
+          <div style={sectionStyle}>
+            <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>Support Snapshot</span>
+              <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: orgHealthQuery.data.setup.isComplete ? "var(--color-success)" : "var(--color-warning)" }}>
+                {orgHealthQuery.data.setup.isComplete ? "Setup complete" : `Missing ${orgHealthQuery.data.setup.missing.join(", ")}`}
+              </span>
+            </div>
+            <div style={{ ...sectionBodyStyle, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+              <InfoRow label="Last login" value={orgHealthQuery.data.supportSnapshot.lastLoginAt ? new Date(orgHealthQuery.data.supportSnapshot.lastLoginAt).toLocaleString() : "Never"} />
+              <InfoRow label="Last publish" value={orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt ? new Date(orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt).toLocaleString() : "—"} />
+              <InfoRow label="Settings change" value={orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt ? new Date(orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt).toLocaleString() : "—"} />
+              <InfoRow label="Cells created 30d" value={String(orgHealthQuery.data.supportSnapshot.scheduleCellsCreated30d)} />
+              <InfoRow label="Runtime overrides" value={Object.keys(orgHealthQuery.data.featureOverrides).length ? Object.keys(orgHealthQuery.data.featureOverrides).join(", ") : "None"} />
+              <InfoRow label="Risk flags" value={orgHealthQuery.data.riskFlags.length ? orgHealthQuery.data.riskFlags.map(formatClientLabel).join(", ") : "None"} />
+            </div>
+          </div>
         </div>
       )}
 
@@ -370,34 +811,59 @@ export default function OrganizationDetail({
       {!tabLoading && tab === "overview" && (
         <OverviewTab organization={organization} stats={stats} onOrgUpdated={onOrgUpdated} />
       )}
-      {!tabLoading && tab === "users" && users && (
+      {!tabLoading && tab === "billing" && (
+        <BillingTab organization={organization} />
+      )}
+      {!tabLoading && tab === "users" && usersQuery.data && (
         <UsersTab
-          users={users}
+          users={usersQuery.data ?? []}
           orgId={organization.id}
-          onUsersChanged={() => setUsers(null)}
+          onUsersChanged={() => {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.gridmaster.orgUsers(organization.id),
+            });
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.gridmaster.orgAudit(organization.id, 0, 50),
+            });
+          }}
           onImpersonate={onImpersonate}
         />
       )}
-      {!tabLoading && tab === "employees" && employees && (
-        <EmployeesTab active={employees} benched={benchedEmployees ?? []} terminated={terminatedEmployees ?? []} />
+      {!tabLoading && tab === "employees" && employeesQuery.data && (
+        <EmployeesTab
+          active={employeesQuery.data.active}
+          benched={employeesQuery.data.benched}
+          terminated={employeesQuery.data.terminated}
+        />
       )}
-      {!tabLoading && tab === "config" && focusAreas && shiftCategories && jobs && (
+      {!tabLoading && tab === "config" && configQuery.data && (
         <ConfigTab
-          focusAreas={focusAreas!}
-          shiftCategories={shiftCategories}
-          jobs={jobs}
-          absenceTypes={absenceTypes!}
-          certifications={certifications!}
-          orgRoles={orgRoles!}
-          indicatorTypes={indicatorTypes!}
+          focusAreas={configQuery.data.focusAreas}
+          shiftCategories={configQuery.data.shiftCategories}
+          jobs={configQuery.data.jobs}
+          absenceTypes={configQuery.data.absenceTypes}
+          certifications={configQuery.data.certifications}
+          orgRoles={configQuery.data.orgRoles}
+          indicatorTypes={configQuery.data.indicatorTypes}
           organization={organization}
         />
       )}
       {!tabLoading && tab === "activity" && (
         <AuditLogView orgId={organization.id} title="Organization Activity" />
       )}
-      {!tabLoading && tab === "invitations" && invitations && (
-        <InvitationsTab invitations={invitations} orgId={organization.id} onRefresh={() => setInvitations(null)} />
+      {!tabLoading && tab === "invitations" && invitationsQuery.data && (
+        <InvitationsTab
+          invitations={invitationsQuery.data}
+          orgId={organization.id}
+          onRefresh={() => {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.gridmaster.orgInvitations(organization.id),
+            });
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.gridmaster.orgAudit(organization.id, 0, 50),
+            });
+          }}
+        />
       )}
       {!tabLoading && tab === "schedule" && (
         <ReadOnlyScheduleView
@@ -446,6 +912,7 @@ function OverviewTab({
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [suspendConfirm, setSuspendConfirm] = useState(false);
+  const [unsuspendConfirm, setUnsuspendConfirm] = useState(false);
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
 
@@ -571,7 +1038,7 @@ function OverviewTab({
         onOrgUpdated?.(err.latestOrganization);
         return;
       }
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to update");
+      toast.error(formatClientErrorMessage(err, "Failed to update"));
     } finally {
       setSaving(false);
     }
@@ -617,9 +1084,23 @@ function OverviewTab({
       }
       setArchiveConfirm(false);
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Operation failed");
+      toast.error(formatClientErrorMessage(err, "Operation failed"));
     } finally {
       setArchiving(false);
+    }
+  }
+
+  async function handleUnsuspend() {
+    setSuspending(true);
+    try {
+      await unsuspendGridmasterOrganization(organization.id);
+      toast.success("Organization unsuspended");
+      onOrgUpdated?.({ ...organization, suspendedAt: null, suspendedReason: null });
+      setUnsuspendConfirm(false);
+    } catch (err: unknown) {
+      toast.error(formatClientErrorMessage(err, "Failed to unsuspend"));
+    } finally {
+      setSuspending(false);
     }
   }
 
@@ -627,7 +1108,7 @@ function OverviewTab({
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* Stats */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <MiniStat label="Users" value={stats?.userCount ?? 0} />
+        <MiniStat label="Org users" value={stats?.userCount ?? 0} />
         <MiniStat label="Employees" value={employeeCount} />
       </div>
 
@@ -858,18 +1339,7 @@ function OverviewTab({
               </div>
               <button
                 className="dg-btn dg-btn-primary"
-                onClick={async () => {
-                  setSuspending(true);
-                  try {
-                    await unsuspendGridmasterOrganization(organization.id);
-                    toast.success("Organization unsuspended");
-                    onOrgUpdated?.({ ...organization, suspendedAt: null, suspendedReason: null });
-                  } catch (err: unknown) {
-                    toast.error((err instanceof Error ? err.message : null) ?? "Failed to unsuspend");
-                  } finally {
-                    setSuspending(false);
-                  }
-                }}
+                onClick={() => setUnsuspendConfirm(true)}
                 disabled={suspending}
                 style={{ flexShrink: 0 }}
               >
@@ -933,12 +1403,24 @@ function OverviewTab({
               setSuspendConfirm(false);
               setSuspendReason("");
             } catch (err: unknown) {
-              toast.error((err instanceof Error ? err.message : null) ?? "Failed to suspend");
+              toast.error(formatClientErrorMessage(err, "Failed to suspend"));
             } finally {
               setSuspending(false);
             }
           }}
           onCancel={() => { setSuspendConfirm(false); setSuspendReason(""); }}
+        />
+      )}
+
+      {unsuspendConfirm && (
+        <ConfirmDialog
+          title="Unsuspend Organization"
+          message={`Unsuspend "${organization.name}"? Members will regain access to the app.`}
+          confirmLabel="Unsuspend"
+          variant="warning"
+          isLoading={suspending}
+          onConfirm={handleUnsuspend}
+          onCancel={() => setUnsuspendConfirm(false)}
         />
       )}
 
@@ -972,11 +1454,19 @@ function UsersTab({
   onImpersonate?: (userId: string, orgId?: string) => void;
 }) {
   const [changingRole, setChangingRole] = useState<string | null>(null);
+  const [roleChangeConfirm, setRoleChangeConfirm] = useState<{
+    user: OrganizationUser;
+    newRole: OrganizationRole;
+  } | null>(null);
   const [editingPerms, setEditingPerms] = useState<OrganizationUser | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<OrganizationUser | null>(null);
   const [removing, setRemoving] = useState(false);
   const [addEmail, setAddEmail] = useState("");
   const [addRole, setAddRole] = useState<"admin" | "user">("user");
+  const [addUserConfirm, setAddUserConfirm] = useState<{
+    email: string;
+    role: "admin" | "user";
+  } | null>(null);
   const [adding, setAdding] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -991,26 +1481,34 @@ function UsersTab({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openMenuId]);
 
-  async function handleRoleChange(userId: string, newRole: OrganizationRole) {
-    setChangingRole(userId);
+  function handleRoleChange(userId: string, newRole: OrganizationRole) {
+    const target = users.find((u) => u.id === userId);
+    if (!target || target.orgRole === newRole) return;
+    setRoleChangeConfirm({ user: target, newRole });
+  }
+
+  async function handleConfirmRoleChange() {
+    if (!roleChangeConfirm) return;
+    const { user: target, newRole } = roleChangeConfirm;
+    setChangingRole(target.id);
     try {
-      const target = users.find((u) => u.id === userId);
       if (!target?.updatedAt) {
         throw new Error("User access data is out of date. Refresh and try again.");
       }
       const oldRole = target?.orgRole ?? "user";
       await updateOrganizationMembershipGuarded({
         orgId,
-        userId,
+        userId: target.id,
         expectedUpdatedAt: target.updatedAt,
         orgRole: newRole,
         adminPermissions: newRole === "admin" ? target.adminPermissions : null,
       });
       toast.success("Role updated");
+      setRoleChangeConfirm(null);
       queueNotification({
         action: "role_changed",
         orgId,
-        targetUserId: userId,
+        targetUserId: target.id,
         fromRole: oldRole,
         toRole: newRole,
       });
@@ -1020,7 +1518,7 @@ function UsersTab({
         toast.error("User access changed elsewhere. Review the latest values and try again.");
         onUsersChanged();
       } else {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to change role");
+        toast.error(formatClientErrorMessage(err, "Failed to change role"));
       }
     } finally {
       setChangingRole(null);
@@ -1047,7 +1545,7 @@ function UsersTab({
         toast.error("User access changed elsewhere. Review the latest values and try again.");
         onUsersChanged();
       } else {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to remove user");
+        toast.error(formatClientErrorMessage(err, "Failed to remove user"));
       }
     } finally {
       setRemoving(false);
@@ -1056,16 +1554,23 @@ function UsersTab({
 
   async function handleAddUser(e: React.FormEvent) {
     e.preventDefault();
-    if (!addEmail.trim()) return;
+    const email = addEmail.trim();
+    if (!email) return;
+    setAddUserConfirm({ email, role: addRole });
+  }
+
+  async function handleConfirmAddUser() {
+    if (!addUserConfirm) return;
     setAdding(true);
     try {
-      await assignGridmasterOrgRoleByEmail(orgId, addEmail.trim(), addRole);
-      toast.success(`User added as ${addRole}`);
+      await assignGridmasterOrgRoleByEmail(orgId, addUserConfirm.email, addUserConfirm.role);
+      toast.success(`User added as ${formatOrganizationRoleLabel(addUserConfirm.role)}`);
       setAddEmail("");
+      setAddUserConfirm(null);
       setShowAddForm(false);
       onUsersChanged();
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to add user");
+      toast.error(formatClientErrorMessage(err, "Failed to add user"));
     } finally {
       setAdding(false);
     }
@@ -1159,7 +1664,7 @@ function UsersTab({
                           { value: "super_admin", label: "Super Admin" },
                         ]}
                         onChange={(v) => handleRoleChange(u.id, v as OrganizationRole)}
-                        disabled={changingRole === u.id}
+                        disabled={changingRole === u.id || roleChangeConfirm?.user.id === u.id}
                         style={{ width: 140 }}
                         fontSize={12}
                       />
@@ -1301,6 +1806,30 @@ function UsersTab({
           isLoading={removing}
           onConfirm={handleRemove}
           onCancel={() => setRemoveConfirm(null)}
+        />
+      )}
+
+      {roleChangeConfirm && (
+        <ConfirmDialog
+          title="Change Organization Role"
+          message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
+          confirmLabel="Change Role"
+          variant="warning"
+          isLoading={changingRole === roleChangeConfirm.user.id}
+          onConfirm={handleConfirmRoleChange}
+          onCancel={() => setRoleChangeConfirm(null)}
+        />
+      )}
+
+      {addUserConfirm && (
+        <ConfirmDialog
+          title="Add Organization User"
+          message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}
+          confirmLabel="Add User"
+          variant="warning"
+          isLoading={adding}
+          onConfirm={handleConfirmAddUser}
+          onCancel={() => setAddUserConfirm(null)}
         />
       )}
     </div>
@@ -1859,7 +2388,7 @@ function InvitationsTab({
         toast.error("Invitation changed elsewhere. Review the latest values and try again.");
         onRefresh();
       } else {
-        toast.error((err instanceof Error ? err.message : null) ?? "Failed to revoke invitation");
+        toast.error(formatClientErrorMessage(err, "Failed to revoke invitation"));
       }
     } finally {
       setRevoking(null);
@@ -1902,7 +2431,7 @@ function InvitationsTab({
                   return (
                     <tr key={inv.id}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{inv.email}</td>
-                      <td style={{ ...tdStyle, textTransform: "capitalize" }}>{inv.role_to_assign?.replace("_", " ") ?? "—"}</td>
+                      <td style={tdStyle}>{formatOrganizationRoleLabel(inv.role_to_assign)}</td>
                       <td style={tdStyle}>
                         <span
                           style={{

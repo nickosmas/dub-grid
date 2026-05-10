@@ -19,7 +19,7 @@ describe("PresenceAvatars", () => {
           {
             editorSessionId: "session-other",
             userId: "user-2",
-            userName: "Riley RN",
+            userName: '"Riley RN',
             editingCell: "emp-2_2026-04-12",
             canLockCells: true,
             isSameUser: false,
@@ -30,13 +30,15 @@ describe("PresenceAvatars", () => {
     );
 
     const selfAvatar = screen.getByRole("img", { name: "Me" });
-    const otherAvatar = screen.getByRole("img", { name: "Riley RN" });
+    const otherAvatar = screen.getByRole("img", { name: '"Riley RN' });
+
+    expect(otherAvatar).toHaveTextContent("RR");
 
     fireEvent.mouseEnter(selfAvatar);
     expect(screen.getByText("Me")).toBeInTheDocument();
 
     fireEvent.mouseLeave(selfAvatar);
     fireEvent.mouseEnter(otherAvatar);
-    expect(screen.getByText("Riley RN")).toBeInTheDocument();
+    expect(screen.getByText('"Riley RN')).toBeInTheDocument();
   });
 });

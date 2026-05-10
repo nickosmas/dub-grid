@@ -15,12 +15,15 @@ export const colorTokens = {
   brandSoft: "#EFF6FF",
   brandBorder: "#BFDBFE",
   success: "#16A34A",
+  successText: "#166534",
   successSoft: "#F0FDF4",
   successBorder: "#BBF7D0",
   warning: "#F59E0B",
+  warningText: "#92400E",
   warningSoft: "#FFFBEB",
   warningBorder: "#FDE68A",
   danger: "#EF4444",
+  dangerText: "#B91C1C",
   dangerSoft: "#FEF2F2",
   dangerBorder: "#FECACA",
   shadow: "rgba(15, 23, 42, 0.08)",
@@ -28,14 +31,14 @@ export const colorTokens = {
 } as const;
 
 export const spacingTokens = {
-  screenX: 20,
-  sectionGap: 18,
-  cardGap: 12,
+  screenX: 16,
+  sectionGap: 16,
+  cardGap: 8,
 } as const;
 
 export const radiusTokens = {
-  card: 24,
-  control: 18,
+  card: 16,
+  control: 12,
   pill: 999,
 } as const;
 
@@ -80,6 +83,80 @@ export const typographyTokens = {
     tight: "1.1",
     normal: "1.4",
     loose: "1.6",
+  },
+} as const;
+
+export const mobileTypographyTokens = {
+  fontFamily: {
+    base: "System",
+  },
+  fontWeight: {
+    regular: "400",
+    medium: "500",
+    semibold: "600",
+    bold: "700",
+  },
+  text: {
+    screenTitle: {
+      fontSize: 22,
+      lineHeight: 28,
+      fontWeight: "700",
+    },
+    heroMetric: {
+      fontSize: 24,
+      lineHeight: 30,
+      fontWeight: "700",
+    },
+    sectionTitle: {
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "700",
+    },
+    cardTitle: {
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "600",
+    },
+    rowTitle: {
+      fontSize: 15,
+      lineHeight: 21,
+      fontWeight: "600",
+    },
+    body: {
+      fontSize: 14,
+      lineHeight: 21,
+      fontWeight: "400",
+    },
+    bodyStrong: {
+      fontSize: 14,
+      lineHeight: 21,
+      fontWeight: "600",
+    },
+    meta: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: "400",
+    },
+    label: {
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: "600",
+    },
+    caption: {
+      fontSize: 12,
+      lineHeight: 16,
+      fontWeight: "400",
+    },
+    badge: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: "700",
+    },
+    micro: {
+      fontSize: 10,
+      lineHeight: 12,
+      fontWeight: "600",
+    },
   },
 } as const;
 

@@ -9,6 +9,7 @@ import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
 import InlineEditEmployee from "@/components/EditEmployeePanel";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
@@ -79,6 +80,9 @@ export function StaffDetailPanel({
   const [closing, setClosing] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [revokingInvite, setRevokingInvite] = useState(false);
+  const [pendingInvitationAction, setPendingInvitationAction] = useState<
+    "reinvite" | "revoke" | null
+  >(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
   const pendingInvitation = canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined;
@@ -112,6 +116,26 @@ export function StaffDetailPanel({
       closePanel();
     }
   }, [closePanel, requestClose]);
+
+  const handleConfirmInvitationAction = async () => {
+    if (!pendingInvitation || !pendingInvitationAction) return;
+
+    if (onRevoke) {
+      setRevokingInvite(true);
+      try {
+        const result = await onRevoke(pendingInvitation.id);
+        if (result === false) return;
+      } finally {
+        setRevokingInvite(false);
+      }
+    }
+
+    if (pendingInvitationAction === "reinvite" && onInvite) {
+      onInvite(employee);
+    }
+
+    setPendingInvitationAction(null);
+  };
 
   // Escape key to close
   useEffect(() => {
@@ -333,18 +357,7 @@ export function StaffDetailPanel({
                     {onInvite && (
                       <button
                         disabled={revokingInvite}
-                        onClick={async () => {
-                          if (onRevoke) {
-                            setRevokingInvite(true);
-                            try {
-                              const result = await onRevoke(pendingInvitation.id);
-                              if (result === false) return;
-                            } finally {
-                              setRevokingInvite(false);
-                            }
-                          }
-                          onInvite(employee);
-                        }}
+                        onClick={() => setPendingInvitationAction("reinvite")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
                           color: "var(--color-link)",
@@ -358,14 +371,7 @@ export function StaffDetailPanel({
                     {onRevoke && (
                       <button
                         disabled={revokingInvite}
-                        onClick={async () => {
-                          setRevokingInvite(true);
-                          try {
-                            await onRevoke(pendingInvitation.id);
-                          } finally {
-                            setRevokingInvite(false);
-                          }
-                        }}
+                        onClick={() => setPendingInvitationAction("revoke")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
                           color: "var(--color-danger)",
@@ -453,6 +459,33 @@ export function StaffDetailPanel({
         )}
       </div>
       {unsavedChangesDialog}
+      {pendingInvitationAction && pendingInvitation && (
+        <ConfirmDialog
+          title={
+            pendingInvitationAction === "reinvite"
+              ? "Reissue Invitation?"
+              : "Revoke Invitation?"
+          }
+          message={
+            pendingInvitationAction === "reinvite"
+              ? `Revoke the existing invitation for ${pendingInvitation.email} and create a new one?`
+              : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
+          }
+          confirmLabel={
+            pendingInvitationAction === "reinvite"
+              ? "Reissue Invitation"
+              : "Revoke Invitation"
+          }
+          variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
+          isLoading={revokingInvite}
+          onConfirm={() => {
+            void handleConfirmInvitationAction();
+          }}
+          onCancel={() => {
+            if (!revokingInvite) setPendingInvitationAction(null);
+          }}
+        />
+      )}
     </>,
     document.body
   );

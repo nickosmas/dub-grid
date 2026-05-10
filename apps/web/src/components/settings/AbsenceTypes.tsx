@@ -16,6 +16,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import {
+  getCodeError,
+  getLineTextError,
+  normalizeCode,
+  normalizeLineText,
+} from "@/lib/form-validation";
 import { PresetColorPicker, labelStyle } from "./shared";
 import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
 
@@ -86,7 +92,31 @@ function AbsenceTypeRow({
   const duplicateLabel = form.label.trim().length > 0 && allTypes.some(
     (candidate) => candidate.id !== absenceType.id && candidate.label.trim().toUpperCase() === form.label.trim().toUpperCase(),
   );
-  const canSave = isDirty && !!form.name.trim() && (isNameMode || !!form.label.trim()) && !duplicateLabel;
+  const labelError =
+    form.label.trim().length > 0 || !isNameMode
+      ? getCodeError(form.label, {
+          label: "Absence code",
+          maxLength: 6,
+          required: !isNameMode,
+          uppercase: true,
+        })
+      : null;
+  const nameError =
+    form.name.trim().length > 0
+      ? getLineTextError(form.name, {
+          label: "Absence name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        })
+      : null;
+  const canSave =
+    isDirty &&
+    !!form.name.trim() &&
+    (isNameMode || !!form.label.trim()) &&
+    !duplicateLabel &&
+    !labelError &&
+    !nameError;
 
   const discardDraft = useCallback((closeAfter: boolean) => {
     if (absenceType.isNew && closeAfter) {
@@ -134,8 +164,21 @@ function AbsenceTypeRow({
       const saved = await upsertAbsenceType({
         id: absenceType.isNew ? undefined : absenceType.id,
         orgId,
-        label: form.label.trim().toUpperCase(),
-        name: form.name.trim(),
+        label:
+          form.label.trim().length > 0 || !isNameMode
+            ? normalizeCode(form.label, {
+                label: "Absence code",
+                maxLength: 6,
+                required: !isNameMode,
+                uppercase: true,
+              })
+            : "",
+        name: normalizeLineText(form.name, {
+          label: "Absence name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        }),
         color: form.color,
         border: form.border,
         text: form.text,
@@ -240,7 +283,16 @@ function AbsenceTypeRow({
                   maxLength={6}
                   placeholder="e.g. PTO"
                   disabled={!canEdit}
+                  style={labelError ? { borderColor: "var(--color-danger)" } : undefined}
                 />
+                {labelError ? (
+                  <p
+                    role="alert"
+                    style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                  >
+                    {labelError}
+                  </p>
+                ) : null}
               </div>
             )}
             <div>
@@ -252,7 +304,16 @@ function AbsenceTypeRow({
                 maxLength={50}
                 placeholder="e.g. Vacation"
                 disabled={!canEdit}
+                style={nameError ? { borderColor: "var(--color-danger)" } : undefined}
               />
+              {nameError ? (
+                <p
+                  role="alert"
+                  style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                >
+                  {nameError}
+                </p>
+              ) : null}
             </div>
           </div>
 

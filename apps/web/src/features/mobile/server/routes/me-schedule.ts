@@ -30,7 +30,12 @@ export async function GET(req: NextRequest) {
     return json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const range = resolveMobileDateRange(queryResult.data);
+  let range: ReturnType<typeof resolveMobileDateRange>;
+  try {
+    range = resolveMobileDateRange(queryResult.data);
+  } catch {
+    return json({ error: "Invalid query" }, { status: 400 });
+  }
   const payload = await loadMobileMeSchedulePayload(auth, range, {
     fetchLinkedEmployeeForUser,
     fetchMobileScheduleEntries,

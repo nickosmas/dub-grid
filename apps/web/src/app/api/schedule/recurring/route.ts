@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { error } = await auth.serviceClient.rpc("upsert_recurring_shift", {
+        const { error } = await auth.userClient.rpc("upsert_recurring_shift", {
           p_emp_id: data.employeeId,
           p_org_id: data.orgId,
           p_day_of_week: data.dayOfWeek,

@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  normalizeOptionalUsPhone,
+  normalizeOptionalStaffEmail,
+  normalizeStaffName,
+} from "@dubgrid/contracts";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -10,6 +16,10 @@ import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/
 import { rowToInvitation } from "@/lib/db/mappers";
 import type { DbInvitation } from "@/lib/db/types";
 import type { Invitation } from "@/types";
+import {
+  buildStaffValidationErrorResponse,
+  getStaffFieldErrors,
+} from "@/lib/staff-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -57,36 +67,16 @@ function getRequestIp(req: NextRequest): string | null {
 }
 
 async function requirePrivilegedActor(
+  req: NextRequest,
   orgId: string,
-  actorId: string,
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-  const serviceClient = getServiceClient();
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role")
-      .eq("user_id", actorId)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", actorId)
-      .maybeSingle(),
-  ]);
-
-  const isGridmaster = profile?.platform_role === "gridmaster";
-  const isSuperAdmin = membership?.org_role === "super_admin";
-
-  if (!isGridmaster && !isSuperAdmin) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Insufficient permissions" },
-        { status: 403 },
-      ),
-    };
+  const auth = await requireOrgPermissions(
+    req,
+    orgId,
+    (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
+  );
+  if ("response" in auth) {
+    return { ok: false, response: auth.response };
   }
 
   return { ok: true };
@@ -161,7 +151,6 @@ async function writeAuditEntry(input: {
 export async function GET(req: NextRequest) {
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
-  const { user } = auth;
 
   const parsed = getSchema.safeParse(
     Object.fromEntries(req.nextUrl.searchParams.entries()),
@@ -171,7 +160,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const allowed = await requirePrivilegedActor(parsed.data.orgId, user.id);
+    const allowed = await requirePrivilegedActor(req, parsed.data.orgId);
     if (!allowed.ok) return allowed.response;
 
     const serviceClient = getServiceClient();
@@ -226,9 +215,18 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { orgId, invitationId, expectedUpdatedAt, ...fields } = parsed.data;
+  const fieldErrors = getStaffFieldErrors({
+    ...(fields.email !== undefined ? { optionalEmail: fields.email } : {}),
+    ...(fields.firstName !== undefined ? { firstName: fields.firstName } : {}),
+    ...(fields.lastName !== undefined ? { lastName: fields.lastName } : {}),
+    ...(fields.phone !== undefined ? { phone: fields.phone } : {}),
+  });
+  if (Object.keys(fieldErrors).length > 0) {
+    return buildStaffValidationErrorResponse(fieldErrors);
+  }
 
   try {
-    const allowed = await requirePrivilegedActor(orgId, user.id);
+    const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
     const currentInvitation = await fetchInvitation(orgId, invitationId);
@@ -241,11 +239,27 @@ export async function PATCH(req: NextRequest) {
     }
 
     const nextInvitation: Partial<Invitation> = {
-      email: fields.email?.toLowerCase(),
+      email:
+        fields.email !== undefined
+          ? normalizeOptionalStaffEmail(fields.email) || undefined
+          : undefined,
       roleToAssign: fields.roleToAssign,
-      firstName: fields.firstName,
-      lastName: fields.lastName,
-      phone: fields.phone,
+      firstName:
+        fields.firstName !== undefined
+          ? fields.firstName.trim()
+            ? normalizeStaffName(fields.firstName)
+            : ""
+          : undefined,
+      lastName:
+        fields.lastName !== undefined
+          ? fields.lastName.trim()
+            ? normalizeStaffName(fields.lastName)
+            : ""
+          : undefined,
+      phone:
+        fields.phone !== undefined
+          ? normalizeOptionalUsPhone(fields.phone)
+          : undefined,
       departmentIds: fields.departmentIds,
       deptAdminIds: fields.deptAdminIds,
     };
@@ -341,7 +355,7 @@ export async function DELETE(req: NextRequest) {
   const { orgId, invitationId, expectedUpdatedAt } = parsed.data;
 
   try {
-    const allowed = await requirePrivilegedActor(orgId, user.id);
+    const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
     const currentInvitation = await fetchInvitation(orgId, invitationId);
@@ -425,7 +439,7 @@ export async function POST(req: NextRequest) {
   const { orgId, invitationId, expectedUpdatedAt } = parsed.data;
 
   try {
-    const allowed = await requirePrivilegedActor(orgId, user.id);
+    const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
     const currentInvitation = await fetchInvitation(orgId, invitationId);

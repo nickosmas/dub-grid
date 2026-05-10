@@ -27,6 +27,7 @@ import {
   getJobPlacementShiftPool,
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
+import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import type { AssignmentDefinition, FocusArea, JobDefinition, ShiftCategory } from "@/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -57,8 +58,11 @@ export interface PublishedScheduleSegment {
   shiftId: number | null;
   jobId: number;
   label: string;
+  isMentored?: boolean;
   startTime: string | null;
   endTime: string | null;
+  durationHours?: number;
+  breakMinutes?: number;
 }
 
 export interface PublishedScheduleEntry {
@@ -117,8 +121,9 @@ function buildNormalizedPublishedShiftSelect(
         snapshot_id,
         org_id,
         position,
-        shift_id,
-        job_id
+            shift_id,
+            job_id,
+            is_mentored
       )
     )`,
     ...extraSelects,
@@ -152,11 +157,14 @@ export function mapNormalizedScheduleCellToPublishedShiftRow(
     published_job_ids: orderedSegments.map((segment) => segment.job_id),
     resolvedAssignmentIds: [],
     resolvedSegments: orderedSegments
-      .map((segment) =>
-        segmentDetailsByPair.get(
+      .map((segment): PublishedScheduleSegment | null => {
+        const detail = segmentDetailsByPair.get(
           buildShiftJobPairKey(segment.shift_id ?? null, segment.job_id),
-        ) ?? null,
-      )
+        );
+        return detail
+          ? { ...detail, isMentored: segment.is_mentored ?? false }
+          : null;
+      })
       .filter((segment): segment is PublishedScheduleSegment => segment != null),
     published_absence_type_id:
       publishedSnapshot.state_kind === "absence"
@@ -176,6 +184,17 @@ function buildPublishedSegmentDetails(input: {
 
   const addDetails = (job: JobDefinition, shift: ShiftCategory | null) => {
     const times = resolveJobTimesForShift(job, shift);
+    const durationHours =
+      times.startTime && times.endTime
+        ? Math.max(
+            0,
+            durationFromTimes(times.startTime, times.endTime) -
+              (shift?.breakMinutes ?? 0) / 60,
+          )
+        : shift == null
+          ? (job.defaultDurationHours ?? 0) +
+            (job.defaultDurationMinutes ?? 0) / 60
+          : 0;
     const displayParts = buildShiftDisplayParts({
       shift,
       job,
@@ -188,11 +207,13 @@ function buildPublishedSegmentDetails(input: {
       label: formatAssignableShiftOptionLabel(displayParts),
       startTime: times.startTime,
       endTime: times.endTime,
+      durationHours,
+      breakMinutes: shift?.breakMinutes ?? 0,
     });
   };
 
   for (const job of input.jobs) {
-    if (job.archivedAt || job.systemKey === "regular_staff") continue;
+    if (job.archivedAt || isRegularStaffSystemJob(job)) continue;
     const mode = job.assignmentMode ?? "with_shift";
     if (mode !== "shiftless") {
       for (const shift of getJobPlacementShiftPool(
@@ -344,6 +365,33 @@ function durationFromTimes(startTime: string | null, endTime: string | null): nu
   return Math.max(0, (end - start) / 60);
 }
 
+function splitPipeTimes(value: string | null | undefined): string[] {
+  return value?.split("|").map((part) => part.trim()) ?? [];
+}
+
+function resolveSegmentDurationHours(
+  segment: PublishedScheduleSegment,
+  index: number,
+  customStarts: string[],
+  customEnds: string[],
+): number {
+  const hasCustomStart = customStarts.length > 0;
+  const hasCustomEnd = customEnds.length > 0;
+  const customStart = hasCustomStart ? (customStarts[index] ?? "") : "";
+  const customEnd = hasCustomEnd ? (customEnds[index] ?? "") : "";
+  const startTime = customStart || segment.startTime;
+  const endTime = customEnd || segment.endTime;
+
+  if (startTime && endTime) {
+    return Math.max(
+      0,
+      durationFromTimes(startTime, endTime) - (segment.breakMinutes ?? 0) / 60,
+    );
+  }
+
+  return segment.durationHours ?? 0;
+}
+
 export function hasPublishedScheduleContent(row: PublishedShiftRow): boolean {
   return (
     (row.resolvedAssignmentIds?.length ?? 0) > 0 ||
@@ -359,6 +407,8 @@ export function resolvePublishedScheduleEntry(
   const assignmentIds = row.resolvedAssignmentIds ?? [];
   const segments = row.resolvedSegments ?? [];
   const absenceTypeId = row.published_absence_type_id ?? null;
+  const customStarts = splitPipeTimes(row.published_custom_start_time);
+  const customEnds = splitPipeTimes(row.published_custom_end_time);
 
   if (assignmentIds.length === 0 && segments.length === 0 && absenceTypeId == null) {
     return null;
@@ -391,6 +441,22 @@ export function resolvePublishedScheduleEntry(
     segments.length > 0
       ? segments.map((segment) => segment.label || "?").join("/")
       : resolveShiftLabel(assignmentIds, assignmentById);
+  const segmentDurationHours = segments.reduce(
+    (sum, segment, index) =>
+      sum + resolveSegmentDurationHours(segment, index, customStarts, customEnds),
+    0,
+  );
+  const durationHours =
+    segments.length > 0
+      ? segmentDurationHours
+      : assignmentIds.length > 0
+        ? computeShiftDurationHours(
+            assignmentIds,
+            assignmentById as Map<number, AssignmentDefinition>,
+            row.published_custom_start_time ?? null,
+            row.published_custom_end_time ?? null,
+          )
+        : durationFromTimes(startTime, endTime);
 
   return {
     kind: "shift",
@@ -401,15 +467,7 @@ export function resolvePublishedScheduleEntry(
     absenceTypeId: null,
     startTime,
     endTime,
-    durationHours:
-      assignmentIds.length > 0
-        ? computeShiftDurationHours(
-            assignmentIds,
-            assignmentById as Map<number, AssignmentDefinition>,
-            row.published_custom_start_time ?? null,
-            row.published_custom_end_time ?? null,
-          )
-        : durationFromTimes(startTime, endTime),
+    durationHours,
     segments,
   };
 }

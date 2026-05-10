@@ -12,6 +12,7 @@ import {
   type ResolvedMobileAuthContext,
 } from "@dubgrid/mobile-api-core";
 import { rowToOrganization } from "@/lib/db/mappers";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
 import { createMobileUserClient } from "./client";
 
@@ -25,7 +26,10 @@ export async function requireMobileAuth(
   );
   if (!accessToken) {
     return {
-      response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
+      response: NextResponse.json(
+        { error: "Your session expired. Sign in again to continue." },
+        { status: 401 },
+      ),
     };
   }
 
@@ -43,7 +47,7 @@ export async function requireMobileAuth(
     if (error instanceof MobileApiRequestError) {
       return {
         response: NextResponse.json(
-          { error: error.message },
+          { error: formatClientErrorMessage(error, "We could not verify this session right now.") },
           { status: error.status },
         ),
       };

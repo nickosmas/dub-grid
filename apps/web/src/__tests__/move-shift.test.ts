@@ -41,6 +41,8 @@ describe("moveShift", () => {
       },
       "copy",
       3,
+      5,
+      false,
     );
 
     expect(supabase.rpc).toHaveBeenCalledWith("move_shift", {
@@ -52,11 +54,14 @@ describe("moveShift", () => {
       p_kind: "absence",
       p_shift_ids: [],
       p_job_ids: [],
+      p_is_mentored_flags: [],
       p_absence_type_id: 7,
       p_custom_start_time: null,
       p_custom_end_time: null,
       p_drag_mode: "copy",
       p_expected_version: 3,
+      p_target_expected_version: 5,
+      p_target_was_empty: false,
     });
   });
 

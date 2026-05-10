@@ -43,6 +43,41 @@ export type TimeRange = {
   end: string;
 };
 
+export type ShiftTimeSegmentLike = {
+  startTime?: string | null;
+  endTime?: string | null;
+  shiftStartTime?: string | null;
+  shiftEndTime?: string | null;
+};
+
+export type ShiftTimeSourceLike = {
+  segments?: ReadonlyArray<ShiftTimeSegmentLike> | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  customStartTime?: string | null;
+  customEndTime?: string | null;
+};
+
+export type ShiftRequestLike = {
+  type: string;
+  requesterShiftDate: string | null | undefined;
+  requesterPresentation?: ShiftTimeSourceLike | null;
+  requesterState?: Pick<
+    ShiftTimeSourceLike,
+    "customStartTime" | "customEndTime"
+  > | null;
+  requesterCustomStartTime?: string | null;
+  requesterCustomEndTime?: string | null;
+  targetShiftDate?: string | null;
+  targetPresentation?: ShiftTimeSourceLike | null;
+  targetState?: Pick<
+    ShiftTimeSourceLike,
+    "customStartTime" | "customEndTime"
+  > | null;
+  targetCustomStartTime?: string | null;
+  targetCustomEndTime?: string | null;
+};
+
 export type MobileScheduleSection = {
   date: string;
   title: string;
@@ -151,7 +186,9 @@ type LegacyMobileShiftRequest = MobileShiftRequest & {
   targetCustomEndTime?: string | null;
 };
 
-function getAvailableShiftFeedItemSlotCount(item: AvailableShiftFeedItem): number {
+function getAvailableShiftFeedItemSlotCount(
+  item: AvailableShiftFeedItem,
+): number {
   if (item.kind === "open_shift") {
     return Math.max(item.openShift.needed, 1);
   }
@@ -288,6 +325,22 @@ export function getIsoDateInTimeZone(
 ): string {
   const parts = getDatePartsInTimeZone(value, timeZone);
   return `${parts.year}-${`${parts.month}`.padStart(2, "0")}-${`${parts.day}`.padStart(2, "0")}`;
+}
+
+export function getCurrentTimeValueInTimeZone(
+  value: Date,
+  timeZone?: string | null,
+): string {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timeZone ?? "UTC",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(value);
+  const hour = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const minute = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `${hour}:${minute}`;
 }
 
 export function addDaysToIsoDate(value: string, days: number): string {
@@ -492,13 +545,43 @@ export function getScheduleEntrySegments(
   ];
 }
 
+function getExplicitScheduleEntrySegmentCount(
+  entry: ScheduleEntryLike,
+): number {
+  const presentationSegments = entry.presentation?.segments ?? [];
+  if (presentationSegments.length > 0) {
+    return presentationSegments.length;
+  }
+
+  if (entry.segments && entry.segments.length > 0) {
+    return entry.segments.length;
+  }
+
+  if (entry.state?.kind === "worked" && entry.state.segments.length > 0) {
+    return entry.state.segments.length;
+  }
+
+  return 0;
+}
+
 export function getScheduleEntryCustomTimeRange(
   entry: ScheduleEntryLike,
 ): string | null {
-  return formatScheduleTimeRange(
-    getScheduleEntryCustomStartTime(entry),
-    getScheduleEntryCustomEndTime(entry),
-  );
+  const customStartTime = getScheduleEntryCustomStartTime(entry);
+  const customEndTime = getScheduleEntryCustomEndTime(entry);
+
+  if (hasPipeParts(customStartTime) || hasPipeParts(customEndTime)) {
+    if (getExplicitScheduleEntrySegmentCount(entry) !== 1) {
+      return null;
+    }
+
+    return formatScheduleTimeRange(
+      splitPipeParts(customStartTime)[0] ?? null,
+      splitPipeParts(customEndTime)[0] ?? null,
+    );
+  }
+
+  return formatScheduleTimeRange(customStartTime, customEndTime);
 }
 
 export function getScheduleEntrySegmentTimeRange(
@@ -519,9 +602,25 @@ export function getScheduleEntrySegmentShiftTimeRange(
 export function getScheduleEntryTimeRange(
   entry: ScheduleEntryLike,
 ): string | null {
+  const customStartTime = getScheduleEntryCustomStartTime(entry);
+  const customEndTime = getScheduleEntryCustomEndTime(entry);
+  const hasPipeCustomTime =
+    hasPipeParts(customStartTime) || hasPipeParts(customEndTime);
+  const shouldUseSinglePipeSegment =
+    hasPipeCustomTime && getExplicitScheduleEntrySegmentCount(entry) === 1;
+  const resolvedCustomStartTime = shouldUseSinglePipeSegment
+    ? (splitPipeParts(customStartTime)[0] ?? null)
+    : customStartTime;
+  const resolvedCustomEndTime = shouldUseSinglePipeSegment
+    ? (splitPipeParts(customEndTime)[0] ?? null)
+    : customEndTime;
+  const shouldUseCustomTime = !hasPipeCustomTime || shouldUseSinglePipeSegment;
+
   return formatScheduleTimeRange(
-    getScheduleEntryCustomStartTime(entry) ?? getScheduleEntryStartTime(entry),
-    getScheduleEntryCustomEndTime(entry) ?? getScheduleEntryEndTime(entry),
+    (shouldUseCustomTime ? resolvedCustomStartTime : null) ??
+      getScheduleEntryStartTime(entry),
+    (shouldUseCustomTime ? resolvedCustomEndTime : null) ??
+      getScheduleEntryEndTime(entry),
   );
 }
 
@@ -792,6 +891,171 @@ function hasPipeParts(value: string | null | undefined): boolean {
   return Boolean(value?.includes("|"));
 }
 
+function normalizeTimeValue(value: string | null | undefined): string | null {
+  const normalized = value?.trim().slice(0, 5) ?? null;
+  return normalized ? normalized : null;
+}
+
+function toShiftTimeRange(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): TimeRange | null {
+  const normalizedStart = normalizeTimeValue(start);
+  const normalizedEnd = normalizeTimeValue(end);
+
+  if (!normalizedStart || !normalizedEnd) {
+    return null;
+  }
+
+  return {
+    start: normalizedStart,
+    end: normalizedEnd,
+  };
+}
+
+export function getShiftLikeTimeRanges(
+  source: ShiftTimeSourceLike | null | undefined,
+): TimeRange[] {
+  if (!source) {
+    return [];
+  }
+
+  const segmentRanges =
+    source.segments?.flatMap((segment) => {
+      const range = toShiftTimeRange(
+        segment.startTime ?? segment.shiftStartTime ?? null,
+        segment.endTime ?? segment.shiftEndTime ?? null,
+      );
+      return range ? [range] : [];
+    }) ?? [];
+
+  if (segmentRanges.length > 0) {
+    return segmentRanges;
+  }
+
+  const explicitRange = toShiftTimeRange(source.startTime, source.endTime);
+  if (explicitRange) {
+    return [explicitRange];
+  }
+
+  const customStartParts = splitPipeParts(source.customStartTime);
+  const customEndParts = splitPipeParts(source.customEndTime);
+  const customRanges: TimeRange[] = [];
+
+  for (
+    let index = 0;
+    index < Math.max(customStartParts.length, customEndParts.length);
+    index += 1
+  ) {
+    const range = toShiftTimeRange(
+      customStartParts[index] ?? null,
+      customEndParts[index] ?? null,
+    );
+    if (range) {
+      customRanges.push(range);
+    }
+  }
+
+  return customRanges;
+}
+
+export function hasShiftStartedAtTimeRanges(input: {
+  shiftDate: string | null | undefined;
+  timeRanges: ReadonlyArray<Pick<TimeRange, "start">>;
+  now: Date;
+  timeZone?: string | null;
+}): boolean {
+  if (!input.shiftDate) {
+    return false;
+  }
+
+  const todayDate = getIsoDateInTimeZone(input.now, input.timeZone);
+  if (input.shiftDate < todayDate) {
+    return true;
+  }
+  if (input.shiftDate > todayDate) {
+    return false;
+  }
+
+  const earliestStart =
+    input.timeRanges
+      .map((range) => normalizeTimeValue(range.start))
+      .filter((value): value is string => Boolean(value))
+      .sort()[0] ?? null;
+  if (!earliestStart) {
+    return true;
+  }
+
+  return (
+    getCurrentTimeValueInTimeZone(input.now, input.timeZone) >= earliestStart
+  );
+}
+
+export function hasShiftLikeStarted(input: {
+  shiftDate: string | null | undefined;
+  source: ShiftTimeSourceLike | null | undefined;
+  now: Date;
+  timeZone?: string | null;
+}): boolean {
+  return hasShiftStartedAtTimeRanges({
+    shiftDate: input.shiftDate,
+    timeRanges: getShiftLikeTimeRanges(input.source),
+    now: input.now,
+    timeZone: input.timeZone,
+  });
+}
+
+export function hasShiftRequestStarted(
+  request: ShiftRequestLike,
+  now: Date,
+  timeZone?: string | null,
+): boolean {
+  const requesterStarted = hasShiftLikeStarted({
+    shiftDate: request.requesterShiftDate,
+    source: {
+      segments: request.requesterPresentation?.segments ?? null,
+      startTime: request.requesterPresentation?.startTime ?? null,
+      endTime: request.requesterPresentation?.endTime ?? null,
+      customStartTime:
+        request.requesterState?.customStartTime ??
+        request.requesterCustomStartTime ??
+        null,
+      customEndTime:
+        request.requesterState?.customEndTime ??
+        request.requesterCustomEndTime ??
+        null,
+    },
+    now,
+    timeZone,
+  });
+
+  if (request.type !== "swap") {
+    return requesterStarted;
+  }
+
+  return (
+    requesterStarted ||
+    hasShiftLikeStarted({
+      shiftDate: request.targetShiftDate ?? null,
+      source: {
+        segments: request.targetPresentation?.segments ?? null,
+        startTime: request.targetPresentation?.startTime ?? null,
+        endTime: request.targetPresentation?.endTime ?? null,
+        customStartTime:
+          request.targetState?.customStartTime ??
+          request.targetCustomStartTime ??
+          null,
+        customEndTime:
+          request.targetState?.customEndTime ??
+          request.targetCustomEndTime ??
+          null,
+      },
+      now,
+      timeZone,
+    })
+  );
+}
+
 function getDurationFieldMinutes(
   value: Pick<
     MobileScheduleEntrySegment,
@@ -999,6 +1263,37 @@ export function getFeaturedMeScheduleSegment(input: {
         status: "upcoming",
       };
     }
+
+    const awayTodayItem =
+      selectedDayItems.find(
+        (item) => getScheduleEntryAbsenceTypeId(item.entry) != null,
+      ) ?? null;
+
+    if (awayTodayItem) {
+      return {
+        item: awayTodayItem,
+        status: "away",
+      };
+    }
+
+    const nextItem =
+      items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ??
+      null;
+
+    if (nextItem) {
+      return {
+        item: nextItem,
+        status:
+          getScheduleEntryAbsenceTypeId(nextItem.entry) != null
+            ? "away"
+            : "upcoming",
+      };
+    }
+
+    return {
+      item: null,
+      status: "empty",
+    };
   }
 
   const selectedDayItem = selectedDayItems[0] ?? null;
@@ -1054,11 +1349,11 @@ function getRequestPrimarySegment(
   const segments =
     which === "requester"
       ? (request.requesterPresentation?.segments ??
-          legacyRequest.requesterSegments ??
-          [])
+        legacyRequest.requesterSegments ??
+        [])
       : (request.targetPresentation?.segments ??
-          legacyRequest.targetSegments ??
-          []);
+        legacyRequest.targetSegments ??
+        []);
 
   return segments[0] ?? null;
 }
@@ -1074,9 +1369,9 @@ function getRequestSortTime(
     primarySegment?.startTime ??
     (which === "requester"
       ? (request.requesterState?.customStartTime ??
-          legacyRequest.requesterCustomStartTime)
+        legacyRequest.requesterCustomStartTime)
       : (request.targetState?.customStartTime ??
-          legacyRequest.targetCustomStartTime)) ??
+        legacyRequest.targetCustomStartTime)) ??
     "99:99:99"
   );
 }
@@ -1162,37 +1457,15 @@ export function buildAvailableShiftDateGroups(input: {
   return groups;
 }
 
-type AvailabilityTimeRange = {
-  start: string;
-  end: string;
-};
-
-function toAvailabilityTimeRange(
-  start: string | null | undefined,
-  end: string | null | undefined,
-): AvailabilityTimeRange | null {
-  const normalizedStart = start?.slice(0, 5) ?? null;
-  const normalizedEnd = end?.slice(0, 5) ?? null;
-
-  if (!normalizedStart || !normalizedEnd) {
-    return null;
-  }
-
-  return {
-    start: normalizedStart,
-    end: normalizedEnd,
-  };
-}
-
 function getScheduleEntryAvailabilityTimeRanges(
   entry: MobileScheduleEntry,
-): AvailabilityTimeRange[] {
+): TimeRange[] {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
     return [];
   }
 
   const segmentRanges = getScheduleEntrySegments(entry).flatMap((segment) => {
-    const range = toAvailabilityTimeRange(
+    const range = toShiftTimeRange(
       segment.startTime ?? segment.shiftStartTime ?? null,
       segment.endTime ?? segment.shiftEndTime ?? null,
     );
@@ -1203,7 +1476,7 @@ function getScheduleEntryAvailabilityTimeRanges(
     return segmentRanges;
   }
 
-  const customRange = toAvailabilityTimeRange(
+  const customRange = toShiftTimeRange(
     getScheduleEntryCustomStartTime(entry),
     getScheduleEntryCustomEndTime(entry),
   );
@@ -1212,7 +1485,7 @@ function getScheduleEntryAvailabilityTimeRanges(
     return [customRange];
   }
 
-  const baseRange = toAvailabilityTimeRange(
+  const baseRange = toShiftTimeRange(
     getScheduleEntryStartTime(entry),
     getScheduleEntryEndTime(entry),
   );
@@ -1222,11 +1495,11 @@ function getScheduleEntryAvailabilityTimeRanges(
 
 function getRequestAvailabilityTimeRanges(
   request: MobileShiftRequest,
-): AvailabilityTimeRange[] {
+): TimeRange[] {
   const legacyRequest = request as LegacyMobileShiftRequest;
   const segments = request.requesterPresentation?.segments ?? [];
   const segmentRanges = segments.flatMap((segment) => {
-    const range = toAvailabilityTimeRange(
+    const range = toShiftTimeRange(
       segment.startTime ?? segment.shiftStartTime ?? null,
       segment.endTime ?? segment.shiftEndTime ?? null,
     );
@@ -1237,7 +1510,7 @@ function getRequestAvailabilityTimeRanges(
     return segmentRanges;
   }
 
-  const presentationRange = toAvailabilityTimeRange(
+  const presentationRange = toShiftTimeRange(
     request.requesterPresentation?.startTime ?? null,
     request.requesterPresentation?.endTime ?? null,
   );
@@ -1246,7 +1519,7 @@ function getRequestAvailabilityTimeRanges(
     return [presentationRange];
   }
 
-  const stateRange = toAvailabilityTimeRange(
+  const stateRange = toShiftTimeRange(
     request.requesterState?.customStartTime ??
       legacyRequest.requesterCustomStartTime,
     request.requesterState?.customEndTime ??
@@ -1258,9 +1531,9 @@ function getRequestAvailabilityTimeRanges(
 
 function getOpenShiftAvailabilityTimeRanges(
   openShift: MobileOpenShift,
-): AvailabilityTimeRange[] {
+): TimeRange[] {
   const segmentRanges = openShift.presentation.segments.flatMap((segment) => {
-    const range = toAvailabilityTimeRange(
+    const range = toShiftTimeRange(
       segment.startTime ?? segment.shiftStartTime ?? null,
       segment.endTime ?? segment.shiftEndTime ?? null,
     );
@@ -1271,7 +1544,7 @@ function getOpenShiftAvailabilityTimeRanges(
     return segmentRanges;
   }
 
-  const presentationRange = toAvailabilityTimeRange(
+  const presentationRange = toShiftTimeRange(
     openShift.presentation.startTime,
     openShift.presentation.endTime,
   );
@@ -1280,7 +1553,7 @@ function getOpenShiftAvailabilityTimeRanges(
     return [presentationRange];
   }
 
-  const stateRange = toAvailabilityTimeRange(
+  const stateRange = toShiftTimeRange(
     openShift.state.customStartTime,
     openShift.state.customEndTime,
   );
@@ -1289,8 +1562,8 @@ function getOpenShiftAvailabilityTimeRanges(
 }
 
 function availabilityRangesOverlap(
-  left: ReadonlyArray<AvailabilityTimeRange>,
-  right: ReadonlyArray<AvailabilityTimeRange>,
+  left: ReadonlyArray<TimeRange>,
+  right: ReadonlyArray<TimeRange>,
 ): boolean {
   return left.some((leftRange) =>
     right.some((rightRange) =>
@@ -1305,10 +1578,55 @@ function availabilityRangesOverlap(
   );
 }
 
+function isPendingVolunteerRequest(
+  request: MobileShiftRequest,
+  linkedEmployeeId?: string | null,
+): boolean {
+  if (
+    request.type !== "pickup" ||
+    request.status !== "pending_approval" ||
+    request.targetEmpId != null ||
+    request.parentRequestId != null
+  ) {
+    return false;
+  }
+
+  return (
+    linkedEmployeeId == null || request.requesterEmpId === linkedEmployeeId
+  );
+}
+
+function requestMatchesOpenShift(
+  request: MobileShiftRequest,
+  openShift: MobileOpenShift,
+): boolean {
+  if (request.requesterShiftDate !== openShift.date) {
+    return false;
+  }
+
+  const requestFocusAreaId =
+    request.requesterState.focusAreaId ??
+    request.requesterPresentation?.focusAreaId ??
+    request.requesterPresentation?.segments[0]?.focusAreaId ??
+    null;
+
+  if (requestFocusAreaId !== openShift.focusAreaId) {
+    return false;
+  }
+
+  return request.requesterState.segments.some((requestSegment) =>
+    openShift.state.segments.some(
+      (openShiftSegment) =>
+        requestSegment.jobId === openShiftSegment.jobId &&
+        requestSegment.shiftId === openShiftSegment.shiftId,
+    ),
+  );
+}
+
 function buildScheduleAvailabilityRangesByDate(
   entries: ReadonlyArray<MobileScheduleEntry>,
-): Map<string, AvailabilityTimeRange[]> {
-  const rangesByDate = new Map<string, AvailabilityTimeRange[]>();
+): Map<string, TimeRange[]> {
+  const rangesByDate = new Map<string, TimeRange[]>();
 
   for (const entry of entries) {
     const ranges = getScheduleEntryAvailabilityTimeRanges(entry);
@@ -1330,8 +1648,11 @@ export function buildAvailableOpenShiftFeed(input: {
   scheduleEntries: ReadonlyArray<MobileScheduleEntry>;
   openShifts: ReadonlyArray<MobileOpenShift>;
   requests: ReadonlyArray<MobileShiftRequest>;
+  now?: Date;
+  showAll?: boolean;
+  timeZone?: string | null;
 }): AvailableOpenShiftFeed {
-  if (!input.linkedEmployeeId) {
+  if (!input.linkedEmployeeId && !input.showAll) {
     return {
       groups: [],
       openShiftRequests: [],
@@ -1343,27 +1664,78 @@ export function buildAvailableOpenShiftFeed(input: {
   const scheduleRangesByDate = buildScheduleAvailabilityRangesByDate(
     input.scheduleEntries,
   );
-  const openShiftRequests = input.requests.filter((request) => {
-    if (
-      request.type !== "pickup" ||
-      request.status !== "open" ||
-      request.requesterEmpId === input.linkedEmployeeId
-    ) {
-      return false;
+  const now = input.now ?? new Date();
+  const showAll = input.showAll ?? false;
+  const pendingVolunteerRequests = input.requests.filter(
+    (request) =>
+      isPendingVolunteerRequest(request, input.linkedEmployeeId) &&
+      !hasShiftRequestStarted(request, now, input.timeZone),
+  );
+  const openShiftRequests = input.requests
+    .filter((request) => {
+      if (
+        request.type !== "pickup" ||
+        request.status !== "open" ||
+        (!showAll && request.requesterEmpId === input.linkedEmployeeId)
+      ) {
+        return false;
+      }
+
+      if (hasShiftRequestStarted(request, now, input.timeZone)) {
+        return false;
+      }
+
+      if (showAll) {
+        return true;
+      }
+
+      return !availabilityRangesOverlap(
+        scheduleRangesByDate.get(request.requesterShiftDate) ?? [],
+        getRequestAvailabilityTimeRanges(request),
+      );
+    })
+    .concat(pendingVolunteerRequests);
+  const openShifts = input.openShifts.flatMap((openShift) => {
+    const hasOwnPendingVolunteer =
+      input.linkedEmployeeId != null &&
+      pendingVolunteerRequests.some((request) =>
+        requestMatchesOpenShift(request, openShift),
+      );
+
+    if (hasOwnPendingVolunteer) {
+      return [];
     }
 
-    return !availabilityRangesOverlap(
-      scheduleRangesByDate.get(request.requesterShiftDate) ?? [],
-      getRequestAvailabilityTimeRanges(request),
-    );
+    if (openShift.needed <= 0) {
+      return [];
+    }
+
+    if (!showAll && openShift.canVolunteer === false) {
+      return [];
+    }
+
+    if (
+      hasShiftStartedAtTimeRanges({
+        shiftDate: openShift.date,
+        timeRanges: getOpenShiftAvailabilityTimeRanges(openShift),
+        now,
+        timeZone: input.timeZone,
+      })
+    ) {
+      return [];
+    }
+
+    if (showAll) {
+      return [openShift];
+    }
+
+    return availabilityRangesOverlap(
+      scheduleRangesByDate.get(openShift.date) ?? [],
+      getOpenShiftAvailabilityTimeRanges(openShift),
+    )
+      ? []
+      : [openShift];
   });
-  const openShifts = input.openShifts.filter(
-    (openShift) =>
-      !availabilityRangesOverlap(
-        scheduleRangesByDate.get(openShift.date) ?? [],
-        getOpenShiftAvailabilityTimeRanges(openShift),
-      ),
-  );
 
   const groups = buildAvailableShiftDateGroups({
     openShifts,
@@ -1381,6 +1753,8 @@ export function buildAvailableOpenShiftFeed(input: {
 export function buildMeShiftRequestSections(input: {
   linkedEmployeeId: string | null;
   requests: MobileShiftRequest[];
+  now?: Date;
+  timeZone?: string | null;
 }): MeShiftRequestSections {
   if (!input.linkedEmployeeId) {
     return {
@@ -1402,20 +1776,23 @@ export function buildMeShiftRequestSections(input: {
     );
   };
 
+  const now = input.now ?? new Date();
   return {
     openShiftRequests: input.requests
       .filter(
         (request) =>
           request.status === "open" &&
           request.type === "pickup" &&
-          request.requesterEmpId !== input.linkedEmployeeId,
+          request.requesterEmpId !== input.linkedEmployeeId &&
+          !hasShiftRequestStarted(request, now, input.timeZone),
       )
       .sort(sortRequests),
     coverRequests: input.requests
       .filter(
         (request) =>
           request.status === "open" &&
-          request.targetEmpId === input.linkedEmployeeId,
+          request.targetEmpId === input.linkedEmployeeId &&
+          !hasShiftRequestStarted(request, now, input.timeZone),
       )
       .sort(sortRequests),
   };

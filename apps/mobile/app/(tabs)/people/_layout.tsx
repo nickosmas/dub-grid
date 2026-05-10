@@ -1,5 +1,8 @@
 import { Stack } from "expo-router";
-import { createTopLevelStackOptions } from "../../../src/shared/navigation/top-level-stack";
+import {
+  createDetailStackOptions,
+  createTopLevelStackOptions,
+} from "../../../src/shared/navigation/top-level-stack";
 
 export default function PeopleLayout() {
   return (
@@ -7,6 +10,10 @@ export default function PeopleLayout() {
       <Stack.Screen
         name="index"
         options={createTopLevelStackOptions("People")}
+      />
+      <Stack.Screen
+        name="[id]"
+        options={createDetailStackOptions("Person")}
       />
     </Stack>
   );

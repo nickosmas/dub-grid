@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
@@ -113,10 +113,15 @@ describe("OrganizationSetupWizard", () => {
     await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
 
     await user.click(screen.getByRole("button", { name: /create organization/i }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }));
 
     expect(await screen.findByRole("button", { name: /continue setup/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /continue setup/i }));
+    expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/select focus area/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/select shift/i).length).toBeGreaterThan(0);
+
     await user.click(screen.getByRole("button", { name: /^skip$/i }));
 
     const readyInput = await screen.findByLabelText(/employees ready to create/i);

@@ -6,7 +6,8 @@ import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { NameMismatchError } from "@/lib/account-linking";
-import { validateEmail, validateRequired } from "@/components/FormField";
+import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
+import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { toast } from "sonner";
 import type { DirectoryPerson, Employee, FocusArea, NameMismatchDetails, NamedItem } from "@/types";
 import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
@@ -16,6 +17,7 @@ import {
   createEmployeeFromOrgUser,
   reconcileEmployeeFromOrgUser,
 } from "@/features/employees/client";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface AddManagementUserToScheduleModalProps {
   orgId: string;
@@ -93,6 +95,7 @@ export function AddManagementUserToScheduleModal({
       firstName: touched.firstName ? validateRequired(firstName, "First name") : null,
       lastName: touched.lastName ? validateRequired(lastName, "Last name") : null,
       email: touched.email ? (email.trim() ? validateEmail(email) : "Email address is required") : null,
+      phone: touched.phone ? validatePhone(phone) : null,
       focusAreaIds:
         touched.focusAreaIds && focusAreaIds.length === 0
           ? `At least one ${focusAreaLabel.toLowerCase()} is required`
@@ -107,6 +110,7 @@ export function AddManagementUserToScheduleModal({
     !validateRequired(lastName, "Last name") &&
     !!email.trim() &&
     !validateEmail(email) &&
+    !validatePhone(phone) &&
     focusAreaIds.length > 0 &&
     !saving;
 
@@ -138,7 +142,7 @@ export function AddManagementUserToScheduleModal({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: email.trim(),
-      phone: phone.trim(),
+      phone: normalizeOptionalUsPhone(phone),
       certificationId,
       focusAreaIds,
       roleIds,
@@ -152,6 +156,7 @@ export function AddManagementUserToScheduleModal({
         firstName: true,
         lastName: true,
         email: true,
+        phone: true,
         focusAreaIds: true,
       });
       return;
@@ -168,7 +173,7 @@ export function AddManagementUserToScheduleModal({
         setNameMismatch(err.details);
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Failed to add management user to the schedule");
+      toast.error(formatClientErrorMessage(err, "We couldn't add that management user to the schedule."));
     } finally {
       setSaving(false);
     }
@@ -184,7 +189,7 @@ export function AddManagementUserToScheduleModal({
       onAdded(employee);
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to add management user to the schedule");
+      toast.error(formatClientErrorMessage(err, "We couldn't add that management user to the schedule."));
     } finally {
       setSaving(false);
     }
@@ -268,7 +273,15 @@ export function AddManagementUserToScheduleModal({
               className="dg-input"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => {
+                markTouched("phone");
+                if (!validatePhone(phone)) {
+                  setPhone(normalizeOptionalUsPhone(phone));
+                }
+              }}
+              style={fieldErrors.phone ? { borderColor: "var(--color-danger)" } : undefined}
             />
+            {fieldErrors.phone && <FieldError message={fieldErrors.phone} />}
           </div>
         </div>
 

@@ -237,7 +237,7 @@ export default function AcceptInvitePage() {
                   onChange={setPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword(!showPassword)}
-                  ariaDescribedBy="password-strength-label"
+                  ariaDescribedBy="password-strength-label password-strength-hints"
                 />
                 {password.length > 0 && <PasswordStrength password={password} />}
               </div>

@@ -15,12 +15,14 @@ function resolveSeedPath(fileName: string) {
 
 describe("seed schedule definition contracts", () => {
   it.each(["seed_arden_wood.sql", "seed_calm_haven.sql"])(
-    "uses Nurse as the nursing job and reserves Staff for non-nursing work in %s",
+    "uses the hidden default shift job instead of generic Nurse or Staff jobs in %s",
     (fileName) => {
       const sql = readFileSync(resolveSeedPath(fileName), "utf8");
 
-      expect(sql).toContain("'Nurse', 'Nurse', true, 'with_shift'");
-      expect(sql).toContain("'Staff', 'Staff', true, 'with_shift'");
+      expect(sql).toContain("'Default shift job', 'SHIFT', false, 'with_shift'");
+      expect(sql).toContain("'default_shift_job'");
+      expect(sql).not.toContain("'Nurse', 'Nurse', true, 'with_shift'");
+      expect(sql).not.toContain("'Staff', 'Staff', true, 'with_shift'");
       expect(sql).not.toContain("'Staff', 'STA'");
       expect(sql).not.toContain("'Christian Science Nurse', 'CN', true, 'with_shift'");
     },
@@ -71,7 +73,7 @@ describe("seed schedule definition contracts", () => {
     }
 
     expect(calmHavenSql).toContain("INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)");
-    for (const jobName of ["Nurse", "Staff", "Supervisor", "Mentor"]) {
+    for (const jobName of ["Default shift job", "Supervisor", "Mentor"]) {
       const blockStart = calmHavenSql.indexOf(`org, '${jobName}'`);
       expect(blockStart).toBeGreaterThanOrEqual(0);
       const nextTupleEnd = calmHavenSql.indexOf("),", blockStart);

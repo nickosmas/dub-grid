@@ -1,12 +1,18 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import type { Organization, AuditLogEntry, FullAuditLogEntry } from "@/types";
+import type { Organization, AuditLogEntry } from "@/types";
 import {
   fetchGridmasterAuditLog,
-  fetchGridmasterFullAuditLog,
+  fetchGridmasterOverview,
   type TenantStats,
 } from "@/features/gridmaster/client";
+import { useQuery } from "@tanstack/react-query";
+import {
+  formatBillingStatusLabel,
+  formatClientLabel,
+  formatOrganizationRoleLabel,
+} from "@/lib/client-facing";
+import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, thStyle } from "@/lib/styles";
 
 // ── Stat card ────────────────────────────────────────────────────────────────
@@ -26,6 +32,40 @@ function StatCard({ label, value }: { label: string; value: number }) {
       </div>
       <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
         {label}
+      </div>
+    </div>
+  );
+}
+
+function OversightCard({
+  label,
+  value,
+  detail,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number | string;
+  detail: string;
+  tone?: "neutral" | "good" | "warning" | "danger";
+}) {
+  const color =
+    tone === "danger"
+      ? "var(--color-danger)"
+      : tone === "warning"
+        ? "var(--color-warning)"
+        : tone === "good"
+          ? "var(--color-success)"
+          : "var(--color-text-primary)";
+  return (
+    <div style={{ ...sectionStyle, padding: "14px 16px", minWidth: 160, flex: "1 1 170px" }}>
+      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 800, color, fontFamily: "var(--font-dm-mono), monospace" }}>
+        {value}
+      </div>
+      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-primary)", marginTop: 2 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
+        {detail}
       </div>
     </div>
   );
@@ -52,11 +92,11 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
         <span style={{ fontWeight: 600 }}>{entry.targetEmail ?? "Unknown"}</span>
         {" from "}
         <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>
-          {entry.fromRole.replace("_", " ")}
+          {formatOrganizationRoleLabel(entry.fromRole)}
         </span>
         {" → "}
         <span style={{ fontWeight: 600 }}>
-          {entry.toRole.replace("_", " ")}
+          {formatOrganizationRoleLabel(entry.toRole)}
         </span>
       </div>
       {entry.orgName && (
@@ -90,79 +130,22 @@ export default function GridmasterDashboard({
   onSelectOrg: (id: string) => void;
   onCreateOrg: () => void;
 }) {
-  const [recentActivity, setRecentActivity] = useState<AuditLogEntry[]>([]);
-  const [platformActivity, setPlatformActivity] = useState<FullAuditLogEntry[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchGridmasterAuditLog({ limit: 10 })
-      .then((entries) => { if (!cancelled) setRecentActivity(entries); })
-      .catch(() => {});
-    fetchGridmasterFullAuditLog({ limit: 100 })
-      .then((entries) => { if (!cancelled) setPlatformActivity(entries); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const overviewQuery = useQuery({
+    queryKey: queryKeys.gridmaster.overview(),
+    queryFn: fetchGridmasterOverview,
+    staleTime: 30_000,
+  });
+  const recentActivityQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgAudit(null, 0, 10, "dashboard-recent"),
+    queryFn: () => fetchGridmasterAuditLog({ limit: 10 }),
+    staleTime: 30_000,
+  });
+  const overview = overviewQuery.data ?? null;
+  const recentActivity = recentActivityQuery.data ?? [];
 
   const activeOrganizations = organizations.filter((c) => !c.archivedAt);
   const suspendedOrgs = organizations.filter((c) => c.suspendedAt);
   const archivedOrgs = organizations.filter((c) => c.archivedAt);
-
-  const [activitySnapshotMs] = useState(() => Date.now());
-  const activityTrends = useMemo(() => {
-    if (platformActivity.length === 0) return null;
-    const now = activitySnapshotMs;
-    const day = 86400000;
-    const last24h = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < day);
-    const last7d = platformActivity.filter((e) => now - new Date(e.createdAt).getTime() < 7 * day);
-
-    const categories: Record<string, number> = {};
-    for (const e of last7d) {
-      const cat = e.action.split(".")[0] ?? "other";
-      categories[cat] = (categories[cat] ?? 0) + 1;
-    }
-    const topCategories = Object.entries(categories).sort((a, b) => b[1] - a[1]).slice(0, 6);
-
-    const orgCounts: Record<string, number> = {};
-    for (const e of last7d) {
-      if (e.orgId) orgCounts[e.orgId] = (orgCounts[e.orgId] ?? 0) + 1;
-    }
-    const anomalies = Object.entries(orgCounts)
-      .filter(([, count]) => count > last7d.length * 0.3 && count > 10)
-      .map(([oid, count]) => ({ orgId: oid, count, name: organizations.find((o) => o.id === oid)?.name ?? oid.slice(0, 8) }));
-
-    return (
-      <div style={{ marginBottom: 28 }}>
-        <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
-          Platform Activity (last 7 days)
-        </h3>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-          <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-            <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last24h.length}</div>
-            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 24h</div>
-          </div>
-          <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-            <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{last7d.length}</div>
-            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 7 days</div>
-          </div>
-          {topCategories.map(([cat, count]) => (
-            <div key={cat} style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{count}</div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{cat}</div>
-            </div>
-          ))}
-        </div>
-        {anomalies.length > 0 && (
-          <div style={{
-            padding: "10px 14px", background: "var(--color-danger-bg)", border: "1px solid var(--color-danger)",
-            borderRadius: "var(--dg-radius-md)", fontSize: "var(--dg-fs-label)", color: "var(--color-danger)", fontWeight: 600,
-          }}>
-            Anomaly detected: {anomalies.map((a) => `${a.name} (${a.count} actions)`).join(", ")}
-          </div>
-        )}
-      </div>
-    );
-  }, [platformActivity, organizations, activitySnapshotMs]);
 
   return (
     <>
@@ -175,12 +158,92 @@ export default function GridmasterDashboard({
         </button>
       </div>
 
+      {overview && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 28 }}>
+          <div>
+            <h3 style={{ margin: "0 0 10px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              Platform Oversight
+            </h3>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <OversightCard
+                label="DB / Redis"
+                value={overview.platformHealth.redis.productionReady ? "OK" : "Check"}
+                detail={overview.platformHealth.redis.configured ? "Rate limiting configured" : overview.platformHealth.redis.message ?? "Redis not configured"}
+                tone={overview.platformHealth.redis.productionReady ? "good" : "warning"}
+              />
+              <OversightCard
+                label="Active Sessions"
+                value={overview.platformHealth.activeSessionCount}
+                detail={`${overview.platformHealth.staleSessionCount} stale over 30d`}
+                tone={overview.platformHealth.staleSessionCount > 0 ? "warning" : "good"}
+              />
+              <OversightCard
+                label="Mobile Devices"
+                value={overview.platformHealth.activeMobileTokenCount}
+                detail="Active push tokens"
+              />
+              <OversightCard
+                label="Org Risk"
+                value={overview.orgRisk.riskiestOrganizations.length}
+                detail={`${overview.orgRisk.pendingSetupCount} setup, ${overview.orgRisk.noLoginCount} stale login`}
+                tone={overview.orgRisk.riskiestOrganizations.length > 0 ? "warning" : "good"}
+              />
+              <OversightCard
+                label="Billing Risk"
+                value={overview.businessHealth.billingRiskCount}
+                detail={`${overview.businessHealth.trialEndingCount} trials ending, ${overview.businessHealth.seatMismatchCount} seat gaps`}
+                tone={overview.businessHealth.billingRiskCount > 0 || overview.businessHealth.seatMismatchCount > 0 ? "danger" : "good"}
+              />
+              <OversightCard
+                label="Compliance Alerts"
+                value={overview.complianceAlerts.highRiskAuditCount}
+                detail={`${overview.complianceAlerts.activeImpersonationCount} active impersonations`}
+                tone={overview.complianceAlerts.highRiskAuditCount > 0 ? "warning" : "good"}
+              />
+            </div>
+          </div>
+
+          {overview.orgRisk.riskiestOrganizations.length > 0 && (
+            <div>
+              <h3 style={{ margin: "0 0 10px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                Highest Risk Organizations
+              </h3>
+              <div style={sectionStyle}>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                    <thead>
+                      <tr>
+                        {["Org", "Score", "Risk", "Active Users", "Open Requests", "Billing"].map((h) => (
+                          <th key={h} style={{ ...thStyle, borderBottom: "1px solid var(--color-border-light)" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overview.orgRisk.riskiestOrganizations.map((org) => (
+                        <tr key={org.orgId} style={{ cursor: "pointer" }} onClick={() => onSelectOrg(org.orgId)}>
+                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 700, borderBottom: "1px solid var(--color-border-light)" }}>{org.orgName}</td>
+                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 700, color: org.oversightScore < 60 ? "var(--color-danger)" : "var(--color-warning)", borderBottom: "1px solid var(--color-border-light)" }}>{org.oversightScore}</td>
+                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>{org.riskFlags.length ? org.riskFlags.map(formatClientLabel).join(", ") : "None"}</td>
+                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", borderBottom: "1px solid var(--color-border-light)" }}>{org.supportSnapshot.activeUsers30d}</td>
+                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", borderBottom: "1px solid var(--color-border-light)" }}>{org.supportSnapshot.openShiftRequests}</td>
+                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>{formatBillingStatusLabel(org.billing.subscriptionStatus)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Stats row */}
       <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
         <StatCard label="Active Orgs" value={activeOrganizations.length - suspendedOrgs.filter((o) => !o.archivedAt).length} />
         <StatCard label="Suspended" value={suspendedOrgs.length} />
         <StatCard label="Archived" value={archivedOrgs.length} />
-        <StatCard label="Users" value={totalUsers} />
+        <StatCard label="Platform Users" value={totalUsers} />
         <StatCard label="Employees" value={totalEmployees} />
       </div>
 
@@ -214,7 +277,56 @@ export default function GridmasterDashboard({
       )}
 
       {/* Platform Activity Trends */}
-      {activityTrends}
+      {overview && overview.activitySummary.last7dCount > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+            Platform Activity
+          </h3>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+            <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{overview.activitySummary.last24hCount}</div>
+              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 24h</div>
+            </div>
+            <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{overview.activitySummary.last7dCount}</div>
+              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 7 days</div>
+            </div>
+            {overview.activitySummary.topCategories.map((category) => (
+              <div key={category.category} style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
+                <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{category.count}</div>
+                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{category.category}</div>
+              </div>
+            ))}
+          </div>
+          {overview.activitySummary.busiestOrganizations.length > 0 && (
+            <div style={sectionStyle}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                  <thead>
+                    <tr>
+                      {["Org", "Activity", "Type", "Status"].map((h) => (
+                        <th key={h} style={{ ...thStyle, borderBottom: "1px solid var(--color-border-light)" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {overview.activitySummary.busiestOrganizations.map((signal) => (
+                      <tr key={signal.orgId} style={{ cursor: "pointer" }} onClick={() => onSelectOrg(signal.orgId)}>
+                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 700, borderBottom: "1px solid var(--color-border-light)" }}>{signal.orgName}</td>
+                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", borderBottom: "1px solid var(--color-border-light)" }}>{signal.actionCount} actions</td>
+                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", textTransform: "capitalize", borderBottom: "1px solid var(--color-border-light)" }}>{signal.dominantCategory ?? "Activity"}</td>
+                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: signal.classification === "review_recommended" ? "var(--color-warning)" : "var(--color-text-muted)", fontWeight: signal.classification === "review_recommended" ? 700 : 500, borderBottom: "1px solid var(--color-border-light)" }}>
+                          {signal.reason}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
@@ -246,7 +358,7 @@ export default function GridmasterDashboard({
         <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
           <thead>
             <tr>
-              {["Name", "Slug", "Status", "Users", "Employees", "Focus Areas", "Certifications", "Roles", "Timezone"].map((h) => (
+              {["Name", "Slug", "Status", "Org Users", "Employees", "Focus Areas", "Certifications", "Roles", "Timezone"].map((h) => (
                 <th
                   key={h}
                   style={{

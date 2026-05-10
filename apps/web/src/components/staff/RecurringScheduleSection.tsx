@@ -9,6 +9,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ShiftPicker from "@/components/ShiftPicker";
@@ -27,6 +28,7 @@ import {
   upsertRecurringShift,
 } from "@/features/schedule/client";
 import * as Sentry from "@/lib/sentry";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import {
@@ -572,6 +574,9 @@ export function RecurringScheduleSection({
   const [savedDraftTimestamp, setSavedDraftTimestamp] = useState<string | null>(
     null,
   );
+  const [pendingRecurringAction, setPendingRecurringAction] = useState<
+    "save" | "discard" | null
+  >(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFocusArea, setFilterFocusArea] = useState<number | "">("");
 
@@ -637,7 +642,7 @@ export function RecurringScheduleSection({
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load data");
+          setError(formatClientErrorMessage(err, "We couldn't load recurring schedules right now."));
         }
       } finally {
         if (!cancelled) {
@@ -885,7 +890,7 @@ export function RecurringScheduleSection({
       toast.success("Recurring schedules saved");
     } catch (err: unknown) {
       toast.error("Failed to save recurring schedules");
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(formatClientErrorMessage(err, "We couldn't save recurring schedules."));
     } finally {
       setSaving(false);
     }
@@ -903,7 +908,7 @@ export function RecurringScheduleSection({
     } catch (err: unknown) {
       Sentry.captureException(err);
       toast.error(
-        `Failed to save draft: ${err instanceof Error ? err.message : "Unknown error"}`,
+        formatClientErrorMessage(err, "We couldn't save that draft."),
       );
     }
   }
@@ -1019,7 +1024,7 @@ export function RecurringScheduleSection({
               Save Draft
             </button>
             <button
-              onClick={handleDiscardDraft}
+              onClick={() => setPendingRecurringAction("discard")}
               className="dg-btn dg-btn-ghost"
               style={{
                 padding: "6px 14px",
@@ -1030,7 +1035,7 @@ export function RecurringScheduleSection({
               Discard
             </button>
             <button
-              onClick={handleSaveAll}
+              onClick={() => setPendingRecurringAction("save")}
               disabled={saving}
               className="dg-btn dg-btn-primary"
               style={{ padding: "6px 18px", fontSize: "var(--dg-fs-caption)" }}
@@ -1457,6 +1462,34 @@ export function RecurringScheduleSection({
           />
         );
       })()}
+
+      {pendingRecurringAction ? (
+        <ConfirmDialog
+          title={
+            pendingRecurringAction === "save"
+              ? "Save Recurring Schedule Changes?"
+              : "Discard Recurring Schedule Draft?"
+          }
+          message={
+            pendingRecurringAction === "save"
+              ? `Save ${dirtyCount} recurring schedule change${dirtyCount === 1 ? "" : "s"}? These templates affect future schedule generation.`
+              : `Discard ${dirtyCount} recurring schedule draft change${dirtyCount === 1 ? "" : "s"}? This cannot be undone.`
+          }
+          confirmLabel={pendingRecurringAction === "save" ? "Save Changes" : "Discard"}
+          variant={pendingRecurringAction === "save" ? "warning" : "danger"}
+          isLoading={saving}
+          onConfirm={() => {
+            const action = pendingRecurringAction;
+            setPendingRecurringAction(null);
+            if (action === "save") {
+              void handleSaveAll();
+            } else {
+              void handleDiscardDraft();
+            }
+          }}
+          onCancel={() => setPendingRecurringAction(null)}
+        />
+      ) : null}
     </div>
   );
 }

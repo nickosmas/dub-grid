@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAuthenticatedUser = vi.fn();
+const requireAuthenticatedSession = vi.fn();
 const validateCsrfOrigin = vi.fn();
-const upsert = vi.fn();
-const from = vi.fn((table: string) => ({ table, upsert }));
+const trackUserSessionForUser = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUser: (req: NextRequest) =>
-    requireAuthenticatedUser(req),
+  requireAuthenticatedSession: (req: NextRequest) =>
+    requireAuthenticatedSession(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 
-vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    from: (table: string) => from(table),
-  }),
+vi.mock("@/features/account/server", () => ({
+  trackUserSessionForUser: (input: unknown) => trackUserSessionForUser(input),
 }));
 
 import { POST } from "@/app/api/auth/track-session/route";
@@ -27,10 +24,16 @@ describe("POST /api/auth/track-session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     validateCsrfOrigin.mockReturnValue(null);
-    requireAuthenticatedUser.mockResolvedValue({
+    requireAuthenticatedSession.mockResolvedValue({
+      session: {
+        access_token: createJwt({
+          session_id: "session-id-1",
+          org_id: "org-id-1",
+        }),
+      },
       user: { id: "session-user" },
     });
-    upsert.mockResolvedValue({ error: null });
+    trackUserSessionForUser.mockResolvedValue(undefined);
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -38,7 +41,7 @@ describe("POST /api/auth/track-session", () => {
       { error: "Unauthenticated" },
       { status: 401 },
     );
-    requireAuthenticatedUser.mockResolvedValueOnce({
+    requireAuthenticatedSession.mockResolvedValueOnce({
       response: unauthenticated,
     });
 
@@ -46,37 +49,37 @@ describe("POST /api/auth/track-session", () => {
       new NextRequest("http://localhost/api/auth/track-session", {
         method: "POST",
         body: JSON.stringify({
-          refreshTokenHash: "hash",
+          platform: "web",
           deviceLabel: "Chrome on macOS",
         }),
       }),
     );
 
     expect(response.status).toBe(401);
-    expect(from).not.toHaveBeenCalled();
+    expect(trackUserSessionForUser).not.toHaveBeenCalled();
   });
 
-  it("uses the authenticated session user id instead of caller-controlled identity", async () => {
+  it("uses the authenticated user and JWT session id instead of caller-controlled identity", async () => {
     await POST(
       new NextRequest("http://localhost/api/auth/track-session", {
         method: "POST",
         headers: { origin: "http://localhost:3000" },
         body: JSON.stringify({
           userId: "forged-user",
-          refreshTokenHash: "hash",
+          platform: "web",
           deviceLabel: "Chrome on macOS",
         }),
       }),
     );
 
-    expect(from).toHaveBeenCalledWith("user_sessions");
-    expect(upsert).toHaveBeenCalledWith(
+    expect(trackUserSessionForUser).toHaveBeenCalledWith(
       expect.objectContaining({
-        user_id: "session-user",
-        refresh_token_hash: "hash",
-        device_label: "Chrome on macOS",
+        userId: "session-user",
+        orgId: "org-id-1",
+        supabaseSessionId: "session-id-1",
+        platform: "web",
+        deviceLabel: "Chrome on macOS",
       }),
-      { onConflict: "refresh_token_hash" },
     );
   });
 
@@ -89,13 +92,26 @@ describe("POST /api/auth/track-session", () => {
       new NextRequest("http://localhost/api/auth/track-session", {
         method: "POST",
         body: JSON.stringify({
-          refreshTokenHash: "hash",
+          platform: "web",
           deviceLabel: "Chrome on macOS",
         }),
       }),
     );
 
     expect(response.status).toBe(403);
-    expect(from).not.toHaveBeenCalled();
+    expect(trackUserSessionForUser).not.toHaveBeenCalled();
   });
 });
+
+function createJwt(payload: Record<string, unknown>): string {
+  return [
+    encodeJwtSegment({ alg: "none", typ: "JWT" }),
+    encodeJwtSegment(payload),
+    "signature",
+  ].join(".");
+}
+
+function encodeJwtSegment(value: Record<string, unknown>): string {
+  return Buffer.from(JSON.stringify(value))
+    .toString("base64url");
+}

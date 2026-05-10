@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchMobileOpenShifts,
+  fetchMobilePeople,
   fetchMobileScheduleEntries,
   fetchMobileShiftRequests,
 } from "./data";
@@ -13,6 +14,7 @@ function createThenableQuery(result: { data: unknown; error: unknown }) {
     gte: vi.fn(() => query),
     lte: vi.fn(() => query),
     is: vi.fn(() => query),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
     or: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
@@ -146,6 +148,7 @@ function createServiceClientForSchedule(
     customEndTime?: string | null;
     customStartTime?: string | null;
     jobIds?: number[];
+    mentoredFlags?: boolean[];
     jobs?: Array<{
       id: number;
       name: string;
@@ -320,6 +323,7 @@ function createServiceClientForSchedule(
                       position: index,
                       shift_id: options?.shiftIds?.[index] ?? null,
                       job_id: options?.jobIds?.[index] ?? 91,
+                      is_mentored: options?.mentoredFlags?.[index] ?? false,
                     }),
                   ),
           },
@@ -458,7 +462,9 @@ function createServiceClientForShiftRequests() {
         target_shift_date: "2026-04-24",
         target_state: {
           kind: "worked",
-          segments: [{ shiftId: 102, jobId: 92, position: 0 }],
+          segments: [
+            { shiftId: 102, jobId: 92, position: 0, isMentored: true },
+          ],
           absenceTypeId: null,
           customStartTime: "15:30:00",
           customEndTime: "23:30:00",
@@ -513,7 +519,10 @@ function createServiceClientForShiftRequests() {
   };
 }
 
-function createServiceClientForOpenShifts() {
+function createServiceClientForOpenShifts(options?: {
+  minStaff?: number;
+  shiftRequests?: unknown[];
+}) {
   const assignments = [
     {
       id: 44,
@@ -588,9 +597,15 @@ function createServiceClientForOpenShifts() {
         job_id: 91,
         preferred_shift_id: 101,
         day_of_week: null,
-        min_staff: 1,
+        min_staff: options?.minStaff ?? 1,
       },
     ],
+    error: null,
+  });
+  const organizationQuery = createThenableQuery({
+    data: {
+      coverage_rule_config: { mentoredCoverageCreditPercent: 100 },
+    },
     error: null,
   });
   const employeesQuery = createThenableQuery({
@@ -623,6 +638,10 @@ function createServiceClientForOpenShifts() {
     data: [],
     error: null,
   });
+  const shiftRequestsQuery = createThenableQuery({
+    data: options?.shiftRequests ?? [],
+    error: null,
+  });
 
   return {
     from: vi.fn((table: string) => {
@@ -644,6 +663,9 @@ function createServiceClientForOpenShifts() {
       if (table === "profiles") {
         return profilesQuery;
       }
+      if (table === "organizations") {
+        return organizationQuery;
+      }
       if (table === "coverage_requirements") {
         return coverageRequirementsQuery;
       }
@@ -653,6 +675,9 @@ function createServiceClientForOpenShifts() {
       if (table === "schedule_cells") {
         return scheduleCellsQuery;
       }
+      if (table === "shift_requests") {
+        return shiftRequestsQuery;
+      }
 
       throw new Error(`Unexpected table ${table}`);
     }),
@@ -661,6 +686,108 @@ function createServiceClientForOpenShifts() {
     }),
   };
 }
+
+function createPendingOpenShiftVolunteerRow(
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id: "request-1",
+    org_id: "org-1",
+    type: "pickup",
+    status: "pending_approval",
+    requester_emp_id: "196d610f-2283-486c-a9e0-197852969a31",
+    requester_shift_date: "2026-04-16",
+    requester_state: {
+      kind: "worked",
+      focusAreaId: 12,
+      segments: [
+        {
+          shiftId: 101,
+          jobId: 91,
+          position: 0,
+          isMentored: false,
+        },
+      ],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    },
+    target_emp_id: null,
+    target_shift_date: null,
+    target_state: null,
+    absence_type_id: null,
+    parent_request_id: null,
+    admin_user_id: null,
+    admin_note: null,
+    expires_at: "2026-04-17T00:00:00.000Z",
+    resolved_at: null,
+    created_at: "2026-04-15T18:00:00.000Z",
+    updated_at: "2026-04-15T18:00:00.000Z",
+    requester: { first_name: "Nic", last_name: "Kosmas" },
+    target: null,
+    ...overrides,
+  };
+}
+
+describe("fetchMobilePeople", () => {
+  it("maps management departments from memberships instead of scheduled employee departments", async () => {
+    const employeesQuery = createThenableQuery({
+      data: [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          first_name: "Mina",
+          last_name: "Diaz",
+          employment_type: "full_time",
+          status: "active",
+          status_changed_at: null,
+          status_note: null,
+          certification_id: null,
+          role_ids: [],
+          seniority: 1,
+          focus_area_ids: [2],
+          department_ids: [4],
+          dept_admin_ids: [],
+          phone: "",
+          email: "mina@example.com",
+          contact_notes: "",
+          user_id: "10000000-0000-4000-8000-000000000001",
+          version: 3,
+        },
+      ],
+      error: null,
+    });
+    const invitationsQuery = createThenableQuery({ data: [], error: null });
+    const membershipsQuery = createThenableQuery({
+      data: [
+        {
+          user_id: "10000000-0000-4000-8000-000000000001",
+          department_ids: [10],
+          dept_admin_ids: [10],
+        },
+      ],
+      error: null,
+    });
+    const serviceClient = {
+      from: vi.fn((table: string) => {
+        if (table === "employees") return employeesQuery;
+        if (table === "invitations") return invitationsQuery;
+        if (table === "organization_memberships") return membershipsQuery;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    const people = await fetchMobilePeople(serviceClient as never, "org-1");
+
+    expect(people).toHaveLength(1);
+    expect(people[0]).toMatchObject({
+      departmentIds: [4],
+      managementDepartmentIds: [10],
+      managementDeptAdminIds: [10],
+    });
+  });
+});
 
 describe("fetchMobileScheduleEntries", () => {
   it.each([
@@ -867,6 +994,7 @@ describe("fetchMobileScheduleEntries", () => {
         shiftFocusAreaId: null,
         assignmentIds: [44, 45],
         shiftIds: [101, 102],
+        mentoredFlags: [false, true],
         assignments: [
           {
             id: 44,
@@ -925,6 +1053,53 @@ describe("fetchMobileScheduleEntries", () => {
         startTime: "15:30:00",
         endTime: "23:30:00",
         displayFocusAreaName: null,
+        isMentored: true,
+      }),
+    ]);
+  });
+
+  it("normalizes stale split custom times after a published shift is reduced to one segment", async () => {
+    const serviceClient = createServiceClientForSchedule(
+      {
+        id: "196d610f-2283-486c-a9e0-197852969a31",
+        first_name: "Nic",
+        last_name: "Kosmas",
+        org_id: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+      },
+      {
+        shiftIds: [101],
+        jobIds: [91],
+        assignments: [
+          {
+            id: 44,
+            label: "D",
+            name: "Day Shift",
+            shiftId: 101,
+            jobId: 91,
+            focusAreaId: 12,
+            defaultStartTime: "07:00:00",
+            defaultEndTime: "15:00:00",
+          },
+        ],
+        customStartTime: "07:00:00|16:00:00",
+        customEndTime: "16:30:00|00:00:00",
+      },
+    );
+
+    const entries = await fetchMobileScheduleEntries(serviceClient as never, {
+      orgId: "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
+      startDate: "2026-04-18",
+      endDate: "2026-04-24",
+    });
+
+    expect(entries[0]?.presentation.startTime).toBe("07:00:00");
+    expect(entries[0]?.presentation.endTime).toBe("16:30:00");
+    expect(entries[0]?.presentation.segments).toEqual([
+      expect.objectContaining({
+        shiftId: 101,
+        jobId: 91,
+        startTime: "07:00:00",
+        endTime: "16:30:00",
       }),
     ]);
   });
@@ -1125,6 +1300,7 @@ describe("fetchMobileShiftRequests", () => {
               startTime: "15:30:00",
               endTime: "23:30:00",
               displayFocusAreaName: "Skilled Nursing",
+              isMentored: true,
             }),
           ],
         }),
@@ -1160,8 +1336,210 @@ describe("fetchMobileOpenShifts", () => {
       } as never,
       startDate: "2026-04-16",
       endDate: "2026-04-16",
+      timeZone: "America/Los_Angeles",
     });
 
     expect(openShifts).toEqual([]);
+  });
+
+  it("keeps manager-visible coverage gaps but marks them unavailable for the linked employee", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts();
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "196d610f-2283-486c-a9e0-197852969a31",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [],
+        } as never,
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toHaveLength(1);
+      expect(openShifts[0]).toMatchObject({
+        id: expect.stringMatching(/^coverage_gap_12_.+_2026-04-16$/),
+        canVolunteer: false,
+        volunteerBlockReason:
+          "You do not meet the eligibility requirements for this shift.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps coverage gaps visible to other employees until pending volunteers fill every needed slot", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts({
+        minStaff: 2,
+        shiftRequests: [createPendingOpenShiftVolunteerRow()],
+      });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "another-employee",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toHaveLength(1);
+      expect(openShifts[0]).toMatchObject({
+        id: expect.stringMatching(/^coverage_gap_12_.+_2026-04-16$/),
+        needed: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not count pending volunteers from another focus area against a mobile open shift", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts({
+        minStaff: 2,
+        shiftRequests: [
+          createPendingOpenShiftVolunteerRow({
+            requester_state: {
+              kind: "worked",
+              focusAreaId: 99,
+              segments: [
+                {
+                  shiftId: 101,
+                  jobId: 91,
+                  position: 0,
+                  isMentored: false,
+                },
+              ],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            },
+          }),
+        ],
+      });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "another-employee",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toHaveLength(1);
+      expect(openShifts[0]).toMatchObject({
+        id: expect.stringMatching(/^coverage_gap_12_.+_2026-04-16$/),
+        needed: 2,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides coverage gaps from other employees once pending volunteers fill the remaining slots", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts({
+        shiftRequests: [createPendingOpenShiftVolunteerRow()],
+      });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "another-employee",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides coverage gaps from the employee with their own pending volunteer request", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts({
+        minStaff: 2,
+        shiftRequests: [createPendingOpenShiftVolunteerRow()],
+      });
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          id: "196d610f-2283-486c-a9e0-197852969a31",
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hides published coverage gaps once their resolved start time has passed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-16T15:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts();
+
+      const openShifts = await fetchMobileOpenShifts(serviceClient as never, {
+        orgId: "org-1",
+        employee: {
+          certificationId: null,
+          focusAreaIds: [12],
+          roleIds: [777],
+        } as never,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(openShifts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

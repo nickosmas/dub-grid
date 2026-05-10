@@ -640,17 +640,8 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: only gridmaster can assign gridmaster role';
   END IF;
 
-  SELECT id INTO target_user_id FROM auth.users WHERE email = p_email;
-
-  IF target_user_id IS NULL THEN
-    RAISE EXCEPTION 'User with email % not found', p_email;
-  END IF;
-
-  INSERT INTO public.profiles (id, platform_role)
-  VALUES (target_user_id, 'gridmaster')
-  ON CONFLICT (id) DO UPDATE
-    SET platform_role = 'gridmaster',
-        updated_at    = NOW();
+  SELECT (public.promote_gridmaster_by_email(p_email)->>'user_id')::UUID
+  INTO target_user_id;
 END;
 $$;
 
@@ -747,6 +738,9 @@ GRANT EXECUTE ON FUNCTION public.get_my_organizations() TO authenticated;
 
 -- ── publish_schedule ──────────────────────────────────────────────────────────
 
+DROP FUNCTION IF EXISTS public.build_schedule_cell_state_json(TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BOOLEAN[], BIGINT);
+DROP FUNCTION IF EXISTS public.build_schedule_cell_state_json(TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BOOLEAN[]);
+
 CREATE OR REPLACE FUNCTION public.build_schedule_cell_state_json(
   p_state_kind TEXT,
   p_shift_ids BIGINT[] DEFAULT '{}'::BIGINT[],
@@ -755,7 +749,9 @@ CREATE OR REPLACE FUNCTION public.build_schedule_cell_state_json(
   p_custom_start_time TEXT DEFAULT NULL,
   p_custom_end_time TEXT DEFAULT NULL,
   p_series_id UUID DEFAULT NULL,
-  p_from_recurring BOOLEAN DEFAULT FALSE
+  p_from_recurring BOOLEAN DEFAULT FALSE,
+  p_is_mentored_flags BOOLEAN[] DEFAULT '{}'::BOOLEAN[],
+  p_focus_area_id BIGINT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE sql
@@ -769,7 +765,8 @@ AS $$
           jsonb_build_object(
             'shiftId', segment.shift_id,
             'jobId', segment.job_id,
-            'position', segment.ordinality - 1
+            'position', segment.ordinality - 1,
+            'isMentored', COALESCE(segment.is_mentored, FALSE)
           )
           ORDER BY segment.ordinality
         ),
@@ -777,8 +774,9 @@ AS $$
       ) AS segments
     FROM unnest(
       COALESCE(p_shift_ids, '{}'::BIGINT[]),
-      COALESCE(p_job_ids, '{}'::BIGINT[])
-    ) WITH ORDINALITY AS segment(shift_id, job_id, ordinality)
+      COALESCE(p_job_ids, '{}'::BIGINT[]),
+      COALESCE(p_is_mentored_flags, '{}'::BOOLEAN[])
+    ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
   )
   SELECT jsonb_build_object(
     'kind', COALESCE(p_state_kind, 'deleted'),
@@ -786,6 +784,7 @@ AS $$
       WHEN p_state_kind = 'worked' THEN ordered_segments.segments
       ELSE '[]'::JSONB
     END,
+    'focusAreaId', p_focus_area_id,
     'absenceTypeId', CASE
       WHEN p_state_kind = 'absence' THEN p_absence_type_id
       ELSE NULL
@@ -891,12 +890,14 @@ BEGIN
       draft.custom_end_time AS draft_custom_end,
       draft.shift_ids AS draft_shift_ids,
       draft.job_ids AS draft_job_ids,
+      draft.is_mentored_flags AS draft_is_mentored_flags,
       published.state_kind AS published_state_kind,
       published.absence_type_id AS published_absence_type_id,
       published.custom_start_time AS published_custom_start,
       published.custom_end_time AS published_custom_end,
       published.shift_ids AS published_shift_ids,
-      published.job_ids AS published_job_ids
+      published.job_ids AS published_job_ids,
+      published.is_mentored_flags AS published_is_mentored_flags
     FROM public.schedule_cells c
     JOIN LATERAL public.get_schedule_cell_snapshot_payload(
       p_org_id,
@@ -933,7 +934,8 @@ BEGIN
           r.published_custom_start,
           r.published_custom_end,
           r.series_id,
-          r.from_recurring
+          r.from_recurring,
+          COALESCE(r.published_is_mentored_flags, '{}'::BOOLEAN[])
         )
       END,
       'toState', CASE
@@ -946,7 +948,8 @@ BEGIN
           r.draft_custom_start,
           r.draft_custom_end,
           r.series_id,
-          r.from_recurring
+          r.from_recurring,
+          COALESCE(r.draft_is_mentored_flags, '{}'::BOOLEAN[])
         )
       END,
       'fromAbsenceTypeId', r.published_absence_type_id,
@@ -986,7 +989,8 @@ BEGIN
         r.from_recurring,
         r.focus_area_id,
         NULL,
-        v_actor_id
+        v_actor_id,
+        COALESCE(r.draft_is_mentored_flags, '{}'::BOOLEAN[])
       );
 
       DELETE FROM public.schedule_cell_snapshots
@@ -1077,6 +1081,9 @@ $$;
 -- Prevents duplication that can occur when the two-step client-side approach
 -- partially fails.
 
+DROP FUNCTION IF EXISTS public.move_shift(UUID, UUID, DATE, UUID, DATE, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, TEXT, BIGINT, BOOLEAN[]);
+DROP FUNCTION IF EXISTS public.move_shift(UUID, UUID, DATE, UUID, DATE, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, TEXT, BIGINT, BIGINT, BOOLEAN, BOOLEAN[]);
+
 CREATE OR REPLACE FUNCTION public.move_shift(
   p_org_id            UUID,
   p_source_emp_id     UUID,
@@ -1090,13 +1097,19 @@ CREATE OR REPLACE FUNCTION public.move_shift(
   p_custom_start_time TEXT DEFAULT NULL,
   p_custom_end_time   TEXT DEFAULT NULL,
   p_drag_mode         TEXT DEFAULT 'move',
-  p_expected_version  BIGINT DEFAULT NULL
+  p_expected_version  BIGINT DEFAULT NULL,
+  p_target_expected_version BIGINT DEFAULT NULL,
+  p_target_was_empty  BOOLEAN DEFAULT FALSE,
+  p_is_mentored_flags BOOLEAN[] DEFAULT '{}'::BOOLEAN[]
 ) RETURNS JSONB
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
   v_source_cell public.schedule_cells%ROWTYPE;
+  v_target_cell public.schedule_cells%ROWTYPE;
+  v_target_found BOOLEAN := FALSE;
+  v_target_write_expected_version BIGINT;
   v_lock_key_src  TEXT;
   v_lock_key_tgt  TEXT;
 BEGIN
@@ -1165,6 +1178,10 @@ BEGIN
     RAISE EXCEPTION 'Worked moves require at least one segment';
   END IF;
 
+  IF COALESCE(array_length(p_is_mentored_flags, 1), 0) NOT IN (0, COALESCE(array_length(p_job_ids, 1), 0)) THEN
+    RAISE EXCEPTION 'Mentored segment flag lengths must match shift segment lengths';
+  END IF;
+
   IF p_kind = 'absence' AND (
     array_length(COALESCE(p_shift_ids, '{}'::BIGINT[]), 1) IS NOT NULL
     OR array_length(COALESCE(p_job_ids, '{}'::BIGINT[]), 1) IS NOT NULL
@@ -1177,6 +1194,42 @@ BEGIN
     RAISE EXCEPTION 'Optimistic lock failed: expected version %, found %',
       p_expected_version, v_source_cell.version;
   END IF;
+
+  SELECT *
+  INTO v_target_cell
+  FROM public.schedule_cells
+  WHERE emp_id = p_target_emp_id
+    AND date = p_target_date
+    AND org_id = p_org_id
+  FOR UPDATE;
+
+  v_target_found := FOUND;
+
+  IF p_target_was_empty AND v_target_found THEN
+    RAISE EXCEPTION 'Optimistic lock failed: expected empty target, found version %',
+      v_target_cell.version;
+  END IF;
+
+  IF p_target_expected_version IS NOT NULL THEN
+    IF NOT v_target_found AND p_target_expected_version <> 0 THEN
+      RAISE EXCEPTION 'Optimistic lock failed: expected target version %, found %',
+        p_target_expected_version, NULL;
+    END IF;
+
+    IF v_target_found AND v_target_cell.version IS DISTINCT FROM p_target_expected_version THEN
+      RAISE EXCEPTION 'Optimistic lock failed: expected target version %, found %',
+        p_target_expected_version, v_target_cell.version;
+    END IF;
+  END IF;
+
+  v_target_write_expected_version := COALESCE(
+    p_target_expected_version,
+    CASE
+      WHEN p_target_was_empty THEN 0
+      WHEN v_target_found THEN v_target_cell.version
+      ELSE 0
+    END
+  );
 
   PERFORM public.write_schedule_cell_snapshot(
     p_org_id,
@@ -1207,7 +1260,11 @@ BEGIN
     NULL,
     FALSE,
     v_source_cell.focus_area_id,
-    NULL
+    v_target_write_expected_version,
+    CASE
+      WHEN p_kind = 'worked' THEN COALESCE(p_is_mentored_flags, '{}'::BOOLEAN[])
+      ELSE '{}'::BOOLEAN[]
+    END
   );
 
   -- Delete source only for real moves. Copies leave the origin untouched.
@@ -1224,7 +1281,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.move_shift(UUID, UUID, DATE, UUID, DATE, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, TEXT, BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.move_shift(UUID, UUID, DATE, UUID, DATE, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, TEXT, BIGINT, BIGINT, BOOLEAN, BOOLEAN[]) TO authenticated;
 
 
 -- ── schedule state storage helpers ──────────────────────────────────────────
@@ -1236,6 +1293,7 @@ CREATE OR REPLACE FUNCTION public.resolve_schedule_state_storage(
   state_kind TEXT,
   shift_ids BIGINT[],
   job_ids BIGINT[],
+  is_mentored_flags BOOLEAN[],
   absence_type_id BIGINT,
   focus_area_id BIGINT
 )
@@ -1248,6 +1306,7 @@ DECLARE
   v_absence_type_id BIGINT;
   v_shift_ids BIGINT[] := '{}'::BIGINT[];
   v_job_ids BIGINT[] := '{}'::BIGINT[];
+  v_is_mentored_flags BOOLEAN[] := '{}'::BOOLEAN[];
   v_focus_area_id BIGINT;
 BEGIN
   IF p_state IS NULL OR jsonb_typeof(p_state) <> 'object' THEN
@@ -1260,6 +1319,7 @@ BEGIN
   END IF;
 
   v_absence_type_id := NULLIF(p_state->>'absenceTypeId', '')::BIGINT;
+  v_focus_area_id := NULLIF(p_state->>'focusAreaId', '')::BIGINT;
 
   IF v_state_kind = 'worked' THEN
     SELECT
@@ -1270,8 +1330,12 @@ BEGIN
       COALESCE(
         array_agg((segment->>'jobId')::BIGINT ORDER BY COALESCE((segment->>'position')::INTEGER, ordinality - 1)),
         '{}'::BIGINT[]
+      ),
+      COALESCE(
+        array_agg(COALESCE((segment->>'isMentored')::BOOLEAN, false) ORDER BY COALESCE((segment->>'position')::INTEGER, ordinality - 1)),
+        '{}'::BOOLEAN[]
       )
-    INTO v_shift_ids, v_job_ids
+    INTO v_shift_ids, v_job_ids, v_is_mentored_flags
     FROM jsonb_array_elements(COALESCE(p_state->'segments', '[]'::JSONB)) WITH ORDINALITY AS segments(segment, ordinality);
 
     IF array_length(v_job_ids, 1) IS NULL THEN
@@ -1311,15 +1375,17 @@ BEGIN
       RAISE EXCEPTION 'One or more schedule state shifts were not found in this organization';
     END IF;
 
-    SELECT sc.focus_area_id
-    INTO v_focus_area_id
-    FROM unnest(v_shift_ids) WITH ORDINALITY AS segment(shift_id, ordinality)
-    JOIN public.shift_categories sc
-      ON sc.id = segment.shift_id
-     AND sc.org_id = p_org_id
-    WHERE segment.shift_id IS NOT NULL
-    ORDER BY segment.ordinality
-    LIMIT 1;
+    IF v_focus_area_id IS NULL THEN
+      SELECT sc.focus_area_id
+      INTO v_focus_area_id
+      FROM unnest(v_shift_ids) WITH ORDINALITY AS segment(shift_id, ordinality)
+      JOIN public.shift_categories sc
+        ON sc.id = segment.shift_id
+       AND sc.org_id = p_org_id
+      WHERE segment.shift_id IS NOT NULL
+      ORDER BY segment.ordinality
+      LIMIT 1;
+    END IF;
   ELSE
     IF v_absence_type_id IS NULL THEN
       RAISE EXCEPTION 'Absence schedule state must include absenceTypeId';
@@ -1341,6 +1407,7 @@ BEGIN
     v_state_kind,
     v_shift_ids,
     v_job_ids,
+    v_is_mentored_flags,
     CASE WHEN v_state_kind = 'absence' THEN v_absence_type_id ELSE NULL END,
     v_focus_area_id;
 END;
@@ -1350,6 +1417,152 @@ $$;
 -- ── series shift bulk editors ───────────────────────────────────────────────
 
 DROP FUNCTION IF EXISTS public.update_series_all_shifts(UUID, BIGINT, BIGINT, UUID, BIGINT);
+DROP FUNCTION IF EXISTS public.create_shift_series(UUID, UUID, UUID, JSONB, public.shift_series_frequency, SMALLINT[], DATE, DATE, INTEGER);
+
+CREATE OR REPLACE FUNCTION public.create_shift_series(
+  p_series_id UUID,
+  p_emp_id UUID,
+  p_org_id UUID,
+  p_state JSONB,
+  p_frequency public.shift_series_frequency,
+  p_days_of_week SMALLINT[] DEFAULT NULL,
+  p_start_date DATE DEFAULT CURRENT_DATE,
+  p_end_date DATE DEFAULT NULL,
+  p_max_occurrences INTEGER DEFAULT NULL
+) RETURNS UUID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_series_id UUID := COALESCE(p_series_id, gen_random_uuid());
+  v_state RECORD;
+  v_current_date DATE := p_start_date;
+  v_end_date DATE := COALESCE(p_end_date, (p_start_date + INTERVAL '7 months')::DATE);
+  v_cap INTEGER := COALESCE(p_max_occurrences, 183);
+  v_occurrence_count INTEGER := 0;
+  v_start_day_of_week INTEGER := EXTRACT(DOW FROM p_start_date)::INTEGER;
+  v_day_of_week INTEGER;
+  v_day_index INTEGER;
+  v_week_index INTEGER;
+  v_day_match BOOLEAN;
+  v_include BOOLEAN;
+  v_existing_version BIGINT;
+BEGIN
+  IF NOT public.check_admin_permission('canManageShiftSeries') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canManageShiftSeries permission';
+  END IF;
+
+  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+    RAISE EXCEPTION 'Unauthorized: org mismatch';
+  END IF;
+
+  IF p_start_date IS NULL THEN
+    RAISE EXCEPTION 'Series start date is required';
+  END IF;
+
+  IF v_end_date < p_start_date THEN
+    RAISE EXCEPTION 'Series end date must be on or after start date';
+  END IF;
+
+  IF v_cap <= 0 THEN
+    RAISE EXCEPTION 'Series max occurrences must be positive';
+  END IF;
+
+  SELECT *
+  INTO v_state
+  FROM public.resolve_schedule_state_storage(p_org_id, p_state);
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.employees e
+    WHERE e.id = p_emp_id
+      AND e.org_id = p_org_id
+      AND e.archived_at IS NULL
+      AND e.status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Employee not found, archived, or inactive';
+  END IF;
+
+  INSERT INTO public.shift_series (
+    id,
+    emp_id,
+    org_id,
+    state,
+    frequency,
+    days_of_week,
+    start_date,
+    end_date,
+    max_occurrences
+  ) VALUES (
+    v_series_id,
+    p_emp_id,
+    p_org_id,
+    jsonb_set(p_state, '{seriesId}', to_jsonb(v_series_id::TEXT), TRUE),
+    p_frequency,
+    p_days_of_week,
+    p_start_date,
+    p_end_date,
+    p_max_occurrences
+  );
+
+  WHILE v_current_date <= v_end_date AND v_occurrence_count < v_cap LOOP
+    v_day_of_week := EXTRACT(DOW FROM v_current_date)::INTEGER;
+    v_day_index := v_current_date - p_start_date;
+    v_week_index := FLOOR(v_day_index / 7.0)::INTEGER;
+    v_day_match := CASE
+      WHEN array_length(p_days_of_week, 1) IS NULL THEN v_day_of_week = v_start_day_of_week
+      ELSE v_day_of_week = ANY(p_days_of_week)
+    END;
+    v_include := CASE p_frequency
+      WHEN 'daily' THEN TRUE
+      WHEN 'weekly' THEN v_day_match
+      WHEN 'biweekly' THEN v_week_index % 2 = 0 AND v_day_match
+      ELSE FALSE
+    END;
+
+    IF v_include THEN
+      SELECT c.version
+      INTO v_existing_version
+      FROM public.schedule_cells c
+      WHERE c.org_id = p_org_id
+        AND c.emp_id = p_emp_id
+        AND c.date = v_current_date
+      FOR UPDATE;
+
+      IF NOT FOUND THEN
+        v_existing_version := 0;
+      END IF;
+
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        p_org_id,
+        p_emp_id,
+        v_current_date,
+        'draft',
+        v_state.state_kind,
+        v_state.shift_ids,
+        v_state.job_ids,
+        v_state.absence_type_id,
+        NULL,
+        NULL,
+        v_series_id,
+        FALSE,
+        v_state.focus_area_id,
+        v_existing_version,
+        auth.uid(),
+        v_state.is_mentored_flags
+      );
+
+      v_occurrence_count := v_occurrence_count + 1;
+    END IF;
+
+    v_current_date := v_current_date + 1;
+  END LOOP;
+
+  RETURN v_series_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.create_shift_series(UUID, UUID, UUID, JSONB, public.shift_series_frequency, SMALLINT[], DATE, DATE, INTEGER) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.update_series_all_shifts(
   p_series_id UUID,
@@ -1363,8 +1576,8 @@ DECLARE
   v_state RECORD;
   r RECORD;
 BEGIN
-  IF NOT public.check_admin_permission('canEditShifts') THEN
-    RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
+  IF NOT public.check_admin_permission('canManageShiftSeries') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canManageShiftSeries permission';
   END IF;
 
   IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
@@ -1396,7 +1609,8 @@ BEGIN
       COALESCE(r.from_recurring, FALSE),
       COALESCE(v_state.focus_area_id, r.focus_area_id),
       r.version,
-      auth.uid()
+      auth.uid(),
+      v_state.is_mentored_flags
     );
   END LOOP;
 
@@ -1423,8 +1637,8 @@ DECLARE
   v_has_published BOOLEAN;
   r RECORD;
 BEGIN
-  IF NOT public.check_admin_permission('canEditShifts') THEN
-    RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
+  IF NOT public.check_admin_permission('canManageShiftSeries') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canManageShiftSeries permission';
   END IF;
 
   IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
@@ -1637,6 +1851,7 @@ BEGIN
         state.state_kind,
         state.shift_ids,
         state.job_ids,
+        state.is_mentored_flags,
         state.absence_type_id,
         state.focus_area_id,
         CASE
@@ -1693,7 +1908,8 @@ BEGIN
         TRUE,
         r.focus_area_id,
         COALESCE(v_existing_version, 0),
-        auth.uid()
+        auth.uid(),
+        r.is_mentored_flags
       );
 
       v_inserted := v_inserted + 1;
@@ -2448,7 +2664,202 @@ BEGIN
   LEFT JOIN public.profiles p ON u.id = p.id
   LEFT JOIN public.organization_memberships cm ON cm.user_id = p.id AND cm.org_id = p.org_id
   LEFT JOIN public.organizations o ON p.org_id = o.id
+  WHERE COALESCE(p.platform_role, 'none'::public.platform_role) <> 'gridmaster'::public.platform_role
   ORDER BY u.email ASC;
+END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.get_gridmaster_accounts()
+RETURNS TABLE (
+  id              UUID,
+  email           TEXT,
+  first_name      TEXT,
+  last_name       TEXT,
+  created_at      TIMESTAMPTZ,
+  last_sign_in_at TIMESTAMPTZ,
+  deactivated_at  TIMESTAMPTZ,
+  deactivated_by  UUID
+)
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  IF NOT public.is_gridmaster() THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+
+  RETURN QUERY
+  SELECT u.id, u.email::TEXT, p.first_name, p.last_name,
+    p.created_at, u.last_sign_in_at, p.deactivated_at, p.deactivated_by
+  FROM public.profiles p
+  JOIN auth.users u ON u.id = p.id
+  WHERE p.platform_role = 'gridmaster'
+  ORDER BY COALESCE(p.deactivated_at, 'infinity'::TIMESTAMPTZ) DESC, u.email ASC;
+END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.promote_gridmaster_by_email(p_email TEXT)
+RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  target_user_id UUID;
+BEGIN
+  IF NOT public.is_gridmaster() THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+
+  SELECT id INTO target_user_id
+  FROM auth.users
+  WHERE lower(email::TEXT) = lower(p_email);
+
+  IF target_user_id IS NULL THEN
+    RAISE EXCEPTION 'User with email % not found', p_email;
+  END IF;
+
+  UPDATE public.organization_memberships
+  SET archived_at = COALESCE(archived_at, NOW()),
+      archived_by = auth.uid(),
+      updated_at = NOW()
+  WHERE user_id = target_user_id
+    AND archived_at IS NULL;
+
+  INSERT INTO public.profiles (id, org_id, platform_role, updated_at)
+  VALUES (target_user_id, NULL, 'gridmaster', NOW())
+  ON CONFLICT (id) DO UPDATE
+    SET platform_role = 'gridmaster',
+        org_id = NULL,
+        updated_at = NOW();
+
+  DELETE FROM public.user_sessions WHERE user_id = target_user_id;
+
+  INSERT INTO public.jwt_refresh_locks (user_id, locked_until, reason)
+    VALUES (target_user_id, NOW() + INTERVAL '5 minutes', 'gridmaster_promotion')
+  ON CONFLICT (user_id) DO UPDATE
+    SET locked_until = NOW() + INTERVAL '5 minutes', reason = 'gridmaster_promotion';
+
+  RETURN jsonb_build_object('user_id', target_user_id, 'email', p_email);
+END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.demote_gridmaster_account(
+  p_target_user_id UUID,
+  p_org_id UUID,
+  p_org_role public.org_role
+)
+RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  target_email TEXT;
+  target_was_active BOOLEAN := FALSE;
+BEGIN
+  IF NOT public.is_gridmaster() THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+  IF p_target_user_id = auth.uid() THEN RAISE EXCEPTION 'Cannot demote your own gridmaster account'; END IF;
+
+  SELECT u.email::TEXT, p.deactivated_at IS NULL
+  INTO target_email, target_was_active
+  FROM public.profiles p
+  JOIN auth.users u ON u.id = p.id
+  WHERE p.id = p_target_user_id
+    AND p.platform_role = 'gridmaster';
+
+  IF target_email IS NULL THEN RAISE EXCEPTION 'Gridmaster account not found'; END IF;
+
+  IF target_was_active AND (
+    SELECT count(*)
+    FROM public.profiles
+    WHERE platform_role = 'gridmaster'
+      AND deactivated_at IS NULL
+      AND id <> p_target_user_id
+  ) = 0 THEN
+    RAISE EXCEPTION 'Cannot remove the last active gridmaster account';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.organizations
+    WHERE id = p_org_id AND archived_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Organization not found';
+  END IF;
+
+  UPDATE public.profiles
+  SET platform_role = 'none',
+      org_id = p_org_id,
+      updated_at = NOW()
+  WHERE id = p_target_user_id;
+
+  INSERT INTO public.organization_memberships (user_id, org_id, org_role, archived_at, archived_by, updated_at)
+  VALUES (p_target_user_id, p_org_id, p_org_role, NULL, NULL, NOW())
+  ON CONFLICT (user_id, org_id) DO UPDATE
+    SET org_role = EXCLUDED.org_role,
+        archived_at = NULL,
+        archived_by = NULL,
+        updated_at = NOW();
+
+  DELETE FROM public.user_sessions WHERE user_id = p_target_user_id;
+
+  INSERT INTO public.jwt_refresh_locks (user_id, locked_until, reason)
+    VALUES (p_target_user_id, NOW() + INTERVAL '5 minutes', 'gridmaster_demotion')
+  ON CONFLICT (user_id) DO UPDATE
+    SET locked_until = NOW() + INTERVAL '5 minutes', reason = 'gridmaster_demotion';
+
+  RETURN jsonb_build_object('user_id', p_target_user_id, 'email', target_email, 'org_id', p_org_id, 'org_role', p_org_role);
+END;
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.set_gridmaster_account_deactivated(
+  p_target_user_id UUID,
+  p_deactivate BOOLEAN
+)
+RETURNS JSONB
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  target_email TEXT;
+  target_was_active BOOLEAN := FALSE;
+BEGIN
+  IF NOT public.is_gridmaster() THEN RAISE EXCEPTION 'Unauthorized'; END IF;
+  IF p_target_user_id = auth.uid() THEN RAISE EXCEPTION 'Cannot change activation for your own gridmaster account'; END IF;
+
+  SELECT u.email::TEXT, p.deactivated_at IS NULL
+  INTO target_email, target_was_active
+  FROM public.profiles p
+  JOIN auth.users u ON u.id = p.id
+  WHERE p.id = p_target_user_id
+    AND p.platform_role = 'gridmaster';
+
+  IF target_email IS NULL THEN RAISE EXCEPTION 'Gridmaster account not found'; END IF;
+
+  IF p_deactivate AND target_was_active AND (
+    SELECT count(*)
+    FROM public.profiles
+    WHERE platform_role = 'gridmaster'
+      AND deactivated_at IS NULL
+      AND id <> p_target_user_id
+  ) = 0 THEN
+    RAISE EXCEPTION 'Cannot deactivate the last active gridmaster account';
+  END IF;
+
+  UPDATE public.profiles
+  SET deactivated_at = CASE WHEN p_deactivate THEN NOW() ELSE NULL END,
+      deactivated_by = CASE WHEN p_deactivate THEN auth.uid() ELSE NULL END,
+      updated_at = NOW()
+  WHERE id = p_target_user_id;
+
+  IF p_deactivate THEN
+    DELETE FROM public.user_sessions WHERE user_id = p_target_user_id;
+  END IF;
+
+  INSERT INTO public.jwt_refresh_locks (user_id, locked_until, reason)
+    VALUES (p_target_user_id, NOW() + INTERVAL '5 minutes', 'gridmaster_activation_change')
+  ON CONFLICT (user_id) DO UPDATE
+    SET locked_until = NOW() + INTERVAL '5 minutes', reason = 'gridmaster_activation_change';
+
+  RETURN jsonb_build_object('user_id', p_target_user_id, 'email', target_email, 'deactivated', p_deactivate);
 END;
 $$;
 
@@ -2491,6 +2902,7 @@ BEGIN
   JOIN auth.users u ON u.id = cm.user_id
   WHERE cm.org_id = p_org_id
     AND cm.archived_at IS NULL
+    AND p.platform_role <> 'gridmaster'
   ORDER BY u.email ASC;
 END;
 $$;
@@ -2700,6 +3112,191 @@ $$;
 GRANT EXECUTE ON FUNCTION public.work_assignment_times_overlap(BIGINT[], BIGINT[], TEXT, TEXT, BIGINT[], BIGINT[], TEXT, TEXT) TO authenticated;
 
 
+-- ── has_work_assignment_started ─────────────────────────────────────────────
+-- Conservative started-shift gate using org-local time and the earliest
+-- resolved segment start. If no usable start time exists, treat as started.
+
+CREATE OR REPLACE FUNCTION public.has_work_assignment_started(
+  p_org_id         UUID,
+  p_shift_date     DATE,
+  p_shift_ids      BIGINT[],
+  p_job_ids        BIGINT[],
+  p_custom_start   TEXT,
+  p_custom_end     TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE PLPGSQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_org_timezone TEXT := 'UTC';
+  v_local_now TIMESTAMP;
+  v_local_date DATE;
+  v_earliest_start TIME;
+BEGIN
+  SELECT COALESCE(timezone, 'UTC')
+  INTO v_org_timezone
+  FROM public.organizations
+  WHERE id = p_org_id;
+
+  v_local_now := now() AT TIME ZONE v_org_timezone;
+  v_local_date := v_local_now::DATE;
+
+  IF p_shift_date < v_local_date THEN
+    RETURN TRUE;
+  END IF;
+
+  IF p_shift_date > v_local_date THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT MIN(r.start_time)
+  INTO v_earliest_start
+  FROM public.resolve_work_assignment_time_ranges(
+    COALESCE(p_shift_ids, '{}'::BIGINT[]),
+    COALESCE(p_job_ids, '{}'::BIGINT[]),
+    p_custom_start,
+    p_custom_end
+  ) r;
+
+  IF v_earliest_start IS NULL THEN
+    RETURN TRUE;
+  END IF;
+
+  RETURN v_local_now::TIME >= v_earliest_start;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.has_work_assignment_started(UUID, DATE, BIGINT[], BIGINT[], TEXT, TEXT) TO authenticated;
+
+
+-- ── segment-scoped request helpers ─────────────────────────────────────────
+-- Request actions identify split-shift segments by chronological index so the
+-- user-facing "Shift 1" is always the earliest resolved shift.
+
+CREATE OR REPLACE FUNCTION public.schedule_custom_time_at(
+  p_custom_time TEXT,
+  p_segment_ordinal INTEGER
+) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE
+SET search_path = 'public'
+AS $$
+  SELECT NULLIF(split_part(COALESCE(p_custom_time, ''), '|', p_segment_ordinal), '');
+$$;
+
+CREATE OR REPLACE FUNCTION public.schedule_custom_times_except_ordinal(
+  p_custom_time TEXT,
+  p_excluded_ordinal INTEGER,
+  p_segment_count INTEGER
+) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE
+SET search_path = 'public'
+AS $$
+  WITH parts AS (
+    SELECT
+      idx,
+      COALESCE(NULLIF(split_part(COALESCE(p_custom_time, ''), '|', idx), ''), '') AS value
+    FROM generate_series(1, GREATEST(COALESCE(p_segment_count, 0), 0)) AS idx
+    WHERE idx <> p_excluded_ordinal
+  )
+  SELECT CASE
+    WHEN BOOL_OR(value <> '') THEN string_agg(value, '|' ORDER BY idx)
+    ELSE NULL
+  END
+  FROM parts;
+$$;
+
+CREATE OR REPLACE FUNCTION public.resolve_schedule_segment_ordinal(
+  p_shift_ids BIGINT[],
+  p_job_ids BIGINT[],
+  p_custom_start TEXT,
+  p_custom_end TEXT,
+  p_segment_index INTEGER DEFAULT NULL
+) RETURNS INTEGER
+LANGUAGE PLPGSQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_segment_count INTEGER := COALESCE(array_length(p_job_ids, 1), 0);
+  v_index INTEGER := COALESCE(p_segment_index, 0);
+  v_ordinal INTEGER;
+BEGIN
+  IF v_segment_count = 0 THEN
+    RAISE EXCEPTION 'No worked shift segment found';
+  END IF;
+
+  IF p_segment_index IS NULL AND v_segment_count > 1 THEN
+    RAISE EXCEPTION 'Multiple shifts exist on this date. Select the shift to request.';
+  END IF;
+
+  IF v_index < 0 OR v_index >= v_segment_count THEN
+    RAISE EXCEPTION 'Selected shift segment is out of range';
+  END IF;
+
+  SELECT ordered_segments.ordinality
+  INTO v_ordinal
+  FROM (
+    SELECT
+      segment.ordinality,
+      time_ranges.start_time,
+      time_ranges.end_time
+    FROM generate_subscripts(p_job_ids, 1) AS segment(ordinality)
+    LEFT JOIN public.resolve_work_assignment_time_ranges(
+      COALESCE(p_shift_ids, '{}'::BIGINT[]),
+      COALESCE(p_job_ids, '{}'::BIGINT[]),
+      p_custom_start,
+      p_custom_end
+    ) time_ranges
+      ON time_ranges.segment_position = segment.ordinality
+    ORDER BY
+      time_ranges.start_time IS NULL,
+      time_ranges.start_time,
+      time_ranges.end_time,
+      segment.ordinality
+    OFFSET v_index
+    LIMIT 1
+  ) ordered_segments;
+
+  IF v_ordinal IS NULL THEN
+    RAISE EXCEPTION 'Selected shift segment could not be resolved';
+  END IF;
+
+  RETURN v_ordinal;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.find_matching_schedule_segment_ordinal(
+  p_shift_ids BIGINT[],
+  p_job_ids BIGINT[],
+  p_is_mentored_flags BOOLEAN[],
+  p_custom_start TEXT,
+  p_custom_end TEXT,
+  p_match_shift_id BIGINT,
+  p_match_job_id BIGINT,
+  p_match_is_mentored BOOLEAN,
+  p_match_custom_start TEXT,
+  p_match_custom_end TEXT
+) RETURNS INTEGER
+LANGUAGE SQL STABLE
+SET search_path = 'public'
+AS $$
+  SELECT segment.ordinality
+  FROM generate_subscripts(p_job_ids, 1) AS segment(ordinality)
+  WHERE p_job_ids[segment.ordinality] = p_match_job_id
+    AND p_shift_ids[segment.ordinality] IS NOT DISTINCT FROM p_match_shift_id
+    AND COALESCE(p_is_mentored_flags[segment.ordinality], FALSE) IS NOT DISTINCT FROM COALESCE(p_match_is_mentored, FALSE)
+    AND public.schedule_custom_time_at(p_custom_start, segment.ordinality) IS NOT DISTINCT FROM p_match_custom_start
+    AND public.schedule_custom_time_at(p_custom_end, segment.ordinality) IS NOT DISTINCT FROM p_match_custom_end
+  ORDER BY segment.ordinality
+  LIMIT 1;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.schedule_custom_time_at(TEXT, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.schedule_custom_times_except_ordinal(TEXT, INTEGER, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.resolve_schedule_segment_ordinal(BIGINT[], BIGINT[], TEXT, TEXT, INTEGER) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.find_matching_schedule_segment_ordinal(BIGINT[], BIGINT[], BOOLEAN[], TEXT, TEXT, BIGINT, BIGINT, BOOLEAN, TEXT, TEXT) TO authenticated;
+
+
 -- ── assert_non_overlapping_work_assignment_times ────────────────────────────
 -- Prevents saving a worked cell whose ordered segments have overlapping
 -- effective time windows after resolving custom/job/shift timing.
@@ -2763,8 +3360,9 @@ GRANT EXECUTE ON FUNCTION public.assert_non_overlapping_work_assignment_times(BI
 -- ── create_shift_request ────────────────────────────────────────────────────
 -- Creates a pickup, swap, or calloff request. Validates shift ownership and snapshots data.
 
--- Drop old 7-param overload so the 8-param version is the only one
+-- Drop old overloads so the segment-aware version is the only one
 DROP FUNCTION IF EXISTS public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID);
+DROP FUNCTION IF EXISTS public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID, BIGINT);
 
 CREATE OR REPLACE FUNCTION public.create_shift_request(
   p_org_id              UUID,
@@ -2774,7 +3372,9 @@ CREATE OR REPLACE FUNCTION public.create_shift_request(
   p_target_emp_id       UUID DEFAULT NULL,
   p_target_shift_date   DATE DEFAULT NULL,
   p_idempotency_key     UUID DEFAULT gen_random_uuid(),
-  p_absence_type_id     BIGINT DEFAULT NULL
+  p_absence_type_id     BIGINT DEFAULT NULL,
+  p_requester_segment_index INTEGER DEFAULT NULL,
+  p_target_segment_index INTEGER DEFAULT NULL
 ) RETURNS UUID
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -2784,15 +3384,35 @@ DECLARE
   v_requester_shift RECORD;
   v_target_shift RECORD;
   v_requester_employee RECORD;
+  v_target_employee RECORD;
+  v_requester_shift_focus_area_id BIGINT;
   v_initial_status public.shift_request_status;
   v_requester_state JSONB;
   v_target_state JSONB;
+  v_requester_required_focus_area_ids BIGINT[] := '{}'::BIGINT[];
+  v_target_required_focus_area_ids BIGINT[] := '{}'::BIGINT[];
+  v_requester_segment_ordinal INTEGER;
+  v_target_segment_ordinal INTEGER;
+  v_requester_selected_shift_ids BIGINT[];
+  v_requester_selected_job_ids BIGINT[];
+  v_requester_selected_is_mentored_flags BOOLEAN[];
+  v_target_selected_shift_ids BIGINT[];
+  v_target_selected_job_ids BIGINT[];
+  v_target_selected_is_mentored_flags BOOLEAN[];
+  v_requester_selected_custom_start TEXT;
+  v_requester_selected_custom_end TEXT;
+  v_target_selected_custom_start TEXT;
+  v_target_selected_custom_end TEXT;
 BEGIN
   -- Idempotency: return existing if already created
   SELECT id INTO v_request_id FROM public.shift_requests WHERE idempotency_key = p_idempotency_key;
   IF FOUND THEN RETURN v_request_id; END IF;
 
-  -- Validate calloff-specific constraints
+  IF p_requester_shift_date < CURRENT_DATE THEN
+    RAISE EXCEPTION 'Cannot create a request for a past shift';
+  END IF;
+
+  -- Validate calloff and targeted-pickup absence constraints
   IF p_type = 'calloff' THEN
     IF p_absence_type_id IS NULL THEN
       RAISE EXCEPTION 'Calloff requests require an absence type';
@@ -2803,8 +3423,27 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'Absence type not found or archived';
     END IF;
+  ELSIF p_type = 'pickup' AND (
+    p_target_emp_id IS NOT NULL
+    OR p_target_shift_date IS NOT NULL
+    OR p_absence_type_id IS NOT NULL
+  ) THEN
+    IF p_target_emp_id IS NULL OR p_target_shift_date IS NULL OR p_absence_type_id IS NULL THEN
+      RAISE EXCEPTION 'Targeted pickup requests require a target employee, target shift date, and absence type';
+    END IF;
+
+    IF p_target_shift_date IS DISTINCT FROM p_requester_shift_date THEN
+      RAISE EXCEPTION 'Targeted pickup requests must target the requester shift date';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM public.absence_types
+      WHERE id = p_absence_type_id AND org_id = p_org_id AND archived_at IS NULL
+    ) THEN
+      RAISE EXCEPTION 'Absence type not found or archived';
+    END IF;
   ELSIF p_absence_type_id IS NOT NULL THEN
-    RAISE EXCEPTION 'Only calloff requests can have an absence type';
+    RAISE EXCEPTION 'Only calloff and targeted pickup requests can have an absence type';
   END IF;
 
   -- Validate requester is an active employee in this org
@@ -2839,6 +3478,40 @@ BEGIN
     RAISE EXCEPTION 'No published shift found for this employee on this date';
   END IF;
 
+  v_requester_segment_ordinal := public.resolve_schedule_segment_ordinal(
+    COALESCE(v_requester_shift.shift_ids, '{}'::BIGINT[]),
+    COALESCE(v_requester_shift.job_ids, '{}'::BIGINT[]),
+    v_requester_shift.custom_start_time,
+    v_requester_shift.custom_end_time,
+    p_requester_segment_index
+  );
+  v_requester_selected_shift_ids := ARRAY[v_requester_shift.shift_ids[v_requester_segment_ordinal]];
+  v_requester_selected_job_ids := ARRAY[v_requester_shift.job_ids[v_requester_segment_ordinal]];
+  v_requester_selected_is_mentored_flags := ARRAY[
+    COALESCE(v_requester_shift.is_mentored_flags[v_requester_segment_ordinal], FALSE)
+  ];
+  v_requester_selected_custom_start := public.schedule_custom_time_at(
+    v_requester_shift.custom_start_time,
+    v_requester_segment_ordinal
+  );
+  v_requester_selected_custom_end := public.schedule_custom_time_at(
+    v_requester_shift.custom_end_time,
+    v_requester_segment_ordinal
+  );
+
+  IF public.has_work_assignment_started(
+    p_org_id,
+    p_requester_shift_date,
+    COALESCE(v_requester_selected_shift_ids, '{}'::BIGINT[]),
+    COALESCE(v_requester_selected_job_ids, '{}'::BIGINT[]),
+    v_requester_selected_custom_start,
+    v_requester_selected_custom_end
+  ) THEN
+    RAISE EXCEPTION 'Cannot create a request for a shift that has already started';
+  END IF;
+
+  v_requester_shift_focus_area_id := v_requester_shift.focus_area_id;
+
   -- Fall back to employee's primary focus area when shift has no focus_area_id
   IF v_requester_shift.focus_area_id IS NULL THEN
     v_requester_shift.focus_area_id := v_requester_employee.focus_area_ids[1];
@@ -2849,15 +3522,42 @@ BEGIN
     RAISE EXCEPTION 'Cannot create a request for an off-day shift';
   END IF;
 
+  IF (p_type = 'swap' OR (p_type = 'pickup' AND p_target_emp_id IS NOT NULL))
+     AND (
+       array_length(v_requester_selected_shift_ids, 1) IS NULL
+       OR EXISTS (
+         SELECT 1
+         FROM unnest(COALESCE(v_requester_selected_shift_ids, '{}'::BIGINT[])) AS requester_segments(shift_id)
+         WHERE requester_segments.shift_id IS NULL
+       )
+     ) THEN
+    RAISE EXCEPTION 'This request requires a scheduled shift';
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT required.focus_area_id), '{}'::BIGINT[])
+  INTO v_requester_required_focus_area_ids
+  FROM (
+    SELECT v_requester_shift_focus_area_id AS focus_area_id
+    WHERE v_requester_shift_focus_area_id IS NOT NULL
+    UNION
+    SELECT sc.focus_area_id
+    FROM unnest(COALESCE(v_requester_selected_shift_ids, '{}'::BIGINT[])) AS shift_ids(shift_id)
+    JOIN public.shift_categories sc
+      ON sc.id = shift_ids.shift_id
+     AND sc.org_id = p_org_id
+    WHERE sc.focus_area_id IS NOT NULL
+  ) required;
+
   v_requester_state := public.build_schedule_cell_state_json(
     'worked',
-    v_requester_shift.shift_ids,
-    v_requester_shift.job_ids,
+    v_requester_selected_shift_ids,
+    v_requester_selected_job_ids,
     NULL,
-    v_requester_shift.custom_start_time,
-    v_requester_shift.custom_end_time,
+    v_requester_selected_custom_start,
+    v_requester_selected_custom_end,
     v_requester_shift.series_id,
-    v_requester_shift.from_recurring
+    v_requester_shift.from_recurring,
+    COALESCE(v_requester_selected_is_mentored_flags, '{}'::BOOLEAN[])
   );
 
   -- Check no active request already exists for this shift (as requester or target)
@@ -2888,6 +3588,68 @@ BEGIN
     v_initial_status := 'open';
   END IF;
 
+  -- For targeted pickups: validate the requested teammate has an absence on the same date
+  IF p_type = 'pickup' AND p_target_emp_id IS NOT NULL THEN
+    IF p_requester_emp_id = p_target_emp_id THEN
+      RAISE EXCEPTION 'Cannot request yourself for pickup';
+    END IF;
+
+    -- Validate target employee exists and is active
+    SELECT id, focus_area_ids
+    INTO v_target_employee
+    FROM public.employees
+    WHERE id = p_target_emp_id AND org_id = p_org_id AND archived_at IS NULL AND status = 'active';
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Target employee not found, archived, or inactive';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_requester_required_focus_area_ids) AS required(focus_area_id)
+      WHERE NOT (required.focus_area_id = ANY(COALESCE(v_target_employee.focus_area_ids, '{}'::BIGINT[])))
+    ) THEN
+      RAISE EXCEPTION 'Target employee is not eligible for the requester shift focus area';
+    END IF;
+
+    SELECT *
+    INTO v_target_shift
+    FROM public.get_schedule_cell_snapshot_payload(
+      p_org_id,
+      p_target_emp_id,
+      p_target_shift_date,
+      'published'
+    );
+
+    IF NOT FOUND OR v_target_shift.state_kind IS DISTINCT FROM 'absence' THEN
+      RAISE EXCEPTION 'Target employee has no published absence on the specified date';
+    END IF;
+
+    v_target_state := public.build_schedule_cell_state_json(
+      'absence',
+      '{}'::BIGINT[],
+      '{}'::BIGINT[],
+      v_target_shift.absence_type_id,
+      NULL,
+      NULL,
+      v_target_shift.series_id,
+      v_target_shift.from_recurring,
+      '{}'::BOOLEAN[]
+    );
+
+    IF EXISTS (
+      SELECT 1 FROM public.shift_requests
+      WHERE (
+        (requester_emp_id = p_target_emp_id AND requester_shift_date = p_target_shift_date)
+        OR (target_emp_id = p_target_emp_id AND target_shift_date = p_target_shift_date)
+      )
+        AND org_id = p_org_id
+        AND status IN ('open', 'pending_approval')
+    ) THEN
+      RAISE EXCEPTION 'The target employee is already involved in another active request on this date';
+    END IF;
+  END IF;
+
   -- For swaps: validate target
   IF p_type = 'swap' THEN
     IF p_target_emp_id IS NULL OR p_target_shift_date IS NULL THEN
@@ -2898,12 +3660,27 @@ BEGIN
       RAISE EXCEPTION 'Cannot swap with yourself';
     END IF;
 
+    IF p_target_shift_date < CURRENT_DATE THEN
+      RAISE EXCEPTION 'Cannot create a swap request for a past target shift';
+    END IF;
+
     -- Validate target employee exists and is active
-    IF NOT EXISTS (
-      SELECT 1 FROM public.employees
+    SELECT id, focus_area_ids
+    INTO v_target_employee
+    FROM public.employees
       WHERE id = p_target_emp_id AND org_id = p_org_id AND archived_at IS NULL AND status = 'active'
-    ) THEN
+    ;
+
+    IF NOT FOUND THEN
       RAISE EXCEPTION 'Target employee not found, archived, or inactive';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_requester_required_focus_area_ids) AS required(focus_area_id)
+      WHERE NOT (required.focus_area_id = ANY(COALESCE(v_target_employee.focus_area_ids, '{}'::BIGINT[])))
+    ) THEN
+      RAISE EXCEPTION 'Target employee is not eligible for the requester shift focus area';
     END IF;
 
     -- Validate target owns a published shift on the target date
@@ -2922,20 +3699,84 @@ BEGIN
       RAISE EXCEPTION 'Target employee has no published shift on the specified date';
     END IF;
 
+    v_target_segment_ordinal := public.resolve_schedule_segment_ordinal(
+      COALESCE(v_target_shift.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_target_shift.job_ids, '{}'::BIGINT[]),
+      v_target_shift.custom_start_time,
+      v_target_shift.custom_end_time,
+      p_target_segment_index
+    );
+    v_target_selected_shift_ids := ARRAY[v_target_shift.shift_ids[v_target_segment_ordinal]];
+    v_target_selected_job_ids := ARRAY[v_target_shift.job_ids[v_target_segment_ordinal]];
+    v_target_selected_is_mentored_flags := ARRAY[
+      COALESCE(v_target_shift.is_mentored_flags[v_target_segment_ordinal], FALSE)
+    ];
+    v_target_selected_custom_start := public.schedule_custom_time_at(
+      v_target_shift.custom_start_time,
+      v_target_segment_ordinal
+    );
+    v_target_selected_custom_end := public.schedule_custom_time_at(
+      v_target_shift.custom_end_time,
+      v_target_segment_ordinal
+    );
+
+    IF public.has_work_assignment_started(
+      p_org_id,
+      p_target_shift_date,
+      COALESCE(v_target_selected_shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_target_selected_job_ids, '{}'::BIGINT[]),
+      v_target_selected_custom_start,
+      v_target_selected_custom_end
+    ) THEN
+      RAISE EXCEPTION 'Cannot create a swap request for a target shift that has already started';
+    END IF;
+
     -- Check target shift is not an absence
     IF v_target_shift.absence_type_id IS NOT NULL THEN
       RAISE EXCEPTION 'Cannot swap with an off-day shift';
     END IF;
 
+    IF array_length(v_target_selected_shift_ids, 1) IS NULL
+       OR EXISTS (
+         SELECT 1
+         FROM unnest(COALESCE(v_target_selected_shift_ids, '{}'::BIGINT[])) AS target_segments(shift_id)
+         WHERE target_segments.shift_id IS NULL
+       ) THEN
+      RAISE EXCEPTION 'Cannot swap with a general job';
+    END IF;
+
+    SELECT COALESCE(array_agg(DISTINCT required.focus_area_id), '{}'::BIGINT[])
+    INTO v_target_required_focus_area_ids
+    FROM (
+      SELECT v_target_shift.focus_area_id AS focus_area_id
+      WHERE v_target_shift.focus_area_id IS NOT NULL
+      UNION
+      SELECT sc.focus_area_id
+      FROM unnest(COALESCE(v_target_selected_shift_ids, '{}'::BIGINT[])) AS shift_ids(shift_id)
+      JOIN public.shift_categories sc
+        ON sc.id = shift_ids.shift_id
+       AND sc.org_id = p_org_id
+      WHERE sc.focus_area_id IS NOT NULL
+    ) required;
+
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_target_required_focus_area_ids) AS required(focus_area_id)
+      WHERE NOT (required.focus_area_id = ANY(COALESCE(v_requester_employee.focus_area_ids, '{}'::BIGINT[])))
+    ) THEN
+      RAISE EXCEPTION 'Requester is not eligible for the target shift focus area';
+    END IF;
+
     v_target_state := public.build_schedule_cell_state_json(
       'worked',
-      v_target_shift.shift_ids,
-      v_target_shift.job_ids,
+      v_target_selected_shift_ids,
+      v_target_selected_job_ids,
       NULL,
-      v_target_shift.custom_start_time,
-      v_target_shift.custom_end_time,
+      v_target_selected_custom_start,
+      v_target_selected_custom_end,
       v_target_shift.series_id,
-      v_target_shift.from_recurring
+      v_target_shift.from_recurring,
+      COALESCE(v_target_selected_is_mentored_flags, '{}'::BOOLEAN[])
     );
 
     -- Block if target's shift is already involved in any active request
@@ -2976,6 +3817,18 @@ BEGIN
       p_requester_emp_id, p_requester_shift_date, v_requester_state,
       p_absence_type_id, p_idempotency_key
     ) RETURNING id INTO v_request_id;
+  ELSIF p_type = 'pickup' AND p_target_emp_id IS NOT NULL THEN
+    INSERT INTO public.shift_requests (
+      org_id, type, status,
+      requester_emp_id, requester_shift_date, requester_state,
+      target_emp_id, target_shift_date, target_state,
+      absence_type_id, idempotency_key
+    ) VALUES (
+      p_org_id, p_type, v_initial_status,
+      p_requester_emp_id, p_requester_shift_date, v_requester_state,
+      p_target_emp_id, p_target_shift_date, v_target_state,
+      p_absence_type_id, p_idempotency_key
+    ) RETURNING id INTO v_request_id;
   ELSE
     INSERT INTO public.shift_requests (
       org_id, type, status,
@@ -2994,7 +3847,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID, BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_shift_request(UUID, public.shift_request_type, UUID, DATE, UUID, DATE, UUID, BIGINT, INTEGER, INTEGER) TO authenticated;
 
 
 -- ── claim_shift_request ─────────────────────────────────────────────────────
@@ -3051,8 +3904,19 @@ BEGIN
   v_request_custom_start := NULLIF(v_request.requester_state->>'customStartTime', '');
   v_request_custom_end := NULLIF(v_request.requester_state->>'customEndTime', '');
 
+  IF public.has_work_assignment_started(
+    v_request.org_id,
+    v_request.requester_shift_date,
+    COALESCE(v_request_state.shift_ids, '{}'::BIGINT[]),
+    COALESCE(v_request_state.job_ids, '{}'::BIGINT[]),
+    v_request_custom_start,
+    v_request_custom_end
+  ) THEN
+    RAISE EXCEPTION 'Cannot claim a pickup request for a shift that has already started';
+  END IF;
+
   -- Validate claimer is active employee in same org
-  SELECT id, user_id, certification_id, status, focus_area_ids INTO v_claimer
+  SELECT id, user_id, certification_id, role_ids, status, focus_area_ids INTO v_claimer
   FROM public.employees
   WHERE id = p_claimer_emp_id AND org_id = v_request.org_id AND archived_at IS NULL;
 
@@ -3071,20 +3935,48 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: you can only claim requests for yourself';
   END IF;
 
-  -- Check job certification requirements.
-  -- Handle NULL certification_id: if claimer has no cert, they fail any required cert.
+  -- Check job eligibility requirements. Items inside each gate are alternatives;
+  -- eligibility_mode only controls how role and certification gates combine.
   IF EXISTS (
     SELECT 1
     FROM unnest(COALESCE(v_request_state.job_ids, '{}'::BIGINT[])) AS request_jobs(job_id)
     JOIN public.jobs j ON j.id = request_jobs.job_id
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(array_agg(role.id ORDER BY role.sort_order, role.id), '{}'::BIGINT[]) AS role_ids
+      FROM public.organization_roles role
+      WHERE role.org_id = j.org_id
+        AND role.id = ANY(j.eligible_role_ids)
+        AND role.archived_at IS NULL
+        AND role.is_schedule_role IS DISTINCT FROM FALSE
+    ) eligible_roles ON TRUE
     WHERE j.archived_at IS NULL
-      AND array_length(j.required_certification_ids, 1) IS NOT NULL
-      AND (
-        v_claimer.certification_id IS NULL
-        OR NOT (v_claimer.certification_id = ANY(j.required_certification_ids))
+      AND NOT (
+        CASE
+          WHEN array_length(eligible_roles.role_ids, 1) IS NOT NULL
+            AND array_length(j.required_certification_ids, 1) IS NOT NULL
+            AND COALESCE(j.eligibility_mode, 'and') = 'or'
+          THEN
+            (COALESCE(v_claimer.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+            OR (
+              v_claimer.certification_id IS NOT NULL
+              AND v_claimer.certification_id = ANY(j.required_certification_ids)
+            )
+          ELSE
+            (
+              array_length(eligible_roles.role_ids, 1) IS NULL
+              OR (COALESCE(v_claimer.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+            )
+            AND (
+              array_length(j.required_certification_ids, 1) IS NULL
+              OR (
+                v_claimer.certification_id IS NOT NULL
+                AND v_claimer.certification_id = ANY(j.required_certification_ids)
+              )
+            )
+        END
       )
   ) THEN
-    RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
+    RAISE EXCEPTION 'You do not meet the eligibility requirements for this shift';
   END IF;
 
   IF v_request_state.focus_area_id IS NOT NULL
@@ -3148,7 +4040,7 @@ GRANT EXECUTE ON FUNCTION public.claim_shift_request(UUID, UUID) TO authenticate
 
 
 -- ── respond_to_shift_request ────────────────────────────────────────────────
--- Target employee accepts or declines a swap request.
+-- Target employee accepts or declines a swap or targeted pickup request.
 
 CREATE OR REPLACE FUNCTION public.respond_to_shift_request(
   p_request_id UUID,
@@ -3164,6 +4056,17 @@ DECLARE
   v_req_shift RECORD;
   v_tgt_shift RECORD;
   v_current_state JSONB;
+  v_requester_state RECORD;
+  v_target_state RECORD;
+  v_requester_custom_start TEXT;
+  v_requester_custom_end TEXT;
+  v_target_custom_start TEXT;
+  v_target_custom_end TEXT;
+  v_requester_match_ordinal INTEGER;
+  v_target_match_ordinal INTEGER;
+  v_requester_employee RECORD;
+  v_requester_required_focus_area_ids BIGINT[] := '{}'::BIGINT[];
+  v_target_required_focus_area_ids BIGINT[] := '{}'::BIGINT[];
 BEGIN
   -- Lock and fetch
   SELECT * INTO v_request
@@ -3173,8 +4076,9 @@ BEGIN
 
   IF NOT FOUND THEN RAISE EXCEPTION 'Request not found'; END IF;
 
-  IF v_request.type != 'swap' THEN
-    RAISE EXCEPTION 'Only swap requests can be responded to';
+  IF v_request.type != 'swap'
+     AND NOT (v_request.type = 'pickup' AND v_request.target_emp_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Only swap or targeted pickup requests can be responded to';
   END IF;
 
   IF v_request.status != 'open' THEN
@@ -3186,7 +4090,7 @@ BEGIN
   END IF;
 
   -- Validate caller is the target employee
-  SELECT id, user_id INTO v_emp FROM public.employees WHERE id = p_emp_id;
+  SELECT id, user_id, focus_area_ids INTO v_emp FROM public.employees WHERE id = p_emp_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Employee not found';
   END IF;
@@ -3195,10 +4099,27 @@ BEGIN
   END IF;
 
   IF v_request.target_emp_id != p_emp_id THEN
-    RAISE EXCEPTION 'You are not the target of this swap request';
+    RAISE EXCEPTION 'You are not the target of this request';
   END IF;
 
   IF p_accept THEN
+    IF v_request.requester_shift_date < CURRENT_DATE
+       OR v_request.target_shift_date < CURRENT_DATE THEN
+      RAISE EXCEPTION 'Cannot accept a request for a past shift';
+    END IF;
+
+    SELECT * INTO v_requester_state
+    FROM public.resolve_schedule_state_storage(v_request.org_id, v_request.requester_state);
+    v_requester_custom_start := NULLIF(v_request.requester_state->>'customStartTime', '');
+    v_requester_custom_end := NULLIF(v_request.requester_state->>'customEndTime', '');
+
+    IF v_request.target_state IS NOT NULL THEN
+      SELECT * INTO v_target_state
+      FROM public.resolve_schedule_state_storage(v_request.org_id, v_request.target_state);
+      v_target_custom_start := NULLIF(v_request.target_state->>'customStartTime', '');
+      v_target_custom_end := NULLIF(v_request.target_state->>'customEndTime', '');
+    END IF;
+
     -- Verify requester's shift still matches snapshot
     SELECT *
     INTO v_req_shift
@@ -3209,18 +4130,58 @@ BEGIN
       'published'
     );
 
-    IF NOT FOUND
-       OR public.build_schedule_cell_state_json(
-            v_req_shift.state_kind,
-            COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
-            COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
-            v_req_shift.absence_type_id,
-            v_req_shift.custom_start_time,
-            v_req_shift.custom_end_time,
-            v_req_shift.series_id,
-            v_req_shift.from_recurring
-          ) IS DISTINCT FROM v_request.requester_state THEN
+    IF NOT FOUND OR v_req_shift.state_kind IS DISTINCT FROM 'worked' THEN
       RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. This request is no longer valid.';
+    END IF;
+
+    v_requester_match_ordinal := public.find_matching_schedule_segment_ordinal(
+      COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
+      COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[]),
+      v_req_shift.custom_start_time,
+      v_req_shift.custom_end_time,
+      v_requester_state.shift_ids[1],
+      v_requester_state.job_ids[1],
+      COALESCE(v_requester_state.is_mentored_flags[1], FALSE),
+      v_requester_custom_start,
+      v_requester_custom_end
+    );
+
+    IF v_requester_match_ordinal IS NULL THEN
+      RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. This request is no longer valid.';
+    END IF;
+
+    IF public.has_work_assignment_started(
+      v_request.org_id,
+      v_request.requester_shift_date,
+            COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[]),
+            COALESCE(v_requester_state.job_ids, '{}'::BIGINT[]),
+            v_requester_custom_start,
+            v_requester_custom_end
+    ) THEN
+      RAISE EXCEPTION 'Cannot accept a request for a shift that has already started';
+    END IF;
+
+    SELECT COALESCE(array_agg(DISTINCT required.focus_area_id), '{}'::BIGINT[])
+    INTO v_requester_required_focus_area_ids
+    FROM (
+      SELECT v_req_shift.focus_area_id AS focus_area_id
+      WHERE v_req_shift.focus_area_id IS NOT NULL
+      UNION
+      SELECT sc.focus_area_id
+      FROM unnest(COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[])) AS shift_ids(shift_id)
+      JOIN public.shift_categories sc
+        ON sc.id = shift_ids.shift_id
+       AND sc.org_id = v_request.org_id
+      WHERE sc.focus_area_id IS NOT NULL
+    ) required;
+
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_requester_required_focus_area_ids) AS required(focus_area_id)
+      WHERE NOT (required.focus_area_id = ANY(COALESCE(v_emp.focus_area_ids, '{}'::BIGINT[])))
+    ) THEN
+      RAISE EXCEPTION 'You are no longer eligible for the requester shift focus area';
     END IF;
 
     -- Verify target's shift still matches snapshot
@@ -3233,7 +4194,28 @@ BEGIN
       'published'
     );
 
-    IF NOT FOUND
+    IF v_request.type = 'swap' THEN
+      IF NOT FOUND OR v_tgt_shift.state_kind IS DISTINCT FROM 'worked' THEN
+        RAISE EXCEPTION 'Your shift has been modified since the request was created. This request is no longer valid.';
+      END IF;
+
+      v_target_match_ordinal := public.find_matching_schedule_segment_ordinal(
+        COALESCE(v_tgt_shift.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_tgt_shift.job_ids, '{}'::BIGINT[]),
+        COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[]),
+        v_tgt_shift.custom_start_time,
+        v_tgt_shift.custom_end_time,
+        v_target_state.shift_ids[1],
+        v_target_state.job_ids[1],
+        COALESCE(v_target_state.is_mentored_flags[1], FALSE),
+        v_target_custom_start,
+        v_target_custom_end
+      );
+
+      IF v_target_match_ordinal IS NULL THEN
+        RAISE EXCEPTION 'Your shift has been modified since the request was created. This request is no longer valid.';
+      END IF;
+    ELSIF NOT FOUND
        OR public.build_schedule_cell_state_json(
             v_tgt_shift.state_kind,
             COALESCE(v_tgt_shift.shift_ids, '{}'::BIGINT[]),
@@ -3242,9 +4224,57 @@ BEGIN
             v_tgt_shift.custom_start_time,
             v_tgt_shift.custom_end_time,
             v_tgt_shift.series_id,
-            v_tgt_shift.from_recurring
+            v_tgt_shift.from_recurring,
+            COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[])
           ) IS DISTINCT FROM v_request.target_state THEN
       RAISE EXCEPTION 'Your shift has been modified since the request was created. This request is no longer valid.';
+    END IF;
+
+    IF v_request.type = 'swap' THEN
+      IF public.has_work_assignment_started(
+        v_request.org_id,
+        v_request.target_shift_date,
+        COALESCE(v_target_state.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_target_state.job_ids, '{}'::BIGINT[]),
+        v_target_custom_start,
+        v_target_custom_end
+      ) THEN
+        RAISE EXCEPTION 'Cannot accept a request for a shift that has already started';
+      END IF;
+
+      SELECT id, focus_area_ids
+      INTO v_requester_employee
+      FROM public.employees
+      WHERE id = v_request.requester_emp_id
+        AND org_id = v_request.org_id
+        AND archived_at IS NULL
+        AND status = 'active';
+
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Requester is no longer active. This request is no longer valid.';
+      END IF;
+
+      SELECT COALESCE(array_agg(DISTINCT required.focus_area_id), '{}'::BIGINT[])
+      INTO v_target_required_focus_area_ids
+      FROM (
+        SELECT v_tgt_shift.focus_area_id AS focus_area_id
+        WHERE v_tgt_shift.focus_area_id IS NOT NULL
+        UNION
+        SELECT sc.focus_area_id
+        FROM unnest(COALESCE(v_target_state.shift_ids, '{}'::BIGINT[])) AS shift_ids(shift_id)
+        JOIN public.shift_categories sc
+          ON sc.id = shift_ids.shift_id
+         AND sc.org_id = v_request.org_id
+        WHERE sc.focus_area_id IS NOT NULL
+      ) required;
+
+      IF EXISTS (
+        SELECT 1
+        FROM unnest(v_target_required_focus_area_ids) AS required(focus_area_id)
+        WHERE NOT (required.focus_area_id = ANY(COALESCE(v_requester_employee.focus_area_ids, '{}'::BIGINT[])))
+      ) THEN
+        RAISE EXCEPTION 'Requester is no longer eligible for your shift focus area';
+      END IF;
     END IF;
 
     UPDATE public.shift_requests
@@ -3286,6 +4316,25 @@ DECLARE
   v_target_custom_end TEXT;
   v_source_matches BOOLEAN;
   v_row_count INTEGER;
+  v_requester_employee RECORD;
+  v_target_employee RECORD;
+  v_requester_required_focus_area_ids BIGINT[] := '{}'::BIGINT[];
+  v_target_required_focus_area_ids BIGINT[] := '{}'::BIGINT[];
+  v_requester_match_ordinal INTEGER;
+  v_target_match_ordinal INTEGER;
+  v_requester_segment_count INTEGER;
+  v_target_segment_count INTEGER;
+  v_remaining_shift_ids BIGINT[];
+  v_remaining_job_ids BIGINT[];
+  v_remaining_is_mentored_flags BOOLEAN[];
+  v_remaining_custom_start TEXT;
+  v_remaining_custom_end TEXT;
+  v_segment RECORD;
+  v_required_staff INTEGER;
+  v_actual_staff NUMERIC;
+  v_pending_volunteer_count INTEGER;
+  v_day_of_week INTEGER;
+  v_mentored_credit NUMERIC := 1;
 BEGIN
   -- Validate admin permissions
   IF NOT (
@@ -3329,6 +4378,23 @@ BEGIN
   END IF;
 
   IF NOT p_approved THEN
+    -- Rejecting a claimed public/calloff pickup releases it for another
+    -- single applicant instead of permanently closing the open shift.
+    IF v_request.type = 'pickup'
+       AND v_request.target_emp_id IS NOT NULL
+       AND v_request.target_state IS NULL THEN
+      UPDATE public.shift_requests
+      SET status = 'open',
+          target_emp_id = NULL,
+          target_shift_date = NULL,
+          admin_user_id = v_admin_user_id,
+          admin_note = p_note,
+          resolved_at = NULL,
+          updated_at = now()
+      WHERE id = p_request_id;
+      RETURN;
+    END IF;
+
     -- Reject
     UPDATE public.shift_requests
     SET status = 'rejected', admin_user_id = v_admin_user_id,
@@ -3365,38 +4431,96 @@ BEGIN
       'published'
     );
 
-    IF NOT FOUND
-       OR public.build_schedule_cell_state_json(
-            v_req_shift.state_kind,
-            COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
-            COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
-            v_req_shift.absence_type_id,
-            v_req_shift.custom_start_time,
-            v_req_shift.custom_end_time,
-            v_req_shift.series_id,
-            v_req_shift.from_recurring
-          ) IS DISTINCT FROM v_request.requester_state THEN
+    IF NOT FOUND OR v_req_shift.state_kind IS DISTINCT FROM 'worked' THEN
       RAISE EXCEPTION 'The requester''s shift has been modified since the calloff was created. Please ask the employee to resubmit.';
     END IF;
 
-    -- Replace published shift with absence type
-    PERFORM public.write_schedule_cell_snapshot_internal(
-      v_request.org_id,
-      v_request.requester_emp_id,
-      v_request.requester_shift_date,
-      'published',
-      'absence',
-      '{}'::BIGINT[],
-      '{}'::BIGINT[],
-      v_request.absence_type_id,
-      NULL,
-      NULL,
-      NULL,
-      FALSE,
-      v_requester_state.focus_area_id,
-      v_req_shift.version,
-      v_admin_user_id
+    v_requester_match_ordinal := public.find_matching_schedule_segment_ordinal(
+      COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
+      COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[]),
+      v_req_shift.custom_start_time,
+      v_req_shift.custom_end_time,
+      v_requester_state.shift_ids[1],
+      v_requester_state.job_ids[1],
+      COALESCE(v_requester_state.is_mentored_flags[1], FALSE),
+      v_requester_custom_start,
+      v_requester_custom_end
     );
+
+    IF v_requester_match_ordinal IS NULL THEN
+      RAISE EXCEPTION 'The requester''s shift has been modified since the calloff was created. Please ask the employee to resubmit.';
+    END IF;
+
+    v_requester_segment_count := COALESCE(array_length(v_req_shift.job_ids, 1), 0);
+
+    IF v_requester_segment_count <= 1 THEN
+      -- Full-day calloff: preserve the existing absence-cell behavior.
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        v_request.org_id,
+        v_request.requester_emp_id,
+        v_request.requester_shift_date,
+        'published',
+        'absence',
+        '{}'::BIGINT[],
+        '{}'::BIGINT[],
+        v_request.absence_type_id,
+        NULL,
+        NULL,
+        NULL,
+        FALSE,
+        v_requester_state.focus_area_id,
+        v_req_shift.version,
+        v_admin_user_id
+      );
+    ELSE
+      -- Partial calloff: remove only the selected segment. The calloff request
+      -- remains the durable absence record for that individual shift.
+      SELECT
+        COALESCE(array_agg(segment.shift_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+        COALESCE(array_agg(segment.job_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+        COALESCE(array_agg(segment.is_mentored ORDER BY segment.ordinality), '{}'::BOOLEAN[])
+      INTO v_remaining_shift_ids, v_remaining_job_ids, v_remaining_is_mentored_flags
+      FROM unnest(
+        COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
+        COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[])
+      ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
+      WHERE segment.ordinality <> v_requester_match_ordinal;
+
+      v_remaining_custom_start := public.schedule_custom_times_except_ordinal(
+        v_req_shift.custom_start_time,
+        v_requester_match_ordinal,
+        v_requester_segment_count
+      );
+      v_remaining_custom_end := public.schedule_custom_times_except_ordinal(
+        v_req_shift.custom_end_time,
+        v_requester_match_ordinal,
+        v_requester_segment_count
+      );
+
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        v_request.org_id,
+        v_request.requester_emp_id,
+        v_request.requester_shift_date,
+        'published',
+        'worked',
+        COALESCE(v_remaining_shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_remaining_job_ids, '{}'::BIGINT[]),
+        NULL,
+        v_remaining_custom_start,
+        v_remaining_custom_end,
+        NULL,
+        FALSE,
+        CASE
+          WHEN v_req_shift.focus_area_id = v_requester_state.focus_area_id THEN v_req_shift.focus_area_id
+          ELSE NULL
+        END,
+        v_req_shift.version,
+        v_admin_user_id,
+        COALESCE(v_remaining_is_mentored_flags, '{}'::BOOLEAN[])
+      );
+    END IF;
 
     DELETE FROM public.schedule_cell_snapshots
     WHERE cell_id = v_req_shift.cell_id
@@ -3467,20 +4591,28 @@ BEGIN
   END IF;
 
   -- Re-validate both employees are still active (status could change between creation and approval)
-  IF NOT EXISTS (
-    SELECT 1 FROM public.employees
+  SELECT id, focus_area_ids, certification_id, role_ids
+  INTO v_requester_employee
+  FROM public.employees
     WHERE id = v_request.requester_emp_id AND org_id = v_request.org_id
       AND archived_at IS NULL AND status = 'active'
-  ) THEN
+  ;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'Requester is no longer active. Cannot approve.';
   END IF;
 
-  IF v_request.target_emp_id IS NOT NULL AND NOT EXISTS (
-    SELECT 1 FROM public.employees
+  IF v_request.target_emp_id IS NOT NULL THEN
+    SELECT id, focus_area_ids, certification_id, role_ids
+    INTO v_target_employee
+    FROM public.employees
     WHERE id = v_request.target_emp_id AND org_id = v_request.org_id
       AND archived_at IS NULL AND status = 'active'
-  ) THEN
-    RAISE EXCEPTION 'Target employee is no longer active. Cannot approve.';
+    ;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Target employee is no longer active. Cannot approve.';
+    END IF;
   END IF;
 
   -- Verify requester's shift still exists as snapshotted
@@ -3495,17 +4627,24 @@ BEGIN
       'published'
     );
 
-    IF NOT FOUND
-       OR public.build_schedule_cell_state_json(
-            v_req_shift.state_kind,
-            COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
-            COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
-            v_req_shift.absence_type_id,
-            v_req_shift.custom_start_time,
-            v_req_shift.custom_end_time,
-            v_req_shift.series_id,
-            v_req_shift.from_recurring
-          ) IS DISTINCT FROM v_request.requester_state THEN
+    IF NOT FOUND OR v_req_shift.state_kind IS DISTINCT FROM 'worked' THEN
+      RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. Please ask the employee to resubmit.';
+    END IF;
+
+    v_requester_match_ordinal := public.find_matching_schedule_segment_ordinal(
+      COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
+      COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[]),
+      v_req_shift.custom_start_time,
+      v_req_shift.custom_end_time,
+      v_requester_state.shift_ids[1],
+      v_requester_state.job_ids[1],
+      COALESCE(v_requester_state.is_mentored_flags[1], FALSE),
+      v_requester_custom_start,
+      v_requester_custom_end
+    );
+
+    IF v_requester_match_ordinal IS NULL THEN
       RAISE EXCEPTION 'The requester''s shift has been modified since the request was created. Please ask the employee to resubmit.';
     END IF;
   END IF;
@@ -3513,6 +4652,130 @@ BEGIN
   IF v_request.type = 'pickup' THEN
     IF v_request.target_emp_id IS NULL THEN
       -- ── VOLUNTEER PICKUP: no source shift to transfer, just assign to volunteer ──
+
+      IF public.has_work_assignment_started(
+        v_request.org_id,
+        v_request.requester_shift_date,
+        COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_requester_state.job_ids, '{}'::BIGINT[]),
+        v_requester_custom_start,
+        v_requester_custom_end
+      ) THEN
+        RAISE EXCEPTION 'Cannot approve: volunteered shift has already started';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(v_requester_state.job_ids, '{}'::BIGINT[])) AS request_jobs(job_id)
+        JOIN public.jobs j ON j.id = request_jobs.job_id
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(array_agg(role.id ORDER BY role.sort_order, role.id), '{}'::BIGINT[]) AS role_ids
+          FROM public.organization_roles role
+          WHERE role.org_id = j.org_id
+            AND role.id = ANY(j.eligible_role_ids)
+            AND role.archived_at IS NULL
+            AND role.is_schedule_role IS DISTINCT FROM FALSE
+        ) eligible_roles ON TRUE
+        WHERE j.archived_at IS NULL
+          AND NOT (
+            CASE
+              WHEN array_length(eligible_roles.role_ids, 1) IS NOT NULL
+                AND array_length(j.required_certification_ids, 1) IS NOT NULL
+                AND COALESCE(j.eligibility_mode, 'and') = 'or'
+              THEN
+                (COALESCE(v_requester_employee.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+                OR (
+                  v_requester_employee.certification_id IS NOT NULL
+                  AND v_requester_employee.certification_id = ANY(j.required_certification_ids)
+                )
+              ELSE
+                (
+                  array_length(eligible_roles.role_ids, 1) IS NULL
+                  OR (COALESCE(v_requester_employee.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+                )
+                AND (
+                  array_length(j.required_certification_ids, 1) IS NULL
+                  OR (
+                    v_requester_employee.certification_id IS NOT NULL
+                    AND v_requester_employee.certification_id = ANY(j.required_certification_ids)
+                  )
+                )
+            END
+          )
+      ) THEN
+        RAISE EXCEPTION 'Cannot approve: volunteer no longer meets the eligibility requirements for this shift';
+      END IF;
+
+      IF v_requester_state.focus_area_id IS NOT NULL
+         AND NOT (v_requester_state.focus_area_id = ANY(COALESCE(v_requester_employee.focus_area_ids, '{}'::BIGINT[]))) THEN
+        RAISE EXCEPTION 'Cannot approve: volunteer is no longer assigned to the required focus area';
+      END IF;
+
+      SELECT COALESCE(
+        NULLIF(o.coverage_rule_config->>'mentoredCoverageCreditPercent', '')::NUMERIC / 100,
+        1
+      )
+      INTO v_mentored_credit
+      FROM public.organizations o
+      WHERE o.id = v_request.org_id;
+
+      v_day_of_week := EXTRACT(DOW FROM v_request.requester_shift_date)::INTEGER;
+
+      FOR v_segment IN
+        SELECT segment.shift_id, segment.job_id, COALESCE(segment.is_mentored, FALSE) AS is_mentored
+        FROM unnest(
+          COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[]),
+          COALESCE(v_requester_state.job_ids, '{}'::BIGINT[]),
+          COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
+        ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
+      LOOP
+        SELECT cr.min_staff
+        INTO v_required_staff
+        FROM public.coverage_requirements cr
+        WHERE cr.org_id = v_request.org_id
+          AND cr.focus_area_id = v_requester_state.focus_area_id
+          AND cr.job_id = v_segment.job_id
+          AND (cr.preferred_shift_id IS NOT DISTINCT FROM v_segment.shift_id OR cr.preferred_shift_id IS NULL)
+          AND (cr.day_of_week = v_day_of_week OR cr.day_of_week IS NULL)
+          AND cr.min_staff > 0
+        ORDER BY
+          CASE WHEN cr.preferred_shift_id IS NOT DISTINCT FROM v_segment.shift_id THEN 0 ELSE 1 END,
+          CASE WHEN cr.day_of_week = v_day_of_week THEN 0 ELSE 1 END
+        LIMIT 1;
+
+        IF v_required_staff IS NULL THEN
+          RAISE EXCEPTION 'Cannot approve: that open shift is no longer available';
+        END IF;
+
+        SELECT COALESCE(SUM(
+          CASE WHEN COALESCE(scheduled_segment.is_mentored, FALSE) THEN v_mentored_credit ELSE 1 END
+        ), 0)
+        INTO v_actual_staff
+        FROM public.employees e
+        JOIN LATERAL public.get_schedule_cell_snapshot_payload(
+          v_request.org_id,
+          e.id,
+          v_request.requester_shift_date,
+          'published'
+        ) snapshot ON TRUE
+        JOIN LATERAL unnest(
+          COALESCE(snapshot.shift_ids, '{}'::BIGINT[]),
+          COALESCE(snapshot.job_ids, '{}'::BIGINT[]),
+          COALESCE(snapshot.is_mentored_flags, '{}'::BOOLEAN[])
+        ) WITH ORDINALITY AS scheduled_segment(shift_id, job_id, is_mentored, ordinality) ON TRUE
+        WHERE e.org_id = v_request.org_id
+          AND e.archived_at IS NULL
+          AND e.status = 'active'
+          AND v_requester_state.focus_area_id = ANY(COALESCE(e.focus_area_ids, '{}'::BIGINT[]))
+          AND snapshot.focus_area_id IS NOT DISTINCT FROM v_requester_state.focus_area_id
+          AND snapshot.state_kind = 'worked'
+          AND scheduled_segment.job_id = v_segment.job_id
+          AND scheduled_segment.shift_id IS NOT DISTINCT FROM v_segment.shift_id;
+
+        IF v_actual_staff >= v_required_staff THEN
+          RAISE EXCEPTION 'Cannot approve: that open shift is no longer available';
+        END IF;
+      END LOOP;
 
       -- Re-check at approval: volunteer must not have an overlapping shift now
       SELECT *
@@ -3569,7 +4832,8 @@ BEGIN
             ELSE NULL
           END,
           v_tgt_shift.version,
-          v_admin_user_id
+          v_admin_user_id,
+          COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[]) || COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
         );
       ELSE
         PERFORM public.write_schedule_cell_snapshot_internal(
@@ -3587,12 +4851,71 @@ BEGIN
           FALSE,
           v_requester_state.focus_area_id,
           CASE WHEN FOUND THEN v_tgt_shift.version ELSE 0 END,
-          v_admin_user_id
+          v_admin_user_id,
+          COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
         );
       END IF;
 
     ELSE
       -- ── CALLOFF-CLAIMED PICKUP: transfer shift from requester to target ──
+
+      IF public.has_work_assignment_started(
+        v_request.org_id,
+        v_request.requester_shift_date,
+        COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_requester_state.job_ids, '{}'::BIGINT[]),
+        v_requester_custom_start,
+        v_requester_custom_end
+      ) THEN
+        RAISE EXCEPTION 'Cannot approve: pickup shift has already started';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(v_requester_state.job_ids, '{}'::BIGINT[])) AS request_jobs(job_id)
+        JOIN public.jobs j ON j.id = request_jobs.job_id
+        LEFT JOIN LATERAL (
+          SELECT COALESCE(array_agg(role.id ORDER BY role.sort_order, role.id), '{}'::BIGINT[]) AS role_ids
+          FROM public.organization_roles role
+          WHERE role.org_id = j.org_id
+            AND role.id = ANY(j.eligible_role_ids)
+            AND role.archived_at IS NULL
+            AND role.is_schedule_role IS DISTINCT FROM FALSE
+        ) eligible_roles ON TRUE
+        WHERE j.archived_at IS NULL
+          AND NOT (
+            CASE
+              WHEN array_length(eligible_roles.role_ids, 1) IS NOT NULL
+                AND array_length(j.required_certification_ids, 1) IS NOT NULL
+                AND COALESCE(j.eligibility_mode, 'and') = 'or'
+              THEN
+                (COALESCE(v_target_employee.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+                OR (
+                  v_target_employee.certification_id IS NOT NULL
+                  AND v_target_employee.certification_id = ANY(j.required_certification_ids)
+                )
+              ELSE
+                (
+                  array_length(eligible_roles.role_ids, 1) IS NULL
+                  OR (COALESCE(v_target_employee.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+                )
+                AND (
+                  array_length(j.required_certification_ids, 1) IS NULL
+                  OR (
+                    v_target_employee.certification_id IS NOT NULL
+                    AND v_target_employee.certification_id = ANY(j.required_certification_ids)
+                  )
+                )
+            END
+          )
+      ) THEN
+        RAISE EXCEPTION 'Cannot approve: target employee no longer meets the eligibility requirements for this shift';
+      END IF;
+
+      IF v_requester_state.focus_area_id IS NOT NULL
+         AND NOT (v_requester_state.focus_area_id = ANY(COALESCE(v_target_employee.focus_area_ids, '{}'::BIGINT[]))) THEN
+        RAISE EXCEPTION 'Cannot approve: target employee is no longer assigned to the required focus area';
+      END IF;
 
       -- Re-check at approval: target must not have an overlapping shift on this date
       SELECT *
@@ -3603,6 +4926,24 @@ BEGIN
         v_request.requester_shift_date,
         'published'
       );
+
+      IF v_request.absence_type_id IS NOT NULL
+         AND (
+           NOT FOUND
+           OR public.build_schedule_cell_state_json(
+                v_tgt_shift.state_kind,
+                COALESCE(v_tgt_shift.shift_ids, '{}'::BIGINT[]),
+                COALESCE(v_tgt_shift.job_ids, '{}'::BIGINT[]),
+                v_tgt_shift.absence_type_id,
+                v_tgt_shift.custom_start_time,
+                v_tgt_shift.custom_end_time,
+                v_tgt_shift.series_id,
+                v_tgt_shift.from_recurring,
+                COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[])
+              ) IS DISTINCT FROM v_request.target_state
+         ) THEN
+        RAISE EXCEPTION 'The target employee''s absence has been modified since the request was created. Please ask the employee to resubmit.';
+      END IF;
 
       IF FOUND
          AND v_tgt_shift.state_kind = 'worked'
@@ -3649,7 +4990,8 @@ BEGIN
             ELSE NULL
           END,
           v_tgt_shift.version,
-          v_admin_user_id
+          v_admin_user_id,
+          COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[]) || COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
         );
       ELSE
         PERFORM public.write_schedule_cell_snapshot_internal(
@@ -3667,12 +5009,107 @@ BEGIN
           FALSE,
           v_requester_state.focus_area_id,
           CASE WHEN FOUND THEN v_tgt_shift.version ELSE 0 END,
+          v_admin_user_id,
+          COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
+        );
+      END IF;
+
+      v_requester_segment_count := COALESCE(array_length(v_req_shift.job_ids, 1), 0);
+
+      IF v_requester_segment_count <= 1 AND v_request.absence_type_id IS NOT NULL THEN
+        PERFORM public.write_schedule_cell_snapshot_internal(
+          v_request.org_id,
+          v_request.requester_emp_id,
+          v_request.requester_shift_date,
+          'published',
+          'absence',
+          '{}'::BIGINT[],
+          '{}'::BIGINT[],
+          v_request.absence_type_id,
+          NULL,
+          NULL,
+          NULL,
+          FALSE,
+          v_requester_state.focus_area_id,
+          v_req_shift.version,
           v_admin_user_id
+        );
+
+        DELETE FROM public.schedule_cell_snapshots
+        WHERE cell_id = v_req_shift.cell_id
+          AND snapshot_kind = 'draft';
+      ELSIF v_requester_segment_count <= 1 THEN
+        PERFORM public.write_schedule_cell_snapshot_internal(
+          v_request.org_id,
+          v_request.requester_emp_id,
+          v_request.requester_shift_date,
+          'published',
+          'deleted',
+          '{}'::BIGINT[],
+          '{}'::BIGINT[],
+          NULL,
+          NULL,
+          NULL,
+          NULL,
+          FALSE,
+          NULL,
+          v_req_shift.version,
+          v_admin_user_id
+        );
+      ELSE
+        SELECT
+          COALESCE(array_agg(segment.shift_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+          COALESCE(array_agg(segment.job_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+          COALESCE(array_agg(segment.is_mentored ORDER BY segment.ordinality), '{}'::BOOLEAN[])
+        INTO v_remaining_shift_ids, v_remaining_job_ids, v_remaining_is_mentored_flags
+        FROM unnest(
+          COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
+          COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
+          COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[])
+        ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
+        WHERE segment.ordinality <> v_requester_match_ordinal;
+
+        v_remaining_custom_start := public.schedule_custom_times_except_ordinal(
+          v_req_shift.custom_start_time,
+          v_requester_match_ordinal,
+          v_requester_segment_count
+        );
+        v_remaining_custom_end := public.schedule_custom_times_except_ordinal(
+          v_req_shift.custom_end_time,
+          v_requester_match_ordinal,
+          v_requester_segment_count
+        );
+
+        PERFORM public.write_schedule_cell_snapshot_internal(
+          v_request.org_id,
+          v_request.requester_emp_id,
+          v_request.requester_shift_date,
+          'published',
+          'worked',
+          COALESCE(v_remaining_shift_ids, '{}'::BIGINT[]),
+          COALESCE(v_remaining_job_ids, '{}'::BIGINT[]),
+          NULL,
+          v_remaining_custom_start,
+          v_remaining_custom_end,
+          NULL,
+          FALSE,
+          CASE
+            WHEN v_req_shift.focus_area_id = v_requester_state.focus_area_id THEN v_req_shift.focus_area_id
+            ELSE NULL
+          END,
+          v_req_shift.version,
+          v_admin_user_id,
+          COALESCE(v_remaining_is_mentored_flags, '{}'::BOOLEAN[])
         );
       END IF;
     END IF;
 
   ELSIF v_request.type = 'swap' THEN
+    IF v_request.requester_shift_date < CURRENT_DATE
+       OR v_request.target_shift_date < CURRENT_DATE THEN
+      RAISE EXCEPTION 'Cannot approve: swap includes a past shift';
+    END IF;
+
     -- Verify target's shift still exists as snapshotted
     SELECT *
     INTO v_tgt_shift
@@ -3683,18 +5120,91 @@ BEGIN
       'published'
     );
 
-    IF NOT FOUND
-       OR public.build_schedule_cell_state_json(
-            v_tgt_shift.state_kind,
-            COALESCE(v_tgt_shift.shift_ids, '{}'::BIGINT[]),
-            COALESCE(v_tgt_shift.job_ids, '{}'::BIGINT[]),
-            v_tgt_shift.absence_type_id,
-            v_tgt_shift.custom_start_time,
-            v_tgt_shift.custom_end_time,
-            v_tgt_shift.series_id,
-            v_tgt_shift.from_recurring
-          ) IS DISTINCT FROM v_request.target_state THEN
+    IF NOT FOUND OR v_tgt_shift.state_kind IS DISTINCT FROM 'worked' THEN
       RAISE EXCEPTION 'The target''s shift has been modified since the request was created. Please ask the employees to resubmit.';
+    END IF;
+
+    v_target_match_ordinal := public.find_matching_schedule_segment_ordinal(
+      COALESCE(v_tgt_shift.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_tgt_shift.job_ids, '{}'::BIGINT[]),
+      COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[]),
+      v_tgt_shift.custom_start_time,
+      v_tgt_shift.custom_end_time,
+      v_target_state.shift_ids[1],
+      v_target_state.job_ids[1],
+      COALESCE(v_target_state.is_mentored_flags[1], FALSE),
+      v_target_custom_start,
+      v_target_custom_end
+    );
+
+    IF v_target_match_ordinal IS NULL THEN
+      RAISE EXCEPTION 'The target''s shift has been modified since the request was created. Please ask the employees to resubmit.';
+    END IF;
+
+    IF public.has_work_assignment_started(
+      v_request.org_id,
+      v_request.requester_shift_date,
+      COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_requester_state.job_ids, '{}'::BIGINT[]),
+      v_requester_custom_start,
+      v_requester_custom_end
+    ) THEN
+      RAISE EXCEPTION 'Cannot approve: requester shift has already started';
+    END IF;
+
+    IF public.has_work_assignment_started(
+      v_request.org_id,
+      v_request.target_shift_date,
+      COALESCE(v_target_state.shift_ids, '{}'::BIGINT[]),
+      COALESCE(v_target_state.job_ids, '{}'::BIGINT[]),
+      v_target_custom_start,
+      v_target_custom_end
+    ) THEN
+      RAISE EXCEPTION 'Cannot approve: target shift has already started';
+    END IF;
+
+    SELECT COALESCE(array_agg(DISTINCT required.focus_area_id), '{}'::BIGINT[])
+    INTO v_requester_required_focus_area_ids
+    FROM (
+      SELECT v_req_shift.focus_area_id AS focus_area_id
+      WHERE v_req_shift.focus_area_id IS NOT NULL
+      UNION
+      SELECT sc.focus_area_id
+      FROM unnest(COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[])) AS shift_ids(shift_id)
+      JOIN public.shift_categories sc
+        ON sc.id = shift_ids.shift_id
+       AND sc.org_id = v_request.org_id
+      WHERE sc.focus_area_id IS NOT NULL
+    ) required;
+
+    SELECT COALESCE(array_agg(DISTINCT required.focus_area_id), '{}'::BIGINT[])
+    INTO v_target_required_focus_area_ids
+    FROM (
+      SELECT v_tgt_shift.focus_area_id AS focus_area_id
+      WHERE v_tgt_shift.focus_area_id IS NOT NULL
+      UNION
+      SELECT sc.focus_area_id
+      FROM unnest(COALESCE(v_target_state.shift_ids, '{}'::BIGINT[])) AS shift_ids(shift_id)
+      JOIN public.shift_categories sc
+        ON sc.id = shift_ids.shift_id
+       AND sc.org_id = v_request.org_id
+      WHERE sc.focus_area_id IS NOT NULL
+    ) required;
+
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_requester_required_focus_area_ids) AS required(focus_area_id)
+      WHERE NOT (required.focus_area_id = ANY(COALESCE(v_target_employee.focus_area_ids, '{}'::BIGINT[])))
+    ) THEN
+      RAISE EXCEPTION 'Cannot approve: target employee is not eligible for the requester shift focus area';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(v_target_required_focus_area_ids) AS required(focus_area_id)
+      WHERE NOT (required.focus_area_id = ANY(COALESCE(v_requester_employee.focus_area_ids, '{}'::BIGINT[])))
+    ) THEN
+      RAISE EXCEPTION 'Cannot approve: requester is not eligible for the target shift focus area';
     END IF;
 
     -- Block if shifts have overlapping time slots (full cascade: custom → job override/default → shift).
@@ -3762,13 +5272,150 @@ BEGIN
       END IF;
     END IF;
 
-    -- Delete the specific swapped shifts from their original owners
-    DELETE FROM public.schedule_cells
-    WHERE org_id = v_request.org_id
-      AND (
-        (emp_id = v_request.requester_emp_id AND date = v_request.requester_shift_date)
-        OR (emp_id = v_request.target_emp_id AND date = v_request.target_shift_date)
+    -- Remove only the specific swapped segments from their original owners.
+    SELECT *
+    INTO v_req_shift
+    FROM public.get_schedule_cell_snapshot_payload(
+      v_request.org_id,
+      v_request.requester_emp_id,
+      v_request.requester_shift_date,
+      'published'
+    );
+
+    v_requester_segment_count := COALESCE(array_length(v_req_shift.job_ids, 1), 0);
+    IF v_requester_segment_count <= 1 THEN
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        v_request.org_id,
+        v_request.requester_emp_id,
+        v_request.requester_shift_date,
+        'published',
+        'deleted',
+        '{}'::BIGINT[],
+        '{}'::BIGINT[],
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        FALSE,
+        NULL,
+        v_req_shift.version,
+        v_admin_user_id
       );
+    ELSE
+      SELECT
+        COALESCE(array_agg(segment.shift_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+        COALESCE(array_agg(segment.job_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+        COALESCE(array_agg(segment.is_mentored ORDER BY segment.ordinality), '{}'::BOOLEAN[])
+      INTO v_remaining_shift_ids, v_remaining_job_ids, v_remaining_is_mentored_flags
+      FROM unnest(
+        COALESCE(v_req_shift.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_req_shift.job_ids, '{}'::BIGINT[]),
+        COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[])
+      ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
+      WHERE segment.ordinality <> v_requester_match_ordinal;
+
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        v_request.org_id,
+        v_request.requester_emp_id,
+        v_request.requester_shift_date,
+        'published',
+        'worked',
+        COALESCE(v_remaining_shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_remaining_job_ids, '{}'::BIGINT[]),
+        NULL,
+        public.schedule_custom_times_except_ordinal(
+          v_req_shift.custom_start_time,
+          v_requester_match_ordinal,
+          v_requester_segment_count
+        ),
+        public.schedule_custom_times_except_ordinal(
+          v_req_shift.custom_end_time,
+          v_requester_match_ordinal,
+          v_requester_segment_count
+        ),
+        NULL,
+        FALSE,
+        CASE
+          WHEN v_req_shift.focus_area_id = v_requester_state.focus_area_id THEN v_req_shift.focus_area_id
+          ELSE NULL
+        END,
+        v_req_shift.version,
+        v_admin_user_id,
+        COALESCE(v_remaining_is_mentored_flags, '{}'::BOOLEAN[])
+      );
+    END IF;
+
+    SELECT *
+    INTO v_tgt_shift
+    FROM public.get_schedule_cell_snapshot_payload(
+      v_request.org_id,
+      v_request.target_emp_id,
+      v_request.target_shift_date,
+      'published'
+    );
+
+    v_target_segment_count := COALESCE(array_length(v_tgt_shift.job_ids, 1), 0);
+    IF v_target_segment_count <= 1 THEN
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        v_request.org_id,
+        v_request.target_emp_id,
+        v_request.target_shift_date,
+        'published',
+        'deleted',
+        '{}'::BIGINT[],
+        '{}'::BIGINT[],
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+        FALSE,
+        NULL,
+        v_tgt_shift.version,
+        v_admin_user_id
+      );
+    ELSE
+      SELECT
+        COALESCE(array_agg(segment.shift_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+        COALESCE(array_agg(segment.job_id ORDER BY segment.ordinality), '{}'::BIGINT[]),
+        COALESCE(array_agg(segment.is_mentored ORDER BY segment.ordinality), '{}'::BOOLEAN[])
+      INTO v_remaining_shift_ids, v_remaining_job_ids, v_remaining_is_mentored_flags
+      FROM unnest(
+        COALESCE(v_tgt_shift.shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_tgt_shift.job_ids, '{}'::BIGINT[]),
+        COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[])
+      ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
+      WHERE segment.ordinality <> v_target_match_ordinal;
+
+      PERFORM public.write_schedule_cell_snapshot_internal(
+        v_request.org_id,
+        v_request.target_emp_id,
+        v_request.target_shift_date,
+        'published',
+        'worked',
+        COALESCE(v_remaining_shift_ids, '{}'::BIGINT[]),
+        COALESCE(v_remaining_job_ids, '{}'::BIGINT[]),
+        NULL,
+        public.schedule_custom_times_except_ordinal(
+          v_tgt_shift.custom_start_time,
+          v_target_match_ordinal,
+          v_target_segment_count
+        ),
+        public.schedule_custom_times_except_ordinal(
+          v_tgt_shift.custom_end_time,
+          v_target_match_ordinal,
+          v_target_segment_count
+        ),
+        NULL,
+        FALSE,
+        CASE
+          WHEN v_tgt_shift.focus_area_id = v_target_state.focus_area_id THEN v_tgt_shift.focus_area_id
+          ELSE NULL
+        END,
+        v_tgt_shift.version,
+        v_admin_user_id,
+        COALESCE(v_remaining_is_mentored_flags, '{}'::BOOLEAN[])
+      );
+    END IF;
 
     SELECT *
     INTO v_tgt_shift
@@ -3808,7 +5455,8 @@ BEGIN
           ELSE NULL
         END,
         v_tgt_shift.version,
-        v_admin_user_id
+        v_admin_user_id,
+        COALESCE(v_tgt_shift.is_mentored_flags, '{}'::BOOLEAN[]) || COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
       );
     ELSE
       PERFORM public.write_schedule_cell_snapshot_internal(
@@ -3826,7 +5474,8 @@ BEGIN
         FALSE,
         v_requester_state.focus_area_id,
         CASE WHEN FOUND THEN v_tgt_shift.version ELSE 0 END,
-        v_admin_user_id
+        v_admin_user_id,
+        COALESCE(v_requester_state.is_mentored_flags, '{}'::BOOLEAN[])
       );
     END IF;
 
@@ -3868,7 +5517,8 @@ BEGIN
           ELSE NULL
         END,
         v_req_shift.version,
-        v_admin_user_id
+        v_admin_user_id,
+        COALESCE(v_req_shift.is_mentored_flags, '{}'::BOOLEAN[]) || COALESCE(v_target_state.is_mentored_flags, '{}'::BOOLEAN[])
       );
     ELSE
       PERFORM public.write_schedule_cell_snapshot_internal(
@@ -3886,7 +5536,8 @@ BEGIN
         FALSE,
         v_target_state.focus_area_id,
         CASE WHEN FOUND THEN v_req_shift.version ELSE 0 END,
-        v_admin_user_id
+        v_admin_user_id,
+        COALESCE(v_target_state.is_mentored_flags, '{}'::BOOLEAN[])
       );
     END IF;
   END IF;
@@ -3896,6 +5547,84 @@ BEGIN
   SET status = 'approved', admin_user_id = v_admin_user_id,
       admin_note = p_note, resolved_at = now(), updated_at = now()
   WHERE id = p_request_id;
+
+  IF v_request.type = 'pickup' AND v_request.target_emp_id IS NULL THEN
+    UPDATE public.shift_requests sr
+    SET status = 'cancelled',
+        admin_note = 'Auto-cancelled: open shift was taken by another approved volunteer',
+        resolved_at = now(),
+        updated_at = now()
+    WHERE sr.id != p_request_id
+      AND sr.org_id = v_request.org_id
+      AND sr.type = 'pickup'
+      AND sr.status = 'pending_approval'
+      AND sr.target_emp_id IS NULL
+      AND sr.parent_request_id IS NULL
+      AND sr.requester_shift_date = v_request.requester_shift_date
+      AND EXISTS (
+        SELECT 1
+        FROM public.resolve_schedule_state_storage(sr.org_id, sr.requester_state) other_state
+        JOIN LATERAL unnest(
+          COALESCE(other_state.shift_ids, '{}'::BIGINT[]),
+          COALESCE(other_state.job_ids, '{}'::BIGINT[])
+        ) AS other_segment(shift_id, job_id) ON TRUE
+        JOIN LATERAL unnest(
+          COALESCE(v_requester_state.shift_ids, '{}'::BIGINT[]),
+          COALESCE(v_requester_state.job_ids, '{}'::BIGINT[])
+        ) AS approved_segment(shift_id, job_id) ON TRUE
+        WHERE other_state.focus_area_id IS NOT DISTINCT FROM v_requester_state.focus_area_id
+          AND other_segment.job_id = approved_segment.job_id
+          AND other_segment.shift_id IS NOT DISTINCT FROM approved_segment.shift_id
+      )
+      AND EXISTS (
+        SELECT 1
+        FROM public.resolve_schedule_state_storage(sr.org_id, sr.requester_state) other_state
+        JOIN LATERAL unnest(
+          COALESCE(other_state.shift_ids, '{}'::BIGINT[]),
+          COALESCE(other_state.job_ids, '{}'::BIGINT[])
+        ) AS other_segment(shift_id, job_id) ON TRUE
+        JOIN LATERAL (
+          SELECT requirement.min_staff
+          FROM public.coverage_requirements requirement
+          WHERE requirement.org_id = sr.org_id
+            AND requirement.focus_area_id = other_state.focus_area_id
+            AND requirement.job_id = other_segment.job_id
+            AND (requirement.preferred_shift_id IS NOT DISTINCT FROM other_segment.shift_id OR requirement.preferred_shift_id IS NULL)
+            AND (requirement.day_of_week = EXTRACT(DOW FROM sr.requester_shift_date)::INTEGER OR requirement.day_of_week IS NULL)
+            AND requirement.min_staff > 0
+          ORDER BY
+            CASE WHEN requirement.preferred_shift_id IS NOT DISTINCT FROM other_segment.shift_id THEN 0 ELSE 1 END,
+            CASE WHEN requirement.day_of_week = EXTRACT(DOW FROM sr.requester_shift_date)::INTEGER THEN 0 ELSE 1 END
+          LIMIT 1
+        ) cr ON TRUE
+        WHERE other_state.focus_area_id IS NOT DISTINCT FROM v_requester_state.focus_area_id
+          AND (
+            SELECT COALESCE(SUM(
+              CASE WHEN COALESCE(scheduled_segment.is_mentored, FALSE) THEN v_mentored_credit ELSE 1 END
+            ), 0)
+            FROM public.employees e
+            JOIN LATERAL public.get_schedule_cell_snapshot_payload(
+              sr.org_id,
+              e.id,
+              sr.requester_shift_date,
+              'published'
+            ) snapshot ON TRUE
+            JOIN LATERAL unnest(
+              COALESCE(snapshot.shift_ids, '{}'::BIGINT[]),
+              COALESCE(snapshot.job_ids, '{}'::BIGINT[]),
+              COALESCE(snapshot.is_mentored_flags, '{}'::BOOLEAN[])
+            ) WITH ORDINALITY AS scheduled_segment(shift_id, job_id, is_mentored, ordinality) ON TRUE
+            WHERE e.org_id = sr.org_id
+              AND e.archived_at IS NULL
+              AND e.status = 'active'
+              AND other_state.focus_area_id = ANY(COALESCE(e.focus_area_ids, '{}'::BIGINT[]))
+              AND snapshot.focus_area_id IS NOT DISTINCT FROM other_state.focus_area_id
+              AND snapshot.state_kind = 'worked'
+              AND scheduled_segment.job_id = other_segment.job_id
+              AND scheduled_segment.shift_id IS NOT DISTINCT FROM other_segment.shift_id
+          ) >= cr.min_staff
+      );
+  END IF;
 
   -- Cascade-cancel all other active requests involving the modified shifts
   UPDATE public.shift_requests
@@ -3972,6 +5701,9 @@ GRANT EXECUTE ON FUNCTION public.cancel_shift_request(UUID, UUID) TO authenticat
 -- Creates a pickup request with status='pending_approval' (volunteer IS the requester,
 -- target_emp_id is NULL to distinguish from calloff-claimed pickups).
 
+DROP FUNCTION IF EXISTS public.volunteer_for_open_shift(UUID, UUID, DATE, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, BOOLEAN[]);
+DROP FUNCTION IF EXISTS public.volunteer_for_open_shift(UUID, UUID, DATE, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION public.volunteer_for_open_shift(
   p_org_id              UUID,
   p_emp_id              UUID,
@@ -3980,7 +5712,8 @@ CREATE OR REPLACE FUNCTION public.volunteer_for_open_shift(
   p_job_ids             BIGINT[],
   p_focus_area_id       BIGINT,
   p_custom_start_time   TEXT DEFAULT NULL,
-  p_custom_end_time     TEXT DEFAULT NULL
+  p_custom_end_time     TEXT DEFAULT NULL,
+  p_is_mentored_flags   BOOLEAN[] DEFAULT '{}'::BOOLEAN[]
 ) RETURNS UUID
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
@@ -3989,9 +5722,20 @@ DECLARE
   v_request_id UUID;
   v_employee RECORD;
   v_existing_shift RECORD;
+  v_segment RECORD;
+  v_required_staff INTEGER;
+  v_actual_staff NUMERIC;
+  v_pending_volunteer_count INTEGER;
+  v_day_of_week INTEGER;
+  v_mentored_credit NUMERIC := 1;
 BEGIN
   IF COALESCE(array_length(p_shift_ids, 1), 0) != COALESCE(array_length(p_job_ids, 1), 0) THEN
     RAISE EXCEPTION 'Shift ID and job ID segment lengths must match';
+  END IF;
+
+  IF array_length(p_is_mentored_flags, 1) IS NOT NULL
+     AND array_length(p_is_mentored_flags, 1) != array_length(p_job_ids, 1) THEN
+    RAISE EXCEPTION 'Mentored flag and job ID segment lengths must match';
   END IF;
 
   -- Validate worked assignment is non-empty
@@ -4000,7 +5744,7 @@ BEGIN
   END IF;
 
   -- Validate employee is active in this org
-  SELECT id, user_id, certification_id, status, focus_area_ids INTO v_employee
+  SELECT id, user_id, certification_id, role_ids, status, focus_area_ids INTO v_employee
   FROM public.employees
   WHERE id = p_emp_id AND org_id = p_org_id AND archived_at IS NULL;
 
@@ -4019,25 +5763,180 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: you can only volunteer for yourself';
   END IF;
 
-  -- Check job certification requirements.
+  -- Check job eligibility requirements. Items inside each gate are alternatives;
+  -- eligibility_mode only controls how role and certification gates combine.
   IF EXISTS (
     SELECT 1
     FROM unnest(COALESCE(p_job_ids, '{}'::BIGINT[])) AS request_jobs(job_id)
     JOIN public.jobs j ON j.id = request_jobs.job_id
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(array_agg(role.id ORDER BY role.sort_order, role.id), '{}'::BIGINT[]) AS role_ids
+      FROM public.organization_roles role
+      WHERE role.org_id = j.org_id
+        AND role.id = ANY(j.eligible_role_ids)
+        AND role.archived_at IS NULL
+        AND role.is_schedule_role IS DISTINCT FROM FALSE
+    ) eligible_roles ON TRUE
     WHERE j.archived_at IS NULL
-      AND array_length(j.required_certification_ids, 1) IS NOT NULL
-      AND (
-        v_employee.certification_id IS NULL
-        OR NOT (v_employee.certification_id = ANY(j.required_certification_ids))
+      AND NOT (
+        CASE
+          WHEN array_length(eligible_roles.role_ids, 1) IS NOT NULL
+            AND array_length(j.required_certification_ids, 1) IS NOT NULL
+            AND COALESCE(j.eligibility_mode, 'and') = 'or'
+          THEN
+            (COALESCE(v_employee.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+            OR (
+              v_employee.certification_id IS NOT NULL
+              AND v_employee.certification_id = ANY(j.required_certification_ids)
+            )
+          ELSE
+            (
+              array_length(eligible_roles.role_ids, 1) IS NULL
+              OR (COALESCE(v_employee.role_ids, '{}'::BIGINT[]) && eligible_roles.role_ids)
+            )
+            AND (
+              array_length(j.required_certification_ids, 1) IS NULL
+              OR (
+                v_employee.certification_id IS NOT NULL
+                AND v_employee.certification_id = ANY(j.required_certification_ids)
+              )
+            )
+        END
       )
   ) THEN
-    RAISE EXCEPTION 'You do not meet the certification requirements for this shift';
+    RAISE EXCEPTION 'You do not meet the eligibility requirements for this shift';
   END IF;
 
   IF p_focus_area_id IS NOT NULL
      AND NOT (p_focus_area_id = ANY(COALESCE(v_employee.focus_area_ids, '{}'::BIGINT[]))) THEN
     RAISE EXCEPTION 'You are not assigned to the focus area required for this shift';
   END IF;
+
+  IF public.has_work_assignment_started(
+    p_org_id,
+    p_shift_date,
+    COALESCE(p_shift_ids, '{}'::BIGINT[]),
+    COALESCE(p_job_ids, '{}'::BIGINT[]),
+    p_custom_start_time,
+    p_custom_end_time
+  ) THEN
+    RAISE EXCEPTION 'Cannot volunteer for a shift that has already started';
+  END IF;
+
+  SELECT COALESCE(
+    NULLIF(o.coverage_rule_config->>'mentoredCoverageCreditPercent', '')::NUMERIC / 100,
+    1
+  )
+  INTO v_mentored_credit
+  FROM public.organizations o
+  WHERE o.id = p_org_id;
+
+  v_day_of_week := EXTRACT(DOW FROM p_shift_date)::INTEGER;
+
+  FOR v_segment IN
+    SELECT segment.shift_id, segment.job_id, COALESCE(segment.is_mentored, FALSE) AS is_mentored
+    FROM unnest(
+      COALESCE(p_shift_ids, '{}'::BIGINT[]),
+      COALESCE(p_job_ids, '{}'::BIGINT[]),
+      COALESCE(p_is_mentored_flags, '{}'::BOOLEAN[])
+    ) WITH ORDINALITY AS segment(shift_id, job_id, is_mentored, ordinality)
+  LOOP
+    PERFORM pg_advisory_xact_lock(hashtext(
+      'open_shift_volunteer_' ||
+      p_org_id::TEXT || '_' ||
+      p_shift_date::TEXT || '_' ||
+      COALESCE(p_focus_area_id::TEXT, 'none') || '_' ||
+      COALESCE(v_segment.shift_id::TEXT, 'none') || '_' ||
+      v_segment.job_id::TEXT
+    ));
+
+    SELECT cr.min_staff
+    INTO v_required_staff
+    FROM public.coverage_requirements cr
+    WHERE cr.org_id = p_org_id
+      AND cr.focus_area_id = p_focus_area_id
+      AND cr.job_id = v_segment.job_id
+      AND (cr.preferred_shift_id IS NOT DISTINCT FROM v_segment.shift_id OR cr.preferred_shift_id IS NULL)
+      AND (cr.day_of_week = v_day_of_week OR cr.day_of_week IS NULL)
+      AND cr.min_staff > 0
+    ORDER BY
+      CASE WHEN cr.preferred_shift_id IS NOT DISTINCT FROM v_segment.shift_id THEN 0 ELSE 1 END,
+      CASE WHEN cr.day_of_week = v_day_of_week THEN 0 ELSE 1 END
+    LIMIT 1;
+
+    IF v_required_staff IS NULL THEN
+      RAISE EXCEPTION 'That open shift is no longer available';
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.shift_requests sr
+      JOIN LATERAL public.resolve_schedule_state_storage(sr.org_id, sr.requester_state) request_state ON TRUE
+      JOIN LATERAL unnest(
+        COALESCE(request_state.shift_ids, '{}'::BIGINT[]),
+        COALESCE(request_state.job_ids, '{}'::BIGINT[])
+      ) AS request_segment(shift_id, job_id) ON TRUE
+      WHERE sr.org_id = p_org_id
+        AND sr.type = 'pickup'
+        AND sr.status = 'pending_approval'
+        AND sr.target_emp_id IS NULL
+        AND sr.parent_request_id IS NULL
+        AND sr.requester_emp_id = p_emp_id
+        AND sr.requester_shift_date = p_shift_date
+        AND request_state.focus_area_id IS NOT DISTINCT FROM p_focus_area_id
+        AND request_segment.job_id = v_segment.job_id
+        AND request_segment.shift_id IS NOT DISTINCT FROM v_segment.shift_id
+    ) THEN
+      RAISE EXCEPTION 'You already volunteered for this open shift';
+    END IF;
+
+    SELECT COUNT(DISTINCT sr.id)
+    INTO v_pending_volunteer_count
+    FROM public.shift_requests sr
+    JOIN LATERAL public.resolve_schedule_state_storage(sr.org_id, sr.requester_state) request_state ON TRUE
+    JOIN LATERAL unnest(
+      COALESCE(request_state.shift_ids, '{}'::BIGINT[]),
+      COALESCE(request_state.job_ids, '{}'::BIGINT[])
+    ) AS request_segment(shift_id, job_id) ON TRUE
+    WHERE sr.org_id = p_org_id
+      AND sr.type = 'pickup'
+      AND sr.status = 'pending_approval'
+      AND sr.target_emp_id IS NULL
+      AND sr.parent_request_id IS NULL
+      AND sr.requester_shift_date = p_shift_date
+      AND request_state.focus_area_id IS NOT DISTINCT FROM p_focus_area_id
+      AND request_segment.job_id = v_segment.job_id
+      AND request_segment.shift_id IS NOT DISTINCT FROM v_segment.shift_id;
+
+    SELECT COALESCE(SUM(
+      CASE WHEN COALESCE(scheduled_segment.is_mentored, FALSE) THEN v_mentored_credit ELSE 1 END
+    ), 0)
+    INTO v_actual_staff
+    FROM public.employees e
+    JOIN LATERAL public.get_schedule_cell_snapshot_payload(
+      p_org_id,
+      e.id,
+      p_shift_date,
+      'published'
+    ) snapshot ON TRUE
+    JOIN LATERAL unnest(
+      COALESCE(snapshot.shift_ids, '{}'::BIGINT[]),
+      COALESCE(snapshot.job_ids, '{}'::BIGINT[]),
+      COALESCE(snapshot.is_mentored_flags, '{}'::BOOLEAN[])
+    ) WITH ORDINALITY AS scheduled_segment(shift_id, job_id, is_mentored, ordinality) ON TRUE
+    WHERE e.org_id = p_org_id
+      AND e.archived_at IS NULL
+      AND e.status = 'active'
+      AND p_focus_area_id = ANY(COALESCE(e.focus_area_ids, '{}'::BIGINT[]))
+      AND snapshot.focus_area_id IS NOT DISTINCT FROM p_focus_area_id
+      AND snapshot.state_kind = 'worked'
+      AND scheduled_segment.job_id = v_segment.job_id
+      AND scheduled_segment.shift_id IS NOT DISTINCT FROM v_segment.shift_id;
+
+    IF v_actual_staff + COALESCE(v_pending_volunteer_count, 0) >= v_required_staff THEN
+      RAISE EXCEPTION 'That open shift is no longer available';
+    END IF;
+  END LOOP;
 
   -- Check time conflicts: volunteer must not have an overlapping shift on this date
   SELECT *
@@ -4095,7 +5994,9 @@ BEGIN
       p_custom_start_time,
       p_custom_end_time,
       NULL,
-      FALSE
+      FALSE,
+      COALESCE(p_is_mentored_flags, '{}'::BOOLEAN[]),
+      p_focus_area_id
     )
   ) RETURNING id INTO v_request_id;
 
@@ -4103,7 +6004,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.volunteer_for_open_shift(UUID, UUID, DATE, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.volunteer_for_open_shift(UUID, UUID, DATE, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, BOOLEAN[]) TO authenticated;
 
 
 -- ── expire_shift_requests ───────────────────────────────────────────────────
@@ -4481,7 +6382,14 @@ BEGIN
     COALESCE(m.cnt, 0) AS user_count,
     COALESCE(e.cnt, 0) AS employee_count
   FROM
-    (SELECT om.org_id, COUNT(*) AS cnt FROM public.organization_memberships om GROUP BY om.org_id) m
+    (
+      SELECT om.org_id, COUNT(*) AS cnt
+      FROM public.organization_memberships om
+      JOIN public.profiles p ON p.id = om.user_id
+      WHERE om.archived_at IS NULL
+        AND p.platform_role <> 'gridmaster'
+      GROUP BY om.org_id
+    ) m
   FULL OUTER JOIN
     (SELECT emp.org_id, COUNT(*) AS cnt FROM public.employees emp WHERE emp.archived_at IS NULL GROUP BY emp.org_id) e
   ON m.org_id = e.org_id;
@@ -4902,11 +6810,13 @@ CREATE TRIGGER trg_jobs_validate_placement
 -- NORMALIZED SCHEDULE CELLS
 -- ══════════════════════════════════════════════════════════════════════════════
 
-DROP FUNCTION IF EXISTS public.sync_schedule_cell_snapshot(UUID, UUID, TEXT, TEXT, BIGINT, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT[]);
+DROP FUNCTION IF EXISTS public.sync_schedule_cell_snapshot(UUID, UUID, TEXT, TEXT, BIGINT, TEXT, TEXT, BIGINT[], BIGINT[], BOOLEAN[]);
 DROP FUNCTION IF EXISTS public.sync_schedule_cell_snapshot(UUID, UUID, TEXT, TEXT, BIGINT, TEXT, TEXT, BIGINT[], BIGINT[]);
 DROP FUNCTION IF EXISTS public.move_shift(UUID, UUID, DATE, UUID, DATE, TEXT, BIGINT[], BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, TEXT, BIGINT);
 DROP FUNCTION IF EXISTS public.write_schedule_cell_snapshot(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT);
+DROP FUNCTION IF EXISTS public.write_schedule_cell_snapshot(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT);
 DROP FUNCTION IF EXISTS public.write_schedule_cell_snapshot_internal(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT, UUID);
+DROP FUNCTION IF EXISTS public.write_schedule_cell_snapshot_internal(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT, UUID);
 
 CREATE OR REPLACE FUNCTION public.sync_schedule_cell_snapshot(
   p_cell_id UUID,
@@ -4917,7 +6827,8 @@ CREATE OR REPLACE FUNCTION public.sync_schedule_cell_snapshot(
   p_custom_start_time TEXT,
   p_custom_end_time TEXT,
   p_shift_ids BIGINT[],
-  p_job_ids BIGINT[]
+  p_job_ids BIGINT[],
+  p_is_mentored_flags BOOLEAN[] DEFAULT '{}'::BOOLEAN[]
 )
 RETURNS VOID
 LANGUAGE plpgsql
@@ -4982,14 +6893,16 @@ BEGIN
       org_id,
       position,
       shift_id,
-      job_id
+      job_id,
+      is_mentored
     )
     VALUES (
       v_snapshot_id,
       p_org_id,
       v_index - 1,
       p_shift_ids[v_index],
-      p_job_ids[v_index]
+      p_job_ids[v_index],
+      COALESCE(p_is_mentored_flags[v_index], false)
     );
   END LOOP;
 END;
@@ -5015,7 +6928,8 @@ RETURNS TABLE (
   custom_start_time TEXT,
   custom_end_time TEXT,
   shift_ids BIGINT[],
-  job_ids BIGINT[]
+  job_ids BIGINT[],
+  is_mentored_flags BOOLEAN[]
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -5044,7 +6958,12 @@ AS $$
         array_agg(segments.job_id ORDER BY segments.position)
           FILTER (WHERE segments.id IS NOT NULL),
         '{}'::BIGINT[]
-      ) AS job_ids
+      ) AS job_ids,
+      COALESCE(
+        array_agg(segments.is_mentored ORDER BY segments.position)
+          FILTER (WHERE segments.id IS NOT NULL),
+        '{}'::BOOLEAN[]
+      ) AS is_mentored_flags
     FROM public.schedule_cells c
     JOIN public.schedule_cell_snapshots snapshot
       ON snapshot.cell_id = c.id
@@ -5083,7 +7002,8 @@ AS $$
     aggregated_segments.custom_start_time,
     aggregated_segments.custom_end_time,
     aggregated_segments.shift_ids,
-    aggregated_segments.job_ids
+    aggregated_segments.job_ids,
+    aggregated_segments.is_mentored_flags
   FROM aggregated_segments;
 $$;
 
@@ -5101,7 +7021,8 @@ CREATE OR REPLACE FUNCTION public.write_schedule_cell_snapshot(
   p_series_id UUID DEFAULT NULL,
   p_from_recurring BOOLEAN DEFAULT FALSE,
   p_focus_area_id BIGINT DEFAULT NULL,
-  p_expected_version BIGINT DEFAULT NULL
+  p_expected_version BIGINT DEFAULT NULL,
+  p_is_mentored_flags BOOLEAN[] DEFAULT '{}'::BOOLEAN[]
 )
 RETURNS BIGINT
 LANGUAGE plpgsql
@@ -5145,6 +7066,10 @@ BEGIN
     RAISE EXCEPTION 'Shift ID and job ID segment lengths must match';
   END IF;
 
+  IF COALESCE(array_length(p_is_mentored_flags, 1), 0) NOT IN (0, COALESCE(array_length(p_job_ids, 1), 0)) THEN
+    RAISE EXCEPTION 'Mentored segment flag lengths must match shift segment lengths';
+  END IF;
+
   IF p_state_kind = 'worked' AND COALESCE(array_length(p_job_ids, 1), 0) = 0 THEN
     RAISE EXCEPTION 'Worked snapshots must include at least one segment';
   END IF;
@@ -5256,6 +7181,10 @@ BEGIN
     CASE
       WHEN p_state_kind = 'worked' THEN COALESCE(p_job_ids, '{}'::BIGINT[])
       ELSE '{}'::BIGINT[]
+    END,
+    CASE
+      WHEN p_state_kind = 'worked' THEN COALESCE(p_is_mentored_flags, '{}'::BOOLEAN[])
+      ELSE '{}'::BOOLEAN[]
     END
   );
 
@@ -5264,7 +7193,7 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_schedule_cell_snapshot_payload(UUID, UUID, DATE, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.write_schedule_cell_snapshot(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.write_schedule_cell_snapshot(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT, BOOLEAN[]) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.write_schedule_cell_snapshot_internal(
   p_org_id UUID,
@@ -5281,7 +7210,8 @@ CREATE OR REPLACE FUNCTION public.write_schedule_cell_snapshot_internal(
   p_from_recurring BOOLEAN DEFAULT FALSE,
   p_focus_area_id BIGINT DEFAULT NULL,
   p_expected_version BIGINT DEFAULT NULL,
-  p_actor_id UUID DEFAULT NULL
+  p_actor_id UUID DEFAULT NULL,
+  p_is_mentored_flags BOOLEAN[] DEFAULT '{}'::BOOLEAN[]
 )
 RETURNS BIGINT
 LANGUAGE plpgsql
@@ -5306,6 +7236,10 @@ BEGIN
     RAISE EXCEPTION 'Shift ID and job ID segment lengths must match';
   END IF;
 
+  IF COALESCE(array_length(p_is_mentored_flags, 1), 0) NOT IN (0, COALESCE(array_length(p_job_ids, 1), 0)) THEN
+    RAISE EXCEPTION 'Mentored segment flag lengths must match shift segment lengths';
+  END IF;
+
   IF p_state_kind = 'worked' AND COALESCE(array_length(p_job_ids, 1), 0) = 0 THEN
     RAISE EXCEPTION 'Worked snapshots must include at least one segment';
   END IF;
@@ -5417,6 +7351,10 @@ BEGIN
     CASE
       WHEN p_state_kind = 'worked' THEN COALESCE(p_job_ids, '{}'::BIGINT[])
       ELSE '{}'::BIGINT[]
+    END,
+    CASE
+      WHEN p_state_kind = 'worked' THEN COALESCE(p_is_mentored_flags, '{}'::BOOLEAN[])
+      ELSE '{}'::BOOLEAN[]
     END
   );
 
@@ -5512,7 +7450,8 @@ BEGIN
       NULL,
       NULL,
       '{}'::BIGINT[],
-      '{}'::BIGINT[]
+      '{}'::BIGINT[],
+      '{}'::BOOLEAN[]
     );
 
     RETURN v_next_version;

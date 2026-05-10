@@ -24,9 +24,9 @@ import { NameMismatchError } from "@/lib/account-linking";
 import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
 import { validateEmail } from "@/components/FormField";
 import { toast } from "sonner";
-import { ExplainerSection, WorkflowStrip } from "@/components/ui/explainer-section";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import type {
   AssignableOrganizationRole,
   Department,
@@ -184,9 +184,9 @@ export function EmployeeManagementAccessModal({
     if (!response.ok) {
       try {
         const parsed = JSON.parse(body) as { error?: string };
-        throw new Error(parsed.error || "Failed to send invitation email");
+        throw new Error(formatClientErrorMessage(parsed.error, "We couldn't send the invitation email."));
       } catch {
-        throw new Error("Failed to send invitation email");
+        throw new Error("We couldn't send the invitation email.");
       }
     }
   }
@@ -296,7 +296,7 @@ export function EmployeeManagementAccessModal({
         setNameMismatch(err.details);
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Failed to update management access");
+      toast.error(formatClientErrorMessage(err, "We couldn't update management access."));
     } finally {
       setSaving(false);
     }
@@ -316,7 +316,7 @@ export function EmployeeManagementAccessModal({
         toast.error("Access changed elsewhere. Review the latest values and try again.");
         return;
       }
-      toast.error(err instanceof Error ? err.message : "Failed to update management access");
+      toast.error(formatClientErrorMessage(err, "We couldn't update management access."));
     } finally {
       setSaving(false);
     }
@@ -343,49 +343,6 @@ export function EmployeeManagementAccessModal({
         />
       ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <ExplainerSection
-          title="How management access works"
-          compact
-          defaultOpen={false}
-          storageKey="dg-explainer-management-access"
-          points={[
-            {
-              title: "The employee record stays separate from the login",
-              description: "You can grant management access without changing the employee's scheduled departments, focus areas, or schedule status.",
-            },
-            {
-              title: "Org role controls app-level access",
-              description: "Role determines whether the linked account is a regular user or an admin inside the organization.",
-            },
-            {
-              title: "Management departments live on the membership or invite",
-              description: "These departments organize management access and roster membership. They do not rewrite the employee record itself.",
-            },
-          ]}
-          preview={(
-            <WorkflowStrip
-              compact
-              steps={[
-                {
-                  label: "Employee record",
-                  description: "Scheduled identity and staffing details",
-                  tone: "default",
-                },
-                {
-                  label: "Linked login",
-                  description: "Email-based account access",
-                  tone: "info",
-                },
-                {
-                  label: "Org role + management departments",
-                  description: "Permissions and management roster membership",
-                  tone: "success",
-                },
-              ]}
-            />
-          )}
-        />
-
         <div>
           <label style={fieldLabelStyle}>Login email</label>
           <input

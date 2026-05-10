@@ -53,8 +53,20 @@ import {
   normalizeShiftTimeOverrides,
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
+import {
+  DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+  isDefaultShiftSystemJob,
+  isProtectedSystemJob,
+  isRegularStaffSystemJob,
+} from "@/lib/system-jobs";
+import {
+  getCodeError,
+  getLineTextError,
+  normalizeCode,
+  normalizeLineText,
+} from "@/lib/form-validation";
 
-type JobSection = "scheduled" | "shiftless";
+type JobSection = "defaultShift" | "scheduled" | "shiftless";
 
 type JobFormState = {
   name: string;
@@ -83,9 +95,15 @@ const EMPTY_SCHEDULED_JOB_STYLE = {
   border: "",
   text: "",
 } as const;
+const DEFAULT_SHIFT_JOB_NAME = "Default shift job";
+const DEFAULT_SHIFT_JOB_ABBR = "SHIFT";
 
 function getJobSection(job: Pick<JobDefinition, "assignmentMode">): JobSection {
   return job.assignmentMode === "shiftless" ? "shiftless" : "scheduled";
+}
+
+function isScheduledLikeSection(section: JobSection): boolean {
+  return section !== "shiftless";
 }
 
 function sortByOrder<T extends { sortOrder: number; id: number }>(items: T[]): T[] {
@@ -526,7 +544,7 @@ function EligibilityModeToggle({
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ ...labelStyle, marginBottom: 0 }}>MATCHING RULE</div>
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.35 }}>
-          Choose whether staff must match both lists or either list.
+          Choose whether staff must match the role gate and certification gate, or just one gate.
         </div>
       </div>
       <div
@@ -571,6 +589,13 @@ function EligibilityModeToggle({
 }
 
 function buildSectionHeaderText(section: JobSection): { title: string; description: string } {
+  if (section === "defaultShift") {
+    return {
+      title: "Default Shift Job",
+      description: "Configure shift-only assignments like Day Shift. The job is hidden on the grid but still controls placement, qualifications, times, and colors.",
+    };
+  }
+
   if (section === "shiftless") {
     return {
       title: "General Jobs",
@@ -589,12 +614,14 @@ function JobSectionCard({
   rows,
   canManageScheduleDefinitions,
   onAdd,
+  hideAddButton = false,
   children,
 }: {
   section: JobSection;
   rows: Array<JobDefinition & { isNew?: boolean }>;
   canManageScheduleDefinitions: boolean;
   onAdd: () => void;
+  hideAddButton?: boolean;
   children: React.ReactNode;
 }) {
   const header = buildSectionHeaderText(section);
@@ -660,7 +687,7 @@ function JobSectionCard({
       )}
 
       {rows.length > 0 && canManageScheduleDefinitions ? (
-        <div style={{ padding: "8px 16px 12px" }}>
+        !hideAddButton ? <div style={{ padding: "8px 16px 12px" }}>
           <button
             onClick={onAdd}
             className="dg-btn dg-btn-dashed dg-btn-sm"
@@ -668,7 +695,7 @@ function JobSectionCard({
           >
             {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
           </button>
-        </div>
+        </div> : null
       ) : null}
     </div>
   );
@@ -708,9 +735,11 @@ function JobRow({
   shiftDisplayMode: ShiftDisplayMode;
 }) {
   const isMobile = useMediaQuery(MOBILE);
-  const isSystemJob = job.systemKey === "regular_staff";
+  const isRegularStaffJob = isRegularStaffSystemJob(job);
+  const isDefaultShiftJob = section === "defaultShift" || isDefaultShiftSystemJob(job);
+  const isLockedIdentityJob = isProtectedSystemJob(job) || isDefaultShiftJob;
   const [form, setForm] = useState<JobFormState>(() => buildJobFormState(job, shiftCategories, focusAreas));
-  const [expanded, setExpanded] = useState(!!job.isNew);
+  const [expanded, setExpanded] = useState(!!job.isNew && !isDefaultShiftJob);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -850,7 +879,26 @@ function JobRow({
   const isDirty = job.isNew || initialSerialized !== currentSerialized;
   const normalizedName = form.name.trim().toLowerCase();
   const normalizedAbbr = form.abbr.trim().toUpperCase();
+  const nameError =
+    form.name.trim().length > 0
+      ? getLineTextError(form.name, {
+          label: "Job name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        })
+      : null;
+  const abbrError =
+    form.abbr.trim().length > 0
+      ? getCodeError(form.abbr, {
+          label: "Job abbreviation",
+          maxLength: 6,
+          required: true,
+          uppercase: true,
+        })
+      : null;
   const duplicateName =
+    !isLockedIdentityJob &&
     normalizedName.length > 0 &&
     allJobs.some(
       (candidate) =>
@@ -858,6 +906,7 @@ function JobRow({
         candidate.name.trim().toLowerCase() === normalizedName,
     );
   const duplicateAbbr =
+    !isLockedIdentityJob &&
     normalizedAbbr.length > 0 &&
     allJobs.some(
       (candidate) =>
@@ -876,6 +925,8 @@ function JobRow({
     isDirty &&
     !!form.name.trim() &&
     !!form.abbr.trim() &&
+    !nameError &&
+    !abbrError &&
     !duplicateName &&
     !duplicateAbbr &&
     !incompleteGeneralJobTime &&
@@ -971,27 +1022,41 @@ function JobRow({
       const saved = await upsertJobDefinition({
         id: job.isNew ? undefined : job.id,
         orgId,
-        name: form.name.trim(),
-        abbr: form.abbr.trim().toUpperCase(),
-        showOnGrid: isSystemJob ? false : true,
+        name: isDefaultShiftJob
+          ? DEFAULT_SHIFT_JOB_NAME
+          : normalizeLineText(form.name, {
+              label: "Job name",
+              maxLength: 50,
+              required: true,
+              disallowUrl: true,
+            }),
+        abbr: isDefaultShiftJob
+          ? DEFAULT_SHIFT_JOB_ABBR
+          : normalizeCode(form.abbr, {
+              label: "Job abbreviation",
+              maxLength: 6,
+              required: true,
+              uppercase: true,
+            }),
+        showOnGrid: isLockedIdentityJob ? false : true,
         assignmentMode: section === "shiftless" ? "shiftless" : "with_shift",
         eligibilityMode: form.eligibilityMode,
-        focusAreaIds: section === "scheduled" ? [...form.focusAreaIds] : [],
-        departmentIds: section === "scheduled" ? [...form.departmentIds] : [],
-        applicableShiftIds: section === "scheduled" ? [...form.applicableShiftIds] : [],
+        focusAreaIds: isScheduledLikeSection(section) ? [...form.focusAreaIds] : [],
+        departmentIds: isScheduledLikeSection(section) ? [...form.departmentIds] : [],
+        applicableShiftIds: isScheduledLikeSection(section) ? [...form.applicableShiftIds] : [],
         eligibleRoleIds: [...form.eligibleRoleIds],
         requiredCertificationIds: [...form.requiredCertificationIds],
         color: section === "shiftless" ? form.color : EMPTY_SCHEDULED_JOB_STYLE.color,
         border: section === "shiftless" ? form.border : EMPTY_SCHEDULED_JOB_STYLE.border,
         text: section === "shiftless" ? form.text : EMPTY_SCHEDULED_JOB_STYLE.text,
-        shiftTimeOverrides: section === "scheduled" ? normalizedShiftTimeOverrides : {},
-        shiftColorOverrides: section === "scheduled" ? normalizedShiftColorOverrides : {},
+        shiftTimeOverrides: isScheduledLikeSection(section) ? normalizedShiftTimeOverrides : {},
+        shiftColorOverrides: isScheduledLikeSection(section) ? normalizedShiftColorOverrides : {},
         defaultStartTime: section === "shiftless" ? timingDefaults.defaultStartTime : null,
         defaultEndTime: section === "shiftless" ? timingDefaults.defaultEndTime : null,
         defaultDurationHours: section === "shiftless" ? timingDefaults.defaultDurationHours : null,
         defaultDurationMinutes: section === "shiftless" ? timingDefaults.defaultDurationMinutes : null,
         sortOrder: job.sortOrder,
-        systemKey: job.systemKey ?? null,
+        systemKey: isDefaultShiftJob ? DEFAULT_SHIFT_JOB_SYSTEM_KEY : (job.systemKey ?? null),
       });
       onSaved(saved, job.id);
       setExpanded(false);
@@ -1010,7 +1075,8 @@ function JobRow({
   }, [
     canSave,
     form,
-    isSystemJob,
+    isDefaultShiftJob,
+    isLockedIdentityJob,
     job.id,
     job.isNew,
     job.sortOrder,
@@ -1060,7 +1126,9 @@ function JobRow({
   }, [closeEditor, expanded, isDirty, requestClose]);
 
   const placementSummary =
-    section === "shiftless"
+    isDefaultShiftJob
+      ? `Shift-only: ${form.departmentIds.length} dept · ${form.focusAreaIds.length} area · ${form.applicableShiftIds.length} shift`
+      : section === "shiftless"
       ? "General / no shift"
       : `${formatCount(form.departmentIds.length, "department")} · ${formatCount(form.focusAreaIds.length, "focus area")} · ${formatCount(form.applicableShiftIds.length, "shift")}`;
 
@@ -1104,9 +1172,9 @@ function JobRow({
             <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
               {placementSummary}
             </span>
-            {isSystemJob ? (
+            {isLockedIdentityJob ? (
               <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-brand)" }}>
-                System default
+                {isDefaultShiftJob ? "Shift-only" : "System default"}
               </span>
             ) : null}
           </div>
@@ -1141,7 +1209,9 @@ function JobRow({
           <SectionBlock
             title="Basics"
             description={
-              section === "scheduled"
+              isDefaultShiftJob
+                ? "Use this row for assignments that should display as the shift only, like D or Day Shift."
+                : section === "scheduled"
                 ? "Name the job once, then configure exactly how it behaves on the selected shifts."
                 : "Use shiftless jobs for work that stands on its own without a scheduled shift."
             }
@@ -1163,8 +1233,17 @@ function JobRow({
                   placeholder={section === "shiftless" ? "e.g. Office" : "e.g. Supervisor"}
                   className="dg-input"
                   maxLength={50}
-                  disabled={!canManageScheduleDefinitions || isSystemJob}
+                  disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
+                  style={nameError ? { borderColor: "var(--color-danger)" } : undefined}
                 />
+                {nameError ? (
+                  <p
+                    role="alert"
+                    style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                  >
+                    {nameError}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label style={labelStyle}>GRID ABBR</label>
@@ -1176,8 +1255,17 @@ function JobRow({
                   placeholder={section === "shiftless" ? "e.g. OFC" : "e.g. SUP"}
                   className="dg-input"
                   maxLength={6}
-                  disabled={!canManageScheduleDefinitions || isSystemJob}
+                  disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
+                  style={abbrError ? { borderColor: "var(--color-danger)" } : undefined}
                 />
+                {abbrError ? (
+                  <p
+                    role="alert"
+                    style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                  >
+                    {abbrError}
+                  </p>
+                ) : null}
               </div>
             </div>
 
@@ -1461,7 +1549,7 @@ function JobRow({
             ) : null}
           </SectionBlock>
 
-          {section === "scheduled" ? (
+          {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Placement"
               description="Choose the scheduled departments first. Then select the focus areas inside them and the shifts where this job applies."
@@ -1518,7 +1606,7 @@ function JobRow({
                       };
                     })
                   }
-                  disabled={!canManageScheduleDefinitions || isSystemJob}
+                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
                   emptyMessage="No scheduled departments exist yet."
                 />
 
@@ -1599,7 +1687,7 @@ function JobRow({
                       };
                     })
                   }
-                  disabled={!canManageScheduleDefinitions || isSystemJob || form.departmentIds.length === 0}
+                  disabled={!canManageScheduleDefinitions || isRegularStaffJob || form.departmentIds.length === 0}
                   emptyMessage={
                     form.departmentIds.length === 0
                       ? "Select scheduled departments first."
@@ -1668,7 +1756,7 @@ function JobRow({
                       };
                     })
                   }
-                  disabled={!canManageScheduleDefinitions || isSystemJob || form.focusAreaIds.length === 0}
+                  disabled={!canManageScheduleDefinitions || isRegularStaffJob || form.focusAreaIds.length === 0}
                   emptyMessage={
                     form.focusAreaIds.length === 0
                       ? "Select focus areas first."
@@ -1679,7 +1767,7 @@ function JobRow({
             </SectionBlock>
           ) : null}
 
-          {section === "scheduled" ? (
+          {isScheduledLikeSection(section) ? (
             <SectionBlock
               title="Per-shift Settings"
               description="Scheduled jobs inherit each selected shift by default. Customize the color and time only where this job needs to behave differently."
@@ -1709,11 +1797,13 @@ function JobRow({
                       shiftAbbr: shift.abbr,
                       shiftDisplayMode,
                     });
-                    const previewSecondary = getJobPreviewLabel({
-                      jobName: form.name,
-                      jobAbbr: form.abbr,
-                      shiftDisplayMode,
-                    });
+                    const previewSecondary = isDefaultShiftJob
+                      ? null
+                      : getJobPreviewLabel({
+                        jobName: form.name,
+                        jobAbbr: form.abbr,
+                        shiftDisplayMode,
+                      });
                     const resolvedTimes = resolveJobTimesForShift(
                       {
                         assignmentMode: "with_shift",
@@ -1798,7 +1888,7 @@ function JobRow({
                                     },
                                   }))
                                 }
-                                disabled={!canManageScheduleDefinitions || isSystemJob}
+                                disabled={!canManageScheduleDefinitions || isRegularStaffJob}
                               />
                               <button
                                 type="button"
@@ -1810,7 +1900,7 @@ function JobRow({
                                     return { ...prev, shiftColorOverrides: nextOverrides };
                                   })
                                 }
-                                disabled={!canManageScheduleDefinitions || isSystemJob || colorOverride == null}
+                                disabled={!canManageScheduleDefinitions || isRegularStaffJob || colorOverride == null}
                               >
                                 {colorOverride == null ? "Using shift color" : "Use shift color"}
                               </button>
@@ -1845,7 +1935,7 @@ function JobRow({
                                     return { ...prev, shiftTimeOverrides: nextOverrides };
                                   })
                                 }
-                                disabled={!canManageScheduleDefinitions || isSystemJob}
+                                disabled={!canManageScheduleDefinitions || isRegularStaffJob}
                               />
                               Override time
                             </label>
@@ -1867,7 +1957,7 @@ function JobRow({
                                       },
                                     }))
                                   }
-                                  disabled={!canManageScheduleDefinitions || isSystemJob}
+                                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
                                 />
                                 <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
                                   to
@@ -1887,7 +1977,7 @@ function JobRow({
                                       },
                                     }))
                                   }
-                                  disabled={!canManageScheduleDefinitions || isSystemJob}
+                                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
                                 />
                               </div>
                             ) : (
@@ -1912,7 +2002,7 @@ function JobRow({
 
           <SectionBlock
             title="Eligibility"
-            description={`Use schedule-eligible ${roleLabel.toLowerCase()}, ${certificationLabel.toLowerCase()}, or both to qualify staff. Leave either list empty to keep that gate open.`}
+            description={`Pick any schedule-eligible ${roleLabel.toLowerCase()} and ${certificationLabel.toLowerCase()} that can qualify staff. Selections inside each list are alternatives. Leave either list empty to keep that gate open.`}
           >
             <div
               style={{
@@ -2023,19 +2113,19 @@ function JobRow({
             </p>
           ) : null}
 
-          {section === "scheduled" && form.departmentIds.length === 0 ? (
+          {isScheduledLikeSection(section) && form.departmentIds.length === 0 ? (
             <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
               Select at least one scheduled department.
             </p>
           ) : null}
 
-          {section === "scheduled" && form.departmentIds.length > 0 && form.focusAreaIds.length === 0 ? (
+          {isScheduledLikeSection(section) && form.departmentIds.length > 0 && form.focusAreaIds.length === 0 ? (
             <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
               Select at least one focus area.
             </p>
           ) : null}
 
-          {section === "scheduled" && form.focusAreaIds.length > 0 && form.applicableShiftIds.length === 0 ? (
+          {isScheduledLikeSection(section) && form.focusAreaIds.length > 0 && form.applicableShiftIds.length === 0 ? (
             <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
               Select at least one shift.
             </p>
@@ -2061,7 +2151,7 @@ function JobRow({
 
           <EditorActionRow
             destructiveAction={
-              canManageScheduleDefinitions && !job.isNew && !isSystemJob ? (
+              canManageScheduleDefinitions && !job.isNew && !isLockedIdentityJob ? (
                 <button
                   onClick={handleDeleteClick}
                   disabled={deleting}
@@ -2181,9 +2271,70 @@ export default function JobsSettings({
     [departments],
   );
   const visibleRows = useMemo(
-    () => local.filter((job) => job.systemKey !== "regular_staff"),
+    () => local.filter((job) => !isRegularStaffSystemJob(job) && !isDefaultShiftSystemJob(job)),
     [local],
   );
+  const defaultShiftRows = useMemo(() => {
+    const existing = local.find((job) => isDefaultShiftSystemJob(job));
+    if (existing) return [existing];
+
+    const defaultDepartmentId =
+      activeScheduledDepartments.find((department) =>
+        focusAreas.some(
+          (focusArea) =>
+            focusArea.departmentId === department.id &&
+            activeShiftCategories.some((shift) => shift.focusAreaId === focusArea.id),
+        ),
+      )?.id ?? null;
+    const focusAreaIds = defaultDepartmentId == null
+      ? []
+      : focusAreas
+          .filter((focusArea) => focusArea.departmentId === defaultDepartmentId)
+          .map((focusArea) => focusArea.id);
+
+    return [
+      {
+        id: -999_001,
+        orgId,
+        name: DEFAULT_SHIFT_JOB_NAME,
+        abbr: DEFAULT_SHIFT_JOB_ABBR,
+        showOnGrid: false,
+        assignmentMode: "with_shift" as const,
+        eligibilityMode: "and" as const,
+        focusAreaId: null,
+        focusAreaIds,
+        departmentIds: defaultDepartmentId != null ? [defaultDepartmentId] : [],
+        applicableShiftIds:
+          defaultDepartmentId == null
+            ? []
+            : activeShiftCategories
+                .filter((shift) =>
+                  shift.focusAreaId != null &&
+                  focusAreas.some(
+                    (focusArea) =>
+                      focusArea.id === shift.focusAreaId &&
+                      focusArea.departmentId === defaultDepartmentId,
+                  ),
+                )
+                .map((shift) => shift.id),
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: EMPTY_SCHEDULED_JOB_STYLE.color,
+        border: EMPTY_SCHEDULED_JOB_STYLE.border,
+        text: EMPTY_SCHEDULED_JOB_STYLE.text,
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: -1000,
+        systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+        archivedAt: null,
+        isNew: true as const,
+      },
+    ];
+  }, [activeScheduledDepartments, activeShiftCategories, focusAreas, orgId]);
   const scheduledRows = useMemo(
     () => {
       const scheduled = visibleRows.filter((job) => getJobSection(job) === "scheduled");
@@ -2193,9 +2344,9 @@ export default function JobsSettings({
           compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
         );
       const drafts = scheduled.filter((job) => job.isNew);
-      return [...persisted, ...drafts];
+      return [...defaultShiftRows, ...persisted, ...drafts];
     },
-    [certifications, orgRoles, visibleRows],
+    [certifications, defaultShiftRows, orgRoles, visibleRows],
   );
   const shiftlessRows = useMemo(
     () => {
@@ -2311,7 +2462,10 @@ export default function JobsSettings({
 
   const handleSaved = useCallback(
     (saved: JobDefinition, previousId: number) => {
-      const updated = local.map((job) => (job.id === previousId ? saved : job));
+      const replaced = local.some((job) => job.id === previousId);
+      const updated = replaced
+        ? local.map((job) => (job.id === previousId ? saved : job))
+        : [...local, saved];
       setLocal(updated);
       emitPersistedJobs(updated);
     },
@@ -2355,7 +2509,7 @@ export default function JobsSettings({
           <JobRow
             key={job.id}
             job={job}
-            section="scheduled"
+            section={isDefaultShiftSystemJob(job) ? "defaultShift" : "scheduled"}
             orgId={orgId}
             roleLabel={roleLabel}
             certificationLabel={certificationLabel}
@@ -2373,7 +2527,7 @@ export default function JobsSettings({
         ))}
       </JobSectionCard>
 
-      {!canCreateScheduledJob && scheduledRows.length === 0 ? (
+      {!canCreateScheduledJob ? (
         <div
           style={{
             marginTop: -4,

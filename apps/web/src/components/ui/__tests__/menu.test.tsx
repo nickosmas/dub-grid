@@ -36,6 +36,11 @@ describe("ui/menu", () => {
 
     expect(container).not.toHaveTextContent("First action");
     expect(screen.getByRole("menuitem", { name: "First action" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "First action" })
+        .closest('[data-slot="menu-content"]')
+        ?.parentElement,
+    ).toHaveStyle({ zIndex: "10002" });
     const arrow = document.body.querySelector('[data-slot="menu-arrow"]');
     expect(arrow).not.toBeNull();
     expect(arrow?.tagName).toBe("svg");

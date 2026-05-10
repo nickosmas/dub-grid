@@ -1,21 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import type { ShiftRequest } from "@/types";
 import type { OpenShift } from "@/lib/dashboard-stats";
 
 export interface ActionItem {
   id: string;
-  type:
-    | "approval"
-    | "swap_proposal"
-    | "pickup"
-    | "coverage_gap"
-    | "draft";
+  type: "approval" | "swap_proposal" | "pickup" | "coverage_gap" | "draft";
   title: string;
   subtitle: string;
   urgency: "high" | "medium" | "low";
   href?: string;
-  action?: { label: string; onClick: () => void };
-  secondaryAction?: { label: string; onClick: () => void };
+  action?: { label: string; onClick: () => void | Promise<unknown> };
+  secondaryAction?: { label: string; onClick: () => void | Promise<unknown> };
 }
 
 const URGENCY_DOT: Record<string, string> = {
@@ -23,6 +23,24 @@ const URGENCY_DOT: Record<string, string> = {
   medium: "var(--color-warning)",
   low: "var(--color-info)",
 };
+
+function getRequestShiftName(request: ShiftRequest): string {
+  const segmentNames =
+    request.requesterPresentation?.segments
+      ?.map((segment) => segment.shiftName?.trim())
+      .filter((name): name is string => Boolean(name)) ?? [];
+  const uniqueSegmentNames = [...new Set(segmentNames)];
+
+  if (uniqueSegmentNames.length > 0) {
+    return uniqueSegmentNames.join(" + ");
+  }
+
+  return (
+    request.requesterPresentation?.shiftName?.trim() ||
+    request.requesterPresentation?.label?.trim() ||
+    request.requesterShiftLabel
+  );
+}
 
 interface ActionQueueCardProps {
   items: ActionItem[];
@@ -59,11 +77,12 @@ export function buildActionItems({
   if (isAdmin) {
     // Pending approvals
     for (const req of pendingApproval.slice(0, 3)) {
+      const shiftName = getRequestShiftName(req);
       items.push({
         id: `approval-${req.id}`,
         type: "approval",
-        title: `${req.requesterName} requested ${req.type}`,
-        subtitle: `${req.requesterShiftLabel} \u00B7 ${req.requesterShiftDate}`,
+        title: `${req.requesterName} requested ${formatShiftRequestTypeLabel(req.type).toLowerCase()}`,
+        subtitle: `${shiftName} \u00B7 ${req.requesterShiftDate}`,
         urgency: "high",
         action: onResolve
           ? { label: "Approve", onClick: () => onResolve(req.id, true) }
@@ -88,11 +107,15 @@ export function buildActionItems({
 
     // Coverage gaps
     const highUrgency = openShifts.filter((s) => s.urgency === "high");
-    if (highUrgency.length > 0) {
+    const highUrgencySlotCount = highUrgency.reduce(
+      (total, shift) => total + shift.needed,
+      0,
+    );
+    if (highUrgencySlotCount > 0) {
       items.push({
         id: "coverage-gaps",
         type: "coverage_gap",
-        title: `${highUrgency.length} urgent coverage gap${highUrgency.length !== 1 ? "s" : ""}`,
+        title: `${highUrgencySlotCount} urgent coverage slot${highUrgencySlotCount !== 1 ? "s" : ""}`,
         subtitle: "Understaffed shifts need attention",
         urgency: "high",
         href: "/schedule",
@@ -101,11 +124,12 @@ export function buildActionItems({
   } else {
     // User: swap proposals
     for (const req of swapProposals.slice(0, 3)) {
+      const shiftName = getRequestShiftName(req);
       items.push({
         id: `swap-${req.id}`,
         type: "swap_proposal",
         title: `${req.requesterName} wants to swap shifts`,
-        subtitle: `${req.requesterShiftLabel} \u00B7 ${req.requesterShiftDate}`,
+        subtitle: `${shiftName} \u00B7 ${req.requesterShiftDate}`,
         urgency: "high",
         action:
           onRespond && currentEmpId != null
@@ -126,10 +150,11 @@ export function buildActionItems({
 
     // User: open pickups
     for (const req of openPickups.slice(0, 3)) {
+      const shiftName = getRequestShiftName(req);
       items.push({
         id: `pickup-${req.id}`,
         type: "pickup",
-        title: `Open shift: ${req.requesterShiftLabel}`,
+        title: `Open shift: ${shiftName}`,
         subtitle: `${req.requesterShiftDate}`,
         urgency: "low",
         action:
@@ -173,104 +198,152 @@ function ActionItemRow({
   item: ActionItem;
   showBorder: boolean;
 }) {
+  const [pendingAction, setPendingAction] = useState<{
+    label: string;
+    onClick: () => void | Promise<unknown>;
+  } | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const confirmationTitle = pendingAction
+    ? `${pendingAction.label} request?`
+    : "Confirm request action?";
+  const confirmationVariant =
+    pendingAction?.label === "Reject" || pendingAction?.label === "Decline"
+      ? "danger"
+      : "info";
+
+  async function confirmAction() {
+    if (!pendingAction || isRunning) return;
+
+    setIsRunning(true);
+    try {
+      await pendingAction.onClick();
+      setPendingAction(null);
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
   const content = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 18px",
-        borderBottom: showBorder
-          ? "1px solid var(--color-border-light)"
-          : "none",
-      }}
-    >
-      {/* Urgency dot */}
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: URGENCY_DOT[item.urgency],
-          flexShrink: 0,
-        }}
-      />
-
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 500,
-            color: "var(--color-text-primary)",
+    <>
+      {pendingAction && (
+        <ConfirmDialog
+          confirmLabel={pendingAction.label}
+          isLoading={isRunning}
+          message={
+            <>
+              {pendingAction.label} <strong>{item.title}</strong>?
+            </>
+          }
+          title={confirmationTitle}
+          variant={confirmationVariant}
+          onCancel={() => {
+            if (!isRunning) setPendingAction(null);
           }}
-        >
-          {item.title}
-        </div>
-        <div
-          style={{
-            fontSize: 10,
-            color: "var(--color-text-subtle)",
-            marginTop: 1,
+          onConfirm={() => {
+            void confirmAction();
           }}
-        >
-          {item.subtitle}
-        </div>
-      </div>
-
-      {/* Actions */}
-      {(item.action || item.secondaryAction) && (
-        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-          {item.action && (
-            <button
-              onClick={item.action.onClick}
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: 5,
-                background: "var(--color-success)",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
-              }}
-            >
-              {item.action.label}
-            </button>
-          )}
-          {item.secondaryAction && (
-            <button
-              onClick={item.secondaryAction.onClick}
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 8px",
-                borderRadius: 5,
-                background: "transparent",
-                color: "var(--color-text-subtle)",
-                border: "1px solid var(--color-border)",
-                cursor: "pointer",
-              }}
-            >
-              {item.secondaryAction.label}
-            </button>
-          )}
-        </div>
+        />
       )}
-
-      {/* Link arrow for href items */}
-      {item.href && !item.action && (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 18px",
+          borderBottom: showBorder
+            ? "1px solid var(--color-border-light)"
+            : "none",
+        }}
+      >
+        {/* Urgency dot */}
         <span
           style={{
-            fontSize: 11,
-            color: "var(--color-primary)",
-            fontWeight: 500,
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: URGENCY_DOT[item.urgency],
+            flexShrink: 0,
           }}
-        >
-          &rarr;
-        </span>
-      )}
-    </div>
+        />
+
+        {/* Content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 500,
+              color: "var(--color-text-primary)",
+            }}
+          >
+            {item.title}
+          </div>
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--color-text-subtle)",
+              marginTop: 1,
+            }}
+          >
+            {item.subtitle}
+          </div>
+        </div>
+
+        {/* Actions */}
+        {(item.action || item.secondaryAction) && (
+          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+            {item.action && (
+              <button
+                disabled={isRunning}
+                onClick={() => setPendingAction(item.action ?? null)}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "3px 8px",
+                  borderRadius: 5,
+                  background: "var(--color-success)",
+                  color: "#fff",
+                  border: "none",
+                  cursor: isRunning ? "not-allowed" : "pointer",
+                }}
+              >
+                {item.action.label}
+              </button>
+            )}
+            {item.secondaryAction && (
+              <button
+                disabled={isRunning}
+                onClick={() => setPendingAction(item.secondaryAction ?? null)}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "3px 8px",
+                  borderRadius: 5,
+                  background: "transparent",
+                  color: "var(--color-text-subtle)",
+                  border: "1px solid var(--color-border)",
+                  cursor: isRunning ? "not-allowed" : "pointer",
+                }}
+              >
+                {item.secondaryAction.label}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Link arrow for href items */}
+        {item.href && !item.action && (
+          <span
+            style={{
+              fontSize: 11,
+              color: "var(--color-primary)",
+              fontWeight: 500,
+            }}
+          >
+            &rarr;
+          </span>
+        )}
+      </div>
+    </>
   );
 
   if (item.href && !item.action) {

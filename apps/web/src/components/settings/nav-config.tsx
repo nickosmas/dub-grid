@@ -4,13 +4,13 @@ import React from "react";
 
 // ── Section IDs ──────────────────────────────────────────────────────────────
 export type SectionId =
-  | "org-general" | "org-labels" | "org-display"
+  | "org-general" | "org-billing" | "org-labels" | "org-display"
   | "schedule-rules" | "schedule-shifts" | "schedule-jobs" | "schedule-absence-types" | "schedule-coverage"
   | "staff-certifications" | "staff-roles" | "staff-departments" | "staff-indicators"
   | "platform-impersonation";
 
 export const VALID_SECTIONS: SectionId[] = [
-  "org-general", "org-labels", "org-display",
+  "org-general", "org-billing", "org-labels", "org-display",
   "schedule-rules", "schedule-shifts", "schedule-jobs", "schedule-absence-types", "schedule-coverage",
   "staff-certifications", "staff-roles", "staff-departments", "staff-indicators",
   "platform-impersonation",
@@ -37,6 +37,7 @@ export function resolveSection(raw: string | null): SectionId | null {
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const iconBuilding = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+const iconBilling = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>;
 const iconLabels = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
 const iconDisplay = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>;
 const iconRules = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
@@ -93,6 +94,7 @@ export function buildNavGroups(
   if (perms.canAccessSettings) {
     const orgItems: NavItem[] = [];
     if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "Organization Details", icon: iconBuilding, description: "Manage your organization's name and basic profile information." });
+    if (perms.isSuperAdmin || perms.isGridmaster) orgItems.push({ id: "org-billing", label: "Billing", icon: iconBilling, helpHint: "Seats are based on active organization users, not employees.", description: "Review subscription status, seats, and Stripe billing access." });
     if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels, helpHint: "Labels rename visible wording across DubGrid but do not change behavior.", description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
     if (orgItems.length > 0) groups.push({ id: "organization", label: "Organization", items: orgItems });
   }
@@ -139,6 +141,10 @@ export function getDefaultSection(perms: NavPermissions): SectionId {
 /** Get max content width for a section. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getMaxWidth(section: SectionId): number {
+  if (section === "org-billing") {
+    return 980;
+  }
+
   if (section === "schedule-jobs") {
     return 1120;
   }

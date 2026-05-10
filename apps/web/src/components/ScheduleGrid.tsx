@@ -42,6 +42,7 @@ import {
   ShiftDisplayMode,
   GridOpenShift,
   ScheduleCellState,
+  ShiftJobSegment,
 } from "@/types";
 import { buildScheduleGridModel } from "./schedule-grid/model";
 import type {
@@ -59,6 +60,7 @@ import {
 } from "@/lib/colors";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import {
+  buildShiftJobPairKey,
   createAssignmentDefinitionIdByPairMap,
   deriveAssignmentDefinitionIdsFromAssignments,
 } from "@/lib/shift-job-segments";
@@ -136,6 +138,7 @@ const MULTI_SHIFT_PILL_RADIUS = 6;
 const RAISED_DIFF_BADGE_TOP_INSET = 10;
 const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 24;
 const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 20;
+const BULK_SELECTION_RING_PADDING = 2;
 
 function areGridCellIdsEqual(
   left: GridCellId | null | undefined,
@@ -147,6 +150,29 @@ function areGridCellIdsEqual(
     left.dateKey === right.dateKey &&
     left.sectionId === right.sectionId
   );
+}
+
+function getGridCellKey(cellId: Pick<GridCellId, "empId" | "dateKey">): string {
+  return `${cellId.empId}_${cellId.dateKey}`;
+}
+
+function getBulkSelectionRingStyle(args: {
+  topInset: number;
+  rightInset: number;
+  bottomInset: number;
+  leftInset: number;
+  topDividerInset: number;
+  leadingDividerInset: number;
+  pillRadius: number;
+}): React.CSSProperties {
+  const padding = BULK_SELECTION_RING_PADDING;
+  return {
+    top: `${args.topDividerInset + args.topInset - padding}px`,
+    right: `${args.rightInset - padding}px`,
+    bottom: `${args.bottomInset - padding}px`,
+    left: `${args.leadingDividerInset + args.leftInset - padding}px`,
+    borderRadius: args.pillRadius + padding,
+  };
 }
 
 function getInsetDividerShadow(args: {
@@ -276,29 +302,8 @@ type GridDiffBadgeConfig = {
 
 function shouldUseShiftColorForDiffState(args: {
   isCross: boolean;
-  draftBadge: GridDiffBadgeConfig | null;
-  publishBadge: GridDiffBadgeConfig | null;
-  draftBorderKind?: ShiftDiffBorderKind;
-  publishBorderKind?: ShiftDiffBorderKind;
 }): boolean {
-  const {
-    isCross,
-    draftBadge,
-    publishBadge,
-    draftBorderKind,
-    publishBorderKind,
-  } = args;
-  if (!isCross) return true;
-  return (
-    draftBorderKind === "new" ||
-    draftBorderKind === "modified" ||
-    publishBorderKind === "new" ||
-    publishBorderKind === "modified" ||
-    draftBadge?.kind === "new" ||
-    draftBadge?.kind === "modified" ||
-    publishBadge?.kind === "new" ||
-    publishBadge?.kind === "modified"
-  );
+  return !args.isCross;
 }
 
 function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
@@ -342,6 +347,44 @@ function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
   return (
     <MaybeHint content={badge.tooltip} side="top">
       {badgeNode}
+    </MaybeHint>
+  );
+}
+
+function MentoredShiftBadge({ compact = false }: { compact?: boolean }) {
+  const size = compact ? 15 : 16;
+  const badge = (
+    <span
+      data-mentored-badge="true"
+      aria-label="Mentored assignment"
+      style={{
+        position: "absolute",
+        top: 0.5,
+        right: 0.5,
+        width: size,
+        height: size,
+        borderRadius: 999,
+        background: "rgba(255,255,255,0.92)",
+        border: "1px solid rgba(51,65,85,0.22)",
+        color: "#334155",
+        boxShadow: "0 1px 2px rgba(15,23,42,0.12)",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: compact ? 8 : 9,
+        fontWeight: 800,
+        lineHeight: 1,
+        pointerEvents: "auto",
+        zIndex: 5,
+      }}
+    >
+      M
+    </span>
+  );
+
+  return (
+    <MaybeHint content="Mentored assignment" side="top">
+      {badge}
     </MaybeHint>
   );
 }
@@ -428,6 +471,13 @@ interface LegacyScheduleGridProps {
   spanWeeks: 1 | 2;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
+  publishedSegmentsForKey?: (
+    empId: string,
+    date: Date,
+  ) => Array<
+    Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">
+  >;
   /** Pass focusAreaId for context-aware label resolution */
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   handleCellClick: (
@@ -518,6 +568,10 @@ interface LegacyScheduleGridProps {
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
   onCellFocus?: (cellId: GridCellId) => void;
   activeCellId?: GridCellId | null;
+  bulkDeleteMode?: boolean;
+  bulkSelectedCellKeys?: Set<string>;
+  bulkSelectableCellKeys?: Set<string>;
+  onToggleBulkDeleteCell?: (cellId: GridCellId) => void;
 }
 
 interface SectionBlockProps {
@@ -529,6 +583,13 @@ interface SectionBlockProps {
   todayKey: string;
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
+  publishedSegmentsForKey?: (
+    empId: string,
+    date: Date,
+  ) => Array<
+    Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">
+  >;
   /** Pass focusAreaId for context-aware label resolution */
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   handleCellClick: (
@@ -604,6 +665,10 @@ interface SectionBlockProps {
   openShifts?: GridOpenShift[];
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
   activeCellId?: GridCellId | null;
+  bulkDeleteMode?: boolean;
+  bulkSelectedCellKeys?: Set<string>;
+  bulkSelectableCellKeys?: Set<string>;
+  onToggleBulkDeleteCell?: (cellId: GridCellId) => void;
 }
 
 interface ActiveOutlineRect {
@@ -621,6 +686,8 @@ const SectionBlock = memo(function SectionBlock({
   todayKey,
   shiftForKey,
   assignmentIdsForKey,
+  segmentsForKey,
+  publishedSegmentsForKey,
   getShiftStyle,
   handleCellClick,
   nameColWidth,
@@ -662,6 +729,10 @@ const SectionBlock = memo(function SectionBlock({
   openShifts,
   onClaimOpenShift,
   activeCellId = null,
+  bulkDeleteMode = false,
+  bulkSelectedCellKeys,
+  bulkSelectableCellKeys,
+  onToggleBulkDeleteCell,
 }: SectionBlockProps) {
   const isNameMode = shiftDisplayMode === "name";
   const { user: currentUser } = useAuth();
@@ -1019,11 +1090,33 @@ const SectionBlock = memo(function SectionBlock({
       isLocked: boolean,
       trigger: "click" | "keyboard",
     ) => {
+      const dateKey = formatDateKey(date);
+      const cellId = buildCellId(emp.id, dateKey);
+      const cellKey = getGridCellKey(cellId);
+      if (bulkDeleteMode) {
+        if (
+          !isLocked &&
+          bulkSelectableCellKeys?.has(cellKey) &&
+          onToggleBulkDeleteCell
+        ) {
+          onToggleBulkDeleteCell(cellId);
+        }
+        return;
+      }
+
       if (isCellInteractive && !isLocked) {
         handleCellClick(emp, date, sectionName, trigger);
       }
     },
-    [handleCellClick, isCellInteractive, sectionName],
+    [
+      buildCellId,
+      bulkDeleteMode,
+      bulkSelectableCellKeys,
+      handleCellClick,
+      isCellInteractive,
+      onToggleBulkDeleteCell,
+      sectionName,
+    ],
   );
 
   const triggerCellContextMenu = useCallback(
@@ -1034,11 +1127,15 @@ const SectionBlock = memo(function SectionBlock({
       emp: Employee,
       date: Date,
     ) => {
+      if (bulkDeleteMode) {
+        event.preventDefault();
+        return;
+      }
       if (!onCellContextMenu || !isCellInteractive) return;
       event.preventDefault();
       onCellContextMenu(event, anchorEl, cellId, emp, date);
     },
-    [isCellInteractive, onCellContextMenu],
+    [bulkDeleteMode, isCellInteractive, onCellContextMenu],
   );
 
   if (employees.length === 0 && (!openShifts || openShifts.length === 0)) {
@@ -1411,6 +1508,17 @@ const SectionBlock = memo(function SectionBlock({
                           os.assignmentIds[0] != null
                             ? assignmentById.get(os.assignmentIds[0])
                             : undefined;
+                        const displayParts = getDisplayPartsByIdOrLabel(
+                          os.assignmentLabel,
+                          os.assignmentIds[0],
+                        );
+                        const hasSecondaryLabel =
+                          displayParts.secondaryLabel != null &&
+                          displayParts.secondaryLabel.trim().length > 0;
+                        const isMentoredOpenShift =
+                          os.segments?.some(
+                            (segment) => segment.isMentored === true,
+                          ) ?? false;
                         const needed = os.needed ?? 1;
                         return (
                           <MaybeHint
@@ -1431,14 +1539,15 @@ const SectionBlock = memo(function SectionBlock({
                                   : `${needed} needed — click to volunteer`
                               }
                               style={{
+                                position: "relative",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                gap: 4,
+                                gap: 6,
                                 flex: colWidth < 92 ? "1 1 100%" : "1 1 72px",
                                 width: colWidth < 92 ? "100%" : undefined,
                                 maxWidth: "100%",
-                                padding: "5px 8px",
+                                padding: hasSecondaryLabel ? "4px 8px" : "5px 8px",
                                 minWidth: 0,
                                 borderRadius: 6,
                                 border: `1.5px dashed ${sc?.border ?? "var(--color-warning-border, #F59E0B)"}`,
@@ -1453,15 +1562,48 @@ const SectionBlock = memo(function SectionBlock({
                                 overflow: "hidden",
                               }}
                             >
+                              {isMentoredOpenShift ? (
+                                <MentoredShiftBadge compact />
+                              ) : null}
                               <span
                                 style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  gap: hasSecondaryLabel ? 1 : 0,
                                   minWidth: 0,
+                                  maxWidth: "100%",
                                   overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
                                 }}
                               >
-                                {os.assignmentLabel}
+                                <span
+                                  style={{
+                                    maxWidth: "100%",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    fontWeight: 800,
+                                    lineHeight: 1.1,
+                                  }}
+                                >
+                                  {displayParts.primaryLabel}
+                                </span>
+                                {hasSecondaryLabel ? (
+                                  <span
+                                    style={{
+                                      maxWidth: "100%",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                      fontSize: "var(--dg-fs-footnote)",
+                                      fontWeight: 700,
+                                      lineHeight: 1,
+                                      opacity: 0.78,
+                                    }}
+                                  >
+                                    {displayParts.secondaryLabel}
+                                  </span>
+                                ) : null}
                               </span>
                               <span
                                 style={{
@@ -1634,6 +1776,8 @@ const SectionBlock = memo(function SectionBlock({
                       const shiftLabel = shiftForKey(emp.id, date);
                       const cellCodeIds =
                         assignmentIdsForKey?.(emp.id, date) ?? [];
+                      const cellSegments =
+                        segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                       const publishDiff =
                         publishDiffForKey?.(emp.id, date) ?? null;
@@ -1645,6 +1789,8 @@ const SectionBlock = memo(function SectionBlock({
                         publishedLabelForKey?.(emp.id, date) ?? null;
                       const publishedCodeIds =
                         publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
+                      const publishedSegments =
+                        publishedSegmentsForKey?.(emp.id, date) ?? [];
                       const publishedCustomTimes =
                         getPublishedCustomShiftTimes?.(emp.id, date) ?? null;
                       const noteTypes =
@@ -1688,12 +1834,21 @@ const SectionBlock = memo(function SectionBlock({
                               : "dark"
                             : undefined;
                       const cellId = buildCellId(emp.id, dateKey);
+                      const bulkCellKey = getGridCellKey(cellId);
+                      const isBulkSelectable =
+                        bulkDeleteMode &&
+                        !isLocked &&
+                        !!bulkSelectableCellKeys?.has(bulkCellKey);
+                      const isBulkSelected =
+                        bulkDeleteMode &&
+                        !!bulkSelectedCellKeys?.has(bulkCellKey);
                       const isActiveCell = areGridCellIdsEqual(
                         activeCellId,
                         cellId,
                       );
                       const hasDraggableEntry =
                         canDragShifts &&
+                        !bulkDeleteMode &&
                         !isLocked &&
                         !!shiftLabel &&
                         shiftLabel !== "OFF" &&
@@ -1722,15 +1877,20 @@ const SectionBlock = memo(function SectionBlock({
                           data={{
                             cellId,
                           }}
-                          disabled={!isCellInteractive || isLocked}
+                          disabled={!isCellInteractive || isLocked || bulkDeleteMode}
                           className="dg-grid-cell"
                           role="gridcell"
                           aria-label={
                             shiftLabel && shiftLabel !== "OFF"
-                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftLabel}`
+                              ? `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: ${shiftLabel}${isBulkSelected ? ", selected for removal" : ""}`
                               : `${getEmployeeDisplayName(emp)}, ${DAY_LABELS[date.getDay()]} ${date.getDate()}: empty`
                           }
-                          tabIndex={isCellInteractive ? 0 : -1}
+                          aria-selected={
+                            bulkDeleteMode ? isBulkSelected : undefined
+                          }
+                          tabIndex={
+                            isCellInteractive || isBulkSelectable ? 0 : -1
+                          }
                           data-emp-id={emp.id}
                           data-date-key={dateKey}
                           data-section-id={sectionId}
@@ -1757,9 +1917,22 @@ const SectionBlock = memo(function SectionBlock({
                           data-today={isToday ? "true" : undefined}
                           data-top-divider={topDivider}
                           data-active={isActiveCell ? "true" : undefined}
+                          data-bulk-mode={
+                            bulkDeleteMode ? "true" : undefined
+                          }
+                          data-bulk-selectable={
+                            isBulkSelectable ? "true" : undefined
+                          }
+                          data-bulk-selected={
+                            isBulkSelected ? "true" : undefined
+                          }
                           style={{
                             height: "var(--dg-grid-cell-height)",
-                            background: showDiffCellTint ? rowBg : undefined,
+                            background: isBulkSelected
+                              ? "var(--color-brand-bg)"
+                              : showDiffCellTint
+                                ? rowBg
+                                : undefined,
                             zIndex: showDiffCellTint
                               ? 8
                               : ri === 0
@@ -1813,6 +1986,15 @@ const SectionBlock = memo(function SectionBlock({
                               overflow: "visible",
                             }}
                           >
+                            {isBulkSelected && (
+                              <span
+                                className="dg-grid-cell__bulk-selected-indicator"
+                                data-bulk-selection-indicator="true"
+                                aria-hidden="true"
+                              >
+                                -
+                              </span>
+                            )}
                             {shiftLabel && shiftLabel !== "OFF" ? (
                               <DraggableShift
                                 id={`drag_${emp.id}_${dateKey}_${sectionName}`}
@@ -1824,20 +2006,55 @@ const SectionBlock = memo(function SectionBlock({
                                     segments:
                                       currentAbsenceTypeId != null
                                         ? []
-                                        : cellCodeIds
-                                            .map((assignmentId, position) => {
+                                        : (cellSegments.length > 0
+                                            ? cellSegments
+                                            : cellCodeIds.map(
+                                                (assignmentId, position) => {
+                                                  const assignment =
+                                                    assignmentById.get(
+                                                      assignmentId,
+                                                    );
+                                                  if (assignment?.jobId == null) {
+                                                    return null;
+                                                  }
+                                                  return {
+                                                    shiftId:
+                                                      assignment.shiftId ??
+                                                      assignment.categoryId ??
+                                                      null,
+                                                    jobId: assignment.jobId,
+                                                    position,
+                                                    isMentored: false,
+                                                  };
+                                                },
+                                              )
+                                          )
+                                            .map((segment, position) => {
+                                              if (!segment) return null;
+                                              const assignmentId =
+                                                assignmentIdByPair.get(
+                                                  buildShiftJobPairKey(
+                                                    segment.shiftId ?? null,
+                                                    segment.jobId,
+                                                  ),
+                                                );
                                               const assignment =
-                                                assignmentById.get(assignmentId);
-                                              if (assignment?.jobId == null) {
-                                                return null;
-                                              }
+                                                assignmentId == null
+                                                  ? null
+                                                  : assignmentById.get(
+                                                      assignmentId,
+                                                    );
                                               return {
                                                 shiftId:
-                                                  assignment.shiftId ??
-                                                  assignment.categoryId ??
+                                                  segment.shiftId ??
+                                                  assignment?.shiftId ??
+                                                  assignment?.categoryId ??
                                                   null,
-                                                jobId: assignment.jobId,
-                                                position,
+                                                jobId: segment.jobId,
+                                                position:
+                                                  segment.position ?? position,
+                                                isMentored:
+                                                  segment.isMentored ?? false,
                                               };
                                             })
                                             .filter(
@@ -1847,6 +2064,7 @@ const SectionBlock = memo(function SectionBlock({
                                                 shiftId: number | null;
                                                 jobId: number;
                                                 position: number;
+                                                isMentored: boolean;
                                               } => segment != null,
                                             ),
                                     absenceTypeId: currentAbsenceTypeId,
@@ -1914,6 +2132,11 @@ const SectionBlock = memo(function SectionBlock({
                                         before: {
                                           assignmentIds: publishedCodeIds,
                                           absenceTypeId: publishedAbsenceTypeId,
+                                          isMentoredFlags:
+                                            publishedSegments.map(
+                                              (segment) =>
+                                                segment.isMentored ?? false,
+                                            ),
                                           timeRanges: timeRangesFromCustomTimes(
                                             {
                                               customTimes: publishedCustomTimes,
@@ -1924,6 +2147,10 @@ const SectionBlock = memo(function SectionBlock({
                                         after: {
                                           assignmentIds: cellCodeIds,
                                           absenceTypeId: currentAbsenceTypeId,
+                                          isMentoredFlags: cellSegments.map(
+                                            (segment) =>
+                                              segment.isMentored ?? false,
+                                          ),
                                           timeRanges: timeRangesFromCustomTimes(
                                             {
                                               customTimes,
@@ -2125,9 +2352,6 @@ const SectionBlock = memo(function SectionBlock({
                                     const singlePublishRingKind =
                                       publishDiffSummary?.pillDiffs[0]
                                         ?.borderKind ?? publishRingKind;
-                                    const singleBottomInset = customTimes
-                                      ? "3px"
-                                      : "4px";
                                     const singleAuthorLeftInset =
                                       5 + leadingDividerInset;
                                     const singleAuthorBottomInset =
@@ -2135,12 +2359,6 @@ const SectionBlock = memo(function SectionBlock({
                                     const singleUsesShiftColor =
                                       shouldUseShiftColorForDiffState({
                                         isCross,
-                                        draftBadge,
-                                        publishBadge,
-                                        draftBorderKind:
-                                          singleDraftDiffBorderKind,
-                                        publishBorderKind:
-                                          singlePublishRingKind,
                                       });
                                     const singleForegroundColor =
                                       singleUsesShiftColor
@@ -2181,6 +2399,16 @@ const SectionBlock = memo(function SectionBlock({
                                       draftBadge ||
                                       publishBadge
                                     );
+                                    const singleTopInset =
+                                      singleHasRaisedDiffBadge
+                                        ? RAISED_DIFF_BADGE_TOP_INSET
+                                        : customTimes
+                                          ? 3
+                                          : 4;
+                                    const singleSideInset = 4;
+                                    const singleBottomInset = customTimes
+                                      ? 3
+                                      : 4;
                                     const singleCrossFocusPill =
                                       isCross && crossHomeFa
                                         ? crossHomeFa
@@ -2191,22 +2419,40 @@ const SectionBlock = memo(function SectionBlock({
                                       !!displayParts.secondaryLabel;
                                     const singleDisplayLabel =
                                       displayParts.primaryLabel;
+                                    const singleIsMentored =
+                                      !isAbsence &&
+                                      (cellSegments[0]?.isMentored ?? false);
                                     return (
                                       <>
+                                        {isBulkSelected && (
+                                          <span
+                                            className="dg-grid-cell__bulk-selection-ring"
+                                            data-bulk-selection-ring="true"
+                                            aria-hidden="true"
+                                            style={getBulkSelectionRingStyle({
+                                              topInset: singleTopInset,
+                                              rightInset: singleSideInset,
+                                              bottomInset: singleBottomInset,
+                                              leftInset: singleSideInset,
+                                              topDividerInset,
+                                              leadingDividerInset,
+                                              pillRadius:
+                                                SINGLE_SHIFT_PILL_RADIUS,
+                                            })}
+                                          />
+                                        )}
                                         <div
                                           data-shift-pill="single"
                                           style={{
                                             position: "absolute",
                                             top: insetFromVisibleCellTop(
-                                              singleHasRaisedDiffBadge
-                                                ? RAISED_DIFF_BADGE_TOP_INSET
-                                                : customTimes
-                                                  ? 3
-                                                  : 4,
+                                              singleTopInset,
                                             ),
-                                            right: "4px",
-                                            bottom: singleBottomInset,
-                                            left: insetFromVisibleCellLeft(4),
+                                            right: `${singleSideInset}px`,
+                                            bottom: `${singleBottomInset}px`,
+                                            left: insetFromVisibleCellLeft(
+                                              singleSideInset,
+                                            ),
                                             background: singleUsesShiftColor
                                               ? style.color
                                               : "var(--color-surface)",
@@ -2242,6 +2488,7 @@ const SectionBlock = memo(function SectionBlock({
                                                 : isNameMode
                                                   ? 6
                                                   : 3,
+                                            paddingRight: isNameMode ? 6 : 3,
                                             overflow: singlePillBadge
                                               ? "visible"
                                               : "hidden",
@@ -2287,6 +2534,9 @@ const SectionBlock = memo(function SectionBlock({
                                                 singleCrossFocusPill.name,
                                               )}
                                             </span>
+                                          )}
+                                          {singleIsMentored && (
+                                            <MentoredShiftBadge />
                                           )}
                                           <div
                                             style={{
@@ -2461,24 +2711,44 @@ const SectionBlock = memo(function SectionBlock({
                                   }
 
                                   // Multi-pill: render each shift as a separate vertical pill
-                                  const multiBottomInset = "3px";
+                                  const multiTopInset =
+                                    showsDraftBadge || showsPublishDiff
+                                      ? RAISED_DIFF_BADGE_TOP_INSET
+                                      : 3;
+                                  const multiSideInset = 3;
+                                  const multiBottomInset = 3;
                                   const multiAuthorLeftInset =
                                     4 + leadingDividerInset;
-                                  const multiHasRaisedDiffBadge =
-                                    showsDraftBadge || showsPublishDiff;
                                   return (
                                     <>
+                                      {isBulkSelected && (
+                                        <span
+                                          className="dg-grid-cell__bulk-selection-ring"
+                                          data-bulk-selection-ring="true"
+                                          aria-hidden="true"
+                                          style={getBulkSelectionRingStyle({
+                                            topInset: multiTopInset,
+                                            rightInset: multiSideInset,
+                                            bottomInset: multiBottomInset,
+                                            leftInset: multiSideInset,
+                                            topDividerInset,
+                                            leadingDividerInset,
+                                            pillRadius:
+                                              MULTI_SHIFT_PILL_RADIUS,
+                                          })}
+                                        />
+                                      )}
                                       <div
                                         style={{
                                           position: "absolute",
                                           top: insetFromVisibleCellTop(
-                                            multiHasRaisedDiffBadge
-                                              ? RAISED_DIFF_BADGE_TOP_INSET
-                                              : 3,
+                                            multiTopInset,
                                           ),
-                                          right: "3px",
-                                          bottom: multiBottomInset,
-                                          left: insetFromVisibleCellLeft(3),
+                                          right: `${multiSideInset}px`,
+                                          bottom: `${multiBottomInset}px`,
+                                          left: insetFromVisibleCellLeft(
+                                            multiSideInset,
+                                          ),
                                           display: "flex",
                                           flexDirection: "column",
                                           gap: 1,
@@ -2537,20 +2807,16 @@ const SectionBlock = memo(function SectionBlock({
                                               badge: null,
                                             };
                                             const draftPillBorderKind: DraftKind =
-                                              draftPillDiff.borderKind ??
-                                              draftKind;
+                                              draftDiff
+                                                ? draftPillDiff.borderKind
+                                                : draftPillDiff.borderKind ??
+                                                  draftKind;
                                             const publishRingStatus =
                                               publishDiffSummary?.pillDiffs[li]
                                                 ?.borderKind ?? null;
                                             const multiUsesShiftColor =
                                               shouldUseShiftColorForDiffState({
                                                 isCross,
-                                                draftBadge,
-                                                publishBadge,
-                                                draftBorderKind:
-                                                  draftPillDiff.borderKind,
-                                                publishBorderKind:
-                                                  publishRingStatus,
                                               });
                                             const multiForegroundColor =
                                               multiUsesShiftColor
@@ -2617,6 +2883,9 @@ const SectionBlock = memo(function SectionBlock({
                                               !!displayParts.secondaryLabel;
                                             const multiDisplayLabel =
                                               displayParts.primaryLabel;
+                                            const isMentoredPill =
+                                              cellSegments[li]?.isMentored ??
+                                              false;
 
                                             return (
                                               <div
@@ -2677,6 +2946,9 @@ const SectionBlock = memo(function SectionBlock({
                                                       : isNameMode
                                                         ? 4
                                                         : 3,
+                                                  paddingRight: isNameMode
+                                                    ? 4
+                                                    : 3,
                                                 }}
                                               >
                                                 {pillBadge && (
@@ -2716,6 +2988,9 @@ const SectionBlock = memo(function SectionBlock({
                                                       multiCrossFocusPill.name,
                                                     )}
                                                   </span>
+                                                )}
+                                                {isMentoredPill && (
+                                                  <MentoredShiftBadge compact />
                                                 )}
                                                 <div
                                                   style={{
@@ -3276,6 +3551,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   spanWeeks,
   shiftForKey,
   assignmentIdsForKey,
+  segmentsForKey,
+  publishedSegmentsForKey,
   getShiftStyle,
   handleCellClick,
   today,
@@ -3319,6 +3596,10 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   openShifts,
   onClaimOpenShift,
   activeCellId = null,
+  bulkDeleteMode = false,
+  bulkSelectedCellKeys,
+  bulkSelectableCellKeys,
+  onToggleBulkDeleteCell,
 }: LegacyScheduleGridProps) {
   const todayKey = useMemo(() => formatDateKey(today), [today]);
 
@@ -3682,6 +3963,8 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                       todayKey={todayKey}
                       shiftForKey={shiftForKey}
                       assignmentIdsForKey={assignmentIdsForKey}
+                      segmentsForKey={segmentsForKey}
+                      publishedSegmentsForKey={publishedSegmentsForKey}
                       getShiftStyle={getShiftStyle}
                       handleCellClick={handleCellClick}
                       nameColWidth={nameColWidth}
@@ -3731,6 +4014,10 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                       )}
                       onClaimOpenShift={onClaimOpenShift}
                       activeCellId={activeCellId}
+                      bulkDeleteMode={bulkDeleteMode}
+                      bulkSelectedCellKeys={bulkSelectedCellKeys}
+                      bulkSelectableCellKeys={bulkSelectableCellKeys}
+                      onToggleBulkDeleteCell={onToggleBulkDeleteCell}
                     />
                   );
                 })}
@@ -3830,9 +4117,12 @@ const ScheduleGrid = memo(function ScheduleGrid({
     );
   }, [interactionState.contextMenuCellId]);
   const activeCellId = interactionState.activeCellId;
+  const bulkDeleteMode = !!interactionState.bulkDeleteMode;
 
   useEffect(() => {
-    if (!handlers.onCopyCell && !handlers.onPasteCell) return;
+    if (bulkDeleteMode || (!handlers.onCopyCell && !handlers.onPasteCell)) {
+      return;
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       const mod = event.metaKey || event.ctrlKey;
@@ -3854,7 +4144,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handlers, resolveKeyboardTarget]);
+  }, [bulkDeleteMode, handlers, resolveKeyboardTarget]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as ShiftDragData | undefined;
@@ -3912,6 +4202,8 @@ const ScheduleGrid = memo(function ScheduleGrid({
         spanWeeks={model.spanWeeks}
         shiftForKey={model.accessors.shiftForKey}
         assignmentIdsForKey={model.accessors.assignmentIdsForKey}
+        segmentsForKey={model.accessors.segmentsForKey}
+        publishedSegmentsForKey={model.accessors.publishedSegmentsForKey}
         getShiftStyle={model.accessors.getShiftStyle}
         handleCellClick={handleLegacyCellClick}
         today={model.today}
@@ -3925,7 +4217,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         jobs={model.jobs}
         indicatorTypes={model.indicatorTypes}
         isCellInteractive={model.options.isCellInteractive}
-        canDragShifts={model.options.canDragShifts}
+        canDragShifts={bulkDeleteMode ? false : model.options.canDragShifts}
         activeIndicatorIdsForKey={model.accessors.activeIndicatorIdsForKey}
         activeFocusArea={model.activeFocusArea}
         certifications={model.certifications}
@@ -3961,6 +4253,10 @@ const ScheduleGrid = memo(function ScheduleGrid({
         openShifts={model.openShifts}
         onClaimOpenShift={handlers.onClaimOpenShift}
         activeCellId={activeCellId}
+        bulkDeleteMode={bulkDeleteMode}
+        bulkSelectedCellKeys={interactionState.bulkSelectedCellKeys}
+        bulkSelectableCellKeys={interactionState.bulkSelectableCellKeys}
+        onToggleBulkDeleteCell={handlers.onToggleBulkDeleteCell}
       />
       <DragOverlay dropAnimation={null}>
         {activeDrag && (

@@ -1,16 +1,18 @@
 import { Redirect, Tabs } from "expo-router";
 import { LoadingScreen } from "../../src/shared/components/LoadingScreen";
 import { useBootstrap } from "../../src/features/auth/hooks/useBootstrap";
+import { WorkspaceLockedScreen } from "../../src/features/auth/screens/WorkspaceLockedScreen";
+import { handleExpiredMobileSession } from "../../src/shared/lib/auth-reset";
+import { getWorkspaceUnavailableMessage } from "../../src/shared/lib/errors";
 import { useSessionState } from "../../src/shared/providers/AuthSessionProvider";
 import { mobileColors } from "../../src/shared/theme/tokens";
 
 export default function TabsLayoutWeb() {
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
-  const canViewTeamSchedule = bootstrapQuery.data
-    ? bootstrapQuery.data.effectiveRole !== "user" ||
-      bootstrapQuery.data.permissions.canApproveShiftRequests ||
-      bootstrapQuery.data.permissions.canManageEmployees
+  const lockedMessage = getWorkspaceUnavailableMessage(bootstrapQuery.error);
+  const canViewTeamSchedule = bootstrapQuery.data && !lockedMessage
+    ? bootstrapQuery.data.permissions.canViewSchedule
     : false;
 
   if (isLoading) {
@@ -24,6 +26,21 @@ export default function TabsLayoutWeb() {
 
   if (!accessToken) {
     return <Redirect href="/(auth)/login" />;
+  }
+
+  if (lockedMessage) {
+    return (
+      <WorkspaceLockedScreen
+        isRetrying={bootstrapQuery.isFetching}
+        message={lockedMessage}
+        onRetry={() => {
+          void bootstrapQuery.refetch();
+        }}
+        onSignOut={() => {
+          void handleExpiredMobileSession();
+        }}
+      />
+    );
   }
 
   return (

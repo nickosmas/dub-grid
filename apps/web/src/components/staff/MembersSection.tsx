@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -29,8 +30,10 @@ import type {
 } from "@/types";
 import { useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { getAvatarInitials } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -56,6 +59,8 @@ import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
 
 const REORDER_SETTLE_MS = 220;
+
+type BulkStaffAction = "bench" | "activate" | "terminate";
 
 export interface MembersSectionProps {
   employees: Employee[];
@@ -112,16 +117,16 @@ export function MembersSection({
   const isTablet = useMediaQuery(TABLET);
   const queryClient = useQueryClient();
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
+  const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
+  const directoryOrgId = canViewManagementUsers ? orgId ?? null : null;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [showOnlyUnlinked, setShowOnlyUnlinked] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
 
   const filters = useStaffFilters({
     employees,
     benchedEmployees,
     terminatedEmployees,
-    showOnlyUnlinked,
   });
   const {
     activeTab,
@@ -130,10 +135,24 @@ export function MembersSection({
     setSearchQuery,
     sortConfig,
     handleSort,
+    filterEmploymentType,
+    setFilterEmploymentType,
+    filterDepartment,
+    setFilterDepartment,
+    filterDepartmentAdminOnly,
+    setFilterDepartmentAdminOnly,
     filterFocusArea,
     setFilterFocusArea,
+    filterCertification,
+    setFilterCertification,
     filterRole,
     setFilterRole,
+    filterAccountLink,
+    setFilterAccountLink,
+    filterEmailPresence,
+    setFilterEmailPresence,
+    filterPhonePresence,
+    setFilterPhonePresence,
     hasActiveFilters,
     clearFilters: clearFiltersBase,
     rawList,
@@ -148,8 +167,16 @@ export function MembersSection({
   } = filters;
   const clearFilters = useCallback(() => {
     clearFiltersBase();
-    setShowOnlyUnlinked(false);
   }, [clearFiltersBase]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [filterOpen]);
 
   const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } =
     useStaffSelection();
@@ -384,10 +411,16 @@ export function MembersSection({
   }, [
     activeTab,
     clearSelection,
+    filterAccountLink,
+    filterCertification,
+    filterDepartment,
+    filterDepartmentAdminOnly,
+    filterEmailPresence,
+    filterEmploymentType,
     filterFocusArea,
+    filterPhonePresence,
     filterRole,
     searchQuery,
-    showOnlyUnlinked,
     sortConfig,
   ]);
 
@@ -395,6 +428,12 @@ export function MembersSection({
   const [inviteQueue, setInviteQueue] = useState<Employee[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<Invitation[]>([]);
   const [, setRevokingId] = useState<string | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState<{
+    action: BulkStaffAction;
+    employeeIds: string[];
+  } | null>(null);
+  const [isBulkActionRunning, setIsBulkActionRunning] = useState(false);
+  const [exportConfirm, setExportConfirm] = useState(false);
 
   useEffect(() => {
     if (!orgId) return;
@@ -431,7 +470,7 @@ export function MembersSection({
     return map;
   }, [pendingInvitations]);
 
-  const { directory } = useDirectory(orgId ?? null);
+  const { directory } = useDirectory(directoryOrgId);
   const departmentUsers = useMemo(
     () => directory.filter((person) => person.managementDepartmentIds.length > 0),
     [directory],
@@ -495,12 +534,40 @@ export function MembersSection({
     }
   }, [showManagement]);
 
+  useEffect(() => {
+    if (!canViewManagementUsers && showManagement) {
+      setShowManagement(false);
+    }
+  }, [canViewManagementUsers, showManagement]);
+
   const [showManagementInvite, setShowManagementInvite] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
   function handleExport() {
     if (!orgId) return;
     window.open(`/api/export?type=staff&orgId=${orgId}`, "_blank");
+  }
+
+  async function handleConfirmBulkAction() {
+    if (!bulkConfirm || isBulkActionRunning) return;
+
+    const pendingAction = bulkConfirm;
+    setIsBulkActionRunning(true);
+    try {
+      for (const employeeId of pendingAction.employeeIds) {
+        if (pendingAction.action === "bench") {
+          await onBench(employeeId);
+        } else if (pendingAction.action === "activate") {
+          await onActivate(employeeId);
+        } else {
+          await onDelete(employeeId);
+        }
+      }
+      setBulkConfirm(null);
+      clearSelection();
+    } finally {
+      setIsBulkActionRunning(false);
+    }
   }
 
   function refreshInvitations() {
@@ -554,17 +621,33 @@ export function MembersSection({
     [onDelete],
   );
 
-  const canReorder =
+  const hasExportableStaffRows = employees.length > 0;
+  const canShowReorder =
     activeTab === "active" &&
     sortConfig.key === "seniority" &&
     sortConfig.dir === "asc" &&
     !searchQuery &&
+    filterEmploymentType === "all" &&
+    !filterDepartment &&
+    !filterDepartmentAdminOnly &&
     !filterFocusArea &&
+    !filterCertification &&
     !filterRole &&
-    !showOnlyUnlinked &&
+    filterAccountLink === "all" &&
+    filterEmailPresence === "all" &&
+    filterPhonePresence === "all" &&
     canManageEmployees &&
-    employees.length >= 2 &&
     !showManagement;
+  const hasReorderableStaffRows = sorted.length >= 2;
+  const canReorder = canShowReorder && hasReorderableStaffRows;
+
+  const employmentSummary = useMemo(
+    () => ({
+      fullTime: employees.filter((employee) => employee.employmentType !== "part_time").length,
+      partTime: employees.filter((employee) => employee.employmentType === "part_time").length,
+    }),
+    [employees],
+  );
 
   const tabs: {
     key: "active" | "benched" | "terminated";
@@ -657,10 +740,9 @@ export function MembersSection({
           </div>
 
           <DirectorySummaryCards
-            activeCount={employees.length}
-            benchedCount={benchedEmployees.length}
-            terminatedCount={terminatedEmployees.length}
-            managementCount={activeManagementUsers.length}
+            onScheduleCount={employees.length}
+            fullTimeCount={employmentSummary.fullTime}
+            partTimeCount={employmentSummary.partTime}
           />
 
           <div className="relative">
@@ -690,7 +772,7 @@ export function MembersSection({
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {managementDepts.length > 0 && (
+              {canViewManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
                   value={showManagement ? "management" : "schedule"}
                   options={[
@@ -721,18 +803,7 @@ export function MembersSection({
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                   style={{ position: "relative" }}
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                  </svg>
+                  <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
                   {isMobile ? "" : "Filter"}
                   {hasActiveFilters && (
                     <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--color-brand)]" />
@@ -740,14 +811,16 @@ export function MembersSection({
                 </button>
               )}
 
-              {canReorder && !showManagement && (
+              {canShowReorder && (
                 <button
                   onClick={() => {
+                    if (!hasReorderableStaffRows) return;
                     handleEnterReorder();
                     setExpandedEmpId(null);
                     setPage(1);
                   }}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
+                  disabled={!hasReorderableStaffRows}
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
                     <rect x="3" y="2" width="2" height="2" rx="1" />
@@ -924,18 +997,24 @@ export function MembersSection({
                   onClick={() => setShowImport(true)}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
+                  <ImportIcon size={14} />
                   Import
                 </button>
               )}
 
-              {!showManagement && orgId && !isMobile && (
-                <button
-                  onClick={handleExport}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                >
-                  Export
-                </button>
-              )}
+              {!showManagement &&
+                canViewManagementUsers &&
+                orgId &&
+                !isMobile && (
+                  <button
+                    onClick={() => setExportConfirm(true)}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    disabled={!hasExportableStaffRows}
+                  >
+                    <Upload size={14} />
+                    Export
+                  </button>
+                )}
 
               {((showManagement && canManageManagementAccess) ||
                 (!showManagement && canManageEmployees)) && (
@@ -955,15 +1034,34 @@ export function MembersSection({
 
           {!showManagement && (
             <StaffContextBar
+              filterEmploymentType={filterEmploymentType}
+              filterDepartment={filterDepartment}
+              filterDepartmentAdminOnly={filterDepartmentAdminOnly}
               filterFocusArea={filterFocusArea}
+              filterCertification={filterCertification}
               filterRole={filterRole}
+              filterAccountLink={filterAccountLink}
+              filterEmailPresence={filterEmailPresence}
+              filterPhonePresence={filterPhonePresence}
               hasActiveFilters={hasActiveFilters}
+              onClearEmploymentType={() => setFilterEmploymentType("all")}
+              onClearDepartment={() => setFilterDepartment(null)}
+              onClearDepartmentAdminOnly={() => setFilterDepartmentAdminOnly(false)}
               onClearFocusArea={() => setFilterFocusArea(null)}
+              onClearCertification={() => setFilterCertification(null)}
               onClearRole={() => setFilterRole(null)}
+              onClearAccountLink={() => setFilterAccountLink("all")}
+              onClearEmailPresence={() => setFilterEmailPresence("all")}
+              onClearPhonePresence={() => setFilterPhonePresence("all")}
               onClearAll={clearFilters}
               focusAreas={focusAreas}
+              certifications={certifications}
               roles={roles}
+              departments={departmentItems}
               focusAreaLabel={focusAreaLabel}
+              certificationLabel={certificationLabel}
+              roleLabel={roleLabel}
+              departmentLabel={departmentLabel}
               selectionCount={selectedIds.size}
               selectedIds={selectedIds}
               activeTab={activeTab}
@@ -975,22 +1073,13 @@ export function MembersSection({
                 setInviteQueue(employeesToInvite.slice(1));
               }}
               onBulkBench={(employeeIds) => {
-                for (const employeeId of employeeIds) {
-                  onBench(employeeId);
-                }
-                clearSelection();
+                setBulkConfirm({ action: "bench", employeeIds });
               }}
               onBulkActivate={(employeeIds) => {
-                for (const employeeId of employeeIds) {
-                  onActivate(employeeId);
-                }
-                clearSelection();
+                setBulkConfirm({ action: "activate", employeeIds });
               }}
               onBulkTerminate={(employeeIds) => {
-                for (const employeeId of employeeIds) {
-                  onDelete(employeeId);
-                }
-                clearSelection();
+                setBulkConfirm({ action: "terminate", employeeIds });
               }}
               onClearSelection={clearSelection}
               isReordering={isReordering}
@@ -1005,17 +1094,33 @@ export function MembersSection({
               open={filterOpen}
               onClose={() => setFilterOpen(false)}
               anchorRef={filterBtnRef.current}
+              filterEmploymentType={filterEmploymentType}
+              onFilterEmploymentTypeChange={setFilterEmploymentType}
+              filterDepartment={filterDepartment}
+              onFilterDepartmentChange={setFilterDepartment}
+              filterDepartmentAdminOnly={filterDepartmentAdminOnly}
+              onFilterDepartmentAdminOnlyChange={setFilterDepartmentAdminOnly}
               filterFocusArea={filterFocusArea}
               onFilterFocusAreaChange={setFilterFocusArea}
+              filterCertification={filterCertification}
+              onFilterCertificationChange={setFilterCertification}
               filterRole={filterRole}
               onFilterRoleChange={setFilterRole}
               focusAreas={focusAreas}
+              certifications={certifications}
               roles={roles}
+              departments={departmentItems}
               focusAreaLabel={focusAreaLabel}
+              certificationLabel={certificationLabel}
               roleLabel={roleLabel}
+              departmentLabel={departmentLabel}
               unlinkedCount={unlinkedCount}
-              showOnlyUnlinked={showOnlyUnlinked}
-              onShowOnlyUnlinkedChange={setShowOnlyUnlinked}
+              filterAccountLink={filterAccountLink}
+              onFilterAccountLinkChange={setFilterAccountLink}
+              filterEmailPresence={filterEmailPresence}
+              onFilterEmailPresenceChange={setFilterEmailPresence}
+              filterPhonePresence={filterPhonePresence}
+              onFilterPhonePresenceChange={setFilterPhonePresence}
               onClearAll={clearFilters}
               hasActiveFilters={hasActiveFilters}
             />
@@ -1206,19 +1311,12 @@ export function MembersSection({
             ) : (
               <StaffEmptyState
                 activeTab={activeTab}
-                hasFilters={
-                  !!(
-                    searchQuery ||
-                    filterFocusArea ||
-                    filterRole ||
-                    showOnlyUnlinked
-                  )
-                }
+                hasFilters={Boolean(searchQuery || hasActiveFilters)}
                 onClearFilters={clearFilters}
               />
             ))}
 
-          {showManagement &&
+          {canViewManagementUsers && showManagement &&
             (filteredDeptUsers.length > 0 ? (
               <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
                 <Table>
@@ -1285,6 +1383,10 @@ export function MembersSection({
                                 background: "var(--color-success-bg)",
                                 color: "var(--color-success-text)",
                               };
+                      const displayName = person.firstName || person.lastName
+                        ? `${person.firstName} ${person.lastName}`.trim()
+                        : person.email;
+                      const initials = getAvatarInitials(displayName);
 
                       return (
                         <UITableRow
@@ -1314,15 +1416,12 @@ export function MembersSection({
                                     : "var(--color-control-active-text)",
                                 }}
                               >
-                                {(person.firstName?.[0] ?? "").toUpperCase()}
-                                {(person.lastName?.[0] ?? "").toUpperCase() || "?"}
+                                {initials}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="truncate text-[14px] font-medium text-[var(--color-text-primary)]">
-                                    {person.firstName || person.lastName
-                                      ? `${person.firstName} ${person.lastName}`.trim()
-                                      : person.email}
+                                    {displayName}
                                   </span>
                                   {person.source === "employee" && (
                                     <span
@@ -1462,7 +1561,7 @@ export function MembersSection({
         />
       )}
 
-      {showManagementInvite && orgId && (
+      {showManagementInvite && canViewManagementUsers && orgId && (
         <InviteEmployeeModal
           employee={null}
           orgId={orgId}
@@ -1534,7 +1633,7 @@ export function MembersSection({
         />
       )}
 
-      {selectedPerson && (
+      {selectedPerson && canViewManagementUsers && (
         <ManagementStaffPanel
           person={selectedPerson}
           departments={managementDepts}
@@ -1707,6 +1806,52 @@ export function MembersSection({
           }}
         />
       )}
+
+      {bulkConfirm ? (
+        <ConfirmDialog
+          title={
+            bulkConfirm.action === "bench"
+              ? "Bench Selected Staff?"
+              : bulkConfirm.action === "activate"
+                ? "Activate Selected Staff?"
+                : "Terminate Selected Staff?"
+          }
+          message={
+            bulkConfirm.action === "bench"
+              ? `Bench ${bulkConfirm.employeeIds.length} selected staff member${bulkConfirm.employeeIds.length === 1 ? "" : "s"}? They will be hidden from active scheduling.`
+              : bulkConfirm.action === "activate"
+                ? `Activate ${bulkConfirm.employeeIds.length} selected staff member${bulkConfirm.employeeIds.length === 1 ? "" : "s"}? They will return to active scheduling.`
+                : `Terminate ${bulkConfirm.employeeIds.length} selected staff member${bulkConfirm.employeeIds.length === 1 ? "" : "s"}? They will be archived from active staff lists.`
+          }
+          confirmLabel={
+            bulkConfirm.action === "bench"
+              ? "Bench"
+              : bulkConfirm.action === "activate"
+                ? "Activate"
+                : "Terminate"
+          }
+          variant={bulkConfirm.action === "terminate" ? "danger" : "warning"}
+          isLoading={isBulkActionRunning}
+          onConfirm={handleConfirmBulkAction}
+          onCancel={() => {
+            if (!isBulkActionRunning) setBulkConfirm(null);
+          }}
+        />
+      ) : null}
+
+      {exportConfirm ? (
+        <ConfirmDialog
+          title="Export Staff Data?"
+          message="Export the current staff directory data as a downloadable file?"
+          confirmLabel="Export"
+          variant="warning"
+          onConfirm={() => {
+            setExportConfirm(false);
+            handleExport();
+          }}
+          onCancel={() => setExportConfirm(false)}
+        />
+      ) : null}
     </>
   );
 }

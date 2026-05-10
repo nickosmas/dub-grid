@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
+import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import * as Sentry from "@/lib/sentry";
@@ -340,33 +341,60 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // ── Organization suspension check ──────────────────────────────────────
+  // ── Organization access check ───────────────────────────────────────────
   // The JWT hook filters out suspended orgs on token refresh, but a user
   // with a pre-suspension JWT can still access the app until it expires
   // (up to 1 hour). This check catches that window.
+  // Billing follows the same pattern: active trials and grace periods keep
+  // regular users out of billing, but a hard lock blocks workspace access.
   // Skip for gridmasters (they manage suspended orgs) and impersonation.
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
-      const suspended = await cacheThrough(
-        CacheKey.mwOrgSuspended(claims.org_id),
+      const orgAccess = await cacheThrough(
+        CacheKey.mwOrgAccess(claims.org_id),
         TTL.MIDDLEWARE,
         async () => {
           const { data } = await supabase
             .from("organizations")
-            .select("suspended_at")
+            .select("suspended_at, subscription_status, trial_ends_at")
             .eq("id", claims.org_id!)
             .maybeSingle();
-          return data?.suspended_at ?? null;
+          return data ?? null;
         },
       );
 
-      if (suspended !== null) {
+      if (orgAccess?.suspended_at !== null && orgAccess?.suspended_at !== undefined) {
         const loginUrl = new URL("/login", req.url);
         loginUrl.searchParams.set("suspended", "true");
         return NextResponse.redirect(loginUrl);
       }
+
+      const billingAccess = evaluateOrganizationBillingAccess({
+        subscriptionStatus: orgAccess?.subscription_status ?? null,
+        trialEndsAt: orgAccess?.trial_ends_at ?? null,
+      });
+
+      if (billingAccess.isLocked) {
+        const canRecoverBilling =
+          getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
+        const isBillingRecoveryPath =
+          pathname === "/settings" &&
+          req.nextUrl.searchParams.get("section") === "org-billing";
+
+        if (canRecoverBilling && !isBillingRecoveryPath) {
+          const billingUrl = new URL("/settings", req.url);
+          billingUrl.searchParams.set("section", "org-billing");
+          return NextResponse.redirect(billingUrl);
+        }
+
+        if (!canRecoverBilling && pathname !== "/billing-required") {
+          return NextResponse.redirect(new URL("/billing-required", req.url));
+        }
+      } else if (pathname === "/billing-required") {
+        return NextResponse.redirect(new URL("/schedule", req.url));
+      }
     } catch (e) {
-      Sentry.captureException(e, { extra: { context: "middleware-suspension-check" } });
+      Sentry.captureException(e, { extra: { context: "middleware-org-access-check" } });
       // DB/cache unavailable — proceed without blocking.
       // RLS + JWT hook are the primary enforcement; this is defense-in-depth.
     }
@@ -399,13 +427,13 @@ export async function middleware(req: NextRequest) {
   }
 
   // Route guards - Requirements 11.2, 11.3
-  // Note: /people and /settings are accessible to all authenticated org members.
-  // Management department users (org_role = 'user') may have elevated permissions
-  // granted via their department's permission template. Since department permissions
-  // are resolved client-side (not in JWT), the middleware cannot gate on them.
-  // Client-side guards in the page components enforce fine-grained access:
-  //   - People page: canViewStaff (always true) + canManageEmployees for mutations
-  //   - Settings page: each section guarded by its specific permission flag
+  // People is accessible to authenticated org members, with mutations gated deeper
+  // by canManageEmployees. Settings is reserved for admins, super admins, and
+  // gridmasters; page-level guards still enforce per-section permissions.
+
+  if (pathname.startsWith("/settings") && getRoleLevel(effectiveRole) < ROLE_HIERARCHY.admin) {
+    return NextResponse.redirect(new URL("/schedule", req.url));
+  }
 
   // Gridmaster-only route — always allow actual gridmasters (even during impersonation,
   // since /gridmaster access auto-ends impersonation above)

@@ -79,10 +79,10 @@ export default function ShiftPicker({
       focusAreaIds: empFocusAreaIds,
       roleIds: empRoleIds,
     },
-    shiftDisplayMode,
+    shiftDisplayMode: "name",
   });
   const visibleAssignableOptions = assignableOptions.filter(
-    (option) => option.showJobOnGrid || option.isShiftless,
+    (option) => option.showJobOnGrid || option.isShiftless || option.isShiftOnly,
   );
 
   const allPickerAreas = [
@@ -122,7 +122,7 @@ export default function ShiftPicker({
 
   const areaOptions = assignableOptions.filter(
     (option) =>
-      (option.showJobOnGrid || option.isShiftless) &&
+      (option.showJobOnGrid || option.isShiftless || option.isShiftOnly) &&
       option.focusAreaId === pickerTab,
   );
   const generalOptions = visibleAssignableOptions.filter(
@@ -132,6 +132,12 @@ export default function ShiftPicker({
     assignableOptions.map((option) => [
       buildShiftJobPairKey(option.shiftId, option.jobId),
       option,
+    ]),
+  );
+  const isMentoredByPairKey = new Map(
+    currentSegments.map((segment) => [
+      buildShiftJobPairKey(segment.shiftId, segment.jobId),
+      segment.isMentored ?? false,
     ]),
   );
   const selectedOptions =
@@ -148,6 +154,23 @@ export default function ShiftPicker({
             assignableOptions.find((option) => option.assignmentId === assignmentId) ?? null,
           )
           .filter((option): option is AssignableShiftOption => option != null);
+  const selectedSegments: ScheduleCellSegmentInput[] =
+    currentSegments.length > 0
+      ? currentSegments.map((segment, index) => ({
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: segment.position ?? index,
+          isMentored: segment.isMentored ?? false,
+        }))
+      : selectedOptions.map((selected, index) => ({
+          shiftId: selected.shiftId,
+          jobId: selected.jobId,
+          position: index,
+          isMentored:
+            isMentoredByPairKey.get(
+              buildShiftJobPairKey(selected.shiftId, selected.jobId),
+            ) ?? false,
+        }));
 
   function compareOptionsWithinGroup(
     left: AssignableShiftOption,
@@ -205,34 +228,50 @@ export default function ShiftPicker({
 
   function renderShiftButton(option: AssignableShiftOption) {
     const optionKey = buildShiftJobPairKey(option.shiftId, option.jobId);
-    const isActive = selectedOptions.some(
+    const isActive = selectedSegments.some(
       (selected) =>
         buildShiftJobPairKey(selected.shiftId, selected.jobId) === optionKey,
     );
 
     const handleToggle = () => {
-      let nextOptions: AssignableShiftOption[];
+      let nextSegments: ScheduleCellSegmentInput[];
       if (multiSelect) {
         if (isActive) {
-          nextOptions = selectedOptions.filter(
+          nextSegments = selectedSegments.filter(
             (selected) =>
               buildShiftJobPairKey(selected.shiftId, selected.jobId) !== optionKey,
           );
-        } else if (selectedOptions.length >= 2) {
+        } else if (selectedSegments.length >= 2) {
           return; // Max 2 shifts per cell
         } else {
-          nextOptions = [...selectedOptions, option];
+          nextSegments = [
+            ...selectedSegments,
+            {
+              shiftId: option.shiftId,
+              jobId: option.jobId,
+              position: selectedSegments.length,
+              isMentored: false,
+            },
+          ];
         }
       } else {
-        nextOptions = [option];
+        nextSegments = [
+          {
+            shiftId: option.shiftId,
+            jobId: option.jobId,
+            position: 0,
+            isMentored: false,
+          },
+        ];
       }
 
       onSelect(
-        nextOptions.map(
-          (selected, index): ScheduleCellSegmentInput => ({
-            shiftId: selected.shiftId,
-            jobId: selected.jobId,
+        nextSegments.map(
+          (segment, index): ScheduleCellSegmentInput => ({
+            shiftId: segment.shiftId,
+            jobId: segment.jobId,
             position: index,
+            isMentored: segment.isMentored ?? false,
           }),
         ),
       );
@@ -283,63 +322,45 @@ export default function ShiftPicker({
           </div>
         )}
 
-        {isNameMode ? (
-          <MaybeHint
-            content={
-              option.secondaryLabel
-                ? `${option.primaryLabel} · ${option.secondaryLabel}`
-                : option.primaryLabel
-            }
-            side="left"
+        <MaybeHint
+          content={
+            option.secondaryLabel
+              ? `${option.primaryLabel} · ${option.secondaryLabel}`
+              : option.primaryLabel
+          }
+          side="left"
+        >
+          <div
+            style={{
+              ...primaryTextStyle,
+              color: option.text,
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              paddingRight: isActive ? 20 : 0,
+            }}
           >
+            {option.primaryLabel}
+          </div>
+        </MaybeHint>
+        {option.secondaryLabel ? (
+          <MaybeHint content={option.secondaryLabel} side="left">
             <div
               style={{
-                ...primaryTextStyle,
+                ...secondaryTextStyle,
                 color: option.text,
-                lineHeight: 1.25,
+                opacity: 0.82,
+                marginTop: 3,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
                 paddingRight: isActive ? 20 : 0,
               }}
             >
-              {option.primaryLabel}
+              {option.secondaryLabel}
             </div>
           </MaybeHint>
-        ) : (
-          <>
-            <div
-              style={{
-                ...primaryTextStyle,
-                color: option.text,
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                paddingRight: isActive ? 20 : 0,
-              }}
-            >
-              {option.primaryLabel}
-            </div>
-            {option.secondaryLabel ? (
-              <MaybeHint content={option.secondaryLabel} side="left">
-                <div
-                  style={{
-                    ...secondaryTextStyle,
-                    color: option.text,
-                    opacity: 0.82,
-                    marginTop: 3,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    paddingRight: isActive ? 20 : 0,
-                  }}
-                >
-                  {option.secondaryLabel}
-                </div>
-              </MaybeHint>
-            ) : null}
-          </>
-        )}
+        ) : null}
       </button>
     );
   }

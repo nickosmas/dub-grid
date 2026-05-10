@@ -10,6 +10,7 @@ import type {
   DbOrganization,
   DbShiftCategory,
 } from "@dubgrid/db-types";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { parseHost } from "@/lib/subdomain";
@@ -116,7 +117,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
     }
 
-    const serviceClient = getServiceClient();
+    const orgAuth = await requireOrgPermissions(req, orgId, () => true, {
+      allowLockedWorkspace: true,
+      allowDuringSetup: true,
+    });
+    if ("response" in orgAuth) {
+      return orgAuth.response;
+    }
+
+    const serviceClient = orgAuth.serviceClient;
     const [
       orgResult,
       focusAreaResult,

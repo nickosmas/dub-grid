@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useId } from "react";
+import { getStaffNameError, normalizeStaffName } from "@dubgrid/contracts";
 import Modal from "@/components/Modal";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
@@ -13,6 +14,7 @@ type RowEntry = {
   _id: string;
   firstName: string;
   lastName: string;
+  employmentType: Employee["employmentType"];
   certificationId: number | null;
   focusAreaIds: number[];
 };
@@ -27,6 +29,7 @@ function makeRow(
     _id: Math.random().toString(36).slice(2),
     firstName: "",
     lastName: "",
+    employmentType: "full_time",
     certificationId,
     focusAreaIds,
   };
@@ -84,6 +87,7 @@ export default function AddEmployeeModal({
         Array.from({ length: 3 }, () => ({
           firstName: "",
           lastName: "",
+          employmentType: "full_time",
           certificationId: defaultCertId,
           focusAreaIds: [...defaultFocusAreaIds],
         })),
@@ -95,6 +99,7 @@ export default function AddEmployeeModal({
       rows.map((row) => ({
         firstName: row.firstName,
         lastName: row.lastName,
+        employmentType: row.employmentType,
         certificationId: row.certificationId,
         focusAreaIds: row.focusAreaIds,
       })),
@@ -109,8 +114,32 @@ export default function AddEmployeeModal({
     }
   }, [onClose, requestClose]);
 
+  const rowErrors = useMemo(
+    () =>
+      rows.map((row) => ({
+        firstName:
+          row.firstName.trim().length > 0
+            ? getStaffNameError(row.firstName, "First name")
+            : null,
+        lastName:
+          row.lastName.trim().length > 0
+            ? getStaffNameError(row.lastName, "Last name")
+            : null,
+        focusAreaIds:
+          row.focusAreaIds.length === 0 &&
+          (row.firstName.trim().length > 0 || row.lastName.trim().length > 0)
+            ? `Select at least one ${focusAreaLabel.replace(/s$/i, "").toLowerCase()}`
+            : null,
+      })),
+    [focusAreaLabel, rows],
+  );
   const validRows = rows.filter(
-    (r) => r.firstName.trim() && r.lastName.trim() && r.focusAreaIds.length > 0,
+    (row, index) =>
+      row.firstName.trim() &&
+      row.lastName.trim() &&
+      row.focusAreaIds.length > 0 &&
+      !rowErrors[index]?.firstName &&
+      !rowErrors[index]?.lastName,
   );
 
   const updateRow = useCallback(
@@ -159,8 +188,9 @@ export default function AddEmployeeModal({
     if (validRows.length === 0) return;
     onAdd(
       validRows.map((r) => ({
-        firstName: r.firstName.trim(),
-        lastName: r.lastName.trim(),
+        firstName: normalizeStaffName(r.firstName),
+        lastName: normalizeStaffName(r.lastName),
+        employmentType: r.employmentType,
         certificationId: r.certificationId,
         focusAreaIds: r.focusAreaIds,
         roleIds: [],
@@ -242,13 +272,20 @@ export default function AddEmployeeModal({
             }}
           >
             {rows.map((row, idx) => {
+              const errors = rowErrors[idx] ?? {
+                firstName: null,
+                lastName: null,
+                focusAreaIds: null,
+              };
               const rowName =
                 `${row.firstName.trim()} ${row.lastName.trim()}`.trim()
                 || `Staff Member ${idx + 1}`;
               const rowReady =
                 row.firstName.trim().length > 0
                 && row.lastName.trim().length > 0
-                && row.focusAreaIds.length > 0;
+                && row.focusAreaIds.length > 0
+                && !errors.firstName
+                && !errors.lastName;
               const rowStatus = rowReady ? "Ready to add" : null;
 
               return (
@@ -328,7 +365,7 @@ export default function AddEmployeeModal({
                       display: "grid",
                       gridTemplateColumns: isMobile
                         ? "1fr"
-                        : "minmax(180px, 1fr) minmax(180px, 1fr) minmax(220px, 0.95fr)",
+                        : "minmax(160px, 1fr) minmax(160px, 1fr) minmax(160px, 0.8fr) minmax(220px, 0.95fr)",
                       gap: 12,
                     }}
                   >
@@ -352,6 +389,17 @@ export default function AddEmployeeModal({
                         placeholder="First name"
                         autoFocus={idx === 0}
                       />
+                      {errors.firstName ? (
+                        <div
+                          role="alert"
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--color-danger)",
+                          }}
+                        >
+                          {errors.firstName}
+                        </div>
+                      ) : null}
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -371,6 +419,35 @@ export default function AddEmployeeModal({
                           }
                         }}
                         placeholder="Last name"
+                      />
+                      {errors.lastName ? (
+                        <div
+                          role="alert"
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--color-danger)",
+                          }}
+                        >
+                          {errors.lastName}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <label style={fieldLabelStyle}>Employment</label>
+                      <CustomSelect
+                        value={row.employmentType}
+                        options={[
+                          { value: "full_time", label: "Full-time" },
+                          { value: "part_time", label: "Part-time" },
+                        ]}
+                        onChange={(v) =>
+                          updateRow(row._id, {
+                            employmentType: v === "part_time" ? "part_time" : "full_time",
+                          })
+                        }
+                        style={{ width: "100%" }}
+                        fontSize={12}
                       />
                     </div>
 
@@ -443,6 +520,17 @@ export default function AddEmployeeModal({
                         );
                       })}
                     </div>
+                    {errors.focusAreaIds ? (
+                      <div
+                        role="alert"
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-danger)",
+                        }}
+                      >
+                        {errors.focusAreaIds}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               );

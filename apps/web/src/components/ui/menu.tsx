@@ -94,6 +94,10 @@ type MenuContentProps = MenuPrimitive.Popup.Props &
       MenuPrimitive.Positioner.State,
       string
     >
+    positionerStyle?: MaybeStateValue<
+      MenuPrimitive.Positioner.State,
+      React.CSSProperties
+    >
     showArrow?: boolean
     arrowClassName?: MaybeStateValue<MenuPrimitive.Arrow.State, string>
   }
@@ -112,6 +116,7 @@ const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
       collisionPadding = 8,
       positionMethod,
       positionerClassName,
+      positionerStyle,
       side = "bottom",
       sideOffset = 0,
       showArrow = false,
@@ -134,6 +139,10 @@ const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(
           className={(state) =>
             cn("isolate z-50", resolveStateValue(positionerClassName, state))
           }
+          style={(state) => ({
+            zIndex: 10002,
+            ...resolveStateValue(positionerStyle, state),
+          })}
         >
           <MenuPrimitive.Popup
             ref={ref}

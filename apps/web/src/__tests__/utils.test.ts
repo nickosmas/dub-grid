@@ -208,7 +208,7 @@ describe("formatDateKey and formatDate — property tests", () => {
   });
 });
 
-import { getInitials } from "@/lib/utils";
+import { getAvatarInitials, getInitials } from "@/lib/utils";
 
 describe("getInitials", () => {
   // Requirements: 5.1
@@ -246,6 +246,20 @@ describe("getInitials — property tests", () => {
         expect(result).toMatch(/^[A-Z]+$/);
       }),
     );
+  });
+});
+
+describe("getAvatarInitials", () => {
+  it("matches the mobile avatar behavior by ignoring leading quotation marks", () => {
+    expect(getAvatarInitials('"Riley RN')).toBe("RR");
+  });
+
+  it("uses the first part only for single-word names", () => {
+    expect(getAvatarInitials("Madonna")).toBe("M");
+  });
+
+  it("returns the fallback when no name parts are present", () => {
+    expect(getAvatarInitials('""', "DG")).toBe("DG");
   });
 });
 

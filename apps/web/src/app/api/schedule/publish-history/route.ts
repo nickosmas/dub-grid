@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import type { PublishChange } from "@/types";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -9,6 +10,16 @@ const querySchema = z.object({
 });
 
 export const dynamic = "force-dynamic";
+
+function formatProfileName(profile: {
+  first_name: string | null;
+  last_name: string | null;
+}): string {
+  return [profile.first_name, profile.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
 
 export async function GET(req: NextRequest) {
   const parsed = querySchema.safeParse(
@@ -31,25 +42,63 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { data, error } = await auth.serviceClient.rpc("get_publish_history", {
-      p_org_id: parsed.data.orgId,
-      p_limit: parsed.data.limit ?? 20,
-      p_offset: parsed.data.offset ?? 0,
-    });
+    const limit = parsed.data.limit ?? 20;
+    const offset = parsed.data.offset ?? 0;
+    const { data, error } = await auth.serviceClient
+      .from("publish_history")
+      .select(
+        "id, published_by, start_date, end_date, change_count, changes, published_at",
+      )
+      .eq("org_id", parsed.data.orgId)
+      .order("published_at", { ascending: false })
+      .range(offset, offset + limit - 1);
     if (error) {
       throw error;
     }
 
+    const rows = (data ?? []) as {
+      id: string;
+      published_by: string;
+      start_date: string;
+      end_date: string;
+      change_count: number;
+      changes: PublishChange[];
+      published_at: string;
+    }[];
+    const publisherIds = [...new Set(rows.map((row) => row.published_by))];
+    const publisherNames = new Map<string, string>();
+
+    if (publisherIds.length > 0) {
+      const { data: profiles, error: profilesError } = await auth.serviceClient
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", publisherIds);
+      if (profilesError) {
+        throw profilesError;
+      }
+
+      for (const profile of (profiles ?? []) as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+      }[]) {
+        const name = formatProfileName(profile);
+        if (name) {
+          publisherNames.set(profile.id, name);
+        }
+      }
+    }
+
     return NextResponse.json({
-      entries: (data ?? []).map((row: Record<string, unknown>) => ({
-        id: row.id as string,
-        publishedBy: row.published_by as string,
-        publishedByName: row.published_by_name as string,
-        startDate: row.start_date as string,
-        endDate: row.end_date as string,
-        changeCount: row.change_count as number,
+      entries: rows.map((row) => ({
+        id: row.id,
+        publishedBy: row.published_by,
+        publishedByName: publisherNames.get(row.published_by) ?? "Unknown",
+        startDate: row.start_date,
+        endDate: row.end_date,
+        changeCount: row.change_count,
         changes: row.changes,
-        publishedAt: row.published_at as string,
+        publishedAt: row.published_at,
       })),
     });
   } catch (error) {

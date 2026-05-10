@@ -66,6 +66,8 @@ vi.mock("@/lib/cache", () => ({
   CacheKey: {
     mwProfile: (userId: string) => `dg:mw:profile:${userId}`,
     mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
+    mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+    mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
   },
   TTL: { MIDDLEWARE: 30 },
 }));
@@ -77,6 +79,23 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
   process.env.NEXT_PUBLIC_BASE_DOMAIN = "localhost";
+  mockSupabaseFrom.mockImplementation((table: string) => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({
+          data:
+            table === "organizations"
+              ? {
+                  suspended_at: null,
+                  subscription_status: "active",
+                  trial_ends_at: null,
+                }
+              : null,
+          error: null,
+        }),
+      })),
+    })),
+  }));
 });
 
 // ── Helper: create a NextRequest-like object ─────────────────────────────────
@@ -317,7 +336,7 @@ describe("middleware: route guards", () => {
     expect((res as { _type: string })._type).toBe("next");
   });
 
-  it("allows user role on /settings (department permissions may apply)", async () => {
+  it("redirects user role from /settings to /schedule", async () => {
     mockSessionWithClaims({
       platform_role: "none",
       org_role: "user",
@@ -327,9 +346,8 @@ describe("middleware: route guards", () => {
     });
     const req = makeNextRequest("http://acme.localhost:3000/settings", { host: "acme.localhost:3000" });
     const res = await runMiddleware(req);
-    // User role is allowed through — department permissions may grant settings access,
-    // and client-side guards enforce per-section authorization.
-    expect((res as { _type: string })._type).toBe("next");
+    expect((res as { _type: string; _redirectUrl: string })._type).toBe("redirect");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe("http://acme.localhost:3000/schedule");
   });
 
   it("allows admin role on /settings", async () => {
@@ -343,6 +361,134 @@ describe("middleware: route guards", () => {
     const req = makeNextRequest("http://acme.localhost:3000/settings", { host: "acme.localhost:3000" });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
+  });
+
+  it("redirects regular users to a neutral unavailable page after trial grace", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "user",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: "2026-01-01T00:00:00.000Z",
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+
+    expect((res as { _type: string })._type).toBe("redirect");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/billing-required",
+    );
+  });
+
+  it("routes super admins to billing recovery after trial grace", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: "2026-01-01T00:00:00.000Z",
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+
+    expect((res as { _type: string })._type).toBe("redirect");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/settings?section=org-billing",
+    );
+  });
+
+  it("keeps super admins locked to billing recovery from direct app URLs", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    mockSupabaseFrom.mockImplementation((table: string) => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data:
+              table === "organizations"
+                ? {
+                    suspended_at: null,
+                    subscription_status: "trialing",
+                    trial_ends_at: "2026-01-01T00:00:00.000Z",
+                  }
+                : null,
+            error: null,
+          }),
+        })),
+      })),
+    }));
+
+    const profileRes = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/profile", {
+        host: "acme.localhost:3000",
+      }),
+    );
+    const settingsRes = await runMiddleware(
+      makeNextRequest("http://acme.localhost:3000/settings", {
+        host: "acme.localhost:3000",
+      }),
+    );
+    const billingRes = await runMiddleware(
+      makeNextRequest(
+        "http://acme.localhost:3000/settings?section=org-billing",
+        { host: "acme.localhost:3000" },
+      ),
+    );
+
+    expect((profileRes as { _type: string })._type).toBe("redirect");
+    expect((profileRes as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/settings?section=org-billing",
+    );
+    expect((settingsRes as { _type: string })._type).toBe("redirect");
+    expect((settingsRes as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/settings?section=org-billing",
+    );
+    expect((billingRes as { _type: string })._type).toBe("next");
   });
 
   it("redirects non-gridmaster from /gridmaster to /schedule", async () => {

@@ -50,11 +50,86 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authentic
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
+-- Organization billing identifiers are server-managed. Keep broad row access
+-- for normal organization context, but do not expose Stripe IDs or billed-seat
+-- snapshots through direct browser/mobile Supabase reads or writes.
+REVOKE SELECT ON TABLE public.organizations FROM anon, authenticated;
+REVOKE UPDATE ON TABLE public.organizations FROM authenticated;
+GRANT SELECT (
+  id,
+  name,
+  slug,
+  address,
+  address_line_1,
+  address_line_2,
+  address_city,
+  address_state,
+  address_postal_code,
+  address_country,
+  phone,
+  employee_count,
+  logo_url,
+  app_name,
+  meta_description,
+  theme_config,
+  landing_page_config,
+  focus_area_label,
+  certification_label,
+  role_label,
+  department_label,
+  shift_display_mode,
+  timezone,
+  pay_period_start_date,
+  subscription_status,
+  trial_ends_at,
+  data_retention_days,
+  archived_at,
+  suspended_at,
+  suspended_reason,
+  enforce_conflict_prevention,
+  coverage_rule_config,
+  feature_overrides,
+  created_by,
+  updated_by,
+  created_at,
+  updated_at
+) ON TABLE public.organizations TO anon, authenticated;
+GRANT UPDATE (
+  name,
+  slug,
+  address,
+  address_line_1,
+  address_line_2,
+  address_city,
+  address_state,
+  address_postal_code,
+  address_country,
+  phone,
+  employee_count,
+  logo_url,
+  app_name,
+  meta_description,
+  theme_config,
+  landing_page_config,
+  focus_area_label,
+  certification_label,
+  role_label,
+  department_label,
+  shift_display_mode,
+  timezone,
+  pay_period_start_date,
+  data_retention_days,
+  enforce_conflict_prevention,
+  coverage_rule_config,
+  feature_overrides,
+  updated_by,
+  updated_at
+) ON TABLE public.organizations TO authenticated;
+
 -- anon: minimal access for unauthenticated visitors
 -- IMPORTANT: anon must NOT have blanket EXECUTE on all functions.
 -- Functions like gdpr_erase_user_data, purge_expired_data, etc. would be
 -- callable via PostgREST by unauthenticated users if granted here.
-GRANT SELECT ON TABLE public.organizations TO anon;
 GRANT INSERT ON TABLE public.cookie_consents TO anon;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
 

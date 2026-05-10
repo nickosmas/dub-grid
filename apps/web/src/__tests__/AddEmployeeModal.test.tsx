@@ -140,6 +140,27 @@ describe("AddEmployeeModal", () => {
       await userEvent.click(submitBtn);
       expect(onAdd).not.toHaveBeenCalled();
     });
+
+    it("rejects numeric-only names and shows inline validation", async () => {
+      const { onAdd } = renderModal();
+      const firstNameInputs = getFirstNameInputs();
+      const lastNameInputs = getLastNameInputs();
+
+      await userEvent.type(firstNameInputs[0], "123");
+      await userEvent.type(lastNameInputs[0], "456");
+
+      expect(
+        screen.getByText("First name must include at least one letter"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Last name must include at least one letter"),
+      ).toBeInTheDocument();
+
+      const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
+      expect(submitBtn).toBeDisabled();
+      await userEvent.click(submitBtn);
+      expect(onAdd).not.toHaveBeenCalled();
+    });
   });
 
   describe("Submission", () => {
@@ -166,6 +187,7 @@ describe("AddEmployeeModal", () => {
         expect.objectContaining({
           firstName: "Alice",
           lastName: "Smith",
+          employmentType: "full_time",
           focusAreaIds: expect.any(Array),
           roleIds: expect.any(Array),
           phone: expect.any(String),

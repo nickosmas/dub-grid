@@ -21,6 +21,11 @@ import {
   pickOrganizationSettings,
 } from "@/lib/organization-settings";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import {
+  getLineTextError,
+  getOptionalUsPhoneFieldError,
+  normalizeLineText,
+} from "@/lib/form-validation";
 
 export default function OrganizationGeneral({
   organization,
@@ -76,6 +81,13 @@ export default function OrganizationGeneral({
   );
 
   const isModified = changes.length > 0;
+  const nameError = getLineTextError(form.name, {
+    label: "Organization name",
+    maxLength: 60,
+    required: true,
+  });
+  const phoneError = getOptionalUsPhoneFieldError(form.phone);
+  const hasValidationErrors = Boolean(nameError || phoneError);
 
   // Warn before navigating away with unsaved changes
   useEffect(() => {
@@ -86,17 +98,22 @@ export default function OrganizationGeneral({
   }, [isModified]);
 
   const handleSave = useCallback(async () => {
-    if (!nextOrganization.name) return;
+    if (nameError || phoneError) return;
     if (!organization.updatedAt) {
       toast.error("Organization data is out of date. Refresh and try again.");
       return;
     }
     setSaving(true);
     try {
+      const normalizedName = normalizeLineText(form.name, {
+        label: "Organization name",
+        maxLength: 60,
+        required: true,
+      });
       const updated = await updateOrganizationSettings({
         orgId: organization.id,
         expectedUpdatedAt: organization.updatedAt,
-        name: nextOrganization.name,
+        name: normalizedName,
         phone: nextOrganization.phone,
         addressLine1: nextOrganization.addressLine1,
         addressLine2: nextOrganization.addressLine2,
@@ -124,12 +141,21 @@ export default function OrganizationGeneral({
     } finally {
       setSaving(false);
     }
-  }, [buildForm, nextOrganization, onSave, organization.id, organization.updatedAt]);
+  }, [
+    buildForm,
+    form.name,
+    nameError,
+    nextOrganization,
+    onSave,
+    organization.id,
+    organization.updatedAt,
+    phoneError,
+  ]);
 
   const handleReview = useCallback(() => {
-    if (!isModified || saving) return;
+    if (!isModified || saving || hasValidationErrors) return;
     setReviewOpen(true);
-  }, [isModified, saving]);
+  }, [hasValidationErrors, isModified, saving]);
 
   const handleCancel = useCallback(() => {
     setReviewOpen(false);
@@ -147,11 +173,24 @@ export default function OrganizationGeneral({
             maxLength={60}
             className="dg-input"
           />
+          {nameError ? (
+            <p
+              role="alert"
+              style={{
+                margin: "6px 0 0",
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-danger)",
+              }}
+            >
+              {nameError}
+            </p>
+          ) : null}
         </div>
       </div>
       <OrganizationLocationFields
         value={form}
         onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+        phoneError={phoneError}
         employeeCount={employeeCount}
         employeeCountLoading={employeeCountLoading}
         gridTemplateColumns={isMobile ? "1fr" : "1fr 1fr"}
@@ -169,7 +208,7 @@ export default function OrganizationGeneral({
         ) : null}
         <button
           onClick={handleReview}
-          disabled={!isModified || saving}
+          disabled={!isModified || saving || hasValidationErrors}
           className="dg-btn dg-btn-primary"
         >
           Review & Save

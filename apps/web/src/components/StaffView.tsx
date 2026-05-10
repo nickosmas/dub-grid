@@ -35,6 +35,7 @@ import type {
 import OrgActivityLog from "@/components/settings/ActivityLog";
 import UserManagementSettings from "@/components/settings/UserManagement";
 import { MembersSection } from "@/components/staff/MembersSection";
+import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
 
 const EMPTY_CODE_MAP = new Map<number, string>();
@@ -89,6 +90,24 @@ const ACTIVITY_ICON = (
   </svg>
 );
 
+const REQUESTS_ICON = (
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="M9 15h6" />
+    <path d="M9 11h2" />
+  </svg>
+);
+
 const CALENDAR_ICON = (
   <svg
     width="14"
@@ -107,7 +126,7 @@ const CALENDAR_ICON = (
   </svg>
 );
 
-type StaffSection = "directory" | "access" | "activity" | "recurring-schedule";
+type StaffSection = "directory" | "requests" | "access" | "activity" | "recurring-schedule";
 
 interface StaffViewProps {
   employees: Employee[];
@@ -181,11 +200,14 @@ export default function StaffView({
   const { user } = useAuth();
   const scheduledDepartmentLabel = departmentLabelProp || "Scheduled Departments";
   const managementDepartmentLabel = "Management Departments";
+  const canAccessPeopleAdminSurfaces = Boolean(canManageEmployees || isSuperAdmin || isGridmaster);
+  const canAccessPeopleRecurring = Boolean(orgId && canViewRecurringShifts && canAccessPeopleAdminSurfaces);
 
   const allowedSections: StaffSection[] = [
     "directory",
+    ...(canAccessPeopleAdminSurfaces ? ["requests" as const] : []),
     ...((isSuperAdmin || isGridmaster) ? ["access" as const] : []),
-    ...(orgId && canViewRecurringShifts ? ["recurring-schedule" as const] : []),
+    ...(canAccessPeopleRecurring ? ["recurring-schedule" as const] : []),
     ...(isSuperAdmin ? ["activity" as const] : []),
   ];
   const sectionParam = searchParams.get("section") as StaffSection | null;
@@ -203,10 +225,13 @@ export default function StaffView({
   const links: { id: StaffSection; label: string; icon: ReactNode }[] = useMemo(
     () => [
       { id: "directory", label: "Directory", icon: MEMBERS_ICON },
+      ...(canAccessPeopleAdminSurfaces
+        ? [{ id: "requests" as StaffSection, label: "Requests", icon: REQUESTS_ICON }]
+        : []),
       ...((isSuperAdmin || isGridmaster)
         ? [{ id: "access" as StaffSection, label: "User Access", icon: USER_MANAGEMENT_ICON }]
         : []),
-      ...(orgId && canViewRecurringShifts
+      ...(canAccessPeopleRecurring
         ? [
             {
               id: "recurring-schedule" as StaffSection,
@@ -219,7 +244,7 @@ export default function StaffView({
         ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: ACTIVITY_ICON }]
         : []),
     ],
-    [canViewRecurringShifts, isGridmaster, isSuperAdmin, orgId],
+    [canAccessPeopleAdminSurfaces, canAccessPeopleRecurring, isGridmaster, isSuperAdmin],
   );
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -383,9 +408,19 @@ export default function StaffView({
               </div>
             )}
 
+            {activeSection === "requests" && canAccessPeopleAdminSurfaces && orgId && (
+              <ProfileChangeRequestQueue
+                orgId={orgId}
+                focusAreas={focusAreas}
+                certifications={certifications}
+                roles={roles}
+                departments={departmentsProp}
+              />
+            )}
+
             {activeSection === "recurring-schedule" &&
               orgId &&
-              canViewRecurringShifts && (
+              canAccessPeopleRecurring && (
                 <RecurringScheduleSection
                   employees={employees}
                   orgId={orgId}

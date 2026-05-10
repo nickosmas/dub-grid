@@ -4,6 +4,9 @@ import { getEmployeeDisplayName } from "@/lib/utils";
 
 export type EmployeeTab = "active" | "benched" | "terminated";
 export type SortKey = "seniority" | "name";
+export type EmploymentTypeFilter = "all" | Employee["employmentType"];
+export type AccountLinkFilter = "all" | "linked" | "unlinked";
+export type ContactPresenceFilter = "all" | "present" | "missing";
 export interface SortConfig { key: SortKey; dir: "asc" | "desc" }
 
 const PAGE_SIZE = 15;
@@ -12,27 +15,48 @@ interface UseStaffFiltersOptions {
   employees: Employee[];
   benchedEmployees: Employee[];
   terminatedEmployees: Employee[];
-  showOnlyUnlinked?: boolean;
 }
 
 export function useStaffFilters({
   employees,
   benchedEmployees,
   terminatedEmployees,
-  showOnlyUnlinked = false,
 }: UseStaffFiltersOptions) {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "seniority", dir: "asc" });
+  const [filterEmploymentType, setFilterEmploymentType] = useState<EmploymentTypeFilter>("all");
+  const [filterDepartment, setFilterDepartment] = useState<number | null>(null);
+  const [filterDepartmentAdminOnly, setFilterDepartmentAdminOnly] = useState(false);
   const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
+  const [filterCertification, setFilterCertification] = useState<number | null>(null);
   const [filterRole, setFilterRole] = useState<number | null>(null);
+  const [filterAccountLink, setFilterAccountLink] = useState<AccountLinkFilter>("all");
+  const [filterEmailPresence, setFilterEmailPresence] = useState<ContactPresenceFilter>("all");
+  const [filterPhonePresence, setFilterPhonePresence] = useState<ContactPresenceFilter>("all");
   const [page, setPage] = useState(1);
 
-  const hasActiveFilters = filterFocusArea !== null || filterRole !== null || showOnlyUnlinked;
+  const hasActiveFilters =
+    filterEmploymentType !== "all" ||
+    filterDepartment !== null ||
+    filterDepartmentAdminOnly ||
+    filterFocusArea !== null ||
+    filterCertification !== null ||
+    filterRole !== null ||
+    filterAccountLink !== "all" ||
+    filterEmailPresence !== "all" ||
+    filterPhonePresence !== "all";
 
   function clearFilters() {
+    setFilterEmploymentType("all");
+    setFilterDepartment(null);
+    setFilterDepartmentAdminOnly(false);
     setFilterFocusArea(null);
+    setFilterCertification(null);
     setFilterRole(null);
+    setFilterAccountLink("all");
+    setFilterEmailPresence("all");
+    setFilterPhonePresence("all");
     setSearchQuery("");
   }
 
@@ -46,7 +70,20 @@ export function useStaffFilters({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPage(1);
-  }, [activeTab, searchQuery, filterFocusArea, filterRole, sortConfig, showOnlyUnlinked]);
+  }, [
+    activeTab,
+    searchQuery,
+    filterEmploymentType,
+    filterDepartment,
+    filterDepartmentAdminOnly,
+    filterFocusArea,
+    filterCertification,
+    filterRole,
+    filterAccountLink,
+    filterEmailPresence,
+    filterPhonePresence,
+    sortConfig,
+  ]);
 
   const tabCounts = useMemo(
     () => ({
@@ -72,13 +109,57 @@ export function useStaffFilters({
         (emp.email && emp.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (emp.phone && emp.phone.includes(searchQuery));
 
+      const matchesEmploymentType =
+        filterEmploymentType === "all" || emp.employmentType === filterEmploymentType;
+      const matchesDepartment =
+        !filterDepartment || emp.departmentIds.includes(filterDepartment);
+      const matchesDepartmentAdmin =
+        !filterDepartmentAdminOnly ||
+        (filterDepartment
+          ? emp.deptAdminIds.includes(filterDepartment)
+          : emp.deptAdminIds.length > 0);
       const matchesFocusArea = !filterFocusArea || emp.focusAreaIds.includes(filterFocusArea);
+      const matchesCertification = !filterCertification || emp.certificationId === filterCertification;
       const matchesRole = !filterRole || emp.roleIds.includes(filterRole);
-      const matchesUnlinked = !showOnlyUnlinked || !emp.userId;
+      const matchesAccountLink =
+        filterAccountLink === "all" ||
+        (filterAccountLink === "linked" ? Boolean(emp.userId) : !emp.userId);
+      const matchesEmailPresence =
+        filterEmailPresence === "all" ||
+        (filterEmailPresence === "present" ? Boolean(emp.email) : !emp.email);
+      const matchesPhonePresence =
+        filterPhonePresence === "all" ||
+        (filterPhonePresence === "present" ? Boolean(emp.phone) : !emp.phone);
 
-      return matchesSearch && matchesFocusArea && matchesRole && matchesUnlinked;
+      return (
+        matchesSearch &&
+        matchesEmploymentType &&
+        matchesDepartment &&
+        matchesDepartmentAdmin &&
+        matchesFocusArea &&
+        matchesCertification &&
+        matchesRole &&
+        matchesAccountLink &&
+        matchesEmailPresence &&
+        matchesPhonePresence
+      );
     });
-  }, [activeTab, employees, benchedEmployees, terminatedEmployees, searchQuery, filterFocusArea, filterRole, showOnlyUnlinked]);
+  }, [
+    activeTab,
+    employees,
+    benchedEmployees,
+    terminatedEmployees,
+    searchQuery,
+    filterEmploymentType,
+    filterDepartment,
+    filterDepartmentAdminOnly,
+    filterFocusArea,
+    filterCertification,
+    filterRole,
+    filterAccountLink,
+    filterEmailPresence,
+    filterPhonePresence,
+  ]);
 
   const sorted = useMemo(
     () => {
@@ -117,10 +198,24 @@ export function useStaffFilters({
     // Sort & filter
     sortConfig,
     handleSort,
+    filterEmploymentType,
+    setFilterEmploymentType,
+    filterDepartment,
+    setFilterDepartment,
+    filterDepartmentAdminOnly,
+    setFilterDepartmentAdminOnly,
     filterFocusArea,
     setFilterFocusArea,
+    filterCertification,
+    setFilterCertification,
     filterRole,
     setFilterRole,
+    filterAccountLink,
+    setFilterAccountLink,
+    filterEmailPresence,
+    setFilterEmailPresence,
+    filterPhonePresence,
+    setFilterPhonePresence,
     hasActiveFilters,
     clearFilters,
     // Lists

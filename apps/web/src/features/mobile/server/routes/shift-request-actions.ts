@@ -31,14 +31,17 @@ export async function PATCH(
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
+      { error: "We couldn't read that request. Try again." },
       { status: 400 },
     );
   }
 
   const parsed = mobileUpdateShiftRequestBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Check the request details and try again." },
+      { status: 400 },
+    );
   }
 
   try {

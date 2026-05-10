@@ -157,6 +157,7 @@ export function scheduleCellSnapshotToInput(
         shiftId: segment.shiftId,
         jobId: segment.jobId,
         position: segment.position,
+        isMentored: segment.isMentored ?? false,
       }),
     ),
     absenceTypeId: snapshot.absenceTypeId ?? null,
@@ -204,6 +205,7 @@ export function resolveScheduleCellSnapshotFromInput(
           (segment, index): ScheduleCellSegmentSnapshot => ({
             ...segment,
             position: orderedSegments[index]?.position ?? index,
+            isMentored: orderedSegments[index]?.isMentored ?? false,
           }),
         )
       : orderedSegments.map(
@@ -220,6 +222,8 @@ export function resolveScheduleCellSnapshotFromInput(
             focusAreaId: null,
             showJobOnGrid: false,
             isShiftless: segment.shiftId == null,
+            isShiftOnly: false,
+            isMentored: segment.isMentored ?? false,
             startTime: null,
             endTime: null,
           }),
@@ -306,7 +310,8 @@ function normalizedSegmentsEqual(
       other != null &&
       segment.position === other.position &&
       segment.shiftId === other.shiftId &&
-      segment.jobId === other.jobId
+      segment.jobId === other.jobId &&
+      (segment.isMentored ?? false) === (other.isMentored ?? false)
     );
   });
 }
@@ -466,6 +471,8 @@ function buildResolvedSegmentsFromNormalizedSnapshot(
         focusAreaId: null,
         showJobOnGrid: false,
         isShiftless: segment.shift_id == null,
+        isShiftOnly: false,
+        isMentored: segment.is_mentored ?? false,
         startTime: null,
         endTime: null,
       };
@@ -481,6 +488,7 @@ function buildResolvedSegmentsFromNormalizedSnapshot(
   ).map((segment, index) => ({
     ...segment,
     position: orderedSegments[index]?.position ?? index,
+    isMentored: orderedSegments[index]?.is_mentored ?? false,
   }));
 }
 

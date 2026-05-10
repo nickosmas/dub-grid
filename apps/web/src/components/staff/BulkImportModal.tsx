@@ -1,11 +1,17 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Upload, FileText, AlertTriangle, CheckCircle, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Import as ImportIcon,
+  X,
+} from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface ParsedRow {
   firstName: string;
@@ -189,7 +195,7 @@ export function BulkImportModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Import failed");
+        toast.error(formatClientErrorMessage(data.error, "We couldn't import those employees."));
         return;
       }
       setResult(data as ImportResult);
@@ -269,7 +275,7 @@ export function BulkImportModal({
                   gap: 12,
                 }}
               >
-                <Upload size={32} style={{ color: "var(--color-text-muted)" }} />
+                <ImportIcon size={32} style={{ color: "var(--color-text-muted)" }} />
                 <p style={{ margin: 0, fontWeight: 600, fontSize: "var(--dg-fs-body)" }}>
                   Drop CSV file here or click to browse
                 </p>
@@ -412,7 +418,7 @@ export function BulkImportModal({
               </button>
               <button className="dg-btn dg-btn-primary" onClick={handleImport} disabled={importing}>
                 <ButtonLoading loading={importing} spinnerColor="var(--color-text-inverse)" spinnerSize={16}>
-                  <FileText size={14} style={{ marginRight: 4 }} />
+                  <ImportIcon size={14} style={{ marginRight: 4 }} />
                   Import {rows.length} Employee{rows.length !== 1 ? "s" : ""}
                 </ButtonLoading>
               </button>

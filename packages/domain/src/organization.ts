@@ -1,5 +1,9 @@
 export type ShiftDisplayMode = "code" | "name";
 
+export interface CoverageRuleConfig {
+  mentoredCoverageCreditPercent: number;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -24,6 +28,7 @@ export interface Organization {
   suspendedAt?: string | null;
   suspendedReason?: string | null;
   enforceConflictPrevention: boolean;
+  coverageRuleConfig?: CoverageRuleConfig;
   stripeCustomerId?: string | null;
   subscriptionStatus?: string | null;
   trialEndsAt?: string | null;

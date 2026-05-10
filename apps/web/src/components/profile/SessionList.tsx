@@ -7,11 +7,14 @@ import { Monitor, Smartphone, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   fetchAccountSessions,
+  getBrowserAuthSession,
   revokeAccountSession,
 } from "@/features/account/client";
 
 interface UserSession {
   id: string;
+  supabaseSessionId: string | null;
+  platform: "web" | "ios" | "android" | null;
   deviceLabel: string;
   ipAddress: string | null;
   lastActiveAt: string;
@@ -19,7 +22,14 @@ interface UserSession {
   isCurrent: boolean;
 }
 
-function parseDeviceLabel(label: string): { icon: "mobile" | "desktop"; label: string } {
+function parseDeviceLabel(
+  label: string,
+  platform: UserSession["platform"],
+): { icon: "mobile" | "desktop"; label: string } {
+  if (platform === "ios" || platform === "android") {
+    return { icon: "mobile", label };
+  }
+
   const lower = label.toLowerCase();
   if (lower.includes("mobile") || lower.includes("iphone") || lower.includes("android")) {
     return { icon: "mobile", label };
@@ -37,6 +47,25 @@ function formatRelative(dateStr: string): string {
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d ago`;
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function extractSupabaseSessionId(accessToken: string): string | null {
+  try {
+    const [, encodedPayload] = accessToken.split(".");
+    if (!encodedPayload) return null;
+
+    const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
+    const padding =
+      normalized.length % 4 === 0
+        ? ""
+        : "=".repeat(4 - (normalized.length % 4));
+    const payload = JSON.parse(
+      atob(`${normalized}${padding}`),
+    ) as Record<string, unknown>;
+    return typeof payload.session_id === "string" ? payload.session_id : null;
+  } catch {
+    return null;
+  }
 }
 
 export function SessionList() {
@@ -60,25 +89,23 @@ export function SessionList() {
       }
 
       const rows = (await fetchAccountSessions()).sessions;
-
-      // Match current session using the stable per-browser session ID (same as AuthProvider)
-      let currentHash = "";
-      const storageKey = `dg_session_id:${user.id}`;
-      const sessionId = localStorage.getItem(storageKey);
-      if (sessionId) {
-        const encoder = new TextEncoder();
-        const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(sessionId));
-        currentHash = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
-      }
+      const currentSession = await getBrowserAuthSession();
+      const currentSupabaseSessionId = currentSession?.access_token
+        ? extractSupabaseSessionId(currentSession.access_token)
+        : null;
 
       setSessions(
         rows.map((row) => ({
           id: row.id,
+          supabaseSessionId: row.supabaseSessionId,
+          platform: row.platform,
           deviceLabel: row.deviceLabel ?? "Unknown device",
           ipAddress: row.ipAddress,
           lastActiveAt: row.lastActiveAt,
           refreshTokenHash: row.refreshTokenHash,
-          isCurrent: currentHash !== "" && row.refreshTokenHash === currentHash,
+          isCurrent:
+            currentSupabaseSessionId != null &&
+            row.supabaseSessionId === currentSupabaseSessionId,
         })),
       );
     } catch {
@@ -124,7 +151,7 @@ export function SessionList() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {sessions.map((s) => {
-        const device = parseDeviceLabel(s.deviceLabel);
+        const device = parseDeviceLabel(s.deviceLabel, s.platform);
         return (
           <div
             key={s.id}

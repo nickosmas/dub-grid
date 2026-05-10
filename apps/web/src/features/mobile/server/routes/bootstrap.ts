@@ -3,7 +3,10 @@ import { mobileBootstrapResponseSchema } from "@dubgrid/contracts";
 import { loadMobileBootstrapPayload } from "@dubgrid/mobile-api-core";
 import {
   fetchMobileAbsenceTypes,
+  fetchMobileCertifications,
+  fetchMobileDepartments,
   fetchMobileFocusAreas,
+  fetchMobileRoles,
   fetchLinkedEmployeeForUser,
   fetchMobileUnreadNotificationCount,
   mapOrganizationToMobileConfig,
@@ -28,6 +31,9 @@ export async function GET(req: NextRequest) {
     fetchMobileUnreadNotificationCount,
     fetchMobileAbsenceTypes,
     fetchMobileFocusAreas,
+    fetchMobileRoles,
+    fetchMobileCertifications,
+    fetchMobileDepartments,
     mapOrganizationToMobileConfig,
   });
 

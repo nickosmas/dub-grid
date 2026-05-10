@@ -6,7 +6,9 @@ import type {
 import type {
   AdminPermissions,
   AssignableOrganizationRole,
+  BillingAccessResult,
   Employee,
+  EmployeeEmploymentType,
   EmployeeStatus,
   Organization,
   OrganizationRole,
@@ -18,7 +20,9 @@ import type {
 export type {
   AdminPermissions,
   AssignableOrganizationRole,
+  BillingAccessResult,
   Employee,
+  EmployeeEmploymentType,
   EmployeeStatus,
   Organization,
   OrganizationRole,
@@ -245,6 +249,7 @@ export interface AssignableShiftOption {
   jobAbbr: string;
   showJobOnGrid: boolean;
   isShiftless: boolean;
+  isShiftOnly: boolean;
   primaryLabel: string;
   secondaryLabel: string | null;
   groupLabel: string;
@@ -263,6 +268,7 @@ export interface ShiftDisplayParts {
   secondaryLabel: string | null;
   showJobOnGrid: boolean;
   isShiftless: boolean;
+  isShiftOnly: boolean;
 }
 
 export interface ShiftJobSegment {
@@ -281,6 +287,8 @@ export interface ShiftJobSegment {
   focusAreaId?: number | null;
   showJobOnGrid?: boolean;
   isShiftless?: boolean;
+  isShiftOnly?: boolean;
+  isMentored?: boolean;
   startTime?: string | null;
   endTime?: string | null;
 }
@@ -536,6 +544,48 @@ export interface Subscription {
   updatedAt: string;
 }
 
+export type BillingSubscriptionStatus =
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "unpaid"
+  | "canceled"
+  | "incomplete"
+  | "incomplete_expired"
+  | "paused"
+  | string;
+
+export interface BillingOperationSummary {
+  id: string;
+  action: string;
+  label: string;
+  actorLabel: string;
+  resourceType: string;
+  resourceId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface OrganizationBillingSummary {
+  orgId: string;
+  orgName: string;
+  orgSlug: string | null;
+  status: BillingSubscriptionStatus | null;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  cancelAt: string | null;
+  canceledAt: string | null;
+  subscriptionSeats: number | null;
+  appUserCount: number;
+  seatDelta: number | null;
+  hasStripeCustomer: boolean;
+  hasStripeSubscription: boolean;
+  stripeConfigured: boolean;
+  canManageBilling: boolean;
+  billingAccess: BillingAccessResult;
+  recentOperations?: BillingOperationSummary[];
+}
+
 /** An organization user record for the user management panel. */
 export interface OrganizationUser {
   id: string;
@@ -605,11 +655,39 @@ export interface DirectoryPerson {
 export interface UserSession {
   id: string;
   userId: string;
+  orgId: string | null;
+  supabaseSessionId: string | null;
+  platform: "web" | "ios" | "android" | null;
+  appVersion: string | null;
   deviceLabel: string | null;
   ipAddress: string | null;
   lastActiveAt: string;
   createdAt: string;
   refreshTokenHash: string;
+}
+
+export interface GridmasterUserSessionOrg {
+  orgId: string;
+  orgName: string;
+  orgSlug: string | null;
+  orgRole: OrganizationRole | null;
+}
+
+export interface GridmasterUserSession {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  userPlatformRole: PlatformRole | null;
+  org: GridmasterUserSessionOrg | null;
+  supabaseSessionId: string | null;
+  platform: "web" | "ios" | "android" | null;
+  appVersion: string | null;
+  deviceLabel: string | null;
+  ipAddress: string | null;
+  lastActiveAt: string;
+  createdAt: string;
+  status: "active" | "recent" | "stale";
 }
 
 export interface ImpersonationSession {
@@ -759,6 +837,226 @@ export interface PlatformUser {
   createdAt: string;
   lastSignInAt: string | null;
   deactivatedAt: string | null;
+  membershipCount?: number;
+  activeSessionCount?: number;
+  mobileDeviceCount?: number;
+  lastForceLogoutAt?: string | null;
+}
+
+/** A platform-only gridmaster account view. */
+export interface GridmasterAccount {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  createdAt: string;
+  lastSignInAt: string | null;
+  deactivatedAt: string | null;
+  deactivatedBy: string | null;
+}
+
+export interface GridmasterAuditEventSummary {
+  id: number;
+  orgId: string | null;
+  actorId: string | null;
+  actorEmail: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface GridmasterActivityCategorySummary {
+  category: string;
+  count: number;
+}
+
+export interface GridmasterOrgActivitySignal {
+  orgId: string;
+  orgName: string;
+  actionCount: number;
+  operationalActionCount: number;
+  highRiskActionCount: number;
+  latestAt: string | null;
+  dominantCategory: string | null;
+  classification: "normal_operation" | "review_recommended";
+  reason: string;
+}
+
+export interface GridmasterPlatformActivitySummary {
+  last24hCount: number;
+  last7dCount: number;
+  topCategories: GridmasterActivityCategorySummary[];
+  busiestOrganizations: GridmasterOrgActivitySignal[];
+  reviewRecommendedOrganizations: GridmasterOrgActivitySignal[];
+}
+
+export interface GridmasterImpersonationSummary {
+  sessionId: string;
+  gridmasterId: string;
+  targetUserId: string;
+  targetOrgId: string;
+  justification: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  expiresAt: string;
+  createdAt: string;
+  endedAt: string | null;
+  endReason: string | null;
+}
+
+export interface GridmasterOrgHealthSummary {
+  orgId: string;
+  orgName: string;
+  orgSlug: string | null;
+  status: "active" | "suspended" | "archived";
+  oversightScore: number;
+  riskFlags: Array<
+    | "suspended"
+    | "archived"
+    | "setup_incomplete"
+    | "no_recent_login"
+    | "pending_invites"
+    | "open_requests"
+    | "billing_risk"
+  >;
+  setup: {
+    isComplete: boolean;
+    missing: Array<
+      "focusAreas" | "scheduleDefinitions" | "certifications" | "orgRoles"
+    >;
+  };
+  supportSnapshot: {
+    userCount: number;
+    employeeCount: number;
+    activeUsers30d: number;
+    activeSessions: number;
+    mobileDevices: number;
+    pendingInvitations: number;
+    openShiftRequests: number;
+    scheduleCellsCreated30d: number;
+    lastLoginAt: string | null;
+    lastSchedulePublishAt: string | null;
+    recentSettingsChangeAt: string | null;
+  };
+  billing: {
+    subscriptionStatus: string | null;
+    trialEndsAt: string | null;
+    subscriptionSeats: number | null;
+    stripeCustomerId: string | null;
+  };
+  featureOverrides: Record<string, boolean>;
+}
+
+export interface GridmasterOverview {
+  generatedAt: string;
+  platformHealth: {
+    db: { status: "ok" | "error"; checkedAt: string };
+    redis: { configured: boolean; productionReady: boolean; message: string | null };
+    activeSessionCount: number;
+    staleSessionCount: number;
+    activeMobileTokenCount: number;
+  };
+  orgRisk: {
+    suspendedCount: number;
+    archivedCount: number;
+    noLoginCount: number;
+    pendingSetupCount: number;
+    pendingInvitationCount: number;
+    openShiftRequestCount: number;
+    riskiestOrganizations: GridmasterOrgHealthSummary[];
+  };
+  businessHealth: {
+    trialEndingCount: number;
+    billingRiskCount: number;
+    missingStripeCount: number;
+    seatMismatchCount: number;
+  };
+  complianceAlerts: {
+    activeImpersonationCount: number;
+    expiredUnendedImpersonationCount: number;
+    highRiskAuditCount: number;
+    dataRetentionRiskCount: number;
+    gdprEventCount: number;
+  };
+  activitySummary: GridmasterPlatformActivitySummary;
+  recentHighRiskEvents: GridmasterAuditEventSummary[];
+}
+
+export interface GridmasterSecuritySummary {
+  generatedAt: string;
+  sessionSummary: {
+    active24h: number;
+    stale30d: number;
+    web: number;
+    ios: number;
+    android: number;
+  };
+  mobileDeviceSummary: {
+    active: number;
+    disabled: number;
+  };
+  impersonation: {
+    activeCount: number;
+    expiredUnendedCount: number;
+    recent: GridmasterImpersonationSummary[];
+  };
+  forceLogoutEvents: GridmasterAuditEventSummary[];
+  highRiskAuditEvents: GridmasterAuditEventSummary[];
+}
+
+export interface GridmasterBillingOrgSummary {
+  orgId: string;
+  orgName: string;
+  orgSlug: string | null;
+  status: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  cancelAt: string | null;
+  canceledAt: string | null;
+  seats: number | null;
+  appUsers: number;
+  employeeCount: number;
+  seatDelta: number | null;
+  updatedAt: string | null;
+}
+
+export interface GridmasterBillingSummary {
+  generatedAt: string;
+  organizations: GridmasterBillingOrgSummary[];
+  trialEndingSoon: GridmasterBillingOrgSummary[];
+  riskOrganizations: GridmasterBillingOrgSummary[];
+  missingStripeCustomer: GridmasterBillingOrgSummary[];
+  seatMismatches: GridmasterBillingOrgSummary[];
+}
+
+export interface GridmasterComplianceSummary {
+  generatedAt: string;
+  termsAcceptanceCount: number;
+  cookieConsentCount: number;
+  pendingProfileChangeRequestCount: number;
+  dataRetentionRisk: Array<{
+    orgId: string;
+    orgName: string;
+    dataRetentionDays: number;
+  }>;
+  gdprEvents: GridmasterAuditEventSummary[];
+  accountDeletionEvents: GridmasterAuditEventSummary[];
+  impersonationEvidence: GridmasterImpersonationSummary[];
+  orgRetention: Array<{
+    orgId: string;
+    orgName: string;
+    dataRetentionDays: number;
+  }>;
+}
+
+export interface GridmasterAuditExportResult {
+  exportedAt: string;
+  rowCount: number;
+  entries: GridmasterAuditEventSummary[];
 }
 
 /** An audit log entry from the role_change_log table, denormalized with user emails. */
@@ -779,11 +1077,15 @@ export interface AuditLogEntry {
 export interface FullAuditLogEntry {
   id: number;
   orgId: string | null;
+  orgName: string | null;
   actorId: string | null;
   actorEmail: string | null;
+  actorName: string | null;
   action: string;
   resourceType: string;
   resourceId: string | null;
+  targetLabel: string | null;
+  targetEmail: string | null;
   details: Record<string, unknown>;
   createdAt: string;
 }

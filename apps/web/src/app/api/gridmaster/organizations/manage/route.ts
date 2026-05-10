@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
 import type { DbOrganization } from "@dubgrid/db-types";
-import { requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+} from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
-import { ORGANIZATION_COLS } from "@/lib/db/shared";
+import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
+import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 
 export const dynamic = "force-dynamic";
+
+function trialEndFrom(date: Date): string {
+  return new Date(
+    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
+  ).toISOString();
+}
 
 const createSetupSchema = z.object({
   name: z.string().trim().min(1),
@@ -84,6 +95,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
+  const requestClient = createRequestSupabaseClient(req);
   const serviceClient = getServiceClient();
 
   try {
@@ -96,6 +108,15 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+        await writeGridmasterAuditLog({
+          serviceClient,
+          actor: auth.user,
+          action: "org.archived",
+          resourceType: "organization",
+          resourceId: parsed.data.orgId,
+          orgId: parsed.data.orgId,
+          request: req,
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -107,6 +128,15 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+        await writeGridmasterAuditLog({
+          serviceClient,
+          actor: auth.user,
+          action: "org.restored",
+          resourceType: "organization",
+          resourceId: parsed.data.orgId,
+          orgId: parsed.data.orgId,
+          request: req,
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -121,6 +151,16 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+        await writeGridmasterAuditLog({
+          serviceClient,
+          actor: auth.user,
+          action: "org.suspended",
+          resourceType: "organization",
+          resourceId: parsed.data.orgId,
+          orgId: parsed.data.orgId,
+          details: { reason: parsed.data.reason },
+          request: req,
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -135,11 +175,20 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+        await writeGridmasterAuditLog({
+          serviceClient,
+          actor: auth.user,
+          action: "org.unsuspended",
+          resourceType: "organization",
+          resourceId: parsed.data.orgId,
+          orgId: parsed.data.orgId,
+          request: req,
+        });
         return NextResponse.json({ success: true });
       }
 
       case "assignOrgRoleByEmail": {
-        const { error } = await serviceClient.rpc("assign_org_role_by_email", {
+        const { error } = await requestClient.rpc("assign_org_role_by_email", {
           p_email: parsed.data.email,
           p_org_id: parsed.data.orgId,
           p_org_role: parsed.data.role,
@@ -147,6 +196,19 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+        await writeGridmasterAuditLog({
+          serviceClient,
+          actor: auth.user,
+          action: "role.assigned",
+          resourceType: "organization_membership",
+          resourceId: parsed.data.orgId,
+          orgId: parsed.data.orgId,
+          details: {
+            target_email: parsed.data.email,
+            role: parsed.data.role,
+          },
+          request: req,
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -182,11 +244,13 @@ export async function POST(req: NextRequest) {
             shift_display_mode: input.shiftDisplayMode,
             timezone: input.timezone || null,
             pay_period_start_date: null,
+            subscription_status: "trialing",
+            trial_ends_at: trialEndFrom(new Date()),
             enforce_conflict_prevention: false,
             data_retention_days: 365,
             feature_overrides: {},
           })
-          .select(ORGANIZATION_COLS)
+          .select(ORGANIZATION_WITH_BILLING_COLS)
           .single();
         if (error) {
           throw error;
@@ -236,11 +300,14 @@ export async function POST(req: NextRequest) {
           }
 
           const displayName = `${firstName} ${lastName}`.trim();
-          const assignResult = await serviceClient.rpc("assign_org_role_by_email", {
-            p_email: email,
-            p_org_id: org.id,
-            p_org_role: "super_admin",
-          });
+          const assignResult = await requestClient.rpc(
+            "assign_org_role_by_email",
+            {
+              p_email: email,
+              p_org_id: org.id,
+              p_org_role: "super_admin",
+            },
+          );
 
           if (!assignResult.error) {
             superAdmin = {
@@ -248,7 +315,7 @@ export async function POST(req: NextRequest) {
               displayName,
             };
           } else {
-            const inviteResult = await serviceClient.rpc("send_invitation", {
+            const inviteResult = await requestClient.rpc("send_invitation", {
               p_email: email,
               p_role: "super_admin",
               p_org_id: org.id,
@@ -280,7 +347,23 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        await writeGridmasterAuditLog({
+          serviceClient,
+          actor: auth.user,
+          action: "org.created",
+          resourceType: "organization",
+          resourceId: org.id,
+          orgId: org.id,
+          details: {
+            name: org.name,
+            slug: org.slug,
+            super_admin: superAdmin,
+          },
+          request: req,
+        });
+
         return NextResponse.json({
+          success: true,
           org,
           superAdmin,
         });

@@ -17,16 +17,43 @@ import {
   rowToInvitation,
 } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
+import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import {
+  buildStaffValidationErrorResponse,
+  employeeEmploymentTypeSchema,
+  getStaffFieldErrorsFromZod,
+  normalizeStaffTextFields,
+  validateStaffOrgReferences,
+} from "@/lib/staff-validation";
+import {
+  optionalUsPhoneSchema,
+  requiredStaffEmailSchema,
+  staffNameSchema,
+  staffNotesSchema,
+} from "@dubgrid/contracts";
 
 export const dynamic = "force-dynamic";
+
+type OrgPermissionPredicate = Parameters<typeof requireOrgPermissions>[2];
+
+function requireEmployeeSetupPermissions(
+  req: NextRequest,
+  orgId: string,
+  isAllowed: OrgPermissionPredicate,
+) {
+  return requireOrgPermissions(req, orgId, isAllowed, {
+    allowDuringSetup: true,
+  });
+}
 
 const employeeStatusSchema = z.enum(["active", "benched", "terminated"]);
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 
 const employeeSchema = z.object({
   id: z.string().uuid(),
-  firstName: z.string(),
-  lastName: z.string(),
+  firstName: staffNameSchema,
+  lastName: staffNameSchema,
+  employmentType: employeeEmploymentTypeSchema,
   status: employeeStatusSchema,
   statusChangedAt: z.string().datetime({ offset: true }).nullable(),
   statusNote: z.string(),
@@ -34,9 +61,9 @@ const employeeSchema = z.object({
   roleIds: z.array(z.number().int()),
   seniority: z.number().int(),
   focusAreaIds: z.array(z.number().int()),
-  phone: z.string(),
-  email: z.string(),
-  contactNotes: z.string(),
+  phone: optionalUsPhoneSchema,
+  email: requiredStaffEmailSchema,
+  contactNotes: staffNotesSchema,
   archivedAt: z.string().datetime({ offset: true }).nullable().optional(),
   userId: z.string().uuid().nullable(),
   departmentIds: z.array(z.number().int()),
@@ -155,12 +182,17 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return buildStaffValidationErrorResponse(
+      getStaffFieldErrorsFromZod(parsed.error),
+    );
   }
 
   const data = parsed.data;
@@ -168,7 +200,7 @@ export async function POST(req: NextRequest) {
   try {
     switch (data.action) {
       case "fetchEmployees": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) =>
@@ -204,7 +236,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "insertEmployee": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) =>
@@ -214,6 +246,22 @@ export async function POST(req: NextRequest) {
         );
         if ("response" in auth) {
           return auth.response;
+        }
+
+        const referenceErrors = await validateStaffOrgReferences(
+          auth.serviceClient,
+          data.orgId,
+          {
+            certificationId: data.employee.certificationId,
+            departmentIds: data.employee.departmentIds,
+            deptAdminIds: data.employee.deptAdminIds,
+            focusAreaIds: data.employee.focusAreaIds,
+            requireFocusArea: true,
+            roleIds: data.employee.roleIds,
+          },
+        );
+        if (Object.keys(referenceErrors).length > 0) {
+          return buildStaffValidationErrorResponse(referenceErrors);
         }
 
         const { data: row, error } = await auth.serviceClient
@@ -231,7 +279,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "updateEmployee": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) =>
@@ -243,13 +291,38 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        const referenceErrors = await validateStaffOrgReferences(
+          auth.serviceClient,
+          data.orgId,
+          {
+            certificationId: data.employee.certificationId,
+            departmentIds: data.employee.departmentIds,
+            deptAdminIds: data.employee.deptAdminIds,
+            focusAreaIds: data.employee.focusAreaIds,
+            requireFocusArea: true,
+            roleIds: data.employee.roleIds,
+          },
+        );
+        if (Object.keys(referenceErrors).length > 0) {
+          return buildStaffValidationErrorResponse(referenceErrors);
+        }
+
+        const normalizedFields = normalizeStaffTextFields({
+          firstName: data.employee.firstName,
+          lastName: data.employee.lastName,
+          email: data.employee.email,
+          phone: data.employee.phone,
+          contactNotes: data.employee.contactNotes,
+        });
+
         const nextEmployee = {
           ...data.employee,
-          firstName: data.employee.firstName.trim(),
-          lastName: data.employee.lastName.trim(),
-          phone: data.employee.phone.trim(),
-          email: data.employee.email.trim(),
-          contactNotes: data.employee.contactNotes.trim(),
+          firstName: normalizedFields.firstName ?? data.employee.firstName,
+          lastName: normalizedFields.lastName ?? data.employee.lastName,
+          phone: normalizedFields.phone ?? data.employee.phone,
+          email: normalizedFields.email ?? data.employee.email,
+          contactNotes:
+            normalizedFields.contactNotes ?? data.employee.contactNotes,
         };
 
         let query = auth.serviceClient
@@ -276,7 +349,8 @@ export async function POST(req: NextRequest) {
           );
           return NextResponse.json(
             {
-              error: "Employee details changed elsewhere. Refresh and try again.",
+              error:
+                "Employee details changed elsewhere. Refresh and try again.",
               code: "EMPLOYEE_CONFLICT",
               employee: latestEmployee,
             },
@@ -297,7 +371,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "fetchEmployeeById": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) =>
@@ -319,7 +393,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "fetchEmployeeByUserId": {
-        const auth = await requireOrgPermissions(req, data.orgId, () => true);
+        const auth = await requireEmployeeSetupPermissions(req, data.orgId, () => true);
         if ("response" in auth) {
           return auth.response;
         }
@@ -352,7 +426,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "fetchEmployeeShifts": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) =>
@@ -366,7 +440,9 @@ export async function POST(req: NextRequest) {
         }
 
         assertDateRange(data.startDate, data.endDate);
-        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
+        const assignmentLabelMap = new Map<number, string>(
+          data.assignmentLabels,
+        );
         const absenceTypeMap = new Map<number, string>(
           data.absenceTypeLabels ?? [],
         );
@@ -378,7 +454,7 @@ export async function POST(req: NextRequest) {
         let query = auth.serviceClient
           .from("schedule_cells")
           .select(
-            "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+            "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
           )
           .eq("org_id", data.orgId)
           .eq("emp_id", data.employeeId)
@@ -412,7 +488,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "fetchEmployeeInvitations": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) =>
@@ -443,7 +519,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "fetchEmployeeRoleHistory": {
-        const auth = await requireOrgPermissions(
+        const auth = await requireEmployeeSetupPermissions(
           req,
           data.orgId,
           (permissions) => permissions.isGridmaster,
@@ -482,6 +558,11 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    const contactConflict = getEmployeeContactConflict(error);
+    if (contactConflict) {
+      return NextResponse.json(contactConflict, { status: 409 });
+    }
+
     const message =
       error instanceof Error ? error.message : "Employee request failed";
     return NextResponse.json({ error: message }, { status: 500 });

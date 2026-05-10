@@ -55,7 +55,7 @@ async function fetchNormalizedShifts(
   let query = supabase
     .from("schedule_cells")
     .select(
-      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
     )
     .eq("org_id", orgId);
   if (startDate) query = query.gte("date", startDate);
@@ -117,6 +117,7 @@ async function resolveScheduleCellStorage(
 ): Promise<{
   shiftIds: Array<number | null>;
   jobIds: number[];
+  isMentoredFlags: boolean[];
   assignmentIds: number[];
   absenceTypeId: number | null;
   customStartTime: string | null;
@@ -126,6 +127,7 @@ async function resolveScheduleCellStorage(
     return {
       shiftIds: [],
       jobIds: [],
+      isMentoredFlags: [],
       assignmentIds: [],
       absenceTypeId: null,
       customStartTime: null,
@@ -137,6 +139,7 @@ async function resolveScheduleCellStorage(
     return {
       shiftIds: [],
       jobIds: [],
+      isMentoredFlags: [],
       assignmentIds: [],
       absenceTypeId: input.absenceTypeId ?? null,
       customStartTime: null,
@@ -148,6 +151,7 @@ async function resolveScheduleCellStorage(
   return {
     shiftIds: orderedSegments.map((segment) => segment.shiftId),
     jobIds: orderedSegments.map((segment) => segment.jobId),
+    isMentoredFlags: orderedSegments.map((segment) => segment.isMentored ?? false),
     assignmentIds: await resolveAssignmentDefinitionIdsForSegments(orgId, orderedSegments),
     absenceTypeId: null,
     customStartTime: input.customStartTime ?? null,
@@ -170,6 +174,7 @@ type ScheduleCellSnapshotPayload = {
   custom_end_time: string | null;
   shift_ids: Array<number | null>;
   job_ids: number[];
+  is_mentored_flags: boolean[];
 };
 
 async function fetchScheduleCellSnapshotPayload(
@@ -286,6 +291,7 @@ export async function upsertShift(
   const {
     shiftIds,
     jobIds,
+    isMentoredFlags,
     assignmentIds,
     absenceTypeId,
     customStartTime,
@@ -308,6 +314,7 @@ export async function upsertShift(
     p_state_kind: input.kind,
     p_shift_ids: shiftIds,
     p_job_ids: jobIds,
+    p_is_mentored_flags: isMentoredFlags,
     p_absence_type_id: absenceTypeId ?? null,
     p_custom_start_time: customStartTime ?? null,
     p_custom_end_time: customEndTime ?? null,
@@ -371,6 +378,7 @@ export async function upsertShiftTimes(
     p_state_kind: "worked",
     p_shift_ids: sourcePayload.shift_ids ?? [],
     p_job_ids: sourcePayload.job_ids ?? [],
+    p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
     p_absence_type_id: null,
     p_custom_start_time: customStartTime,
     p_custom_end_time: customEndTime,
@@ -422,10 +430,13 @@ export async function moveShift(
   input: ScheduleCellInput,
   dragMode: "move" | "copy" = "move",
   expectedVersion?: number,
+  targetExpectedVersion?: number,
+  targetWasEmpty?: boolean,
 ): Promise<void> {
   const {
     shiftIds,
     jobIds,
+    isMentoredFlags,
     assignmentIds,
     absenceTypeId,
     customStartTime,
@@ -440,11 +451,14 @@ export async function moveShift(
     p_kind: input.kind,
     p_shift_ids: shiftIds,
     p_job_ids: jobIds,
+    p_is_mentored_flags: isMentoredFlags,
     p_absence_type_id: absenceTypeId ?? null,
     p_custom_start_time: customStartTime ?? null,
     p_custom_end_time: customEndTime ?? null,
     p_drag_mode: dragMode,
     p_expected_version: expectedVersion ?? null,
+    p_target_expected_version: targetExpectedVersion ?? null,
+    p_target_was_empty: targetWasEmpty ?? false,
   });
   if (error) {
     if (error.message?.includes("Optimistic lock failed")) {

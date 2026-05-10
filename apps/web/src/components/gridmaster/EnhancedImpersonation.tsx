@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchOrganizationUsers } from "@/features/organization/client";
 import {
@@ -10,11 +10,17 @@ import {
 } from "@/features/gridmaster/client";
 import { setImpersonationCookie, clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "@/features/permissions/client";
+import {
+  formatClientErrorMessage,
+  formatOrganizationRoleLabel,
+} from "@/lib/client-facing";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
 import CustomSelect from "@/components/CustomSelect";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import * as Sentry from "@/lib/sentry";
+import { queryKeys } from "@/lib/query-keys";
 
 export default function EnhancedImpersonation({
   organizations,
@@ -28,8 +34,6 @@ export default function EnhancedImpersonation({
   const queryClient = useQueryClient();
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(initialOrgId ?? null);
   const [orgSearch, setOrgSearch] = useState("");
-  const [users, setUsers] = useState<OrganizationUser[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<OrganizationUser | null>(null);
   const [roleOverride, setRoleOverride] = useState<string>("");
@@ -38,6 +42,8 @@ export default function EnhancedImpersonation({
   const [justification, setJustification] = useState("");
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
+  const [startConfirm, setStartConfirm] = useState(false);
+  const [endConfirm, setEndConfirm] = useState(false);
 
   const selectedOrg = useMemo(
     () => organizations.find((o) => o.id === selectedOrgId) ?? null,
@@ -47,34 +53,36 @@ export default function EnhancedImpersonation({
   // When both org and user are pre-selected (e.g. from org detail view), skip the pickers
   const preSelected = !!(initialOrgId && initialTargetId);
 
-  // Load users when org changes
+  const usersQuery = useQuery({
+    queryKey: selectedOrgId
+      ? queryKeys.gridmaster.orgUsers(selectedOrgId)
+      : queryKeys.gridmaster.orgUsers("none"),
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      const data = await fetchOrganizationUsers(selectedOrgId);
+      return data.filter((u) => u.platformRole !== "gridmaster");
+    },
+    enabled: selectedOrgId != null,
+    staleTime: 30_000,
+  });
+  const users = usersQuery.data ?? [];
+
   useEffect(() => {
     if (!selectedOrgId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUsers([]);
       setSelectedUser(null);
       return;
     }
-    let cancelled = false;
-    setLoadingUsers(true);
     setSelectedUser(null);
     setSearch("");
-    fetchOrganizationUsers(selectedOrgId)
-      .then((data) => {
-        if (cancelled) return;
-        const nonGridmaster = data.filter((u) => u.platformRole !== "gridmaster");
-        setUsers(nonGridmaster);
-        if (initialTargetId) {
-          const found = nonGridmaster.find((u) => u.id === initialTargetId);
-          if (found) setSelectedUser(found);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) toast.error("Failed to load organization users");
-      })
-      .finally(() => { if (!cancelled) setLoadingUsers(false); });
-    return () => { cancelled = true; };
-  }, [selectedOrgId, initialTargetId]);
+  }, [selectedOrgId]);
+
+  useEffect(() => {
+    if (!initialTargetId || users.length === 0) return;
+    const found = users.find((u) => u.id === initialTargetId);
+    if (found) {
+      setSelectedUser(found);
+    }
+  }, [initialTargetId, users]);
 
   // Countdown timer for active session
   useEffect(() => {
@@ -154,9 +162,18 @@ export default function EnhancedImpersonation({
       window.location.replace("/schedule");
     } catch (err: unknown) {
       Sentry.captureException(err, { extra: { context: "impersonation-start" } });
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to start impersonation");
+      toast.error(formatClientErrorMessage(err, "Failed to start impersonation"));
       setLoading(false);
     }
+  }
+
+  function requestStart() {
+    if (!selectedUser || !selectedOrg) return;
+    if (justification.trim().length < 10) {
+      toast.error("Please provide a justification (at least 10 characters)");
+      return;
+    }
+    setStartConfirm(true);
   }
 
   async function handleEnd() {
@@ -179,6 +196,7 @@ export default function EnhancedImpersonation({
     setSelectedUser(null);
     setSearch("");
     setJustification("");
+    setEndConfirm(false);
     toast.success("Impersonation session ended");
     setLoading(false);
   }
@@ -224,7 +242,7 @@ export default function EnhancedImpersonation({
           </div>
           <button
             className="dg-btn dg-btn-danger"
-            onClick={handleEnd}
+            onClick={() => setEndConfirm(true)}
             disabled={loading}
             style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
           >
@@ -299,9 +317,17 @@ export default function EnhancedImpersonation({
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}>Confirm Impersonation</div>
           <div style={sectionBodyStyle}>
-            {loadingUsers || !selectedUser ? (
+            {usersQuery.isLoading ? (
               <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
                 Loading user…
+              </div>
+            ) : usersQuery.error instanceof Error ? (
+              <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+                {formatClientErrorMessage(usersQuery.error, "Failed to load user")}
+              </div>
+            ) : !selectedUser ? (
+              <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+                Unable to find the selected user in this organization.
               </div>
             ) : (
               <>
@@ -310,7 +336,7 @@ export default function EnhancedImpersonation({
                     {selectedUser.email}
                   </div>
                   <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
-                    {selectedUser.orgRole?.replace("_", " ") ?? "user"} in {selectedOrg?.name}
+                    {formatOrganizationRoleLabel(selectedUser.orgRole)} in {selectedOrg?.name}
                   </div>
                 </div>
                 <div style={{ marginTop: 16 }}>
@@ -320,7 +346,7 @@ export default function EnhancedImpersonation({
                   <CustomSelect
                     value={roleOverride}
                     options={[
-                      { value: "", label: `Use actual role (${selectedUser.orgRole?.replace("_", " ") ?? "user"})` },
+                      { value: "", label: `Use actual role (${formatOrganizationRoleLabel(selectedUser.orgRole)})` },
                       { value: "user", label: "User (read-only)" },
                       { value: "admin", label: "Admin" },
                       { value: "super_admin", label: "Super Admin" },
@@ -350,7 +376,7 @@ export default function EnhancedImpersonation({
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
                   <button
                     className="dg-btn dg-btn-primary"
-                    onClick={handleStart}
+                    onClick={requestStart}
                     disabled={loading || justification.trim().length < 10}
                   >
                     <ButtonLoading loading={loading} spinnerSize={16}>{`Impersonate ${selectedUser.email}`}</ButtonLoading>
@@ -383,9 +409,13 @@ export default function EnhancedImpersonation({
               style={{ marginBottom: 12 }}
             />
 
-            {loadingUsers ? (
+            {usersQuery.isLoading ? (
               <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
                 Loading users…
+              </div>
+            ) : usersQuery.error instanceof Error ? (
+              <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+                {formatClientErrorMessage(usersQuery.error, "Failed to load users")}
               </div>
             ) : (
               <div style={{ maxHeight: 280, overflowY: "auto" }}>
@@ -420,7 +450,7 @@ export default function EnhancedImpersonation({
                             {u.email ?? "No email"}
                           </div>
                           <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 1 }}>
-                            {u.orgRole?.replace("_", " ") ?? "user"}
+                            {formatOrganizationRoleLabel(u.orgRole)}
                           </div>
                         </div>
                         {isSelected && (
@@ -442,7 +472,7 @@ export default function EnhancedImpersonation({
                   <CustomSelect
                     value={roleOverride}
                     options={[
-                      { value: "", label: `Use actual role (${selectedUser.orgRole?.replace("_", " ") ?? "user"})` },
+                      { value: "", label: `Use actual role (${formatOrganizationRoleLabel(selectedUser.orgRole)})` },
                       { value: "user", label: "User (read-only)" },
                       { value: "admin", label: "Admin" },
                       { value: "super_admin", label: "Super Admin" },
@@ -472,7 +502,7 @@ export default function EnhancedImpersonation({
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
                   <button
                     className="dg-btn dg-btn-primary"
-                    onClick={handleStart}
+                    onClick={requestStart}
                     disabled={loading || justification.trim().length < 10}
                   >
                     <ButtonLoading loading={loading} spinnerSize={16}>{`Impersonate ${selectedUser.email}`}</ButtonLoading>
@@ -488,6 +518,30 @@ export default function EnhancedImpersonation({
             )}
           </div>
         </div>
+      )}
+
+      {startConfirm && selectedUser && selectedOrg && (
+        <ConfirmDialog
+          title="Start Impersonation"
+          message={`Start impersonating "${selectedUser.email}" in ${selectedOrg.name} as ${roleOverride || selectedUser.orgRole || "user"}?`}
+          confirmLabel="Start Impersonation"
+          variant="warning"
+          isLoading={loading}
+          onConfirm={handleStart}
+          onCancel={() => setStartConfirm(false)}
+        />
+      )}
+
+      {endConfirm && (
+        <ConfirmDialog
+          title="End Impersonation"
+          message="End the active impersonation session and return to your gridmaster session?"
+          confirmLabel="End Session"
+          variant="danger"
+          isLoading={loading}
+          onConfirm={handleEnd}
+          onCancel={() => setEndConfirm(false)}
+        />
       )}
     </div>
   );

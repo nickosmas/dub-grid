@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
+import { Suspense } from "react";
 import { DM_Sans, DM_Mono, Geist } from "next/font/google";
 import { createWebCssVariables } from "@dubgrid/design-tokens";
 import "./globals.css";
@@ -75,19 +76,21 @@ export default function RootLayout({
           <PostHogProvider>
             <QueryProvider>
               <TermsAcceptanceGate>
-                <OnboardingGate>
-                  <MobileSubNavProvider>
-                    <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                      <AppShell>{children}</AppShell>
-                    </TooltipProvider>
-                  </MobileSubNavProvider>
-                </OnboardingGate>
+                <Suspense fallback={null}>
+                  <OnboardingGate>
+                    <MobileSubNavProvider>
+                      <TooltipProvider delay={TOOLTIP_DELAY_MS}>
+                        <AppShell>{children}</AppShell>
+                      </TooltipProvider>
+                    </MobileSubNavProvider>
+                  </OnboardingGate>
+                </Suspense>
               </TermsAcceptanceGate>
             </QueryProvider>
           </PostHogProvider>
         </AuthProvider>
         <Toaster
-          position="bottom-center"
+          position="top-center"
           closeButton
           duration={6000}
           toastOptions={{

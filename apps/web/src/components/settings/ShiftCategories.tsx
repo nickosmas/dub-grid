@@ -15,6 +15,12 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import {
+  getCodeError,
+  getLineTextError,
+  normalizeCode,
+  normalizeLineText,
+} from "@/lib/form-validation";
 import { labelStyle, inputStyle, PresetColorPicker, TimeInput12h } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import {
@@ -25,6 +31,33 @@ import {
 } from "@/lib/colors";
 
 // ── Shift Categories Settings ──────────────────────────────────────────────────
+const SHIFT_ABBR_MAX_LENGTH = 8;
+const SHIFT_ABBR_IGNORED_WORDS = new Set(["shift"]);
+
+function deriveShiftAbbreviation(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.replace(/[^a-zA-Z0-9]/g, ""))
+    .filter(Boolean)
+    .filter((word) => !SHIFT_ABBR_IGNORED_WORDS.has(word.toLowerCase()));
+
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0]!.slice(0, 1).toUpperCase();
+
+  return words
+    .map((word) => word[0] ?? "")
+    .join("")
+    .slice(0, SHIFT_ABBR_MAX_LENGTH)
+    .toUpperCase();
+}
+
+function normalizeShiftAbbreviation(abbr: string | null | undefined, name: string): string | null {
+  const explicit = abbr?.trim().toUpperCase().slice(0, SHIFT_ABBR_MAX_LENGTH) ?? "";
+  const derived = deriveShiftAbbreviation(name);
+  return explicit || derived || null;
+}
+
 function ShiftCategoriesSettings({
   shiftCategories,
   focusAreas,
@@ -76,6 +109,7 @@ function ShiftCategoriesSettings({
       id: tmpId,
       orgId: orgId,
       name: "",
+      abbr: "",
       startTime: null,
       endTime: null,
       color: defaultColor,
@@ -92,10 +126,34 @@ function ShiftCategoriesSettings({
     setLocal((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
   };
 
+  const handleNameChange = (cat: ShiftCategory & { isNew?: boolean }, value: string) => {
+    const currentAbbr = cat.abbr?.trim().toUpperCase() ?? "";
+    const previousSuggestedAbbr = deriveShiftAbbreviation(cat.name);
+    const shouldUpdateSuggestedAbbr = currentAbbr === "" || currentAbbr === previousSuggestedAbbr;
+    const nextSuggestedAbbr = deriveShiftAbbreviation(value);
+
+    setLocal((prev) =>
+      prev.map((entry) =>
+        entry.id === cat.id
+          ? {
+              ...entry,
+              name: value,
+              abbr: shouldUpdateSuggestedAbbr ? nextSuggestedAbbr : entry.abbr,
+            }
+          : entry,
+      ),
+    );
+  };
+
+  const handleAbbrChange = (id: number, value: string) => {
+    handleChange(id, "abbr", value.toUpperCase().slice(0, SHIFT_ABBR_MAX_LENGTH));
+  };
+
   const isCategoryDirty = (cat: ShiftCategory & { isNew?: boolean }) => {
     const orig = originalRef.current.get(cat.id);
     return cat.isNew || !orig ||
       cat.name !== orig.name ||
+      normalizeShiftAbbreviation(cat.abbr, cat.name) !== normalizeShiftAbbreviation(orig.abbr, orig.name) ||
       (cat.startTime ?? null) !== (orig.startTime ?? null) ||
       (cat.endTime ?? null) !== (orig.endTime ?? null) ||
       (cat.color ?? DEFAULT_PREDEFINED_COLOR_BG) !== (orig.color ?? DEFAULT_PREDEFINED_COLOR_BG) ||
@@ -185,13 +243,40 @@ function ShiftCategoriesSettings({
   };
 
   const handleSave = async (cat: ShiftCategory & { isNew?: boolean }) => {
-    if (!cat.name.trim()) return;
+    const nameError = getLineTextError(cat.name, {
+      label: "Shift name",
+      maxLength: 50,
+      required: true,
+      disallowUrl: true,
+    });
+    const abbrError =
+      cat.abbr?.trim()
+        ? getCodeError(cat.abbr, {
+            label: "Shift code",
+            maxLength: SHIFT_ABBR_MAX_LENGTH,
+            uppercase: true,
+          })
+        : null;
+    if (nameError || abbrError) return;
     setSaving(cat.id);
     try {
       const saved = await upsertShiftCategory({
         id: cat.isNew ? undefined : cat.id,
         orgId: orgId,
-        name: cat.name.trim(),
+        name: normalizeLineText(cat.name, {
+          label: "Shift name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        }),
+        abbr:
+          cat.abbr?.trim()
+            ? normalizeCode(cat.abbr, {
+                label: "Shift code",
+                maxLength: SHIFT_ABBR_MAX_LENGTH,
+                uppercase: true,
+              })
+            : normalizeShiftAbbreviation(cat.abbr, cat.name),
         startTime: cat.startTime || null,
         endTime: cat.endTime || null,
         color: cat.color ?? DEFAULT_PREDEFINED_COLOR_BG,
@@ -249,9 +334,42 @@ function ShiftCategoriesSettings({
     const isSavingThis = saving === cat.id;
     const isDeletingThis = deleting === cat.id;
     const isDirty = isCategoryDirty(cat);
+    const nameError =
+      cat.name.trim().length > 0
+        ? getLineTextError(cat.name, {
+            label: "Shift name",
+            maxLength: 50,
+            required: true,
+            disallowUrl: true,
+          })
+        : null;
+    const abbrError =
+      cat.abbr?.trim()
+        ? getCodeError(cat.abbr, {
+            label: "Shift code",
+            maxLength: SHIFT_ABBR_MAX_LENGTH,
+            uppercase: true,
+          })
+        : null;
+    const duplicateName =
+      cat.name.trim().length > 0 &&
+      local.some(
+        (candidate) =>
+          candidate.id !== cat.id &&
+          candidate.name.trim().toLowerCase() === cat.name.trim().toLowerCase(),
+      );
+    const normalizedCode = normalizeShiftAbbreviation(cat.abbr, cat.name);
+    const duplicateCode =
+      Boolean(normalizedCode) &&
+      local.some(
+        (candidate) =>
+          candidate.id !== cat.id &&
+          normalizeShiftAbbreviation(candidate.abbr, candidate.name)?.toUpperCase() ===
+            normalizedCode?.toUpperCase(),
+      );
     const previewColor = cat.color ?? DEFAULT_PREDEFINED_COLOR_BG;
     const previewPreset = getPresetByBg(previewColor);
-    const rawPreviewLabel = (cat.abbr ?? cat.name.slice(0, 2)).trim();
+    const rawPreviewLabel = normalizedCode ?? "";
     const previewLabel = (rawPreviewLabel || "S").toUpperCase();
 
     if (!isEditing) {
@@ -342,18 +460,64 @@ function ShiftCategoriesSettings({
           border: "1px solid var(--color-border-light)",
         }}
       >
-        {/* NAME — full width */}
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>NAME</label>
-          <input
-            value={cat.name}
-            onChange={(e) => handleChange(cat.id, "name", e.target.value)}
-            placeholder="e.g. Day Shift"
-            maxLength={50}
-            style={{ ...inputStyle }}
-            autoFocus
-            disabled={!canManageScheduleDefinitions}
-          />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <label style={labelStyle}>NAME</label>
+            <input
+              value={cat.name}
+              onChange={(e) => handleNameChange(cat, e.target.value)}
+              placeholder="e.g. Day Shift"
+              maxLength={50}
+              style={{
+                ...inputStyle,
+                ...(nameError || duplicateName
+                  ? { borderColor: "var(--color-danger)" }
+                  : {}),
+              }}
+              autoFocus
+              disabled={!canManageScheduleDefinitions}
+            />
+            {(nameError || duplicateName) ? (
+              <p
+                role="alert"
+                style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+              >
+                {nameError ?? "Another shift already uses that name."}
+              </p>
+            ) : null}
+          </div>
+          <div>
+            <label style={labelStyle}>CODE</label>
+            <input
+              value={cat.abbr ?? ""}
+              onChange={(e) => handleAbbrChange(cat.id, e.target.value)}
+              placeholder={deriveShiftAbbreviation(cat.name) || "D"}
+              maxLength={SHIFT_ABBR_MAX_LENGTH}
+              style={{
+                ...inputStyle,
+                textTransform: "uppercase",
+                ...(abbrError || duplicateCode
+                  ? { borderColor: "var(--color-danger)" }
+                  : {}),
+              }}
+              disabled={!canManageScheduleDefinitions}
+            />
+            {(abbrError || duplicateCode) ? (
+              <p
+                role="alert"
+                style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+              >
+                {abbrError ?? "Another shift already uses that code."}
+              </p>
+            ) : null}
+          </div>
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>COLOR</label>
@@ -477,7 +641,7 @@ function ShiftCategoriesSettings({
           primaryAction={(
             <button
               onClick={() => handleSave(cat)}
-              disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageScheduleDefinitions}
+              disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageScheduleDefinitions || Boolean(nameError) || Boolean(abbrError) || duplicateName || duplicateCode}
               className="dg-btn dg-btn-primary dg-btn-sm"
             >
               {getEditorSaveLabel(isSavingThis)}

@@ -1,8 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type Session } from "@supabase/supabase-js";
 import { getMobileEnvConfig } from "./env";
 import { secureStoreAdapter } from "./session";
 
 let supabaseClient: ReturnType<typeof createClient> | null = null;
+
+export type { Session };
 
 export function getSupabaseClient() {
   if (supabaseClient) {
@@ -20,4 +22,15 @@ export function getSupabaseClient() {
   });
 
   return supabaseClient;
+}
+
+export function createEphemeralSupabaseClient() {
+  const env = getMobileEnvConfig();
+  return createClient(env.supabaseUrl, env.supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+  });
 }

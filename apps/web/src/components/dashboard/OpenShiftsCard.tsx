@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
@@ -31,6 +33,7 @@ interface OpenShiftsCardProps {
   openShifts: OpenShift[];
   publishedWindowState?: PublishedWindowState;
   maxVisible?: number;
+  periodLabel?: string;
   onExpand?: () => void;
   onVolunteer?: (shift: OpenShift) => void;
 }
@@ -39,18 +42,23 @@ export default function OpenShiftsCard({
   openShifts,
   publishedWindowState = "published",
   maxVisible = 5,
+  periodLabel = "this week",
   onExpand,
   onVolunteer,
 }: OpenShiftsCardProps) {
   const visible = openShifts.slice(0, maxVisible);
   const remainingCount = Math.max(0, openShifts.length - visible.length);
+  const openSlotCount = openShifts.reduce(
+    (total, shift) => total + shift.needed,
+    0,
+  );
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
   const subtitle = isUnpublished
     ? "Not published yet"
     : isPartial
-      ? `${openShifts.length} unfilled across published dates`
-      : `${openShifts.length} unfilled this week`;
+      ? `${openSlotCount} unfilled across published dates`
+      : `${openSlotCount} unfilled ${periodLabel}`;
 
   return (
     <div className="dg-card">
@@ -73,7 +81,7 @@ export default function OpenShiftsCard({
                 ? "Not published yet"
                 : isPartial
                   ? "No open shifts on published dates"
-                  : "All shifts covered this week"
+                  : `All shifts covered ${periodLabel}`
             }
             description={
               isUnpublished
@@ -95,18 +103,18 @@ export default function OpenShiftsCard({
               ]
                 .filter(Boolean)
                 .join(" · ");
-              return (
+              const rowStyle: CSSProperties = {
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "14px 16px",
+                borderRadius: "var(--dg-radius-md)",
+                background: "var(--color-bg)",
+                border: "1px solid var(--color-border)",
+              };
+              const rowContent = (
                 <div
-                  key={shift.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "14px 16px",
-                    borderRadius: "var(--dg-radius-md)",
-                    background: "var(--color-bg)",
-                    border: "1px solid var(--color-border)",
-                  }}
+                  style={rowStyle}
                 >
                   {/* Date block */}
                   <div style={{ textAlign: "center", minWidth: 34 }}>
@@ -210,6 +218,21 @@ export default function OpenShiftsCard({
                   </div>
                 </div>
               );
+              return onVolunteer ? (
+                <div key={shift.id}>{rowContent}</div>
+              ) : (
+                <Link
+                  key={shift.id}
+                  href="/schedule"
+                  style={{
+                    display: "block",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  {rowContent}
+                </Link>
+              );
             })}
             {remainingCount > 0 && (
               <div
@@ -220,7 +243,7 @@ export default function OpenShiftsCard({
                   color: "var(--color-text-subtle)",
                 }}
               >
-                {remainingCount} more
+                {remainingCount} more gap{remainingCount === 1 ? "" : "s"}
               </div>
             )}
           </div>

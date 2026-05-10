@@ -1,3 +1,11 @@
+"use client";
+
+import { useState } from "react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import {
+  formatShiftRequestStatusLabel,
+  formatShiftRequestTypeLabel,
+} from "@/lib/client-facing";
 import type { ShiftRequest } from "@/types";
 
 interface ShiftRequestsSummaryCardProps {
@@ -19,12 +27,6 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; border: string 
   rejected: { bg: "var(--color-danger-bg)", color: "var(--color-danger)", border: "var(--color-danger-border)" },
   cancelled: { bg: "var(--color-bg-secondary)", color: "var(--color-text-subtle)", border: "var(--color-border)" },
   expired: { bg: "var(--color-bg-secondary)", color: "var(--color-text-subtle)", border: "var(--color-border)" },
-};
-
-const TYPE_LABELS: Record<string, string> = {
-  pickup: "Pickup",
-  swap: "Swap",
-  calloff: "Call-off",
 };
 
 function formatRelativeTime(dateStr: string): string {
@@ -67,7 +69,7 @@ function RequestRow({
           whiteSpace: "nowrap",
         }}
       >
-        {TYPE_LABELS[request.type] ?? request.type}
+        {formatShiftRequestTypeLabel(request.type)}
       </span>
 
       {/* Details */}
@@ -98,7 +100,7 @@ function RequestRow({
           whiteSpace: "nowrap",
         }}
       >
-        {request.status.replace("_", " ")}
+        {formatShiftRequestStatusLabel(request.status)}
       </span>
 
       {/* Actions */}
@@ -114,32 +116,65 @@ function ActionButton({
 }: {
   label: string;
   variant: "approve" | "reject" | "cancel";
-  onClick: () => void;
+  onClick: () => void | Promise<unknown>;
 }) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const styles = {
     approve: { bg: "var(--color-success)", color: "#fff" },
     reject: { bg: "transparent", color: "var(--color-danger)" },
     cancel: { bg: "transparent", color: "var(--color-text-subtle)" },
   };
   const s = styles[variant];
+  const confirmVariant = variant === "approve" ? "info" : "danger";
+
+  async function confirmAction() {
+    if (isRunning) return;
+
+    setIsRunning(true);
+    try {
+      await onClick();
+      setIsConfirming(false);
+    } finally {
+      setIsRunning(false);
+    }
+  }
 
   return (
-    <button
-      onClick={onClick}
-      style={{
-        fontSize: 10,
-        fontWeight: 600,
-        padding: "3px 8px",
-        borderRadius: 5,
-        background: s.bg,
-        color: s.color,
-        border: variant === "approve" ? "none" : "1px solid var(--color-border)",
-        cursor: "pointer",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </button>
+    <>
+      {isConfirming && (
+        <ConfirmDialog
+          confirmLabel={label}
+          isLoading={isRunning}
+          message={`Confirm that you want to ${label.toLowerCase()} this request.`}
+          title={`${label} request?`}
+          variant={confirmVariant}
+          onCancel={() => {
+            if (!isRunning) setIsConfirming(false);
+          }}
+          onConfirm={() => {
+            void confirmAction();
+          }}
+        />
+      )}
+      <button
+        disabled={isRunning}
+        onClick={() => setIsConfirming(true)}
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          padding: "3px 8px",
+          borderRadius: 5,
+          background: s.bg,
+          color: s.color,
+          border: variant === "approve" ? "none" : "1px solid var(--color-border)",
+          cursor: isRunning ? "not-allowed" : "pointer",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </button>
+    </>
   );
 }
 

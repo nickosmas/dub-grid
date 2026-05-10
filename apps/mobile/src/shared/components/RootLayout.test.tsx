@@ -72,6 +72,19 @@ vi.mock("../providers/NetworkStateProvider", async () => {
   };
 });
 
+vi.mock("../../features/auth/providers/MobileRealtimeProvider", async () => {
+  const React = await import("react");
+
+  return {
+    MobileRealtimeProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        "div",
+        { "data-testid": "mobile-realtime-provider" },
+        children,
+      ),
+  };
+});
+
 vi.mock("expo-router", async () => {
   const React = await import("react");
   const Stack = Object.assign(
@@ -123,7 +136,10 @@ describe("RootLayout", () => {
     expect(
       screen.getByText("Mobile configuration needs attention"),
     ).toBeInTheDocument();
-    expect(screen.getByText("Use a reachable API URL.")).toBeInTheDocument();
+    expect(screen.getByText("Mobile connection")).toBeInTheDocument();
+    expect(
+      screen.getByText("This build is missing a reachable DubGrid web connection."),
+    ).toBeInTheDocument();
   });
 
   it("renders the app shell when env validation passes", () => {
@@ -140,6 +156,7 @@ describe("RootLayout", () => {
 
     expect(screen.getByTestId("query-provider")).toBeInTheDocument();
     expect(screen.getByTestId("auth-provider")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-realtime-provider")).toBeInTheDocument();
     expect(screen.getByTestId("stack")).toBeInTheDocument();
   });
 });

@@ -5,7 +5,18 @@ import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
+import {
+  validateEmail,
+  validateNotes,
+  validatePhone,
+  validateRequired,
+} from "@/components/FormField";
+import {
+  normalizeOptionalStaffEmail,
+  normalizeOptionalUsPhone,
+  normalizeStaffName,
+  normalizeStaffNotes,
+} from "@dubgrid/contracts";
 import {
   EDITOR_ACTION_LABELS,
   getEditorDismissLabel,
@@ -35,6 +46,7 @@ export interface EditEmployeePanelProps {
 type EditForm = {
   firstName: string;
   lastName: string;
+  employmentType: Employee["employmentType"];
   certificationId: number | null;
   focusAreaIds: number[];
   roleIds: number[];
@@ -48,6 +60,7 @@ function buildEditForm(employee: Employee): EditForm {
   return {
     firstName: employee.firstName || "",
     lastName: employee.lastName || "",
+    employmentType: employee.employmentType ?? "full_time",
     certificationId: employee.certificationId ?? null,
     focusAreaIds: employee.focusAreaIds || [],
     roleIds: employee.roleIds || [],
@@ -81,14 +94,21 @@ export default function EditEmployeePanel({
 
   const fieldErrors = useMemo(
     () => ({
-      firstName: touched.firstName ? validateRequired(form.firstName, "First name") : null,
-      lastName: touched.lastName ? validateRequired(form.lastName, "Last name") : null,
+      firstName: touched.firstName
+        ? validateRequired(form.firstName, "First name")
+        : null,
+      lastName: touched.lastName
+        ? validateRequired(form.lastName, "Last name")
+        : null,
       focusAreaIds:
         touched.focusAreaIds && form.focusAreaIds.length === 0
           ? `At least one ${focusAreaLabel.toLowerCase()} is required`
           : null,
       email: touched.email ? validateEmail(form.email) : null,
       phone: touched.phone ? validatePhone(form.phone) : null,
+      contactNotes: touched.contactNotes
+        ? validateNotes(form.contactNotes)
+        : null,
     }),
     [form, touched, focusAreaLabel],
   );
@@ -107,6 +127,7 @@ export default function EditEmployeePanel({
     return (
       (form.firstName || "") !== (employee.firstName || "") ||
       (form.lastName || "") !== (employee.lastName || "") ||
+      form.employmentType !== (employee.employmentType ?? "full_time") ||
       form.certificationId !== employee.certificationId ||
       (form.phone || "") !== (employee.phone || "") ||
       (form.email || "") !== (employee.email || "") ||
@@ -125,7 +146,11 @@ export default function EditEmployeePanel({
   }, [isModified, onDirtyChange]);
 
   const handleSave = useCallback(() => {
-    if (!form.firstName.trim() || !form.lastName.trim() || form.focusAreaIds.length === 0) {
+    if (
+      !form.firstName.trim() ||
+      !form.lastName.trim() ||
+      form.focusAreaIds.length === 0
+    ) {
       setTouched({
         firstName: true,
         lastName: true,
@@ -135,27 +160,35 @@ export default function EditEmployeePanel({
       });
       return;
     }
-    if (validateEmail(form.email) || validatePhone(form.phone)) {
+    if (
+      validateRequired(form.firstName, "First name") ||
+      validateRequired(form.lastName, "Last name") ||
+      validateEmail(form.email) ||
+      validatePhone(form.phone) ||
+      validateNotes(form.contactNotes)
+    ) {
       setTouched({
         firstName: true,
         lastName: true,
         focusAreaIds: true,
         email: true,
         phone: true,
+        contactNotes: true,
       });
       return;
     }
     onSave({
       ...employee,
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
+      firstName: normalizeStaffName(form.firstName),
+      lastName: normalizeStaffName(form.lastName),
+      employmentType: form.employmentType,
       certificationId: form.certificationId,
       focusAreaIds: form.focusAreaIds,
       roleIds: form.roleIds,
       departmentIds: form.departmentIds,
-      phone: form.phone.trim(),
-      email: form.email.trim(),
-      contactNotes: form.contactNotes.trim(),
+      phone: normalizeOptionalUsPhone(form.phone),
+      email: normalizeOptionalStaffEmail(form.email),
+      contactNotes: normalizeStaffNotes(form.contactNotes),
     });
   }, [form, employee, onSave]);
 
@@ -300,6 +333,26 @@ export default function EditEmployeePanel({
               </div>
             </div>
 
+            <div>
+              <label style={fieldLabel}>Employment</label>
+              <CustomSelect
+                value={form.employmentType}
+                options={[
+                  { value: "full_time", label: "Full-time" },
+                  { value: "part_time", label: "Part-time" },
+                ]}
+                onChange={(v) =>
+                  setForm((p) => ({
+                    ...p,
+                    employmentType:
+                      v === "part_time" ? "part_time" : "full_time",
+                  }))
+                }
+                disabled={readOnly}
+                style={{ width: isMobile ? "100%" : "min(280px, 100%)" }}
+              />
+            </div>
+
             <div
               style={{
                 display: "grid",
@@ -316,6 +369,14 @@ export default function EditEmployeePanel({
                     setForm((p) => ({ ...p, phone: e.target.value }))
                   }
                   onBlur={() => markTouched("phone")}
+                  onBlurCapture={() => {
+                    if (!validatePhone(form.phone)) {
+                      setForm((p) => ({
+                        ...p,
+                        phone: normalizeOptionalUsPhone(p.phone),
+                      }));
+                    }
+                  }}
                   placeholder="(415) 555-0100"
                   readOnly={readOnly}
                   style={
@@ -391,6 +452,7 @@ export default function EditEmployeePanel({
                 onChange={(e) =>
                   setForm((p) => ({ ...p, contactNotes: e.target.value }))
                 }
+                onBlur={() => markTouched("contactNotes")}
                 placeholder="Preferences, availability, etc."
                 rows={2}
                 style={{
@@ -399,6 +461,18 @@ export default function EditEmployeePanel({
                 }}
                 readOnly={readOnly}
               />
+              {fieldErrors.contactNotes && (
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-danger)",
+                    marginTop: 4,
+                  }}
+                  role="alert"
+                >
+                  {fieldErrors.contactNotes}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -674,40 +748,42 @@ export default function EditEmployeePanel({
         {/* Primary actions */}
         {canEdit && (
           <EditorActionRow
-            secondaryAction={(
+            secondaryAction={
               <button
                 onClick={handleDismiss}
                 className="dg-btn dg-btn-secondary"
               >
                 {getEditorDismissLabel(isModified)}
               </button>
-            )}
-            primaryAction={(
+            }
+            primaryAction={
               <button
                 onClick={handleSave}
                 disabled={
                   !isModified ||
                   !form.firstName.trim() ||
                   !form.lastName.trim() ||
-                  form.focusAreaIds.length === 0
+                  form.focusAreaIds.length === 0 ||
+                  Boolean(validateRequired(form.firstName, "First name")) ||
+                  Boolean(validateRequired(form.lastName, "Last name")) ||
+                  Boolean(validateEmail(form.email)) ||
+                  Boolean(validatePhone(form.phone)) ||
+                  Boolean(validateNotes(form.contactNotes))
                 }
                 className="dg-btn dg-btn-primary"
               >
                 {EDITOR_ACTION_LABELS.save}
               </button>
-            )}
+            }
           />
         )}
         {!canEdit && (
           <EditorActionRow
-            secondaryAction={(
-              <button
-                onClick={onCancel}
-                className="dg-btn dg-btn-secondary"
-              >
+            secondaryAction={
+              <button onClick={onCancel} className="dg-btn dg-btn-secondary">
                 {EDITOR_ACTION_LABELS.close}
               </button>
-            )}
+            }
           />
         )}
       </div>

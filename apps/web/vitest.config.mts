@@ -29,6 +29,13 @@ export default defineConfig(async () => {
             "./src/__tests__/__mocks__/next-font.ts",
           ),
         },
+        {
+          find: "server-only",
+          replacement: path.resolve(
+            __dirname,
+            "./src/__tests__/__mocks__/server-only.ts",
+          ),
+        },
       ],
     },
     test: {

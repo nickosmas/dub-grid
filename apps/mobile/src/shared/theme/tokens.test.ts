@@ -11,6 +11,8 @@ import {
   mobileColors,
   mobileRadii,
   mobileSpacing,
+  mobileText,
+  mobileTypography,
 } from "./tokens";
 
 describe("mobileBorderColorFromText", () => {
@@ -35,6 +37,7 @@ describe("shared design token derivation", () => {
         surface: colorTokens.surface,
         cardRadius: radiusTokens.card,
         screenX: spacingTokens.screenX,
+        screenTitle: mobileTypography.text.screenTitle,
       },
       web: {
         brand: webCssVariables["--dg-color-brand"],
@@ -46,19 +49,30 @@ describe("shared design token derivation", () => {
         surface: mobileColors.surface,
         cardRadius: mobileRadii.card,
         screenX: mobileSpacing.screenX,
+        screenTitle: mobileText.screenTitle,
       },
     }).toMatchInlineSnapshot(`
       {
         "mobile": {
           "brand": "#2563EB",
-          "cardRadius": 24,
-          "screenX": 20,
+          "cardRadius": 16,
+          "screenTitle": {
+            "fontSize": 22,
+            "fontWeight": "700",
+            "lineHeight": 28,
+          },
+          "screenX": 16,
           "surface": "#FFFFFF",
         },
         "source": {
           "brand": "#2563EB",
-          "cardRadius": 24,
-          "screenX": 20,
+          "cardRadius": 16,
+          "screenTitle": {
+            "fontSize": 22,
+            "fontWeight": "700",
+            "lineHeight": 28,
+          },
+          "screenX": 16,
           "surface": "#FFFFFF",
         },
         "web": {

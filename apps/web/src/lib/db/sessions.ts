@@ -4,7 +4,7 @@ import type { ImpersonationHistoryEntry } from "@/types";
 export async function fetchUserSessions() {
   const { data, error } = await supabase
     .from("user_sessions")
-    .select("id, user_id, device_label, ip_address, last_active_at, created_at, refresh_token_hash")
+    .select("id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash")
     .order("last_active_at", { ascending: false });
 
   if (error) throw error;
@@ -12,6 +12,10 @@ export async function fetchUserSessions() {
   return (data ?? []).map((row: Record<string, unknown>) => ({
     id: row.id as string,
     userId: row.user_id as string,
+    orgId: (row.org_id as string | null) ?? null,
+    supabaseSessionId: (row.supabase_session_id as string | null) ?? null,
+    platform: isUserSessionPlatform(row.platform) ? row.platform : null,
+    appVersion: (row.app_version as string | null) ?? null,
     deviceLabel: (row.device_label as string | null) ?? null,
     ipAddress: (row.ip_address as string | null) ?? null,
     lastActiveAt: row.last_active_at as string,
@@ -27,6 +31,10 @@ export async function revokeUserSession(refreshTokenHash: string): Promise<void>
     .eq("refresh_token_hash", refreshTokenHash);
 
   if (error) throw error;
+}
+
+function isUserSessionPlatform(value: unknown): value is "web" | "ios" | "android" {
+  return value === "web" || value === "ios" || value === "android";
 }
 
 export async function startImpersonation(

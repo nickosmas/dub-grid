@@ -1,13 +1,14 @@
 "use client";
 
+import type { Factor } from "@supabase/supabase-js";
 import { useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { ShieldCheck, ShieldOff, Copy, Check } from "lucide-react";
-import Image from "next/image";
 import { MaybeHint } from "@/components/ui/hint";
 import {
+  BROWSER_TOTP_FRIENDLY_NAME,
   disableBrowserMfaFactor,
   listBrowserMfaFactors,
   startBrowserTotpEnrollment,
@@ -34,6 +35,18 @@ const labelStyle: React.CSSProperties = {
   marginBottom: 5,
 };
 
+function isVerifiedTotpFactor(factor: Factor): boolean {
+  return factor.factor_type === "totp" && factor.status === "verified";
+}
+
+function isStaleDubGridTotpFactor(factor: Factor): boolean {
+  return (
+    factor.factor_type === "totp" &&
+    factor.status === "unverified" &&
+    factor.friendly_name === BROWSER_TOTP_FRIENDLY_NAME
+  );
+}
+
 export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   const [step, setStep] = useState<MFAStep>("idle");
   const [loading, setLoading] = useState(false);
@@ -47,6 +60,24 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   async function startEnrollment() {
     setLoading(true);
     try {
+      const { data: factorsData, error: listError } = await listBrowserMfaFactors();
+      if (listError) throw listError;
+
+      const existingVerifiedTotp = factorsData.all.find(isVerifiedTotpFactor);
+      if (existingVerifiedTotp) {
+        await updateMfaStatus(true);
+        toast.info("Two-factor authentication is already enabled.");
+        onStatusChange(true);
+        resetState();
+        return;
+      }
+
+      const staleFactors = factorsData.all.filter(isStaleDubGridTotpFactor);
+      for (const factor of staleFactors) {
+        const { error: unenrollError } = await disableBrowserMfaFactor(factor.id);
+        if (unenrollError) throw unenrollError;
+      }
+
       const { data, error } = await startBrowserTotpEnrollment();
       if (error) throw error;
 
@@ -230,12 +261,12 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           width: "fit-content",
           alignSelf: "center",
         }}>
-          <Image
-            src={qrCode}
+          <img
+            src={qrCode.trimEnd()}
             alt="Scan this QR code with your authenticator app"
             width={200}
             height={200}
-            unoptimized
+            style={{ display: "block", height: 200, width: 200 }}
           />
         </div>
       )}

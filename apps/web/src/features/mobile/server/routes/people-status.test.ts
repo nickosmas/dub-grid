@@ -58,7 +58,9 @@ describe("mobile people status route", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "Unauthorized" });
+    expect(await response.json()).toEqual({
+      error: "You don't have permission to update staff status.",
+    });
   });
 
   it("updates employee status for authorized mobile managers", async () => {
@@ -150,14 +152,24 @@ describe("mobile people status route", () => {
         id: "00000000-0000-0000-0000-000000000001",
         firstName: "Mina",
         lastName: "Diaz",
+        employmentType: "full_time",
         phone: "555-0100",
         email: "mina@dubgrid.com",
         status: "benched",
+        certificationId: null,
+        roleIds: [3],
+        seniority: 1,
         focusAreaIds: [1, 2],
+        departmentIds: [4],
+        deptAdminIds: [],
+        managementDepartmentIds: [],
+        managementDeptAdminIds: [],
         contactNotes: "Weekend availability",
         statusChangedAt: "2026-04-24T12:00:00.000Z",
         statusNote: "Coverage hold",
+        userId: null,
         version: 8,
+        pendingInvitation: null,
       },
     });
     expect(auditInsert).toHaveBeenCalledTimes(1);

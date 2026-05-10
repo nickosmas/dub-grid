@@ -11,7 +11,9 @@ import {
 } from "@/features/employees/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
+import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import type { Employee } from "@/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -71,6 +73,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
     if (orgId) {
       queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.org.employeeCount(orgId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
+      broadcastInvalidation(queryKeys.employees.all(orgId));
+      broadcastInvalidation(queryKeys.org.employeeCount(orgId));
+      broadcastInvalidation(queryKeys.org.directory(orgId));
     }
   }, [queryClient, orgId]);
 
@@ -96,7 +102,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         invalidateEmployees();
         return added;
       } catch (err) {
-        toast.error("Failed to add employee");
+        toast.error(formatClientErrorMessage(err, "Failed to add employee"));
         Sentry.captureException(err);
         return undefined;
       }
@@ -118,7 +124,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         invalidateEmployees();
       } catch (err) {
         setAllLocal(prevAll);
-        toast.error("Failed to save employee");
+        toast.error(formatClientErrorMessage(err, "Failed to save employee"));
         Sentry.captureException(err);
       }
     },

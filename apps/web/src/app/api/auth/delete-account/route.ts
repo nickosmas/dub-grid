@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { canManageProfileChangeRequests } from "@/features/account/server";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { extractJwtClaims } from "@/features/permissions/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -21,9 +23,28 @@ export async function DELETE(req: NextRequest) {
 
   try {
     // Auth check
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) return auth.response;
     const { user } = auth;
+    const { orgId } = extractJwtClaims(auth.session.access_token);
+
+    const canDeleteDirectly = orgId
+      ? await canManageProfileChangeRequests({
+          serviceClient: getServiceClient(),
+          actorId: user.id,
+          orgId,
+        })
+      : false;
+
+    if (!canDeleteDirectly) {
+      return NextResponse.json(
+        {
+          error:
+            "Account deletion must be requested and approved by an admin from People requests.",
+        },
+        { status: 403 },
+      );
+    }
 
     // Require explicit confirmation
     let body: { confirmation?: string } = {};

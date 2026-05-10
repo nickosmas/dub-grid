@@ -1,4 +1,5 @@
 import type { AdminPermissions, Invitation, OrganizationRole, OrganizationUser } from "@/types";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface ErrorBody {
   error?: string;
@@ -32,7 +33,7 @@ async function parseBody(response: Response): Promise<ErrorBody | null> {
 }
 
 function getErrorMessage(body: ErrorBody | null, fallback: string): string {
-  return body?.error || fallback;
+  return formatClientErrorMessage(body?.error, fallback);
 }
 
 export async function updateOrganizationMembershipGuarded(input: {

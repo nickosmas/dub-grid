@@ -10,6 +10,7 @@ import type {
   NamedItem,
   ShiftCategory,
 } from "@/types";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export interface DependencyInfo {
   hasDependencies: boolean;
@@ -42,7 +43,7 @@ async function requestSettingsJson<T>(
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string" ? body.error : options.errorMessage,
+      formatClientErrorMessage(body?.error, options.errorMessage),
     );
   }
 

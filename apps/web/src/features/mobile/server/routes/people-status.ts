@@ -40,12 +40,18 @@ export async function PATCH(
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "We couldn't read that status update. Try again." },
+      { status: 400 },
+    );
   }
 
   const parsed = mobilePersonStatusUpdateBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Check the status details and try again." },
+      { status: 400 },
+    );
   }
 
   const { id } = await context.params;
@@ -103,7 +109,10 @@ export async function PATCH(
     );
   } catch (error) {
     if (error instanceof MobileApiAuthorizationError) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json(
+        { error: "You don't have permission to update staff status." },
+        { status: 403 },
+      );
     }
 
     return NextResponse.json(

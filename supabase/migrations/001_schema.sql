@@ -14,8 +14,11 @@ CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'none');
 CREATE TYPE public.org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly');
 CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
+CREATE TYPE public.employee_employment_type AS ENUM ('full_time', 'part_time');
 CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap', 'calloff');
 CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired');
+CREATE TYPE public.profile_change_request_type AS ENUM ('profile_update', 'account_deletion');
+CREATE TYPE public.profile_change_request_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled');
 CREATE TYPE public.department_type AS ENUM ('scheduled', 'management');
 
 
@@ -60,18 +63,22 @@ CREATE TABLE public.organizations (
   pay_period_start_date DATE,
   stripe_customer_id   TEXT UNIQUE,
   subscription_status  TEXT NOT NULL DEFAULT 'trialing',
-  trial_ends_at        TIMESTAMPTZ,
+  trial_ends_at        TIMESTAMPTZ DEFAULT (now() + interval '14 days'),
   subscription_seats   INTEGER,
   data_retention_days  INTEGER NOT NULL DEFAULT 365,
   archived_at          TIMESTAMPTZ,
   suspended_at                  TIMESTAMPTZ,
   suspended_reason              TEXT,
   enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
+  coverage_rule_config JSONB NOT NULL DEFAULT '{"mentoredCoverageCreditPercent":100}'::jsonb,
   feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_by           UUID,
   updated_by           UUID,
   created_at           TIMESTAMPTZ DEFAULT now(),
-  updated_at           TIMESTAMPTZ DEFAULT now()
+  updated_at           TIMESTAMPTZ DEFAULT now(),
+
+  CONSTRAINT organizations_trialing_requires_trial_end
+    CHECK (subscription_status <> 'trialing' OR trial_ends_at IS NOT NULL)
 );
 
 COMMENT ON COLUMN public.organizations.suspended_at IS 'Non-null when the organization is suspended. Members are blocked from accessing the app.';
@@ -85,6 +92,7 @@ COMMENT ON COLUMN public.organizations.theme_config IS 'JSON object containing p
 COMMENT ON COLUMN public.organizations.landing_page_config IS 'JSON object containing hero_title, features, and pain_points';
 COMMENT ON COLUMN public.organizations.feature_overrides IS 'JSON object of per-org feature flag overrides. Keys are flag names, values are booleans. Checked before PostHog.';
 COMMENT ON COLUMN public.organizations.pay_period_start_date IS 'Optional biweekly pay-period anchor date. When set, the 2-week schedule view aligns to 14-day periods starting on this date.';
+COMMENT ON COLUMN public.organizations.coverage_rule_config IS 'Organization-level schedule coverage rules. mentoredCoverageCreditPercent controls how mentored assignments count toward coverage.';
 
 
 -- ── profiles ──────────────────────────────────────────────────────────────────
@@ -226,6 +234,7 @@ CREATE TABLE public.employees (
   certification_id  BIGINT,
   role_ids          BIGINT[] NOT NULL DEFAULT '{}',
   focus_area_ids    BIGINT[] NOT NULL DEFAULT '{}',
+  employment_type   public.employee_employment_type NOT NULL DEFAULT 'full_time',
   status            public.employee_status NOT NULL DEFAULT 'active',
   status_changed_at TIMESTAMPTZ,
   status_note       TEXT NOT NULL DEFAULT '',
@@ -243,6 +252,16 @@ CREATE TABLE public.employees (
   /** Optimistic concurrency control version counter. */
   version           INTEGER NOT NULL DEFAULT 0
 );
+
+-- Non-empty contact details identify one active person per organization.
+-- Historical/terminated rows are excluded once archived_at is set.
+CREATE UNIQUE INDEX unique_active_employee_email_per_org
+  ON public.employees (org_id, lower(btrim(email)))
+  WHERE archived_at IS NULL AND btrim(email) <> '';
+
+CREATE UNIQUE INDEX unique_active_employee_phone_per_org
+  ON public.employees (org_id, regexp_replace(phone, '[^0-9]+', '', 'g'))
+  WHERE archived_at IS NULL AND regexp_replace(phone, '[^0-9]+', '', 'g') <> '';
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
 
@@ -404,6 +423,7 @@ CREATE TABLE public.schedule_cell_segments (
   position                   INTEGER NOT NULL,
   shift_id                   BIGINT,
   job_id                     BIGINT NOT NULL,
+  is_mentored                BOOLEAN NOT NULL DEFAULT false,
   created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -622,6 +642,48 @@ CREATE TABLE public.notifications (
 COMMENT ON TABLE public.notifications IS 'In-app and email notifications for users';
 
 
+-- ── profile_change_requests ─────────────────────────────────────────────────
+
+CREATE TABLE public.profile_change_requests (
+  id                         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                     UUID NOT NULL,
+  requester_user_id          UUID,
+  requester_employee_id      UUID,
+  requester_employee_version INTEGER,
+  requester_name             TEXT NOT NULL DEFAULT '',
+  requester_email            TEXT,
+  request_type               public.profile_change_request_type NOT NULL,
+  status                     public.profile_change_request_status NOT NULL DEFAULT 'pending',
+  requested_changes          JSONB NOT NULL DEFAULT '{}'::JSONB,
+  current_values             JSONB NOT NULL DEFAULT '{}'::JSONB,
+  request_note               TEXT NOT NULL DEFAULT '',
+  resolver_user_id           UUID,
+  resolver_note              TEXT NOT NULL DEFAULT '',
+  resolved_at                TIMESTAMPTZ,
+  cancelled_at               TIMESTAMPTZ,
+  created_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+  version                    INTEGER NOT NULL DEFAULT 0,
+
+  CONSTRAINT profile_change_requests_changes_object
+    CHECK (jsonb_typeof(requested_changes) = 'object'),
+  CONSTRAINT profile_change_requests_current_object
+    CHECK (jsonb_typeof(current_values) = 'object'),
+  CONSTRAINT profile_change_requests_resolved_state
+    CHECK (
+      (status IN ('approved', 'rejected') AND resolved_at IS NOT NULL AND resolver_user_id IS NOT NULL)
+      OR (status NOT IN ('approved', 'rejected') AND resolved_at IS NULL)
+    ),
+  CONSTRAINT profile_change_requests_cancelled_state
+    CHECK (
+      (status = 'cancelled' AND cancelled_at IS NOT NULL)
+      OR (status <> 'cancelled' AND cancelled_at IS NULL)
+    )
+);
+
+ALTER TABLE ONLY public.profile_change_requests REPLICA IDENTITY FULL;
+
+
 -- ── notification_preferences ────────────────────────────────────────────────
 
 CREATE TABLE public.notification_preferences (
@@ -657,6 +719,10 @@ COMMENT ON TABLE public.mobile_device_tokens IS 'Expo push tokens for native iOS
 CREATE TABLE public.user_sessions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL,
+  org_id             UUID,
+  supabase_session_id UUID UNIQUE,
+  platform           TEXT,
+  app_version        TEXT,
   device_label       TEXT,
   ip_address         INET,
   last_active_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -665,6 +731,10 @@ CREATE TABLE public.user_sessions (
 );
 
 COMMENT ON TABLE public.user_sessions IS 'Tracks individual device sessions for per-device session management';
+COMMENT ON COLUMN public.user_sessions.org_id IS 'Organization context active in the session when the device last reported presence';
+COMMENT ON COLUMN public.user_sessions.supabase_session_id IS 'Supabase auth session_id claim for correlating web and mobile sessions';
+COMMENT ON COLUMN public.user_sessions.platform IS 'Client platform for the session (web, ios, android)';
+COMMENT ON COLUMN public.user_sessions.app_version IS 'Client application version when reported';
 COMMENT ON COLUMN public.user_sessions.device_label IS 'User-friendly device identifier (e.g., "Chrome on MacOS")';
 COMMENT ON COLUMN public.user_sessions.ip_address IS 'IP address of the device at session creation';
 COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification - UNIQUE constraint prevents duplicate sessions';
@@ -778,9 +848,19 @@ ALTER TABLE ONLY public.shift_requests REPLICA IDENTITY FULL;
 ALTER TABLE public.shift_requests ADD CONSTRAINT target_required_for_swap
   CHECK (type IN ('pickup', 'calloff') OR (target_emp_id IS NOT NULL AND target_shift_date IS NOT NULL));
 
--- Calloffs must have an absence type; non-calloffs must not
+-- Calloffs and targeted pickups must have an absence type; other requests must not
 ALTER TABLE public.shift_requests ADD CONSTRAINT calloff_requires_absence_type
-  CHECK ((type = 'calloff' AND absence_type_id IS NOT NULL) OR (type != 'calloff' AND absence_type_id IS NULL));
+  CHECK (
+    (type = 'calloff' AND absence_type_id IS NOT NULL)
+    OR (
+      type = 'pickup'
+      AND (
+        (target_emp_id IS NOT NULL AND target_shift_date IS NOT NULL AND absence_type_id IS NOT NULL)
+        OR (target_emp_id IS NULL AND target_shift_date IS NULL AND absence_type_id IS NULL)
+      )
+    )
+    OR (type = 'swap' AND absence_type_id IS NULL)
+  );
 
 -- Cannot swap with yourself
 ALTER TABLE public.shift_requests ADD CONSTRAINT no_self_swap
@@ -944,6 +1024,13 @@ ALTER TABLE public.notifications
 ALTER TABLE public.notifications
   ADD CONSTRAINT notifications_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
+-- profile_change_requests
+ALTER TABLE public.profile_change_requests
+  ADD CONSTRAINT profile_change_requests_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
+  ADD CONSTRAINT profile_change_requests_requester_user_id_fkey FOREIGN KEY (requester_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD CONSTRAINT profile_change_requests_requester_employee_id_fkey FOREIGN KEY (requester_employee_id) REFERENCES public.employees(id) ON DELETE SET NULL,
+  ADD CONSTRAINT profile_change_requests_resolver_user_id_fkey FOREIGN KEY (resolver_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
 -- mobile_device_tokens
 ALTER TABLE public.mobile_device_tokens
   ADD CONSTRAINT mobile_device_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -951,7 +1038,8 @@ ALTER TABLE public.mobile_device_tokens
 
 -- user_sessions
 ALTER TABLE public.user_sessions
-  ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  ADD CONSTRAINT user_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
 
 -- shift_requests
 ALTER TABLE public.shift_requests
@@ -1123,12 +1211,22 @@ CREATE INDEX idx_notifications_user_unread ON public.notifications(user_id, crea
 CREATE INDEX idx_notifications_user_all ON public.notifications(user_id, created_at DESC);
 CREATE INDEX idx_notifications_user_org ON public.notifications(user_id, org_id, created_at DESC);
 
+-- profile_change_requests
+CREATE INDEX idx_profile_change_requests_org_status ON public.profile_change_requests(org_id, status, created_at DESC);
+CREATE INDEX idx_profile_change_requests_requester ON public.profile_change_requests(requester_user_id, org_id, created_at DESC);
+CREATE INDEX idx_profile_change_requests_employee ON public.profile_change_requests(requester_employee_id, created_at DESC) WHERE requester_employee_id IS NOT NULL;
+CREATE UNIQUE INDEX one_pending_profile_change_request_per_type
+  ON public.profile_change_requests(org_id, requester_user_id, request_type)
+  WHERE status = 'pending';
+
 -- mobile_device_tokens
 CREATE INDEX idx_mobile_device_tokens_user_org ON public.mobile_device_tokens(user_id, org_id);
 CREATE INDEX idx_mobile_device_tokens_active ON public.mobile_device_tokens(org_id, user_id) WHERE disabled_at IS NULL;
 
 -- user_sessions
 CREATE INDEX idx_user_sessions_user_last_active ON public.user_sessions(user_id, last_active_at DESC);
+CREATE INDEX idx_user_sessions_user_supabase_session ON public.user_sessions(user_id, supabase_session_id);
+CREATE INDEX idx_user_sessions_org_last_active ON public.user_sessions(org_id, last_active_at DESC);
 
 -- coverage_requirements
 CREATE INDEX idx_coverage_requirements_org ON public.coverage_requirements(org_id);
@@ -1237,11 +1335,21 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_cells;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_cell_snapshots;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_cell_segments;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.schedule_notes;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.organizations;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.focus_areas;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_categories;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.jobs;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.profile_change_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.absence_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.coverage_requirements;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.organization_memberships;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.organization_roles;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.invitations;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.certifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.departments;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.indicator_types;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.subscriptions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_log;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.impersonation_sessions;

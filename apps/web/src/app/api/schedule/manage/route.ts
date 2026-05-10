@@ -10,10 +10,12 @@ import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import {
   requireOrgPermissions,
 } from "@/app/api/shared/permissions";
-import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
+import {
+  fetchAssignmentIdByPairMap,
+  fetchAssignmentLabelMap,
+} from "@/app/api/shared/schedule";
 import {
   rowToShiftRequest,
-  generateSeriesDates,
 } from "@/lib/db/mappers";
 import {
   mapNormalizedScheduleCellRowToScheduleEntry,
@@ -39,6 +41,17 @@ const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 const noteStatusSchema = z.enum(["published", "draft", "draft_deleted"]);
 const seriesFrequencySchema = z.enum(["daily", "weekly", "biweekly"]);
 const dragModeSchema = z.enum(["move", "copy"]);
+const upsertShiftBatchItemSchema = z.object({
+  employeeId: z.string().uuid(),
+  date: z.string().date(),
+  input: scheduleCellStateSchema,
+  expectedVersion: z.number().int().nonnegative().optional(),
+});
+const deleteShiftBatchItemSchema = z.object({
+  employeeId: z.string().uuid(),
+  date: z.string().date(),
+  expectedVersion: z.number().int().nonnegative().optional(),
+});
 
 const requestSchema = z.discriminatedUnion("action", [
   z.object({
@@ -80,11 +93,21 @@ const requestSchema = z.discriminatedUnion("action", [
     expectedVersion: z.number().int().nonnegative().optional(),
   }),
   z.object({
+    action: z.literal("upsertShifts"),
+    orgId: z.string().uuid(),
+    shifts: z.array(upsertShiftBatchItemSchema).min(1).max(50),
+  }),
+  z.object({
     action: z.literal("deleteShift"),
     orgId: z.string().uuid(),
     employeeId: z.string().uuid(),
     date: z.string().date(),
     expectedVersion: z.number().int().nonnegative().optional(),
+  }),
+  z.object({
+    action: z.literal("deleteShifts"),
+    orgId: z.string().uuid(),
+    shifts: z.array(deleteShiftBatchItemSchema).min(1).max(50),
   }),
   z.object({
     action: z.literal("upsertShiftTimes"),
@@ -105,6 +128,8 @@ const requestSchema = z.discriminatedUnion("action", [
     input: scheduleCellStateSchema,
     dragMode: dragModeSchema.optional(),
     expectedVersion: z.number().int().nonnegative().optional(),
+    targetExpectedVersion: z.number().int().nonnegative().optional(),
+    targetWasEmpty: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("createShiftSeries"),
@@ -224,6 +249,7 @@ function normalizeScheduleInput(
       shiftId: segment.shiftId,
       jobId: segment.jobId,
       position: index,
+      isMentored: segment.isMentored ?? false,
     })),
     absenceTypeId: null,
     customStartTime: input.customStartTime ?? null,
@@ -238,6 +264,7 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
     return {
       shiftIds: [] as Array<number | null>,
       jobIds: [] as number[],
+      isMentoredFlags: [] as boolean[],
       absenceTypeId: null,
       customStartTime: null,
       customEndTime: null,
@@ -248,6 +275,7 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
     return {
       shiftIds: [] as Array<number | null>,
       jobIds: [] as number[],
+      isMentoredFlags: [] as boolean[],
       absenceTypeId: input.absenceTypeId ?? null,
       customStartTime: null,
       customEndTime: null,
@@ -258,6 +286,7 @@ function getScheduleCellStorage(input: ScheduleCellInput) {
   return {
     shiftIds: orderedSegments.map((segment) => segment.shiftId),
     jobIds: orderedSegments.map((segment) => segment.jobId),
+    isMentoredFlags: orderedSegments.map((segment) => segment.isMentored ?? false),
     absenceTypeId: null,
     customStartTime: input.customStartTime ?? null,
     customEndTime: input.customEndTime ?? null,
@@ -316,6 +345,7 @@ async function writeShiftSnapshot(
   const {
     shiftIds,
     jobIds,
+    isMentoredFlags,
     absenceTypeId,
     customStartTime,
     customEndTime,
@@ -329,6 +359,7 @@ async function writeShiftSnapshot(
     p_state_kind: state.kind,
     p_shift_ids: shiftIds,
     p_job_ids: jobIds,
+    p_is_mentored_flags: isMentoredFlags,
     p_absence_type_id: absenceTypeId,
     p_custom_start_time: customStartTime,
     p_custom_end_time: customEndTime,
@@ -408,6 +439,7 @@ async function fetchScheduleCellSnapshotPayload(
     state_kind: "worked" | "absence" | "deleted";
     shift_ids: Array<number | null>;
     job_ids: number[];
+    is_mentored_flags: boolean[];
   }>;
   return rows[0] ?? null;
 }
@@ -420,34 +452,6 @@ function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
   }
 
   return snapshots.some((snapshot) => snapshot.snapshot_kind === "published");
-}
-
-async function fetchScheduleCellVersionsForDates(
-  serviceClient: ScheduleServiceClient,
-  orgId: string,
-  employeeId: string,
-  dates: string[],
-): Promise<Map<string, number>> {
-  if (dates.length === 0) {
-    return new Map();
-  }
-
-  const { data, error } = await serviceClient
-    .from("schedule_cells")
-    .select("date, version")
-    .eq("org_id", orgId)
-    .eq("emp_id", employeeId)
-    .in("date", dates);
-  if (error) {
-    throw error;
-  }
-
-  return new Map(
-    ((data ?? []) as Array<{ date: string; version: number }>).map((row) => [
-      row.date,
-      row.version,
-    ]),
-  );
 }
 
 export async function POST(req: NextRequest) {
@@ -493,7 +497,7 @@ export async function POST(req: NextRequest) {
         let query = auth.serviceClient
           .from("schedule_cells")
           .select(
-            "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+            "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
           )
           .eq("org_id", data.orgId);
         if (data.startDate) {
@@ -685,7 +689,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { data: value, error } = await auth.serviceClient.rpc(
+        const { data: value, error } = await auth.userClient.rpc(
           "get_schedule_last_viewed",
           { p_org_id: data.orgId },
         );
@@ -709,7 +713,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { error } = await auth.serviceClient.rpc(
+        const { error } = await auth.userClient.rpc(
           "update_schedule_last_viewed",
           { p_org_id: data.orgId },
         );
@@ -732,7 +736,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        await writeShiftSnapshot(auth.serviceClient, {
+        await writeShiftSnapshot(auth.userClient, {
           orgId: data.orgId,
           employeeId: data.employeeId,
           date: data.date,
@@ -740,6 +744,31 @@ export async function POST(req: NextRequest) {
           expectedVersion: data.expectedVersion,
         });
         return NextResponse.json({ success: true });
+      }
+
+      case "upsertShifts": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        for (const shift of data.shifts) {
+          await writeShiftSnapshot(auth.userClient, {
+            orgId: data.orgId,
+            employeeId: shift.employeeId,
+            date: shift.date,
+            state: shift.input,
+            expectedVersion: shift.expectedVersion,
+          });
+        }
+        return NextResponse.json({ success: true, count: data.shifts.length });
       }
 
       case "deleteShift": {
@@ -755,13 +784,37 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        await deleteShiftSnapshot(auth.serviceClient, {
+        await deleteShiftSnapshot(auth.userClient, {
           orgId: data.orgId,
           employeeId: data.employeeId,
           date: data.date,
           expectedVersion: data.expectedVersion,
         });
         return NextResponse.json({ success: true });
+      }
+
+      case "deleteShifts": {
+        const auth = await requireOrgPermissions(
+          req,
+          data.orgId,
+          (permissions) =>
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts,
+        );
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        for (const shift of data.shifts) {
+          await deleteShiftSnapshot(auth.userClient, {
+            orgId: data.orgId,
+            employeeId: shift.employeeId,
+            date: shift.date,
+            expectedVersion: shift.expectedVersion,
+          });
+        }
+        return NextResponse.json({ success: true, count: data.shifts.length });
       }
 
       case "upsertShiftTimes": {
@@ -804,7 +857,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { error } = await auth.serviceClient.rpc(
+        const { error } = await auth.userClient.rpc(
           "write_schedule_cell_snapshot",
           {
             p_org_id: data.orgId,
@@ -814,6 +867,7 @@ export async function POST(req: NextRequest) {
             p_state_kind: "worked",
             p_shift_ids: sourcePayload.shift_ids ?? [],
             p_job_ids: sourcePayload.job_ids ?? [],
+            p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
             p_absence_type_id: null,
             p_custom_start_time: data.customStartTime,
             p_custom_end_time: data.customEndTime,
@@ -857,11 +911,12 @@ export async function POST(req: NextRequest) {
         const {
           shiftIds,
           jobIds,
+          isMentoredFlags,
           absenceTypeId,
           customStartTime,
           customEndTime,
         } = getScheduleCellStorage(state);
-        const { error } = await auth.serviceClient.rpc("move_shift", {
+        const { error } = await auth.userClient.rpc("move_shift", {
           p_org_id: data.orgId,
           p_source_emp_id: data.sourceEmpId,
           p_source_date: data.sourceDate,
@@ -870,11 +925,14 @@ export async function POST(req: NextRequest) {
           p_kind: state.kind,
           p_shift_ids: shiftIds,
           p_job_ids: jobIds,
+          p_is_mentored_flags: isMentoredFlags,
           p_absence_type_id: absenceTypeId,
           p_custom_start_time: customStartTime,
           p_custom_end_time: customEndTime,
           p_drag_mode: data.dragMode ?? "move",
           p_expected_version: data.expectedVersion ?? null,
+          p_target_expected_version: data.targetExpectedVersion ?? null,
+          p_target_was_empty: data.targetWasEmpty ?? false,
         });
         if (error) {
           if (error.message?.includes("Optimistic lock failed")) {
@@ -902,10 +960,10 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const id = crypto.randomUUID();
+        const requestedId = crypto.randomUUID();
         const now = new Date().toISOString();
         const normalizedInput = normalizeScheduleInput(data.input, {
-          seriesId: id,
+          seriesId: requestedId,
           fromRecurring: false,
         });
 
@@ -928,55 +986,41 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { error } = await auth.serviceClient.from("shift_series").insert({
-          id,
-          emp_id: data.employeeId,
-          org_id: data.orgId,
-          state: normalizedInput,
-          frequency: data.frequency,
-          days_of_week: data.daysOfWeek,
-          start_date: data.startDate,
-          end_date: data.endDate,
-          max_occurrences: data.maxOccurrences,
-        });
+        const { data: createdSeriesId, error } = await auth.userClient.rpc(
+          "create_shift_series",
+          {
+            p_series_id: requestedId,
+            p_emp_id: data.employeeId,
+            p_org_id: data.orgId,
+            p_state: normalizedInput,
+            p_frequency: data.frequency,
+            p_days_of_week: data.daysOfWeek,
+            p_start_date: data.startDate,
+            p_end_date: data.endDate,
+            p_max_occurrences: data.maxOccurrences,
+          },
+        );
         if (error) {
           throw error;
         }
 
-        const dates = generateSeriesDates(
-          data.frequency as SeriesFrequency,
-          data.daysOfWeek,
-          data.startDate,
-          data.endDate,
-          data.maxOccurrences,
-        );
-        const existingVersions = await fetchScheduleCellVersionsForDates(
-          auth.serviceClient,
-          data.orgId,
-          data.employeeId,
-          dates,
-        );
-
-        for (const date of dates) {
-          await writeShiftSnapshot(auth.serviceClient, {
-            orgId: data.orgId,
-            employeeId: data.employeeId,
-            date,
-            state: normalizedInput,
-            expectedVersion: existingVersions.get(date),
-          });
-        }
+        const id =
+          typeof createdSeriesId === "string" ? createdSeriesId : requestedId;
+        const seriesInput = {
+          ...normalizedInput,
+          seriesId: id,
+        };
 
         const series: ShiftSeries = {
           id,
           empId: data.employeeId,
           orgId: data.orgId,
-          state: normalizedInput,
+          state: seriesInput,
           presentation: null,
-          input: normalizedInput,
+          input: seriesInput,
           absenceTypeId:
-            normalizedInput.kind === "absence"
-              ? (normalizedInput.absenceTypeId ?? null)
+            seriesInput.kind === "absence"
+              ? (seriesInput.absenceTypeId ?? null)
               : null,
           shiftLabel: data.shiftLabel,
           frequency: data.frequency as SeriesFrequency,
@@ -1018,34 +1062,11 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { data: cells, error: cellError } = await auth.serviceClient
-          .from("schedule_cells")
-          .select("emp_id, date, version")
-          .eq("org_id", data.orgId)
-          .eq("series_id", data.seriesId);
-        if (cellError) {
-          throw cellError;
-        }
-
-        for (const cell of (cells ?? []) as Array<{
-          emp_id: string;
-          date: string;
-          version: number;
-        }>) {
-          await writeShiftSnapshot(auth.serviceClient, {
-            orgId: data.orgId,
-            employeeId: cell.emp_id,
-            date: cell.date,
-            state: normalizedInput,
-            expectedVersion: cell.version,
-          });
-        }
-
-        const { error } = await auth.serviceClient
-          .from("shift_series")
-          .update({ state: normalizedInput })
-          .eq("org_id", data.orgId)
-          .eq("id", data.seriesId);
+        const { error } = await auth.userClient.rpc("update_series_all_shifts", {
+          p_series_id: data.seriesId,
+          p_org_id: data.orgId,
+          p_state: normalizedInput,
+        });
         if (error) {
           throw error;
         }
@@ -1066,48 +1087,19 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { data: cells, error: cellError } = await auth.serviceClient
-          .from("schedule_cells")
-          .select("emp_id, date, version")
-          .eq("org_id", data.orgId)
-          .eq("series_id", data.seriesId);
-        if (cellError) {
-          throw cellError;
-        }
-
-        for (const cell of (cells ?? []) as Array<{
-          emp_id: string;
-          date: string;
-          version: number;
-        }>) {
-          await deleteShiftSnapshot(auth.serviceClient, {
-            orgId: data.orgId,
-            employeeId: cell.emp_id,
-            date: cell.date,
-            expectedVersion: cell.version,
-          });
-        }
-
-        const { error } = await auth.serviceClient
-          .from("shift_series")
-          .update({ archived_at: new Date().toISOString() })
-          .eq("org_id", data.orgId)
-          .eq("id", data.seriesId);
+        const { data: deletedCount, error } = await auth.userClient.rpc(
+          "delete_shift_series",
+          {
+            p_series_id: data.seriesId,
+            p_org_id: data.orgId,
+          },
+        );
         if (error) {
           throw error;
         }
 
-        const { error: clearError } = await auth.serviceClient
-          .from("schedule_cells")
-          .update({ series_id: null })
-          .eq("org_id", data.orgId)
-          .eq("series_id", data.seriesId);
-        if (clearError) {
-          throw clearError;
-        }
-
         return NextResponse.json({
-          deletedCount: (cells ?? []).length,
+          deletedCount: Number(deletedCount ?? 0),
         });
       }
 
@@ -1124,6 +1116,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        assertDateRange(data.startDate, data.endDate);
         const [{ data: recurringRows, error: recurringError }, { data: cells, error: cellError }] =
           await Promise.all([
             auth.serviceClient
@@ -1136,7 +1129,7 @@ export async function POST(req: NextRequest) {
             auth.serviceClient
               .from("schedule_cells")
               .select(
-                "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+                "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
               )
               .eq("org_id", data.orgId)
               .gte("date", data.startDate)
@@ -1163,7 +1156,6 @@ export async function POST(req: NextRequest) {
           cellsByKey.set(`${cell.emp_id}_${cell.date}`, cell);
         }
 
-        const assignmentLabelMap = new Map<number, string>();
         const absenceTypeIds = Array.from(
           new Set(
             ((recurringRows ?? []) as DbRecurringShift[])
@@ -1189,10 +1181,10 @@ export async function POST(req: NextRequest) {
             (row) => [row.id, row.name],
           ),
         );
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
-          auth.serviceClient,
-          data.orgId,
-        );
+        const [assignmentIdByPair, assignmentLabelMap] = await Promise.all([
+          fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
+          fetchAssignmentLabelMap(auth.serviceClient, data.orgId),
+        ]);
 
         const generated: Array<{
           empId: string;
@@ -1227,7 +1219,7 @@ export async function POST(req: NextRequest) {
               fromRecurring: true,
             });
 
-            await writeShiftSnapshot(auth.serviceClient, {
+            await writeShiftSnapshot(auth.userClient, {
               orgId: data.orgId,
               employeeId: template.emp_id,
               date: dateKey,

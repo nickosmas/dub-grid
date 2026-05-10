@@ -102,8 +102,27 @@ describe("recurring schedule database contract", () => {
     expect(sql).toContain("UPDATE public.shift_series");
     expect(sql).toContain("state = p_state");
     expect(sql).toContain("public.resolve_schedule_state_storage(p_org_id, p_state)");
+    expect(sql).toContain("canManageShiftSeries");
     expect(sql).not.toContain("SET shift_id =");
     expect(sql).not.toContain("SET job_id =");
     expect(sql).not.toContain("SET absence_type_id =");
+  });
+
+  it("creates shift series atomically in SQL", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.create_shift_series\s*\(/);
+    expect(sql).toContain("INSERT INTO public.shift_series");
+    expect(sql).toContain("public.write_schedule_cell_snapshot_internal");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION public.create_shift_series");
+  });
+
+  it("checks target-cell optimistic state before moving or copying shifts", () => {
+    const sql = readFileSync(resolveMigrationPath(), "utf8");
+
+    expect(sql).toContain("p_target_expected_version BIGINT DEFAULT NULL");
+    expect(sql).toContain("p_target_was_empty  BOOLEAN DEFAULT FALSE");
+    expect(sql).toContain("expected empty target");
+    expect(sql).toContain("v_target_write_expected_version");
   });
 });

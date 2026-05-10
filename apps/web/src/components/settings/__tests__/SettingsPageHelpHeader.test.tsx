@@ -81,6 +81,10 @@ vi.mock("@/components/settings/OrganizationLabels", () => ({
   default: () => <div>Organization labels</div>,
 }));
 
+vi.mock("@/components/settings/BillingSettings", () => ({
+  default: () => <div>Billing settings</div>,
+}));
+
 vi.mock("@/components/settings/DisplayMode", () => ({
   default: () => <div>Display mode</div>,
 }));

@@ -132,6 +132,9 @@ export default function NotificationBell() {
     }
   }
 
+  const unreadCountLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+  const unreadCountFontSize = unreadCount > 99 ? 6 : unreadCount > 9 ? 8 : 9;
+
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>
       <button
@@ -174,23 +177,24 @@ export default function NotificationBell() {
           <span
             style={{
               position: "absolute",
-              top: 4,
-              right: 4,
-              minWidth: 16,
+              top: -1,
+              right: 1,
+              width: 16,
               height: 16,
-              borderRadius: 8,
+              borderRadius: "50%",
               background: "#EF4444",
               color: "#fff",
-              fontSize: 10,
+              fontSize: unreadCountFontSize,
               fontWeight: 700,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "0 4px",
+              padding: 0,
               lineHeight: 1,
+              zIndex: 1,
             }}
           >
-            {unreadCount > 99 ? "99+" : unreadCount}
+            {unreadCountLabel}
           </span>
         )}
       </button>

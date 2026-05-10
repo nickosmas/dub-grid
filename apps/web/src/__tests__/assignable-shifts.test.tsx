@@ -3,11 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import ShiftPicker from "@/components/ShiftPicker";
 import {
   buildAssignableShiftOptions,
+  buildScheduleAssignmentOptions,
   formatShiftAssignmentDisqualificationMessage,
   getQualificationSeniorityRank,
   getAssignmentDefinitionDisqualificationReasons,
+  isEmployeeQualifiedForJob,
   isEmployeeQualifiedForAssignmentDefinition,
 } from "@/lib/assignable-shifts";
+import { DEFAULT_SHIFT_JOB_SYSTEM_KEY } from "@/lib/system-jobs";
 import type {
   AbsenceType,
   FocusArea,
@@ -176,6 +179,54 @@ const assignments: AssignmentDefinition[] = [
 ];
 
 describe("assignable shift resolution", () => {
+  it("treats selected roles and certifications as any-of gates before applying the matching rule", () => {
+    const multiGateJob: JobDefinition = {
+      ...jobs[1]!,
+      eligibleRoleIds: [7, 9],
+      requiredCertificationIds: [1, 2],
+      eligibilityMode: "and",
+    };
+
+    expect(
+      isEmployeeQualifiedForJob(
+        {
+          certificationId: 1,
+          focusAreaIds: [1],
+          roleIds: [9],
+        },
+        multiGateJob,
+        [],
+        orgRoles,
+      ),
+    ).toBe(true);
+
+    expect(
+      isEmployeeQualifiedForJob(
+        {
+          certificationId: 1,
+          focusAreaIds: [1],
+          roleIds: [],
+        },
+        multiGateJob,
+        [],
+        orgRoles,
+      ),
+    ).toBe(false);
+
+    expect(
+      isEmployeeQualifiedForJob(
+        {
+          certificationId: 1,
+          focusAreaIds: [1],
+          roleIds: [],
+        },
+        { ...multiGateJob, eligibilityMode: "or" },
+        [],
+        orgRoles,
+      ),
+    ).toBe(true);
+  });
+
   it("derives qualification seniority from roles first, then certifications", () => {
     expect(
       getQualificationSeniorityRank({
@@ -310,6 +361,90 @@ describe("assignable shift resolution", () => {
       isShiftless: true,
       groupLabel: "General",
     });
+  });
+
+  it("generates shift-only assignments from the configurable default shift job", () => {
+    const defaultShiftJob: JobDefinition = {
+      ...jobs[0]!,
+      id: 104,
+      name: "Default shift job",
+      abbr: "SHIFT",
+      showOnGrid: false,
+      eligibleRoleIds: [7],
+      shiftColorOverrides: { "10": "#D9F99D" },
+      systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+    };
+    const generatedAssignments = buildScheduleAssignmentOptions({
+      orgId: "org-1",
+      focusAreas,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+    });
+
+    expect(generatedAssignments).toHaveLength(1);
+    expect(generatedAssignments[0]).toMatchObject({
+      label: "D",
+      name: "Day Shift",
+      shiftId: 10,
+      jobId: 104,
+      color: "#D9F99D",
+    });
+
+    const ineligibleOptions = buildAssignableShiftOptions({
+      assignments: generatedAssignments,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+      focusAreas,
+      orgRoles,
+      employee: {
+        certificationId: null,
+        focusAreaIds: [1],
+        roleIds: [],
+      },
+      shiftDisplayMode: "name",
+    });
+    expect(ineligibleOptions).toEqual([]);
+
+    const eligibleOptions = buildAssignableShiftOptions({
+      assignments: generatedAssignments,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+      focusAreas,
+      orgRoles,
+      employee: {
+        certificationId: null,
+        focusAreaIds: [1],
+        roleIds: [7],
+      },
+      shiftDisplayMode: "name",
+    });
+
+    expect(eligibleOptions[0]).toMatchObject({
+      primaryLabel: "Day Shift",
+      secondaryLabel: null,
+      showJobOnGrid: false,
+      isShiftOnly: true,
+      isShiftless: false,
+    });
+
+    render(
+      <ShiftPicker
+        assignments={generatedAssignments}
+        shiftCategories={shiftCategories}
+        jobs={[defaultShiftJob]}
+        orgRoles={orgRoles}
+        focusAreas={focusAreas}
+        onSelect={vi.fn()}
+        empFocusAreaIds={[1]}
+        empRoleIds={[7]}
+        shiftDisplayMode="name"
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Day Shift" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
   });
 
   it("filters specialty jobs by combined role and certification eligibility", () => {
@@ -471,6 +606,32 @@ describe("assignable shift resolution", () => {
 });
 
 describe("ShiftPicker combined options", () => {
+  it("spells out shift and job names even when the organization uses code display mode", () => {
+    render(
+      <ShiftPicker
+        assignments={assignments}
+        shiftCategories={shiftCategories}
+        jobs={jobs}
+        certifications={certifications}
+        focusAreas={focusAreas}
+        onSelect={vi.fn()}
+        empFocusAreaIds={[1]}
+        empCertificationId={null}
+        empRoleIds={[]}
+        shiftDisplayMode="code"
+      />,
+    );
+
+    const dayStaff = screen.getByRole("button", {
+      name: "Day Shift - Staff",
+    });
+    expect(within(dayStaff).getByText("Day Shift")).toBeInTheDocument();
+    expect(within(dayStaff).getByText("Staff")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "D - ST" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows only eligible combined options and keeps shiftless jobs under General", () => {
     render(
       <ShiftPicker

@@ -54,7 +54,10 @@ export async function requireAuthenticatedSession(
 
   if (!session?.access_token || !user) {
     return {
-      response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
+      response: NextResponse.json(
+        { error: "Your session expired. Please sign in again." },
+        { status: 401 },
+      ),
     };
   }
 
@@ -71,7 +74,10 @@ export async function requireAuthenticatedUser(
 
   if (!user) {
     return {
-      response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
+      response: NextResponse.json(
+        { error: "Your session expired. Please sign in again." },
+        { status: 401 },
+      ),
     };
   }
 
@@ -92,7 +98,10 @@ export async function requireAuthenticatedUserWithClaims(
 
   if (claimsResult.error || !claims) {
     return {
-      response: NextResponse.json({ error: "Invalid session" }, { status: 401 }),
+      response: NextResponse.json(
+        { error: "Your session could not be verified. Please sign in again." },
+        { status: 401 },
+      ),
     };
   }
 
@@ -109,7 +118,10 @@ export async function requireGridmasterSession(
 
   if (auth.claims.platform_role !== "gridmaster") {
     return {
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 403 }),
+      response: NextResponse.json(
+        { error: "You don't have permission to use that area." },
+        { status: 403 },
+      ),
     };
   }
 
