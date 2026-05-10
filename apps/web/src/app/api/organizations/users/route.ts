@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
@@ -9,31 +9,6 @@ import type { OrganizationUser, PlatformRole } from "@/types";
 const searchSchema = z.object({
   orgId: z.string().uuid(),
 });
-
-async function canViewOrganizationUsers(
-  actorId: string,
-  orgId: string,
-  claims: Record<string, unknown>,
-): Promise<boolean> {
-  if (claims.platform_role === "gridmaster") {
-    return true;
-  }
-
-  if (claims.org_id === orgId) {
-    return true;
-  }
-
-  const serviceClient = getServiceClient();
-  const { data: membership } = await serviceClient
-    .from("organization_memberships")
-    .select("user_id")
-    .eq("user_id", actorId)
-    .eq("org_id", orgId)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  return !!membership;
-}
 
 async function fetchOrganizationUserRows(
   orgId: string,
@@ -49,9 +24,8 @@ async function fetchOrganizationUserRows(
 
   if (error) throw error;
 
-  const userIds = ((memberships ?? []) as DbOrganizationMembership[]).map(
-    (membership) => membership.user_id,
-  );
+  const membershipRows = (memberships ?? []) as DbOrganizationMembership[];
+  const userIds = membershipRows.map((membership) => membership.user_id);
 
   const [profilesResult, authUsersResult] = await Promise.all([
     userIds.length > 0
@@ -76,6 +50,10 @@ async function fetchOrganizationUserRows(
       },
     ]),
   );
+  const visibleMemberships = membershipRows.filter(
+    (membership) =>
+      (profiles.get(membership.user_id)?.platformRole ?? "none") !== "gridmaster",
+  );
 
   const authUsers = new Map(
     authUsersResult.map((result) => [
@@ -87,7 +65,7 @@ async function fetchOrganizationUserRows(
     ]),
   );
 
-  return ((memberships ?? []) as DbOrganizationMembership[]).map((membership) =>
+  return visibleMemberships.map((membership) =>
     membershipRowToOrganizationUser(membership, {
       email: authUsers.get(membership.user_id)?.email ?? null,
       firstName: profiles.get(membership.user_id)?.firstName ?? null,
@@ -101,11 +79,6 @@ async function fetchOrganizationUserRows(
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAuthenticatedUserWithClaims(req);
-    if ("response" in auth) {
-      return auth.response;
-    }
-
     const parsed = searchSchema.safeParse(
       Object.fromEntries(req.nextUrl.searchParams.entries()),
     );
@@ -113,13 +86,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
-    const allowed = await canViewOrganizationUsers(
-      auth.user.id,
+    const orgAuth = await requireOrgPermissions(
+      req,
       parsed.data.orgId,
-      auth.claims,
+      () => true,
     );
-    if (!allowed) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
 
     const users = await fetchOrganizationUserRows(parsed.data.orgId);

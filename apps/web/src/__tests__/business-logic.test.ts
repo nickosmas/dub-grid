@@ -11,6 +11,7 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     id: "emp-1",
     firstName: "Test",
     lastName: "Employee",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",

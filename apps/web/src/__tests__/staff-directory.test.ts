@@ -37,6 +37,7 @@ const baseEmployee: Employee = {
   id: "emp-1",
   firstName: "Alicia",
   lastName: "Stone",
+  employmentType: "full_time",
   status: "active",
   statusChangedAt: null,
   statusNote: "",

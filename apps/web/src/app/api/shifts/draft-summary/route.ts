@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServiceClient } from "@/lib/supabase-service";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { checkRateLimit, scheduleReviewLimiter } from "@/lib/rate-limit";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { fetchScheduleDraftBreakdown } from "@/lib/server/schedule-draft-safety";
@@ -52,33 +52,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
-    ]);
-
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    const isSuperAdmin = membership?.org_role === "super_admin";
-    const isAdmin = membership?.org_role === "admin";
-    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-
-    const hasPermission =
-      isGridmaster
-      || isSuperAdmin
-      || (isAdmin && (adminPerms?.canEditShifts === true || adminPerms?.canPublishSchedule === true));
-
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    const orgAuth = await requireOrgPermissions(
+      req,
+      orgId,
+      (permissions) =>
+        permissions.isGridmaster ||
+        permissions.isSuperAdmin ||
+        permissions.canEditShifts ||
+        permissions.canPublishSchedule,
+    );
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
 
     const summary = await fetchScheduleDraftBreakdown({
@@ -86,7 +70,7 @@ export async function GET(req: NextRequest) {
       startDate,
       endDate,
       updatedBy: scope === "mine" ? user.id : undefined,
-      serviceClient,
+      serviceClient: orgAuth.serviceClient,
     });
 
     return NextResponse.json({ summary });

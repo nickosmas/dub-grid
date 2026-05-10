@@ -6,6 +6,7 @@ import {
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import { z } from "zod";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
@@ -190,38 +191,19 @@ export async function GET(req: NextRequest) {
 
     const { type, orgId, startDate, endDate } = parsed.data;
 
-    // Verify the user belongs to this org (check via service client)
-    const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
-    ]);
-
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    const isSuperAdmin = membership?.org_role === "super_admin";
-    const isAdmin = membership?.org_role === "admin";
-    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-
-    // Gridmaster and super_admin always have full export access.
-    // Admin must have the specific permission for the export type.
-    const hasExportPermission =
-      isGridmaster ||
-      isSuperAdmin ||
-      (isAdmin && type === "staff" && adminPerms?.canManageEmployees === true) ||
-      (isAdmin && type === "schedule" && adminPerms?.canEditShifts === true);
-
-    if (!hasExportPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    const orgAuth = await requireOrgPermissions(
+      req,
+      orgId,
+      (permissions) =>
+        permissions.isGridmaster ||
+        permissions.isSuperAdmin ||
+        (type === "staff" && permissions.canManageEmployees) ||
+        (type === "schedule" && permissions.canEditShifts),
+    );
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
+    const serviceClient = orgAuth.serviceClient;
 
     let csv: string;
     let filename: string;

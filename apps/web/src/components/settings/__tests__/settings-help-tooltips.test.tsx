@@ -211,12 +211,12 @@ describe("settings help cleanup", () => {
     ).toBeInTheDocument();
     expect(
       screen.getAllByText(
-        "Use schedule-eligible roles, certifications, or both to qualify staff. Leave either list empty to keep that gate open.",
+        "Pick any schedule-eligible roles and certifications that can qualify staff. Selections inside each list are alternatives. Leave either list empty to keep that gate open.",
       ).length,
     ).toBeGreaterThan(0);
     expect(
       screen.getByText(
-        "Choose whether staff must match both lists or either list.",
+        "Choose whether staff must match the role gate and certification gate, or just one gate.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();

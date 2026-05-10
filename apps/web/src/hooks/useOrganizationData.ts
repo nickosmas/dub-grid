@@ -4,10 +4,16 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { handleApiError } from "@/lib/error-handling";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
+import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
 import { fetchAccountOrgContext } from "@/features/account/client";
-import { fetchOrganizationBootstrap } from "@/features/organization/client";
+import { useOrgRealtimeInvalidation } from "./useOrgRealtimeInvalidation";
+import {
+  fetchOrganizationBootstrap,
+  type OrganizationBootstrap,
+} from "@/features/organization/client";
 import type {
   Organization,
   FocusArea,
@@ -74,6 +80,80 @@ interface OrgContext {
 
 interface UseOrganizationDataOptions {
   includeAssignmentDefinitionCompatibility?: boolean;
+  enabled?: boolean;
+}
+
+export function computeOrganizationSetupStatus({
+  focusAreas,
+  shiftCategories,
+  jobs,
+  certifications,
+  orgRoles,
+  departments,
+}: Pick<
+  OrganizationData,
+  "focusAreas" | "shiftCategories" | "jobs" | "certifications" | "orgRoles" | "departments"
+>): SetupStatus {
+  const scheduledDepartmentIds = new Set(
+    departments
+      .filter((department) => department.type === "scheduled" && !department.archivedAt)
+      .map((department) => department.id),
+  );
+  const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
+  const activeFocusAreaIds = new Set(activeFocusAreas.map((focusArea) => focusArea.id));
+  const focusAreasPlaced =
+    scheduledDepartmentIds.size > 0 &&
+    activeFocusAreas.length > 0 &&
+    activeFocusAreas.every(
+      (focusArea) =>
+        focusArea.departmentId != null &&
+        scheduledDepartmentIds.has(focusArea.departmentId),
+    );
+  const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
+  const shiftsPlaced =
+    activeShifts.length > 0 &&
+    activeShifts.every(
+      (shift) =>
+        shift.focusAreaId != null &&
+        activeFocusAreaIds.has(shift.focusAreaId),
+    );
+  const visibleJobs = jobs.filter((job) => !job.archivedAt && job.showOnGrid !== false);
+  const jobsPlaced =
+    visibleJobs.length > 0 &&
+    visibleJobs.every((job) => {
+      if (job.assignmentMode === "shiftless") {
+        return true;
+      }
+      const departmentIds = job.departmentIds ?? [];
+      const focusAreaIds = job.focusAreaIds ?? [];
+      const hasDepartmentPlacement = departmentIds.some((id) =>
+        scheduledDepartmentIds.has(id),
+      );
+      const hasFocusAreaPlacement = focusAreaIds.some((id) =>
+        activeFocusAreaIds.has(id),
+      );
+      const shiftIds = job.applicableShiftIds ?? [];
+      const shiftsAreInScope =
+        shiftIds.length > 0 &&
+        shiftIds.every((id) => activeShifts.some((shift) => shift.id === id));
+
+      return (hasDepartmentPlacement || hasFocusAreaPlacement) && shiftsAreInScope;
+    });
+  const scheduleDefinitionsReady = shiftsPlaced && jobsPlaced;
+
+  return {
+    isComplete:
+      focusAreasPlaced &&
+      scheduleDefinitionsReady &&
+      certifications.length > 0 &&
+      orgRoles.length > 0,
+    missing: {
+      focusAreas: !focusAreasPlaced,
+      scheduleDefinitions: !scheduleDefinitionsReady,
+      certifications: certifications.length === 0,
+      orgRoles: orgRoles.length === 0,
+    },
+  };
 }
 
 const INITIAL_CTX: OrgContext = {
@@ -145,24 +225,56 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const ctx = useOrgContext();
   const includeAssignmentDefinitionCompatibility =
     options?.includeAssignmentDefinitionCompatibility ?? true;
+  const enabled = options?.enabled ?? true;
+  const bootstrapQueryKey = queryKeys.org.bootstrap(
+    ctx.orgId,
+    includeAssignmentDefinitionCompatibility,
+  );
 
   const bootstrapQuery = useQuery({
-    queryKey: [
-      "organization-bootstrap",
-      ctx.orgId ?? "auto",
-      includeAssignmentDefinitionCompatibility,
-    ],
+    queryKey: bootstrapQueryKey,
     queryFn: () =>
       fetchOrganizationBootstrap({
         includeAssignments: includeAssignmentDefinitionCompatibility,
       }),
-    enabled: ctx.resolved,
+    enabled: enabled && ctx.resolved,
     staleTime: 5 * 60_000,
   });
 
   const bootstrap = bootstrapQuery.data;
   const org = bootstrap?.org ?? null;
   const effectiveOrgId = ctx.orgId ?? org?.id ?? null;
+  useOrgRealtimeInvalidation({
+    orgId: effectiveOrgId,
+    disabled: org?.featureOverrides?.disable_realtime === true,
+    queryClient,
+  });
+
+  const updateBootstrapCache = useCallback(
+    (updater: (current: OrganizationBootstrap) => OrganizationBootstrap) => {
+      if (!effectiveOrgId) return;
+      queryClient.setQueriesData<OrganizationBootstrap>(
+        { queryKey: queryKeys.org.bootstrapAll() },
+        (current) => {
+          if (!current?.org || current.org.id !== effectiveOrgId) {
+            return current;
+          }
+          return updater(current);
+        },
+      );
+    },
+    [effectiveOrgId, queryClient],
+  );
+
+  const broadcastOrgInvalidations = useCallback(
+    (...queryKeysToBroadcast: readonly (readonly unknown[])[]) => {
+      broadcastInvalidation(queryKeys.org.bootstrapAll());
+      for (const key of queryKeysToBroadcast) {
+        broadcastInvalidation(key);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!bootstrap || !effectiveOrgId) return;
@@ -268,9 +380,10 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
 
   const loading = !ctx.resolved || bootstrapQuery.isLoading;
   const loadError = bootstrapQuery.isError
-    ? (bootstrapQuery.error instanceof Error
-        ? bootstrapQuery.error.message
-        : "Failed to load organization")
+    ? formatClientErrorMessage(
+        bootstrapQuery.error,
+        "Failed to load organization",
+      )
     : null;
 
   const handledErrorsRef = useRef<Set<string>>(new Set());
@@ -284,20 +397,18 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     }
   }, [bootstrapQuery.error]);
 
-  const setupStatus = useMemo<SetupStatus>(() => ({
-    isComplete:
-      focusAreas.length > 0 &&
-      shiftCategories.length > 0 &&
-      jobs.length > 0 &&
-      certifications.length > 0 &&
-      orgRoles.length > 0,
-    missing: {
-      focusAreas: focusAreas.length === 0,
-      scheduleDefinitions: shiftCategories.length === 0 || jobs.length === 0,
-      certifications: certifications.length === 0,
-      orgRoles: orgRoles.length === 0,
-    },
-  }), [certifications, focusAreas, jobs.length, orgRoles, shiftCategories.length]);
+  const setupStatus = useMemo(
+    () =>
+      computeOrganizationSetupStatus({
+        focusAreas,
+        shiftCategories,
+        jobs,
+        certifications,
+        orgRoles,
+        departments,
+      }),
+    [certifications, departments, focusAreas, jobs, orgRoles, shiftCategories],
+  );
 
   const setOrg = useCallback((nextOrg: Organization) => {
     const key = ctx.orgId
@@ -307,72 +418,101 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     if (!ctx.orgId) {
       queryClient.setQueryData(queryKeys.org.detail(nextOrg.id), nextOrg);
     }
-  }, [queryClient, ctx.orgId]);
+    updateBootstrapCache((current) => ({ ...current, org: nextOrg }));
+    broadcastOrgInvalidations(queryKeys.org.detail(nextOrg.id));
+  }, [broadcastOrgInvalidations, queryClient, ctx.orgId, updateBootstrapCache]);
 
   const setFocusAreas = useCallback((areas: FocusArea[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.focusAreas(effectiveOrgId), areas);
+      updateBootstrapCache((current) => ({ ...current, focusAreas: areas }));
+      broadcastOrgInvalidations(queryKeys.org.focusAreas(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const handleAssignmentDefinitionsChange = useCallback((nextAssignments: AssignmentDefinition[]) => {
     if (!effectiveOrgId) return;
     const archived = allAssignmentDefinitionsRef.current.filter((assignment) => assignment.archivedAt);
-    queryClient.setQueryData(queryKeys.org.assignments(effectiveOrgId), [
+    const nextAllAssignments = [
       ...nextAssignments,
       ...archived,
-    ]);
-  }, [queryClient, effectiveOrgId]);
+    ];
+    queryClient.setQueryData(queryKeys.org.assignments(effectiveOrgId), nextAllAssignments);
+    updateBootstrapCache((current) => ({
+      ...current,
+      allAssignmentDefinitions: nextAllAssignments,
+    }));
+    broadcastOrgInvalidations(queryKeys.org.assignments(effectiveOrgId));
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const handleAbsenceTypesChange = useCallback((types: AbsenceType[]) => {
     if (!effectiveOrgId) return;
     const archived = allAbsenceTypesRef.current.filter((absenceType) => absenceType.archivedAt);
-    queryClient.setQueryData(queryKeys.org.absenceTypes(effectiveOrgId), [
+    const nextAllAbsenceTypes = [
       ...types,
       ...archived,
-    ]);
-  }, [queryClient, effectiveOrgId]);
+    ];
+    queryClient.setQueryData(queryKeys.org.absenceTypes(effectiveOrgId), nextAllAbsenceTypes);
+    updateBootstrapCache((current) => ({
+      ...current,
+      allAbsenceTypes: nextAllAbsenceTypes,
+    }));
+    broadcastOrgInvalidations(queryKeys.org.absenceTypes(effectiveOrgId));
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const setShiftCategories = useCallback((categories: ShiftCategory[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.shiftCategories(effectiveOrgId), categories);
+      updateBootstrapCache((current) => ({ ...current, shiftCategories: categories }));
+      broadcastOrgInvalidations(queryKeys.org.shiftCategories(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const setJobs = useCallback((items: JobDefinition[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.jobs(effectiveOrgId), items);
+      updateBootstrapCache((current) => ({ ...current, jobs: items }));
+      broadcastOrgInvalidations(queryKeys.org.jobs(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const setIndicatorTypes = useCallback((types: IndicatorType[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.indicatorTypes(effectiveOrgId), types);
+      updateBootstrapCache((current) => ({ ...current, indicatorTypes: types }));
+      broadcastOrgInvalidations(queryKeys.org.indicatorTypes(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const handleCertificationsChange = useCallback(async (items: NamedItem[]) => {
     if (!effectiveOrgId) return;
     queryClient.setQueryData(queryKeys.org.certifications(effectiveOrgId), items);
+    updateBootstrapCache((current) => ({ ...current, certifications: items }));
+    broadcastOrgInvalidations(queryKeys.org.certifications(effectiveOrgId));
     try {
       await queryClient.invalidateQueries({ queryKey: queryKeys.org.assignments(effectiveOrgId) });
+      broadcastInvalidation(queryKeys.org.assignments(effectiveOrgId));
     } catch (error) {
       Sentry.captureException(error);
       toast.error("Failed to refresh schedule assignments");
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const setOrgRoles = useCallback((items: NamedItem[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.orgRoles(effectiveOrgId), items);
+      updateBootstrapCache((current) => ({ ...current, orgRoles: items }));
+      broadcastOrgInvalidations(queryKeys.org.orgRoles(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const setDepartments = useCallback((items: Department[]) => {
     if (effectiveOrgId) {
       queryClient.setQueryData(queryKeys.org.departments(effectiveOrgId), items);
+      updateBootstrapCache((current) => ({ ...current, departments: items }));
+      broadcastOrgInvalidations(queryKeys.org.departments(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   const setCoverageRequirements = useCallback((requirements: CoverageRequirement[]) => {
     if (effectiveOrgId) {
@@ -380,8 +520,13 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
         queryKeys.org.coverageRequirements(effectiveOrgId),
         requirements,
       );
+      updateBootstrapCache((current) => ({
+        ...current,
+        coverageRequirements: requirements,
+      }));
+      broadcastOrgInvalidations(queryKeys.org.coverageRequirements(effectiveOrgId));
     }
-  }, [queryClient, effectiveOrgId]);
+  }, [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache]);
 
   return {
     org,

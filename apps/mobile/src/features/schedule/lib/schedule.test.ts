@@ -13,6 +13,7 @@ import {
   buildUpcomingMeScheduleItems,
   buildWeeklyHoursSummary,
   buildTeamScheduleFocusAreaTabs,
+  doScheduleEntrySegmentsShareShiftAndFocusArea,
   filterTeamScheduleEntriesByFocusArea,
   filterScheduleEntriesByDate,
   formatScheduleDayLabel,
@@ -29,6 +30,10 @@ import {
   getScheduleEntryTimeRange,
   getScheduleMonthStartDate,
   getScheduleShiftGroupTimeRange,
+  getSplitShiftBadgeLabel,
+  getSplitShiftSegmentLabel,
+  getSplitShiftSegmentsForEntry,
+  getSplitShiftSegmentsFromPresentation,
   formatScheduleTimeRange,
   getScheduleRange,
   getScheduleRangeForDate,
@@ -111,6 +116,40 @@ describe("mobile schedule helpers", () => {
         customEndTime: "16:00:00",
       } as never),
     ).toBe("8:00 AM - 4:00 PM");
+    expect(
+      getScheduleEntryCustomTimeRange({
+        customStartTime: "07:00:00|16:00:00",
+        customEndTime: "16:30:00|00:00:00",
+      } as never),
+    ).toBeNull();
+    expect(
+      getScheduleEntryTimeRange({
+        startTime: "07:00:00",
+        endTime: "00:00:00",
+        customStartTime: "07:00:00|16:00:00",
+        customEndTime: "16:30:00|00:00:00",
+        segments: [
+          {
+            shiftName: "Day Shift",
+            startTime: "07:00:00",
+            endTime: "16:30:00",
+          },
+        ],
+      } as never),
+    ).toBe("7:00 AM - 4:30 PM");
+    expect(
+      getScheduleEntryCustomTimeRange({
+        customStartTime: "07:00:00|16:00:00",
+        customEndTime: "16:30:00|00:00:00",
+        segments: [
+          {
+            shiftName: "Day Shift",
+            startTime: "07:00:00",
+            endTime: "16:30:00",
+          },
+        ],
+      } as never),
+    ).toBe("7:00 AM - 4:30 PM");
     expect(
       getScheduleEntrySegmentShiftTimeRange({
         shiftStartTime: "07:00:00",
@@ -583,6 +622,205 @@ describe("mobile schedule helpers", () => {
     ]);
   });
 
+  it("identifies multiple shifts only for worked multi-segment entries and sorts earliest first", () => {
+    const splitState = {
+      kind: "worked",
+      segments: [
+        { shiftId: 1, jobId: 10, position: 0 },
+        { shiftId: 2, jobId: 11, position: 1, isMentored: true },
+      ],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    } as const;
+    const splitEntry = {
+      employeeId: "00000000-0000-0000-0000-000000000001",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      state: splitState,
+      presentation: {
+        label: "Day Shift / Evening Shift",
+        startTime: "07:00:00",
+        endTime: "23:00:00",
+        segments: [
+          {
+            shiftId: 2,
+            jobId: 11,
+            shiftName: "Evening Shift",
+            jobName: "Lead",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            displayFocusAreaName: "ICU",
+            isMentored: true,
+          },
+          {
+            shiftId: 1,
+            jobId: 10,
+            shiftName: "Day Shift",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "ICU",
+          },
+        ],
+      },
+      publishedAt: null,
+      publishedByName: null,
+    };
+
+    const absenceEntry = {
+      ...splitEntry,
+      state: {
+        ...splitState,
+        kind: "absence",
+        absenceTypeId: 1,
+      },
+    };
+    const generalSplitPresentation = {
+      segments: [
+        {
+          shiftId: null,
+          jobId: 10,
+          shiftName: "General Admin",
+          startTime: "08:00:00",
+          endTime: "12:00:00",
+        },
+        {
+          shiftId: null,
+          jobId: 11,
+          shiftName: "General Desk",
+          startTime: "13:00:00",
+          endTime: "17:00:00",
+        },
+      ],
+    };
+
+    const sortedSplitSegments = getSplitShiftSegmentsForEntry(
+      splitEntry as never,
+    );
+
+    expect(sortedSplitSegments).toHaveLength(2);
+    expect(sortedSplitSegments[0]?.shiftName).toBe("Day Shift");
+    expect(sortedSplitSegments[1]?.shiftName).toBe("Evening Shift");
+    expect(getSplitShiftSegmentsForEntry(absenceEntry as never)).toEqual([]);
+    expect(
+      getSplitShiftSegmentsFromPresentation(generalSplitPresentation, {
+        kind: "worked",
+      }),
+    ).toHaveLength(2);
+    expect(
+      getSplitShiftSegmentsFromPresentation(
+        { segments: [generalSplitPresentation.segments[0]!] },
+        { kind: "worked" },
+      ),
+    ).toEqual([]);
+    expect(getSplitShiftBadgeLabel(2)).toBe("2 shifts");
+    expect(getSplitShiftSegmentLabel(0, 2)).toBe("Shift 1");
+    expect(getSplitShiftSegmentLabel(1, 2)).toBe("Shift 2");
+    expect(sortedSplitSegments[1]?.isMentored).toBe(true);
+  });
+
+  it("matches shiftmate segments only when the shift and focus area both match", () => {
+    const sourceEntry = {
+      employeeId: "emp-1",
+      employeeName: "Alex Kim",
+      date: "2026-04-16",
+      focusAreaId: 2,
+      presentation: {
+        label: "Day Shift",
+        focusAreaId: 2,
+        focusAreaName: "ICU",
+        displayFocusAreaName: "ICU",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        segments: [],
+      },
+    };
+    const sameShiftSameAreaEntry = {
+      ...sourceEntry,
+      employeeId: "emp-2",
+      employeeName: "Bri Shaw",
+    };
+    const sameShiftDifferentAreaEntry = {
+      ...sourceEntry,
+      employeeId: "emp-3",
+      employeeName: "Chris Hall",
+      focusAreaId: 1,
+      presentation: {
+        ...sourceEntry.presentation,
+        focusAreaId: 1,
+        focusAreaName: "Emergency",
+        displayFocusAreaName: "Emergency",
+      },
+    };
+    const sourceSegment = {
+      shiftId: 1,
+      jobId: 10,
+      shiftName: "Day Shift",
+      startTime: "07:00:00",
+      endTime: "15:00:00",
+      focusAreaId: 2,
+      displayFocusAreaName: "ICU",
+    };
+    const sameShiftSameAreaSegment = {
+      ...sourceSegment,
+      jobId: 11,
+    };
+    const sameShiftDifferentAreaSegment = {
+      ...sourceSegment,
+      jobId: 12,
+      focusAreaId: 1,
+      displayFocusAreaName: "Emergency",
+    };
+    const differentShiftSameAreaSegment = {
+      ...sourceSegment,
+      shiftId: 3,
+      shiftName: "Evening Shift",
+      startTime: "15:00:00",
+      endTime: "23:00:00",
+    };
+    const generalSegment = {
+      ...sourceSegment,
+      shiftId: null,
+      shiftName: "General shift",
+    };
+
+    expect(
+      doScheduleEntrySegmentsShareShiftAndFocusArea(
+        sourceEntry as never,
+        sourceSegment,
+        sameShiftSameAreaEntry as never,
+        sameShiftSameAreaSegment,
+      ),
+    ).toBe(true);
+    expect(
+      doScheduleEntrySegmentsShareShiftAndFocusArea(
+        sourceEntry as never,
+        sourceSegment,
+        sameShiftDifferentAreaEntry as never,
+        sameShiftDifferentAreaSegment,
+      ),
+    ).toBe(false);
+    expect(
+      doScheduleEntrySegmentsShareShiftAndFocusArea(
+        sourceEntry as never,
+        sourceSegment,
+        sameShiftSameAreaEntry as never,
+        differentShiftSameAreaSegment,
+      ),
+    ).toBe(false);
+    expect(
+      doScheduleEntrySegmentsShareShiftAndFocusArea(
+        sourceEntry as never,
+        generalSegment,
+        sameShiftSameAreaEntry as never,
+        generalSegment,
+      ),
+    ).toBe(false);
+  });
+
   it("builds team focus area tabs and filters entries from the active tab", () => {
     const focusAreas = [
       {
@@ -875,6 +1113,50 @@ describe("mobile schedule helpers", () => {
     ]);
   });
 
+  it("does not feature a completed remaining shift today after a split shift is reduced", () => {
+    const featured = getFeaturedMeScheduleSegment({
+      entries: [
+        {
+          employeeId: "emp-1",
+          employeeName: "Alex Kim",
+          date: "2026-04-30",
+          shiftIds: [1],
+          jobIds: [10],
+          shiftLabel: "D",
+          assignmentLabel: "D",
+          shiftName: "Day Shift",
+          absenceTypeId: null,
+          focusAreaId: 2,
+          focusAreaName: "Skilled Nursing",
+          displayFocusAreaName: "Skilled Nursing",
+          startTime: "07:00:00",
+          endTime: "16:30:00",
+          customStartTime: "07:00:00|16:00:00",
+          customEndTime: "16:30:00|00:00:00",
+          segments: [
+            {
+              shiftId: 1,
+              jobId: 10,
+              shiftName: "Day Shift",
+              jobName: "Nurse",
+              startTime: "07:00:00",
+              endTime: "16:30:00",
+              displayFocusAreaName: "Skilled Nursing",
+            },
+          ],
+          publishedAt: null,
+          publishedByName: null,
+        },
+      ],
+      selectedDate: "2026-04-30",
+      todayDate: "2026-04-30",
+      currentTime: "16:40:00",
+    });
+
+    expect(featured.status).toBe("empty");
+    expect(featured.item).toBeNull();
+  });
+
   it("uses the first shift in a future selected week for the me hero", () => {
     const entries = [
       {
@@ -1089,6 +1371,8 @@ describe("mobile schedule helpers", () => {
           updatedAt: "2026-04-15T00:00:00.000Z",
         },
       ] as never,
+      now: new Date("2026-04-16T18:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
     });
 
     expect(sections.openShiftRequests.map((request) => request.id)).toEqual([
@@ -1309,6 +1593,34 @@ describe("mobile schedule helpers", () => {
             segments: [],
           },
         },
+        {
+          id: "open-blocked",
+          date: "2026-04-18",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          canVolunteer: false,
+          volunteerBlockReason:
+            "You do not meet the eligibility requirements for this shift.",
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 6, jobId: 15, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Blocked Open",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "23:00:00",
+            endTime: "07:00:00",
+            segments: [],
+          },
+        },
       ] as never,
       requests: [
         {
@@ -1474,6 +1786,8 @@ describe("mobile schedule helpers", () => {
           targetState: null,
         },
       ] as never,
+      now: new Date("2026-04-16T18:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
     });
 
     expect(feed.totalCount).toBe(4);
@@ -1492,6 +1806,551 @@ describe("mobile schedule helpers", () => {
         ],
       },
     ]);
+  });
+
+  it("replaces a volunteered open shift with the user's pending approval request", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      linkedEmployeeId: "emp-1",
+      scheduleEntries: [],
+      openShifts: [
+        {
+          id: "open-volunteered",
+          date: "2026-04-18",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      ] as never,
+      requests: [
+        {
+          id: "pending-volunteer",
+          orgId: "org-1",
+          type: "pickup",
+          status: "pending_approval",
+          requesterEmpId: "emp-1",
+          requesterName: "Alex Kim",
+          requesterShiftDate: "2026-04-18",
+          requesterState: {
+            kind: "worked",
+            focusAreaId: 2,
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          requesterPresentation: {
+            label: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+          targetEmpId: null,
+          targetName: null,
+          targetShiftDate: null,
+          targetState: null,
+          targetPresentation: null,
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+      ] as never,
+      now: new Date("2026-04-16T18:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(feed.openShifts).toEqual([]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
+      "pending-volunteer",
+    ]);
+    expect(feed.groups[0]?.items).toMatchObject([
+      { kind: "request", key: "pending-volunteer" },
+    ]);
+  });
+
+  it("keeps partially filled open shifts visible to other mobile users", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      linkedEmployeeId: "emp-2",
+      scheduleEntries: [],
+      openShifts: [
+        {
+          id: "open-partial",
+          date: "2026-04-18",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      ] as never,
+      requests: [
+        {
+          id: "pending-volunteer",
+          orgId: "org-1",
+          type: "pickup",
+          status: "pending_approval",
+          requesterEmpId: "emp-1",
+          requesterName: "Alex Kim",
+          requesterShiftDate: "2026-04-18",
+          requesterState: {
+            kind: "worked",
+            focusAreaId: 2,
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          requesterPresentation: {
+            label: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+          targetEmpId: null,
+          targetName: null,
+          targetShiftDate: null,
+          targetState: null,
+          targetPresentation: null,
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+      ] as never,
+      now: new Date("2026-04-16T18:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(feed.openShifts).toMatchObject([
+      {
+        id: "open-partial",
+        needed: 1,
+      },
+    ]);
+    expect(feed.openShiftRequests).toEqual([]);
+  });
+
+  it("does not hide a focused open shift for a pending volunteer request in another focus area", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      linkedEmployeeId: "emp-1",
+      scheduleEntries: [],
+      openShifts: [
+        {
+          id: "open-icu",
+          date: "2026-04-18",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          state: {
+            kind: "worked",
+            focusAreaId: 2,
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      ] as never,
+      requests: [
+        {
+          id: "pending-other-focus",
+          orgId: "org-1",
+          type: "pickup",
+          status: "pending_approval",
+          requesterEmpId: "emp-1",
+          requesterName: "Alex Kim",
+          requesterShiftDate: "2026-04-18",
+          requesterState: {
+            kind: "worked",
+            focusAreaId: 99,
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          requesterPresentation: {
+            label: "Day Shift",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+          targetEmpId: null,
+          targetName: null,
+          targetShiftDate: null,
+          targetState: null,
+          targetPresentation: null,
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+      ] as never,
+      now: new Date("2026-04-16T18:00:00.000Z"),
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(feed.openShifts).toMatchObject([{ id: "open-icu" }]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
+      "pending-other-focus",
+    ]);
+  });
+
+  it("filters started open requests and open shifts using org-local time", () => {
+    const now = new Date("2026-04-18T18:30:00.000Z");
+    const sections = buildMeShiftRequestSections({
+      linkedEmployeeId: "emp-1",
+      requests: [
+        {
+          id: "started-cover",
+          orgId: "org-1",
+          type: "swap",
+          status: "open",
+          requesterEmpId: "emp-2",
+          requesterName: "Sarah Jenkins",
+          requesterShiftDate: "2026-04-18",
+          requesterShiftIds: [1],
+          requesterJobIds: [10],
+          requesterSegments: [],
+          requesterShiftLabel: "Morning Shift",
+          requesterFocusAreaId: 2,
+          requesterCustomStartTime: "08:00:00",
+          requesterCustomEndTime: "16:00:00",
+          targetEmpId: "emp-1",
+          targetName: "Alex Kim",
+          targetShiftDate: "2026-04-19",
+          targetShiftIds: [2],
+          targetJobIds: [11],
+          targetSegments: [],
+          targetShiftLabel: "Day Shift",
+          targetFocusAreaId: 2,
+          targetCustomStartTime: "15:00:00",
+          targetCustomEndTime: "23:00:00",
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+        {
+          id: "future-cover",
+          orgId: "org-1",
+          type: "swap",
+          status: "open",
+          requesterEmpId: "emp-2",
+          requesterName: "Sarah Jenkins",
+          requesterShiftDate: "2026-04-19",
+          requesterShiftIds: [3],
+          requesterJobIds: [12],
+          requesterSegments: [],
+          requesterShiftLabel: "Day Shift",
+          requesterFocusAreaId: 2,
+          requesterCustomStartTime: "07:00:00",
+          requesterCustomEndTime: "15:00:00",
+          targetEmpId: "emp-1",
+          targetName: "Alex Kim",
+          targetShiftDate: "2026-04-20",
+          targetShiftIds: [4],
+          targetJobIds: [13],
+          targetSegments: [],
+          targetShiftLabel: "Evening Shift",
+          targetFocusAreaId: 2,
+          targetCustomStartTime: "15:00:00",
+          targetCustomEndTime: "23:00:00",
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+      ] as never,
+      now,
+      timeZone: "America/Los_Angeles",
+    });
+
+    const feed = buildAvailableOpenShiftFeed({
+      linkedEmployeeId: "emp-1",
+      scheduleEntries: [] as never,
+      openShifts: [
+        {
+          id: "started-open",
+          date: "2026-04-18",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Morning Open",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "08:00:00",
+            endTime: "16:00:00",
+            segments: [],
+          },
+        },
+        {
+          id: "future-open",
+          date: "2026-04-19",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 2, jobId: 11, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Future Open",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "15:00:00",
+            endTime: "23:00:00",
+            segments: [],
+          },
+        },
+      ] as never,
+      requests: [
+        {
+          id: "started-request",
+          orgId: "org-1",
+          type: "pickup",
+          status: "open",
+          requesterEmpId: "emp-2",
+          requesterName: "Jordan Lee",
+          requesterShiftDate: "2026-04-18",
+          requesterShiftIds: [5],
+          requesterJobIds: [14],
+          requesterSegments: [],
+          requesterShiftLabel: "Started Pickup",
+          requesterFocusAreaId: 2,
+          requesterCustomStartTime: "08:00:00",
+          requesterCustomEndTime: "16:00:00",
+          targetEmpId: null,
+          targetName: null,
+          targetShiftDate: null,
+          targetShiftIds: null,
+          targetJobIds: null,
+          targetSegments: null,
+          targetShiftLabel: null,
+          targetFocusAreaId: null,
+          targetCustomStartTime: null,
+          targetCustomEndTime: null,
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+        {
+          id: "future-request",
+          orgId: "org-1",
+          type: "pickup",
+          status: "open",
+          requesterEmpId: "emp-3",
+          requesterName: "Ivy Stone",
+          requesterShiftDate: "2026-04-19",
+          requesterShiftIds: [6],
+          requesterJobIds: [15],
+          requesterSegments: [],
+          requesterShiftLabel: "Future Pickup",
+          requesterFocusAreaId: 2,
+          requesterCustomStartTime: "15:00:00",
+          requesterCustomEndTime: "23:00:00",
+          targetEmpId: null,
+          targetName: null,
+          targetShiftDate: null,
+          targetShiftIds: null,
+          targetJobIds: null,
+          targetSegments: null,
+          targetShiftLabel: null,
+          targetFocusAreaId: null,
+          targetCustomStartTime: null,
+          targetCustomEndTime: null,
+          absenceTypeId: null,
+          parentRequestId: null,
+          adminUserId: null,
+          adminNote: null,
+          expiresAt: "2026-04-19T00:00:00.000Z",
+          resolvedAt: null,
+          createdAt: "2026-04-15T00:00:00.000Z",
+          updatedAt: "2026-04-15T00:00:00.000Z",
+        },
+      ] as never,
+      now,
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(sections.coverRequests.map((request) => request.id)).toEqual([
+      "future-cover",
+    ]);
+    expect(feed.openShifts.map((shift) => shift.id)).toEqual(["future-open"]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
+      "future-request",
+    ]);
+  });
+
+  it("keeps org-wide open shifts visible for editor-style show-all feeds", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      linkedEmployeeId: "emp-1",
+      scheduleEntries: [
+        {
+          employeeId: "emp-1",
+          employeeName: "Alex Kim",
+          date: "2026-04-19",
+          shiftIds: [1],
+          jobIds: [10],
+          shiftLabel: "D",
+          assignmentLabel: "D",
+          shiftName: "Day Shift",
+          absenceTypeId: null,
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          customStartTime: null,
+          customEndTime: null,
+          segments: [
+            {
+              shiftId: 1,
+              jobId: 10,
+              shiftName: "Day Shift",
+              jobName: "Nurse",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              displayFocusAreaName: "ICU",
+            },
+          ],
+        },
+      ] as never,
+      openShifts: [
+        {
+          id: "open-overlap",
+          date: "2026-04-19",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          needed: 1,
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "Overlapping Open",
+            focusAreaId: 2,
+            focusAreaName: "ICU",
+            displayFocusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+        },
+      ] as never,
+      requests: [] as never,
+      now: new Date("2026-04-16T18:00:00.000Z"),
+      showAll: true,
+      timeZone: "America/Los_Angeles",
+    });
+
+    expect(feed.openShifts.map((shift) => shift.id)).toEqual(["open-overlap"]);
+    expect(feed.totalCount).toBe(1);
   });
 
   it("calculates weekly scheduled hours against a 40h target", () => {
@@ -1603,9 +2462,9 @@ describe("mobile schedule helpers", () => {
           date: "2026-04-17",
           shiftIds: [2, 3],
           jobIds: [20, 21],
-          shiftLabel: "Split",
-          assignmentLabel: "Split",
-          shiftName: "Split Shift",
+          shiftLabel: "D/E",
+          assignmentLabel: "D/E",
+          shiftName: "Day Shift / Evening Shift",
           absenceTypeId: null,
           focusAreaId: 2,
           focusAreaName: "ICU",

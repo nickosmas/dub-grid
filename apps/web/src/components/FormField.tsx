@@ -1,6 +1,12 @@
 "use client";
 
 import { useId, type CSSProperties, type ReactNode, type ReactElement, cloneElement, isValidElement } from "react";
+import {
+  getRequiredStaffEmailError,
+  getOptionalUsPhoneError,
+  getStaffNameError,
+  getStaffNotesError,
+} from "@dubgrid/contracts";
 
 const labelStyle: CSSProperties = {
   display: "block",
@@ -84,9 +90,7 @@ export function FormField({
  */
 export function validateEmail(email: string): string | null {
   if (!email.trim()) return null; // empty is ok for optional fields
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!re.test(email.trim())) return "Invalid email address";
-  return null;
+  return getRequiredStaffEmailError(email);
 }
 
 /**
@@ -94,18 +98,16 @@ export function validateEmail(email: string): string | null {
  * Returns error message or null if valid.
  */
 export function validateRequired(value: string, label: string): string | null {
-  if (!value.trim()) return `${label} is required`;
-  return null;
+  return getStaffNameError(value, label);
 }
 
 /**
  * Validates a phone number (loose — allows various formats).
  */
 export function validatePhone(phone: string): string | null {
-  if (!phone.trim()) return null;
-  const cleaned = phone.replace(/[\s\-().+]/g, "");
-  if (cleaned.length > 0 && (cleaned.length < 7 || !/^\d+$/.test(cleaned))) {
-    return "Invalid phone number";
-  }
-  return null;
+  return getOptionalUsPhoneError(phone);
+}
+
+export function validateNotes(notes: string): string | null {
+  return getStaffNotesError(notes);
 }

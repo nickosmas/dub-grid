@@ -4,6 +4,7 @@ import { vi } from "vitest";
 type ReactModule = typeof ReactType;
 
 export const screenScrollToMock = vi.fn();
+export const alertMock = vi.fn();
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -13,12 +14,15 @@ function pickDomProps(input: Record<string, any>) {
       key === "children" ||
       key === "contentContainerStyle" ||
       key === "keyboardShouldPersistTaps" ||
+      key === "keyboardDismissMode" ||
       key === "keyboardType" ||
       key === "blurOnSubmit" ||
       key === "placeholderTextColor" ||
       key === "returnKeyType" ||
       key === "textContentType" ||
       key === "autoCorrect" ||
+      key === "editable" ||
+      key === "multiline" ||
       key === "refreshControl" ||
       key === "style" ||
       key === "hitSlop" ||
@@ -39,7 +43,10 @@ function pickDomProps(input: Record<string, any>) {
       key === "onLayout" ||
       key === "onResponderGrant" ||
       key === "onResponderRelease" ||
-      key === "pointerEvents"
+      key === "pointerEvents" ||
+      key === "numberOfLines" ||
+      key === "accessibilityIgnoresInvertColors" ||
+      key === "android_ripple"
     ) {
       continue;
     }
@@ -51,6 +58,24 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "accessibilityRole") {
       output.role = value;
+      continue;
+    }
+
+    if (key === "accessibilityState") {
+      const state = value as {
+        disabled?: boolean;
+        expanded?: boolean;
+        selected?: boolean;
+      };
+      if (state.disabled !== undefined) {
+        output["aria-disabled"] = String(state.disabled);
+      }
+      if (state.expanded !== undefined) {
+        output["aria-expanded"] = String(state.expanded);
+      }
+      if (state.selected !== undefined) {
+        output["aria-selected"] = String(state.selected);
+      }
       continue;
     }
 
@@ -114,12 +139,20 @@ export function createReactNativeModule(React: ReactModule) {
 
     return React.createElement(
       "div",
-      pickDomProps(props),
+      {
+        ...pickDomProps(props),
+        "data-keyboard-dismiss-mode": props.keyboardDismissMode,
+      },
       children as ReactType.ReactNode,
     );
   });
   const KeyboardAvoidingView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
+  const Image = ({ source, ...props }: Record<string, any>) =>
+    React.createElement("img", {
+      alt: props.accessibilityLabel ?? "",
+      ...pickDomProps(props),
+    });
   const SafeAreaView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
   const Pressable = ({
@@ -181,10 +214,53 @@ export function createReactNativeModule(React: ReactModule) {
           children as ReactType.ReactNode,
         )
       : null;
+  class AnimatedValue {
+    value: number;
 
+    constructor(value: number) {
+      this.value = value;
+    }
+
+    setValue(value: number) {
+      this.value = value;
+    }
+
+    interpolate() {
+      return this.value;
+    }
+  }
+  const createAnimation = () => ({
+    start(callback?: (result: { finished: boolean }) => void) {
+      callback?.({ finished: true });
+    },
+    stop() {
+      return undefined;
+    },
+  });
+  const Animated = {
+    Value: AnimatedValue,
+    View,
+    parallel: () => createAnimation(),
+    loop: () => createAnimation(),
+    sequence: () => createAnimation(),
+    spring: () => createAnimation(),
+    timing: () => createAnimation(),
+  };
   return {
+    AccessibilityInfo: {
+      addEventListener: () => ({
+        remove() {
+          return undefined;
+        },
+      }),
+      isReduceMotionEnabled: () => Promise.resolve(false),
+    },
     ActivityIndicator: (props: Record<string, any>) =>
       React.createElement("span", pickDomProps(props), "Loading"),
+    Alert: {
+      alert: alertMock,
+    },
+    Animated,
     AppState: {
       currentState: "active",
       addEventListener: () => ({
@@ -194,11 +270,17 @@ export function createReactNativeModule(React: ReactModule) {
       }),
     },
     KeyboardAvoidingView,
+    Image,
     LayoutAnimation: {
       configureNext: () => undefined,
       Presets: {
         easeInEaseOut: {},
       },
+    },
+    Easing: {
+      cubic: (value: number) => value,
+      linear: (value: number) => value,
+      out: (easing: (value: number) => number) => easing,
     },
     Linking: {
       openURL: () => Promise.resolve(),
@@ -214,6 +296,13 @@ export function createReactNativeModule(React: ReactModule) {
     SafeAreaView,
     ScrollView,
     StyleSheet: {
+      absoluteFillObject: {
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+      },
       create: <T,>(value: T) => value,
     },
     Text,
@@ -221,6 +310,12 @@ export function createReactNativeModule(React: ReactModule) {
     UIManager: {
       setLayoutAnimationEnabledExperimental: () => undefined,
     },
+    useWindowDimensions: () => ({
+      fontScale: 1,
+      height: 844,
+      scale: 2,
+      width: 390,
+    }),
     View,
   };
 }

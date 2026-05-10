@@ -89,6 +89,8 @@ function StaffRowCells({
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
   const profileHref = getEmployeeProfileHref(emp.id, emp.userId, currentUser?.id ?? null);
   const rankNumber = isReordering ? globalIndex + 1 : emp.seniority;
+  const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
+  const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
 
   return (
     <>
@@ -155,6 +157,13 @@ function StaffRowCells({
               {isYou && (
                 <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">You</span>
               )}
+              <span
+                aria-label={employmentLabel}
+                className="shrink-0 rounded-full border border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] px-1.5 py-px text-[10px] font-bold text-[var(--color-text-muted)]"
+                title={employmentLabel}
+              >
+                {employmentAbbr}
+              </span>
             </div>
             {(emp.email || emp.phone) && (
               <div className="text-[12px] text-[var(--color-text-muted)] truncate mt-0.5">

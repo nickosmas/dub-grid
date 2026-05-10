@@ -7,9 +7,11 @@ const loggerError = vi.fn();
 const captureException = vi.fn();
 const fetchScheduleDraftBreakdown = vi.fn();
 const membershipMaybeSingle = vi.fn();
-const profileSingle = vi.fn();
+const profileMaybeSingle = vi.fn();
+const organizationMaybeSingle = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
+  createRequestSupabaseClient: vi.fn(() => ({})),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
 
@@ -35,12 +37,34 @@ vi.mock("@/lib/server/schedule-draft-safety", () => ({
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: (table: string) => {
+      const setupRowsByTable: Record<string, unknown[] | null> = {
+        departments: [{ id: 10, type: "scheduled", archived_at: null }],
+        focus_areas: [{ id: 20, department_id: 10, archived_at: null }],
+        shift_categories: [{ id: 30, focus_area_id: 20, archived_at: null }],
+        jobs: [
+          {
+            id: 40,
+            assignment_mode: "with_shift",
+            show_on_grid: true,
+            focus_area_ids: [20],
+            department_ids: [],
+            applicable_shift_ids: [30],
+            archived_at: null,
+          },
+        ],
+        certifications: [{ id: 50, archived_at: null }],
+        organization_roles: [{ id: 60, archived_at: null }],
+        employees: null,
+      };
+
       if (table === "organization_memberships") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
-                maybeSingle: membershipMaybeSingle,
+                is: vi.fn(() => ({
+                  maybeSingle: membershipMaybeSingle,
+                })),
               })),
             })),
           })),
@@ -51,9 +75,42 @@ vi.mock("@/lib/supabase-service", () => ({
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              single: profileSingle,
+              maybeSingle: profileMaybeSingle,
+              single: profileMaybeSingle,
             })),
           })),
+        };
+      }
+
+      if (table === "organizations") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: organizationMaybeSingle,
+            })),
+          })),
+        };
+      }
+
+      if (table in setupRowsByTable) {
+        return {
+          select: vi.fn((_columns?: string, options?: { count?: string }) => {
+            const query = {
+              eq: vi.fn(() => query),
+              is: vi.fn(() => query),
+              then: vi.fn((resolve, reject) =>
+                Promise.resolve({
+                  data: setupRowsByTable[table],
+                  error: null,
+                  count:
+                    table === "employees" && options?.count === "exact"
+                      ? 1
+                      : null,
+                }).then(resolve, reject),
+              ),
+            };
+            return query;
+          }),
         };
       }
 
@@ -88,8 +145,16 @@ describe("GET /api/shifts/draft-summary", () => {
       },
       error: null,
     });
-    profileSingle.mockResolvedValue({
+    profileMaybeSingle.mockResolvedValue({
       data: { platform_role: "none" },
+      error: null,
+    });
+    organizationMaybeSingle.mockResolvedValue({
+      data: {
+        suspended_at: null,
+        subscription_status: "active",
+        trial_ends_at: null,
+      },
       error: null,
     });
   });

@@ -97,11 +97,29 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           </div>
         )}
 
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <ShieldCheck size={32} style={{ color: "var(--color-brand)", marginBottom: 8 }} />
-          <h1 className="dg-auth-heading" style={{ marginBottom: 8 }}>
-            Two-factor authentication
-          </h1>
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              marginBottom: 8,
+            }}
+          >
+            <ShieldCheck
+              size={32}
+              style={{ color: "var(--color-brand)", flexShrink: 0 }}
+            />
+            <h1 className="dg-auth-heading" style={{ marginBottom: 0 }}>
+              Two-factor authentication
+            </h1>
+          </div>
           <p style={{
             fontSize: "var(--dg-fs-body-sm)",
             color: "var(--color-text-secondary)",

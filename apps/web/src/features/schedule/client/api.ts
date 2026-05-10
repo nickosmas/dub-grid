@@ -17,6 +17,7 @@ import type {
 } from "@/types";
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export interface ScheduleActorNamesResponse {
   names: Record<string, string>;
@@ -54,9 +55,7 @@ async function requestScheduleJson<T>(
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "Schedule request failed.",
+      formatClientErrorMessage(body?.error, "Schedule request failed."),
     );
   }
 
@@ -118,6 +117,8 @@ export function createShiftRequest(
   targetEmpId?: string,
   targetShiftDate?: string,
   absenceTypeId?: number,
+  requesterSegmentIndex?: number,
+  targetSegmentIndex?: number,
 ): Promise<string> {
   return requestScheduleAction<{ requestId: string }>({
     action: "createShiftRequest",
@@ -128,6 +129,8 @@ export function createShiftRequest(
     targetEmpId,
     targetShiftDate,
     absenceTypeId,
+    requesterSegmentIndex,
+    targetSegmentIndex,
   }).then((data) => data.requestId);
 }
 
@@ -444,7 +447,7 @@ async function requestManageWithLock(
   }
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Schedule request failed.");
+    throw new Error(formatClientErrorMessage(payload?.error, "Schedule request failed."));
   }
 }
 
@@ -465,6 +468,24 @@ export function upsertShift(
   });
 }
 
+export type UpsertShiftBatchItem = {
+  employeeId: string;
+  date: string;
+  input: ScheduleCellInput;
+  expectedVersion?: number;
+};
+
+export function upsertShiftBatch(
+  orgId: string,
+  shifts: UpsertShiftBatchItem[],
+): Promise<void> {
+  return requestManageWithLock({
+    action: "upsertShifts",
+    orgId,
+    shifts,
+  });
+}
+
 export function deleteShift(
   employeeId: string,
   date: string,
@@ -477,6 +498,23 @@ export function deleteShift(
     employeeId,
     date,
     expectedVersion,
+  });
+}
+
+export type DeleteShiftBatchItem = {
+  employeeId: string;
+  date: string;
+  expectedVersion?: number;
+};
+
+export function deleteShiftBatch(
+  orgId: string,
+  shifts: DeleteShiftBatchItem[],
+): Promise<void> {
+  return requestManageWithLock({
+    action: "deleteShifts",
+    orgId,
+    shifts,
   });
 }
 
@@ -508,6 +546,8 @@ export function moveShift(
   input: ScheduleCellInput,
   dragMode: "move" | "copy" = "move",
   expectedVersion?: number,
+  targetExpectedVersion?: number,
+  targetWasEmpty?: boolean,
 ): Promise<void> {
   return requestManageWithLock({
     action: "moveShift",
@@ -519,6 +559,8 @@ export function moveShift(
     input,
     dragMode,
     expectedVersion,
+    targetExpectedVersion,
+    targetWasEmpty,
   });
 }
 
@@ -610,7 +652,7 @@ export async function fetchScheduleDraftSummary(input: {
     | { summary?: DraftBreakdown; error?: string }
     | null;
   if (!response.ok || !body?.summary) {
-    throw new Error(body?.error || "Failed to load schedule draft summary");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to load schedule draft summary"));
   }
   return body.summary;
 }
@@ -638,7 +680,7 @@ export async function publishSchedule(
     throw new ScheduleDraftConflictError(body.summary);
   }
   if (!response.ok || !body?.summary) {
-    throw new Error(body?.error || "Failed to publish schedule");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
   }
   return body.summary;
 }
@@ -664,7 +706,7 @@ export async function discardScheduleDrafts(
     throw new ScheduleDraftConflictError(body.summary);
   }
   if (!response.ok || !body?.summary) {
-    throw new Error(body?.error || "Failed to discard schedule drafts");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
   }
   return body.summary;
 }

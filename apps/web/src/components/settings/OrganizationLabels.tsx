@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { SectionCard, labelStyle } from "./shared";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 
@@ -30,6 +31,45 @@ export default function OrganizationLabels({
   }), [organization]);
   const [form, setForm] = useState(buildForm);
   const [saving, setSaving] = useState(false);
+  const fieldErrors = {
+    focusAreaLabel:
+      form.focusAreaLabel.trim().length > 0
+        ? getLineTextError(form.focusAreaLabel, {
+            label: "Focus area label",
+            maxLength: 50,
+            required: true,
+            disallowUrl: true,
+          })
+        : null,
+    certificationLabel:
+      form.certificationLabel.trim().length > 0
+        ? getLineTextError(form.certificationLabel, {
+            label: "Certification label",
+            maxLength: 50,
+            required: true,
+            disallowUrl: true,
+          })
+        : null,
+    roleLabel:
+      form.roleLabel.trim().length > 0
+        ? getLineTextError(form.roleLabel, {
+            label: "Role label",
+            maxLength: 50,
+            required: true,
+            disallowUrl: true,
+          })
+        : null,
+    departmentLabel:
+      form.departmentLabel.trim().length > 0
+        ? getLineTextError(form.departmentLabel, {
+            label: "Department label",
+            maxLength: 50,
+            required: true,
+            disallowUrl: true,
+          })
+        : null,
+  } as const;
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
 
   const isModified =
     form.focusAreaLabel !== organization.focusAreaLabel ||
@@ -46,6 +86,9 @@ export default function OrganizationLabels({
   }, [isModified]);
 
   const handleSave = useCallback(async () => {
+    if (hasFieldErrors) {
+      return;
+    }
     if (!organization.updatedAt) {
       toast.error("Organization data is out of date. Refresh and try again.");
       return;
@@ -54,10 +97,42 @@ export default function OrganizationLabels({
     try {
       const updated: Organization = {
         ...organization,
-        focusAreaLabel: form.focusAreaLabel.trim() || "Focus Areas",
-        certificationLabel: form.certificationLabel.trim() || "Certifications",
-        roleLabel: form.roleLabel.trim() || "Roles",
-        departmentLabel: form.departmentLabel.trim() || "Scheduled Departments",
+        focusAreaLabel:
+          form.focusAreaLabel.trim()
+            ? normalizeLineText(form.focusAreaLabel, {
+                label: "Focus area label",
+                maxLength: 50,
+                required: true,
+                disallowUrl: true,
+              })
+            : "Focus Areas",
+        certificationLabel:
+          form.certificationLabel.trim()
+            ? normalizeLineText(form.certificationLabel, {
+                label: "Certification label",
+                maxLength: 50,
+                required: true,
+                disallowUrl: true,
+              })
+            : "Certifications",
+        roleLabel:
+          form.roleLabel.trim()
+            ? normalizeLineText(form.roleLabel, {
+                label: "Role label",
+                maxLength: 50,
+                required: true,
+                disallowUrl: true,
+              })
+            : "Roles",
+        departmentLabel:
+          form.departmentLabel.trim()
+            ? normalizeLineText(form.departmentLabel, {
+                label: "Department label",
+                maxLength: 50,
+                required: true,
+                disallowUrl: true,
+              })
+            : "Scheduled Departments",
       };
       const persisted = await updateOrganizationSettings({
         orgId: organization.id,
@@ -86,7 +161,7 @@ export default function OrganizationLabels({
     } finally {
       setSaving(false);
     }
-  }, [form, organization, onSave]);
+  }, [form, hasFieldErrors, organization, onSave]);
 
   const handleCancel = useCallback(() => {
     setForm(buildForm());
@@ -105,7 +180,13 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
+              style={fieldErrors.focusAreaLabel ? { borderColor: "var(--color-danger)" } : undefined}
             />
+            {fieldErrors.focusAreaLabel ? (
+              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+                {fieldErrors.focusAreaLabel}
+              </p>
+            ) : null}
             <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               e.g. Focus Areas, Departments, Units
             </p>
@@ -119,7 +200,13 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
+              style={fieldErrors.certificationLabel ? { borderColor: "var(--color-danger)" } : undefined}
             />
+            {fieldErrors.certificationLabel ? (
+              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+                {fieldErrors.certificationLabel}
+              </p>
+            ) : null}
             <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               e.g. Certifications, Designations
             </p>
@@ -133,7 +220,13 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
+              style={fieldErrors.roleLabel ? { borderColor: "var(--color-danger)" } : undefined}
             />
+            {fieldErrors.roleLabel ? (
+              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+                {fieldErrors.roleLabel}
+              </p>
+            ) : null}
             <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               e.g. Responsibilities, Positions
             </p>
@@ -150,7 +243,13 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
+              style={fieldErrors.departmentLabel ? { borderColor: "var(--color-danger)" } : undefined}
             />
+            {fieldErrors.departmentLabel ? (
+              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+                {fieldErrors.departmentLabel}
+              </p>
+            ) : null}
             <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
               e.g. Scheduled Departments, Teams, Service Lines
             </p>
@@ -169,7 +268,7 @@ export default function OrganizationLabels({
           ) : null}
           <button
             onClick={handleSave}
-            disabled={!isModified || saving}
+            disabled={!isModified || saving || hasFieldErrors}
             className="dg-btn dg-btn-primary"
           >
             {saving ? "Saving…" : "Save"}

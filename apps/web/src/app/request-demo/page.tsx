@@ -1,12 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import {
+  getRequiredStaffEmailError,
+  getStaffNameError,
+  normalizeOptionalUsPhone,
+} from "@dubgrid/contracts";
 import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import {
+  getLineTextError,
+  getMultilineTextError,
+  getOptionalUsPhoneFieldError,
+  normalizeLineText,
+  normalizeMultilineText,
+} from "@/lib/form-validation";
 
 const ORG_SIZE_OPTIONS = ["1-25", "26-50", "51-100", "101-250", "250+"];
 
@@ -42,12 +54,50 @@ export default function RequestDemoPage() {
 
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const contactNameError = getStaffNameError(contactName, "Contact name");
+  const emailError = getRequiredStaffEmailError(email);
+  const phoneError = getOptionalUsPhoneFieldError(phone);
+  const orgNameError = getLineTextError(orgName, {
+    label: "Organization name",
+    maxLength: 200,
+    required: true,
+  });
+  const industryError = getLineTextError(industry, {
+    label: "Industry / facility type",
+    maxLength: 200,
+  });
+  const messageError = getMultilineTextError(message, {
+    label: "Additional notes",
+    maxLength: 2000,
+  });
+  const hasValidationErrors = Boolean(
+    contactNameError ||
+      emailError ||
+      phoneError ||
+      orgNameError ||
+      industryError ||
+      messageError,
+  );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!contactName.trim() || !email.trim() || !orgName.trim() || !orgSize) {
-      toast.error("Please fill in all required fields.");
+    if (
+      !contactName.trim() ||
+      !email.trim() ||
+      !orgName.trim() ||
+      !orgSize ||
+      hasValidationErrors
+    ) {
+      toast.error(
+        contactNameError ??
+          emailError ??
+          phoneError ??
+          orgNameError ??
+          industryError ??
+          messageError ??
+          "Please fill in all required fields.",
+      );
       return;
     }
 
@@ -57,13 +107,27 @@ export default function RequestDemoPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contactName: contactName.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          orgName: orgName.trim(),
+          contactName: normalizeLineText(contactName, {
+            label: "Contact name",
+            maxLength: 80,
+            required: true,
+          }),
+          email: email.trim().toLowerCase(),
+          phone: normalizeOptionalUsPhone(phone),
+          orgName: normalizeLineText(orgName, {
+            label: "Organization name",
+            maxLength: 200,
+            required: true,
+          }),
           orgSize,
-          industry: industry.trim(),
-          message: message.trim(),
+          industry: normalizeLineText(industry, {
+            label: "Industry / facility type",
+            maxLength: 200,
+          }),
+          message: normalizeMultilineText(message, {
+            label: "Additional notes",
+            maxLength: 2000,
+          }),
         }),
       });
 
@@ -235,6 +299,9 @@ export default function RequestDemoPage() {
                   placeholder="Your full name"
                   style={inputStyle}
                 />
+                {contactNameError ? (
+                  <p style={errorStyle}>{contactNameError}</p>
+                ) : null}
               </div>
 
               {/* Email + Phone row */}
@@ -252,6 +319,7 @@ export default function RequestDemoPage() {
                     placeholder="you@company.com"
                     style={inputStyle}
                   />
+                  {emailError ? <p style={errorStyle}>{emailError}</p> : null}
                 </div>
                 <div>
                   <label style={labelStyle}>Phone</label>
@@ -261,7 +329,13 @@ export default function RequestDemoPage() {
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(optional)"
                     style={inputStyle}
+                    onBlur={() => {
+                      if (!phoneError && phone.trim()) {
+                        setPhone(normalizeOptionalUsPhone(phone));
+                      }
+                    }}
                   />
+                  {phoneError ? <p style={errorStyle}>{phoneError}</p> : null}
                 </div>
               </div>
 
@@ -279,6 +353,7 @@ export default function RequestDemoPage() {
                   placeholder="Your company or facility name"
                   style={inputStyle}
                 />
+                {orgNameError ? <p style={errorStyle}>{orgNameError}</p> : null}
               </div>
 
               {/* Org Size + Industry row */}
@@ -307,6 +382,7 @@ export default function RequestDemoPage() {
                     placeholder="e.g. Residential Care"
                     style={inputStyle}
                   />
+                  {industryError ? <p style={errorStyle}>{industryError}</p> : null}
                 </div>
               </div>
 
@@ -325,13 +401,14 @@ export default function RequestDemoPage() {
                     minHeight: "80px",
                   }}
                 />
+                {messageError ? <p style={errorStyle}>{messageError}</p> : null}
               </div>
             </div>
 
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || hasValidationErrors}
               style={{
                 width: "100%",
                 marginTop: "28px",
@@ -389,3 +466,9 @@ export default function RequestDemoPage() {
     </div>
   );
 }
+
+const errorStyle: React.CSSProperties = {
+  margin: "6px 0 0",
+  fontSize: "var(--dg-fs-footnote)",
+  color: "var(--color-danger)",
+};

@@ -1,6 +1,7 @@
 // src/hooks/useRoleChange.ts
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export interface RoleChangeParams {
   targetUserId: string;
@@ -61,7 +62,7 @@ export function useRoleChange() {
         | null;
 
       if (!response.ok) {
-        throw new Error(body?.error ?? "Failed to change role");
+        throw new Error(formatClientErrorMessage(body?.error, "Failed to change role"));
       }
 
       return (

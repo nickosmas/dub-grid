@@ -22,10 +22,21 @@ function createServiceClientMock(input?: {
     id: string;
     name: string;
     slug: string;
+    suspended_at?: string | null;
+    subscription_status?: string | null;
+    trial_ends_at?: string | null;
   } | null;
   profile?: {
     platform_role: string | null;
   } | null;
+  factors?: Array<{
+    id: string;
+    friendly_name?: string | null;
+    factor_type: "totp";
+    status: "verified";
+    created_at?: string;
+    updated_at?: string;
+  }>;
   signInError?: { message: string } | null;
 }) {
   return {
@@ -47,7 +58,7 @@ function createServiceClientMock(input?: {
                 id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
                 email: "manager@dubgrid.com",
                 email_confirmed_at: "2026-04-17T00:00:00.000Z",
-                factors: [],
+                factors: input?.factors ?? [],
                 user_metadata: {
                   first_name: "Mina",
                   last_name: "Diaz",
@@ -70,6 +81,9 @@ function createServiceClientMock(input?: {
                           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
                           name: "DubGrid Health",
                           slug: "dubgrid-health",
+                          suspended_at: null,
+                          subscription_status: "active",
+                          trial_ends_at: null,
                         },
                   error: null,
                 }
@@ -89,6 +103,7 @@ function createSessionClientMock(input?: {
     org_id: string;
     org_name: string;
     org_slug: string | null;
+    org_role?: string;
     is_active: boolean;
   }>;
   switchError?: { message: string } | null;
@@ -214,6 +229,52 @@ describe("mobile auth login route", () => {
     });
   });
 
+  it("returns a generic unavailable message for regular users when trial grace has ended", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({
+        workspace: {
+          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+          name: "DubGrid Health",
+          slug: "dubgrid-health",
+          suspended_at: null,
+          subscription_status: "trialing",
+          trial_ends_at: "2026-01-01T00:00:00.000Z",
+        },
+      }),
+    );
+    createClient.mockReturnValue(
+      createSessionClientMock({
+        memberships: [
+          {
+            org_id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+            org_name: "DubGrid Health",
+            org_slug: "dubgrid-health",
+            org_role: "user",
+            is_active: true,
+          },
+        ],
+      }),
+    );
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+    });
+  });
+
   it("switches org context before returning the mobile session when the target workspace is inactive", async () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     getServiceClient.mockReturnValue(createServiceClientMock());
@@ -256,6 +317,52 @@ describe("mobile auth login route", () => {
       },
       user: {
         email: "manager@dubgrid.com",
+      },
+    });
+  });
+
+  it("returns an MFA-required login payload without rejecting verified TOTP users", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({
+        factors: [
+          {
+            id: "factor-123",
+            friendly_name: "DubGrid Authenticator",
+            factor_type: "totp",
+            status: "verified",
+          },
+        ],
+      }),
+    );
+    createClient.mockReturnValue(createSessionClientMock());
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          workspaceSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      session: {
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+      },
+      mfaRequired: true,
+      mfa: {
+        factorId: "factor-123",
+        friendlyName: "DubGrid Authenticator",
+      },
+      workspace: {
+        slug: "dubgrid-health",
       },
     });
   });

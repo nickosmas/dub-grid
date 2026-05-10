@@ -4,8 +4,41 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 import { getScreenBottomPadding } from "./screen-layout";
+
+function getIssueTitle(key: string): string {
+  switch (key) {
+    case "EXPO_PUBLIC_API_BASE_URL":
+      return "Mobile connection";
+    case "EXPO_PUBLIC_SUPABASE_URL":
+      return "Sign-in service";
+    case "EXPO_PUBLIC_SUPABASE_ANON_KEY":
+      return "Sign-in access";
+    default:
+      return "App setup";
+  }
+}
+
+function getIssueMessage(key: string, message: string): string {
+  if (/127\.0\.0\.1|localhost/i.test(message)) {
+    return "This build points to an address this phone cannot reach.";
+  }
+
+  if (/hosted|local machine|local testing/i.test(message)) {
+    return "This build mixes local and hosted services. Use a single reachable environment.";
+  }
+
+  switch (key) {
+    case "EXPO_PUBLIC_API_BASE_URL":
+      return "This build is missing a reachable DubGrid web connection.";
+    case "EXPO_PUBLIC_SUPABASE_URL":
+    case "EXPO_PUBLIC_SUPABASE_ANON_KEY":
+      return "This build is missing sign-in configuration.";
+    default:
+      return "This build needs updated app configuration.";
+  }
+}
 
 export function ConfigurationScreen({
   validation,
@@ -40,8 +73,10 @@ export function ConfigurationScreen({
           <Text style={styles.sectionTitle}>What needs fixing</Text>
           {validation.issues.map((issue) => (
             <View key={`${issue.key}-${issue.message}`} style={styles.issue}>
-              <Text style={styles.issueKey}>{issue.key}</Text>
-              <Text style={styles.issueMessage}>{issue.message}</Text>
+              <Text style={styles.issueKey}>{getIssueTitle(issue.key)}</Text>
+              <Text style={styles.issueMessage}>
+                {getIssueMessage(issue.key, issue.message)}
+              </Text>
             </View>
           ))}
         </View>
@@ -71,31 +106,27 @@ const styles = StyleSheet.create({
     borderColor: mobileColors.borderSubtle,
   },
   eyebrow: {
+    ...mobileText.label,
     color: mobileColors.brand,
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   title: {
-    color: mobileColors.textPrimary,
+    ...mobileText.heroMetric,
     fontSize: 28,
-    fontWeight: "800",
+    lineHeight: 34,
+    color: mobileColors.textPrimary,
   },
   body: {
+    ...mobileText.body,
     color: mobileColors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
   },
   step: {
+    ...mobileText.bodyStrong,
     color: mobileColors.brand,
-    fontSize: 15,
-    fontWeight: "700",
   },
   sectionTitle: {
+    ...mobileText.sectionTitle,
     color: mobileColors.textPrimary,
-    fontSize: 17,
-    fontWeight: "700",
   },
   issue: {
     gap: 4,
@@ -104,13 +135,11 @@ const styles = StyleSheet.create({
     borderTopColor: mobileColors.borderSubtle,
   },
   issueKey: {
+    ...mobileText.bodyStrong,
     color: mobileColors.textPrimary,
-    fontSize: 14,
-    fontWeight: "700",
   },
   issueMessage: {
+    ...mobileText.body,
     color: mobileColors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
   },
 });

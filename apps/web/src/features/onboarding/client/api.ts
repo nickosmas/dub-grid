@@ -1,5 +1,7 @@
 "use client";
 
+import { formatClientErrorMessage } from "@/lib/client-facing";
+
 export interface OnboardingStatus {
   completed: boolean;
   completedAt: string | null;
@@ -28,9 +30,7 @@ async function requestOnboardingJson<T>(
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "Onboarding request failed.",
+      formatClientErrorMessage(body?.error, "Onboarding request failed."),
     );
   }
 

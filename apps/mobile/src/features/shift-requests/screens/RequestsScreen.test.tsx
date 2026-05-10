@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -93,7 +93,9 @@ describe("RequestsScreen", () => {
         },
         effectiveRole: "admin",
         permissions: {
+          canEditShifts: false,
           canApproveShiftRequests: true,
+          canManageEmployees: false,
         },
         absenceTypes: [],
       },
@@ -142,6 +144,46 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Could not load requests")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Try Again"));
     expect(refetch).toHaveBeenCalled();
+  });
+
+  it("shows a success toast after a request action completes", async () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    useQuery.mockReturnValue({
+      data: {
+        openShifts: [],
+        requests: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch,
+    });
+
+    render(<RequestsScreen />);
+
+    const mutationConfig = useMutation.mock.calls[0][0] as {
+      onSuccess: (
+        result: unknown,
+        variables: {
+          requestId: string;
+          body: { action: string; approved?: boolean };
+        },
+      ) => Promise<void>;
+    };
+
+    await act(async () => {
+      await mutationConfig.onSuccess(undefined, {
+        requestId: "request-1",
+        body: { action: "resolve", approved: true },
+      });
+    });
+
+    expect(refetch).toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith({
+      tone: "success",
+      title: "Request approved",
+      message: "The staffing change was finalized.",
+    });
   });
 
   it("shows the empty state when no requests exist", () => {
@@ -193,6 +235,7 @@ describe("RequestsScreen", () => {
             startTime: "07:00:00",
             endTime: "15:00:00",
             displayFocusAreaName: "Skilled Nursing",
+            isMentored: true,
           },
         ],
       },
@@ -217,21 +260,104 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
-    expect(screen.getByLabelText("Job Nurse")).toBeInTheDocument();
+    const mentoredJobPill = screen.getByLabelText(
+      "Job Nurse mentored assignment",
+    );
+    expect(mentoredJobPill).toHaveTextContent("Nurse");
+    expect(mentoredJobPill).toHaveTextContent("(Mentored)");
+    expect(mentoredJobPill).not.toHaveTextContent("(MENTORED)");
+    expect(screen.queryByLabelText("Mentored assignment")).not.toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
+    expect(screen.getAllByText("7:00 AM - 3:00 PM")).toHaveLength(1);
+    const pageText = document.body.textContent ?? "";
+    expect(pageText.indexOf("Day Shift")).toBeLessThan(
+      pageText.indexOf("7:00 AM - 3:00 PM"),
+    );
+    expect(pageText.indexOf("Skilled Nursing")).toBeLessThan(
+      pageText.indexOf("Nurse"),
+    );
+    fireEvent.click(screen.getByText("Volunteer"));
+    expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", {
+        name: "Volunteer",
+      }),
+    );
+
+    expect(mutate).toHaveBeenCalledWith(
+      {
+        requestId: "coverage-gap-1",
+        body: {
+          action: "volunteer_open_shift",
+          empId: "emp-1",
+          shiftDate: "2026-04-19",
+          focusAreaId: 2,
+          state: openShift.state,
+        },
+      },
+      expect.objectContaining({ onSettled: expect.any(Function) }),
+    );
+  });
+
+  it("shows why a manager-visible open shift cannot be volunteered for", () => {
+    const mutate = vi.fn();
+    useQuery.mockReturnValue({
+      data: {
+        openShifts: [
+          {
+            id: "coverage-gap-blocked",
+            date: "2026-04-19",
+            focusAreaId: 2,
+            focusAreaName: "Skilled Nursing",
+            needed: 1,
+            canVolunteer: false,
+            volunteerBlockReason:
+              "You are not assigned to the focus area required for this shift.",
+            state: {
+              kind: "worked",
+              segments: [{ shiftId: 1, jobId: 20, position: 0 }],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            },
+            presentation: {
+              label: "Day Shift",
+              focusAreaId: 2,
+              focusAreaName: "Skilled Nursing",
+              displayFocusAreaName: "Skilled Nursing",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              segments: [],
+            },
+          },
+        ],
+        requests: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    useMutation.mockReturnValue({
+      error: null,
+      isPending: false,
+      mutate,
+    });
+
+    render(<RequestsScreen />);
+
+    expect(
+      screen.getByText(
+        "You are not assigned to the focus area required for this shift.",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText("Volunteer"));
 
-    expect(mutate).toHaveBeenCalledWith({
-      requestId: "coverage-gap-1",
-      body: {
-        action: "volunteer_open_shift",
-        empId: "emp-1",
-        shiftDate: "2026-04-19",
-        focusAreaId: 2,
-        state: openShift.state,
-      },
-    });
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it("groups available open shifts and pickup requests under each date", () => {
@@ -311,6 +437,8 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
+    fireEvent.click(screen.getByText("Available"));
+
     expect(screen.getByText("Sat, Apr 18")).toBeInTheDocument();
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
 
@@ -321,6 +449,153 @@ describe("RequestsScreen", () => {
     expect(content.indexOf("Ivy Stone")).toBeLessThan(
       content.indexOf("Sun, Apr 19"),
     );
+  });
+
+  it("shows split-shift segments on open shifts and request cards", () => {
+    useQuery.mockReturnValue({
+      data: {
+        openShifts: [
+          {
+            id: "split-open",
+            date: "2026-04-19",
+            focusAreaId: 2,
+            focusAreaName: "Skilled Nursing",
+            needed: 1,
+            state: {
+              kind: "worked",
+              segments: [
+                { shiftId: 1, jobId: 20, position: 0 },
+                { shiftId: 2, jobId: 21, position: 1 },
+              ],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            },
+            presentation: {
+              label: "Day Shift / Evening Shift",
+              focusAreaId: 2,
+              focusAreaName: "Skilled Nursing",
+              displayFocusAreaName: "Skilled Nursing",
+              startTime: "07:00:00",
+              endTime: "23:00:00",
+              segments: [
+                {
+                  shiftId: 1,
+                  jobId: 20,
+                  shiftName: "Day Shift",
+                  jobName: "Nurse",
+                  startTime: "07:00:00",
+                  endTime: "15:00:00",
+                  displayFocusAreaName: "Skilled Nursing",
+                },
+                {
+                  shiftId: 2,
+                  jobId: 21,
+                  shiftName: "Evening Shift",
+                  jobName: "Lead",
+                  startTime: "15:00:00",
+                  endTime: "23:00:00",
+                  displayFocusAreaName: "Skilled Nursing",
+                },
+              ],
+            },
+          },
+        ],
+        requests: [
+          {
+            id: "split-request",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-18",
+            status: "open",
+            type: "swap",
+            requesterShiftLabel: "Morning / Desk",
+            requesterEmpId: "emp-2",
+            targetEmpId: "emp-1",
+            targetName: "Alex Kim",
+            targetShiftDate: "2026-04-19",
+            requesterPresentation: {
+              label: "Morning Shift / Desk Shift",
+              segments: [
+                {
+                  shiftId: 3,
+                  jobId: 22,
+                  shiftName: "Morning Shift",
+                  jobName: "Nurse",
+                  startTime: "06:00:00",
+                  endTime: "10:00:00",
+                  displayFocusAreaName: "Skilled Nursing",
+                },
+                {
+                  shiftId: 4,
+                  jobId: 23,
+                  shiftName: "Desk Shift",
+                  jobName: "Coordinator",
+                  startTime: "10:00:00",
+                  endTime: "14:00:00",
+                  displayFocusAreaName: "Skilled Nursing",
+                },
+              ],
+            },
+            requesterState: {
+              kind: "worked",
+              customStartTime: null,
+              customEndTime: null,
+            },
+            targetPresentation: {
+              label: "Target Day / Target Evening",
+              segments: [
+                {
+                  shiftId: 5,
+                  jobId: 24,
+                  shiftName: "Target Day",
+                  jobName: "Nurse",
+                  startTime: "07:00:00",
+                  endTime: "15:00:00",
+                  displayFocusAreaName: "Skilled Nursing",
+                },
+                {
+                  shiftId: 6,
+                  jobId: 25,
+                  shiftName: "Target Evening",
+                  jobName: "Lead",
+                  startTime: "15:00:00",
+                  endTime: "23:00:00",
+                  displayFocusAreaName: "Skilled Nursing",
+                },
+              ],
+            },
+            targetState: {
+              kind: "worked",
+              customStartTime: null,
+              customEndTime: null,
+            },
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    fireEvent.click(screen.getByText("Available"));
+    expect(screen.getAllByLabelText("Multiple Shifts, 2 shifts").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
+    expect(screen.getByText("Evening Shift")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("All"));
+    expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
+    expect(screen.getByText("Morning Shift")).toBeInTheDocument();
+    expect(screen.getByText("Desk Shift")).toBeInTheDocument();
+    expect(screen.getByText("Target shift")).toBeInTheDocument();
+    expect(screen.getByText("Target Day")).toBeInTheDocument();
+    expect(screen.getByText("Target Evening")).toBeInTheDocument();
+    expect(screen.getAllByText("Shift 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Shift 2").length).toBeGreaterThan(0);
   });
 
   it("uses the org timezone for available day labels", () => {
@@ -402,7 +677,11 @@ describe("RequestsScreen", () => {
             targetEmpId: null,
             requesterPresentation: {
               label: "Day Shift",
-              segments: [],
+              segments: [
+                {
+                  isMentored: true,
+                },
+              ],
             },
             requesterState: {
               customStartTime: "07:00:00",
@@ -425,7 +704,12 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.queryByText("Could not update request")).not.toBeInTheDocument();
-    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent(
+      "Mentored",
+    );
+    expect(screen.queryByText("(Mentored)")).not.toBeInTheDocument();
+    expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
   });
 
   it("defaults managers into the approval tab when a request is waiting for review", () => {
@@ -457,6 +741,71 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("Approve")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
+  });
+
+  it("shows the all-requests tab for schedule editors without a linked employee", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        linkedEmployee: null,
+        currentOrg: {
+          timezone: null,
+        },
+        effectiveRole: "user",
+        permissions: {
+          canEditShifts: true,
+          canApproveShiftRequests: false,
+          canManageEmployees: false,
+        },
+        absenceTypes: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        requests: [
+          {
+            id: "req-2",
+            requesterName: "Mina Diaz",
+            requesterShiftDate: "2026-04-17",
+            status: "open",
+            type: "swap",
+            requesterShiftLabel: "Day",
+            requesterEmpId: "emp-2",
+            targetEmpId: "emp-3",
+            requesterPresentation: {
+              label: "Day Shift",
+              segments: [],
+            },
+            targetPresentation: {
+              label: "Night Shift",
+              segments: [],
+            },
+            requesterState: {
+              customStartTime: "07:00:00",
+              customEndTime: "15:00:00",
+            },
+            targetState: {
+              customStartTime: "15:00:00",
+              customEndTime: "23:00:00",
+            },
+          },
+        ],
+        openShifts: [],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    expect(screen.getByText("All")).toBeInTheDocument();
+    expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
     expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import type { ActivityIconVariant, ActivityItem } from "@/lib/dashboard-stats";
 import Modal from "@/components/Modal";
 
@@ -116,8 +117,12 @@ export default function ExpandedActivity({
             <div style={emptyStyle}>No activity matching filter</div>
           ) : (
             filtered.map((item, i) => (
-              <div
+              <Link
                 key={item.id}
+                href={item.href}
+                style={{ display: "block", textDecoration: "none", color: "inherit" }}
+              >
+              <div
                 style={{
                   display: "flex",
                   gap: 12,
@@ -138,6 +143,7 @@ export default function ExpandedActivity({
                   </div>
                 </div>
               </div>
+              </Link>
             ))
           )}
         </div>

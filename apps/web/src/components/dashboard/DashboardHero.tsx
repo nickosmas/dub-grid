@@ -4,6 +4,7 @@ type DashboardHeroMetric = {
   label: string;
   value: string;
   detail?: string;
+  href?: string;
 };
 
 interface DashboardHeroProps {
@@ -170,7 +171,7 @@ export default function DashboardHero({
 function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
   const accent = getMetricAccent(metric.label);
 
-  return (
+  const card = (
     <div
       style={{
         background: "var(--color-bg)",
@@ -235,5 +236,19 @@ function MetricCard({ metric }: { metric: DashboardHeroMetric }) {
         </div>
       ) : null}
     </div>
+  );
+
+  if (!metric.href) {
+    return card;
+  }
+
+  return (
+    <Link
+      href={metric.href}
+      style={{ display: "block", textDecoration: "none", color: "inherit" }}
+      aria-label={`${metric.label}: ${metric.value}`}
+    >
+      {card}
+    </Link>
   );
 }

@@ -123,11 +123,19 @@ export async function updateMobilePersonStatus(
 
   const now = new Date().toISOString();
   const nextStatus =
-    input.body.action === "bench" ? "benched" : "active";
+    input.body.action === "bench"
+      ? "benched"
+      : input.body.action === "terminate"
+        ? "terminated"
+        : "active";
   const nextStatusNote =
     input.body.action === "bench" ? (input.body.note ?? "") : "";
   const action =
-    input.body.action === "bench" ? "employee.benched" : "employee.activated";
+    input.body.action === "bench"
+      ? "employee.benched"
+      : input.body.action === "terminate"
+        ? "employee.archived"
+        : "employee.activated";
 
   const updatedEmployee = await deps.updateEmployeeStatus(auth.serviceClient, {
     orgId: auth.currentOrg.id,
@@ -136,7 +144,12 @@ export async function updateMobilePersonStatus(
     status: nextStatus,
     statusNote: nextStatusNote,
     statusChangedAt: now,
-    archivedAt: input.body.action === "activate" ? null : undefined,
+    archivedAt:
+      input.body.action === "activate"
+        ? null
+        : input.body.action === "terminate"
+          ? now
+          : undefined,
   });
 
   if (!updatedEmployee) {

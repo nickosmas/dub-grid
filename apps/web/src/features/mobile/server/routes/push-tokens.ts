@@ -16,12 +16,18 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "We couldn't read that request. Try again." },
+      { status: 400 },
+    );
   }
 
   const parsed = mobilePushTokenBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Check the request details and try again." },
+      { status: 400 },
+    );
   }
 
   const payload = await registerMobilePushToken(auth, parsed.data, {

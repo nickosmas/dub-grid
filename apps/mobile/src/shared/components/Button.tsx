@@ -1,8 +1,23 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 
-type ButtonTone = "primary" | "secondary" | "neutral" | "danger" | "ghost";
+export type ButtonTone =
+  | "primary"
+  | "secondary"
+  | "neutral"
+  | "danger"
+  | "dangerFilled"
+  | "warningFilled"
+  | "success"
+  | "link"
+  | "ghost";
 
 export function Button({
   children,
@@ -11,6 +26,7 @@ export function Button({
   disabled = false,
   compact = false,
   leadingAccessory,
+  loading = false,
   onPress,
 }: PropsWithChildren<{
   label?: string;
@@ -18,14 +34,30 @@ export function Button({
   disabled?: boolean;
   compact?: boolean;
   leadingAccessory?: ReactNode;
+  loading?: boolean;
   onPress: () => void;
 }>) {
   const content = children ?? label;
+  const isDisabled = disabled || loading;
+  const spinnerColor =
+    tone === "primary" || tone === "dangerFilled" || tone === "warningFilled"
+      ? mobileColors.textInverse
+      : tone === "danger"
+        ? mobileColors.dangerText
+        : tone === "neutral" || tone === "ghost"
+          ? mobileColors.textMuted
+          : mobileColors.brand;
+  const rippleColor =
+    tone === "primary"
+      ? "rgba(255, 255, 255, 0.22)"
+      : "rgba(15, 23, 42, 0.08)";
 
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      android_ripple={isDisabled ? undefined : { color: rippleColor }}
+      disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
@@ -34,13 +66,19 @@ export function Button({
         tone === "secondary" && styles.buttonSecondary,
         tone === "neutral" && styles.buttonNeutral,
         tone === "danger" && styles.buttonDanger,
+        tone === "dangerFilled" && styles.buttonDangerFilled,
+        tone === "warningFilled" && styles.buttonWarningFilled,
+        tone === "success" && styles.buttonSuccess,
+        tone === "link" && styles.buttonLink,
         tone === "ghost" && styles.buttonGhost,
-        pressed && !disabled && styles.buttonPressed,
-        disabled && styles.buttonDisabled,
+        pressed && !isDisabled && styles.buttonPressed,
+        isDisabled && styles.buttonDisabled,
       ]}
     >
       <View style={styles.content}>
-        {leadingAccessory ? (
+        {loading ? (
+          <ActivityIndicator color={spinnerColor} size="small" />
+        ) : leadingAccessory ? (
           <View style={styles.leadingAccessory}>{leadingAccessory}</View>
         ) : null}
         <Text
@@ -50,6 +88,10 @@ export function Button({
             tone === "secondary" && styles.labelSecondary,
             tone === "neutral" && styles.labelNeutral,
             tone === "danger" && styles.labelDanger,
+            tone === "dangerFilled" && styles.labelFilled,
+            tone === "warningFilled" && styles.labelFilled,
+            tone === "success" && styles.labelSuccess,
+            tone === "link" && styles.labelLink,
             tone === "ghost" && styles.labelGhost,
           ]}
         >
@@ -70,7 +112,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   buttonCompact: {
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -96,6 +138,22 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.dangerSoft,
     borderColor: mobileColors.dangerBorder,
   },
+  buttonDangerFilled: {
+    backgroundColor: mobileColors.danger,
+    borderColor: mobileColors.danger,
+  },
+  buttonWarningFilled: {
+    backgroundColor: mobileColors.warning,
+    borderColor: mobileColors.warning,
+  },
+  buttonSuccess: {
+    backgroundColor: mobileColors.successSoft,
+    borderColor: mobileColors.successBorder,
+  },
+  buttonLink: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+  },
   buttonGhost: {
     backgroundColor: "transparent",
     borderColor: "transparent",
@@ -111,8 +169,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   label: {
-    fontSize: 15,
-    fontWeight: "700",
+    ...mobileText.bodyStrong,
   },
   labelPrimary: {
     color: mobileColors.textInverse,
@@ -124,7 +181,16 @@ const styles = StyleSheet.create({
     color: mobileColors.textSecondary,
   },
   labelDanger: {
-    color: mobileColors.danger,
+    color: mobileColors.dangerText,
+  },
+  labelFilled: {
+    color: mobileColors.textInverse,
+  },
+  labelSuccess: {
+    color: mobileColors.successText,
+  },
+  labelLink: {
+    color: mobileColors.brand,
   },
   labelGhost: {
     color: mobileColors.textMuted,

@@ -9,9 +9,43 @@ import type {
   CoverageShortageDetail,
   ShiftMap,
 } from "@/types";
+import type { CoverageRuleConfig } from "@dubgrid/domain";
 import { formatDateKey, iterateDateRange } from "@/lib/utils";
 
 export type PublishedWindowState = "unpublished" | "partial" | "published";
+
+export const DEFAULT_COVERAGE_RULE_CONFIG: CoverageRuleConfig = {
+  mentoredCoverageCreditPercent: 100,
+};
+
+export function normalizeCoverageRuleConfig(
+  config?: Partial<CoverageRuleConfig> | null,
+): CoverageRuleConfig {
+  const rawPercent = config?.mentoredCoverageCreditPercent;
+  const mentoredCoverageCreditPercent =
+    typeof rawPercent === "number" && Number.isFinite(rawPercent)
+      ? Math.min(100, Math.max(0, Math.round(rawPercent)))
+      : DEFAULT_COVERAGE_RULE_CONFIG.mentoredCoverageCreditPercent;
+
+  return { mentoredCoverageCreditPercent };
+}
+
+export function createCoverageCreditResolver(
+  shifts: ShiftMap,
+  config?: Partial<CoverageRuleConfig> | null,
+): (empId: string, date: Date, assignmentId: number) => number {
+  const normalized = normalizeCoverageRuleConfig(config);
+  const mentoredCredit = normalized.mentoredCoverageCreditPercent / 100;
+
+  return (empId, date, assignmentId) => {
+    const entry = shifts[`${empId}_${formatDateKey(date)}`];
+    if (!entry || entry.isDelete) return 0;
+    const segmentIndex = entry.assignmentIds.findIndex((id) => id === assignmentId);
+    if (segmentIndex === -1) return 0;
+    const segment = entry.segments?.[segmentIndex];
+    return segment?.isMentored ? mentoredCredit : 1;
+  };
+}
 
 /**
  * Checks whether an employee is qualified for a given shift code based on
@@ -312,6 +346,7 @@ export function computeCoverageStatus(
   sectionCodeIds: Set<number>,
   eligibleAssignmentDefinitionIds: number[] | Set<number>,
   requirement: { minStaff: number },
+  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number,
 ): CoverageStatus {
   const eligibleAssignmentDefinitionIdSet =
     eligibleAssignmentDefinitionIds instanceof Set
@@ -321,8 +356,16 @@ export function computeCoverageStatus(
 
   for (const emp of employees) {
     const codeIds = assignmentIdsForKey(emp.id, date);
-    if (codeIds.some((codeId) => sectionCodeIds.has(codeId) && eligibleAssignmentDefinitionIdSet.has(codeId))) {
-      actual++;
+    let employeeCredit = 0;
+    for (const codeId of codeIds) {
+      if (!sectionCodeIds.has(codeId) || !eligibleAssignmentDefinitionIdSet.has(codeId)) {
+        continue;
+      }
+      const credit = coverageCreditForKey?.(emp.id, date, codeId) ?? 1;
+      employeeCredit = Math.max(employeeCredit, Math.min(1, Math.max(0, credit)));
+    }
+    if (employeeCredit > 0) {
+      actual += employeeCredit;
     }
   }
 
@@ -405,6 +448,7 @@ export function computeCoverageCategorySnapshots(
   assignmentIdsForKey: (empId: string, date: Date) => number[],
   assignmentIdsByFocusArea: Map<number, Set<number>>,
   assignmentLabelMap?: Map<number, string>,
+  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number,
 ): CoverageCategorySnapshot[] {
   const snapshots: CoverageCategorySnapshot[] = [];
   const categoryById = new Map(shiftCategories.map((category) => [category.id, category]));
@@ -476,6 +520,7 @@ export function computeCoverageCategorySnapshots(
             sectionCodeIds,
             [assignmentId],
             requirement,
+            coverageCreditForKey,
           );
           const shortage = Math.max(requirement.minStaff - exactStatus.actual, 0);
           if (shortage > 0) {
@@ -498,6 +543,7 @@ export function computeCoverageCategorySnapshots(
           sectionCodeIds,
           eligibleAssignmentDefinitions.map((assignment) => assignment.id),
           { minStaff: totalRequired },
+          coverageCreditForKey,
         );
         const preferredOpenAssignmentDefinitionId =
           shortageDetails[0]?.assignmentId ??
@@ -578,6 +624,7 @@ export function computeCoverageCategorySnapshots(
           sectionCodeIds,
           [assignment.id],
           resolvedRequirement,
+          coverageCreditForKey,
         );
         const shortage = Math.max(resolvedRequirement.minStaff - status.actual, 0);
         const displayLabel = getAssignmentDisplayLabel(assignment, assignmentLabelMap);
@@ -622,6 +669,7 @@ export function computeCoverageGaps(
   assignmentById: Map<number, AssignmentDefinition>,
   assignmentIdsByFocusArea: Map<number, Set<number>>,
   assignmentLabelMap?: Map<number, string>,
+  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number,
 ): CoverageGap[] {
   void assignmentById;
 
@@ -635,6 +683,7 @@ export function computeCoverageGaps(
     assignmentIdsForKey,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
+    coverageCreditForKey,
   )
     .filter((snapshot) => snapshot.status.hasRequirement && !snapshot.status.isMet)
     .map((snapshot) => ({

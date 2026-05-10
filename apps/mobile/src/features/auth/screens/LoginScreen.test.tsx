@@ -22,6 +22,8 @@ const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
 const loginToWorkspace = vi.fn();
 const lookupWorkspace = vi.fn();
+const registerMobileSessionPresence = vi.fn();
+const verifyMobileTotpFactor = vi.fn();
 const loadLastWorkspaceSlug = vi.fn();
 const saveLastWorkspaceSlug = vi.fn();
 const pushToast = vi.fn();
@@ -55,6 +57,8 @@ vi.mock("../../../shared/lib/supabase", () => ({
 vi.mock("../../../shared/lib/api", () => ({
   loginToWorkspace,
   lookupWorkspace,
+  registerMobileSessionPresence,
+  verifyMobileTotpFactor,
 }));
 
 vi.mock("../../../shared/lib/session", () => ({
@@ -79,6 +83,8 @@ describe("LoginScreen", () => {
     getSupabaseClient.mockReset();
     loginToWorkspace.mockReset();
     lookupWorkspace.mockReset();
+    registerMobileSessionPresence.mockReset();
+    verifyMobileTotpFactor.mockReset();
     loadLastWorkspaceSlug.mockReset();
     saveLastWorkspaceSlug.mockReset();
     pushToast.mockReset();
@@ -89,6 +95,7 @@ describe("LoginScreen", () => {
       isLoading: false,
     });
     loadLastWorkspaceSlug.mockResolvedValue(null);
+    registerMobileSessionPresence.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -98,8 +105,12 @@ describe("LoginScreen", () => {
   it("loads a remembered workspace slug on mount", async () => {
     loadLastWorkspaceSlug.mockResolvedValue("dubgrid-health");
 
-    render(<LoginScreen />);
+    const { container } = render(<LoginScreen />);
 
+    expect(
+      container.querySelector('[data-keyboard-dismiss-mode="interactive"]'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
     expect(await screen.findByDisplayValue("dubgrid-health")).toBeInTheDocument();
   });
 
@@ -168,10 +179,17 @@ describe("LoginScreen", () => {
     fireEvent.click(screen.getByText("Continue"));
 
     await screen.findByPlaceholderText("Email");
+    const passwordInput = screen.getByPlaceholderText("Password");
+    expect(passwordInput).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(passwordInput).toHaveAttribute("type", "text");
+    fireEvent.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(passwordInput).toHaveAttribute("type", "password");
+
     fireEvent.change(screen.getByPlaceholderText("Email"), {
       target: { value: "staff@dubgrid.com" },
     });
-    fireEvent.change(screen.getByPlaceholderText("Password"), {
+    fireEvent.change(passwordInput, {
       target: { value: "super-secret" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
@@ -187,6 +205,100 @@ describe("LoginScreen", () => {
       access_token: "token-123",
       refresh_token: "refresh-123",
     });
+    expect(registerMobileSessionPresence).toHaveBeenCalledWith("token-123");
+    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/me");
+  });
+
+  it("verifies MFA before storing the mobile session", async () => {
+    lookupWorkspace.mockResolvedValue({
+      workspace: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
+    loginToWorkspace.mockResolvedValue({
+      session: {
+        accessToken: "pending-token",
+        refreshToken: "pending-refresh",
+        expiresIn: 3600,
+        tokenType: "bearer",
+      },
+      workspace: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+      user: {
+        id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+        email: "staff@dubgrid.com",
+        firstName: "Mina",
+        lastName: "Diaz",
+      },
+      mfaRequired: true,
+      mfa: {
+        factorId: "factor-123",
+        friendlyName: "DubGrid Authenticator",
+      },
+    });
+    verifyMobileTotpFactor.mockResolvedValue({
+      accessToken: "verified-token",
+      refreshToken: "verified-refresh",
+      expiresIn: 3600,
+      tokenType: "bearer",
+    });
+    const setSession = vi.fn().mockResolvedValue({
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        setSession,
+      },
+    } as never);
+
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    expect(
+      await screen.findByText("Two-factor authentication"),
+    ).toBeInTheDocument();
+    expect(setSession).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("Verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Verify and Sign In" }));
+
+    await waitFor(() => {
+      expect(verifyMobileTotpFactor).toHaveBeenCalledWith({
+        session: {
+          accessToken: "pending-token",
+          refreshToken: "pending-refresh",
+          expiresIn: 3600,
+          tokenType: "bearer",
+        },
+        factorId: "factor-123",
+        code: "123456",
+      });
+    });
+    expect(setSession).toHaveBeenCalledWith({
+      access_token: "verified-token",
+      refresh_token: "verified-refresh",
+    });
+    expect(registerMobileSessionPresence).toHaveBeenCalledWith("verified-token");
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/me");
   });
 
@@ -237,6 +349,27 @@ describe("LoginScreen", () => {
         "We couldn't find that workspace. Check the subdomain and try again.",
       ),
     ).toBeInTheDocument();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
+
+  it("shows client-friendly inline copy for workspace lookup network failures", async () => {
+    const backendError =
+      "We couldn't reach the mobile backend at http://192.168.1.181:3000 (Network request failed). Check EXPO_PUBLIC_API_BASE_URL in apps/mobile/.env.local and make sure your phone can reach that host.";
+    lookupWorkspace.mockRejectedValue(new Error(backendError));
+
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+
+    expect(
+      await screen.findByText(
+        "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(pushToast).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 

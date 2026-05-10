@@ -17,6 +17,27 @@ export function getInitials(name?: string): string {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
+export function getAvatarInitials(
+  name?: string | null,
+  fallback = "?",
+): string {
+  const parts =
+    name?.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ??
+    [];
+
+  if (parts.length === 0) {
+    return fallback;
+  }
+
+  const first = parts[0]?.charAt(0).toUpperCase() ?? "";
+  const last =
+    parts.length > 1
+      ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "")
+      : "";
+
+  return `${first}${last}` || fallback;
+}
+
 export function getEmployeeDisplayName(emp: { firstName: string, lastName: string }): string {
   return `${emp.firstName} ${emp.lastName}`.trim();
 }

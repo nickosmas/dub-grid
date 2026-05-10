@@ -25,7 +25,22 @@ export async function GET(
       return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
     }
 
-    const { data, error } = await getServiceClient()
+    const serviceClient = getServiceClient();
+    const { data: profile, error: profileError } = await serviceClient
+      .from("profiles")
+      .select("platform_role")
+      .eq("id", parsed.data.userId)
+      .maybeSingle();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    if (profile?.platform_role === "gridmaster") {
+      return NextResponse.json({ memberships: [] });
+    }
+
+    const { data, error } = await serviceClient
       .from("organization_memberships")
       .select("org_id, org_role, joined_at, updated_at, admin_permissions, organizations(name, slug)")
       .eq("user_id", parsed.data.userId)

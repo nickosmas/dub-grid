@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeCoveragePctAndSlots,
+  computeCoverageBySection,
   computeOpenShifts,
   computeShiftDurationHours,
   computeAllEmployeeHours,
@@ -13,8 +14,17 @@ import {
   filterShiftsByWeek,
   getWeekStart,
 } from "@/lib/dashboard-stats";
-import { buildPublishedDateSet, filterPublishedDates } from "@/lib/schedule-logic";
-import type { ShiftMap, Employee, FocusArea, AssignmentDefinition, CoverageRequirement } from "@/types";
+import {
+  buildPublishedDateSet,
+  filterPublishedDates,
+} from "@/lib/schedule-logic";
+import type {
+  ShiftMap,
+  Employee,
+  FocusArea,
+  AssignmentDefinition,
+  CoverageRequirement,
+} from "@/types";
 
 describe("Dashboard Metrics", () => {
   // Sample data
@@ -27,6 +37,7 @@ describe("Dashboard Metrics", () => {
     userId: "user1",
     firstName: "John",
     lastName: "Doe",
+    employmentType: "full_time",
     email: "john@example.com",
     phone: "",
     status: "active",
@@ -105,7 +116,9 @@ describe("Dashboard Metrics", () => {
         label: codeIds.map((id) => (id === 101 ? "DAY" : "EVE")).join("/"),
         assignmentIds: codeIds,
         publishedAssignmentDefinitionIds: codeIds,
-        publishedLabel: codeIds.map((id) => (id === 101 ? "DAY" : "EVE")).join("/"),
+        publishedLabel: codeIds
+          .map((id) => (id === 101 ? "DAY" : "EVE"))
+          .join("/"),
         customStartTime,
         customEndTime,
         isDraft: false,
@@ -157,6 +170,39 @@ describe("Dashboard Metrics", () => {
     expect(result.openSlots).toBe(1);
   });
 
+  it("returns filled and required counts for coverage heatmap cells", () => {
+    const mondayKey = formatDateKey(weekDates[1]);
+    const shifts: ShiftMap = {
+      ...Object.fromEntries([createShift("emp1", mondayKey, [101])]),
+    };
+
+    const sections = computeCoverageBySection(
+      [focusArea1],
+      weekDates,
+      shifts,
+      [employee1, employee2],
+      [coverageRequirement],
+      [assignment1, assignment2],
+    );
+    const mondayCoverage = sections[0]?.daily.find(
+      (day) => day.dateKey === mondayKey,
+    );
+    const sundayCoverage = sections[0]?.daily[0];
+
+    expect(mondayCoverage).toMatchObject({
+      filledCount: 1,
+      requiredCount: 2,
+      staffCount: 1,
+      status: "amber",
+    });
+    expect(sundayCoverage).toMatchObject({
+      filledCount: 0,
+      requiredCount: 0,
+      staffCount: 0,
+      status: "none",
+    });
+  });
+
   it("should detect open shifts gaps", () => {
     const mondayDateObj = weekDates[1];
     const mondayKey = formatDateKey(mondayDateObj);
@@ -177,15 +223,23 @@ describe("Dashboard Metrics", () => {
     // Should detect open shifts when no shifts are scheduled
     expect(openShifts.length).toBeGreaterThan(0);
     // Verify Monday date is in the detected gaps
-    const hasMonday = openShifts.some((s) => formatDateKey(s.date) === mondayKey);
+    const hasMonday = openShifts.some(
+      (s) => formatDateKey(s.date) === mondayKey,
+    );
     expect(hasMonday).toBe(true);
+    expect(
+      openShifts.every((shift) => shift.focusAreaId === focusArea1.id),
+    ).toBe(true);
   });
 
   it("hides dashboard open shifts when the gap falls on an unpublished date", () => {
     const mondayDateObj = weekDates[1];
     const assignmentById = new Map([[101, assignment1]]);
     const publishedDateSet = buildPublishedDateSet([
-      { startDate: formatDateKey(weekDates[2]), endDate: formatDateKey(weekDates[2]) },
+      {
+        startDate: formatDateKey(weekDates[2]),
+        endDate: formatDateKey(weekDates[2]),
+      },
     ]);
     const publishedDates = filterPublishedDates(weekDates, publishedDateSet);
 
@@ -200,7 +254,51 @@ describe("Dashboard Metrics", () => {
     );
 
     expect(openShifts).toEqual([]);
-    expect(publishedDates.some((date) => formatDateKey(date) === formatDateKey(mondayDateObj))).toBe(false);
+    expect(
+      publishedDates.some(
+        (date) => formatDateKey(date) === formatDateKey(mondayDateObj),
+      ),
+    ).toBe(false);
+  });
+
+  it("hides dashboard open shifts that already started today", () => {
+    const monday = new Date("2026-04-06T12:00:00.000Z");
+    const assignmentById = new Map([[101, assignment1]]);
+    const shifts: ShiftMap = {};
+
+    const afterStart = computeOpenShifts(
+      [focusArea1],
+      [assignment1, assignment2],
+      [coverageRequirement],
+      [monday],
+      [employee1, employee2],
+      shifts,
+      assignmentById,
+      undefined,
+      undefined,
+      {
+        now: new Date("2026-04-06T10:00:00.000Z"),
+        timeZone: "UTC",
+      },
+    );
+    const beforeStart = computeOpenShifts(
+      [focusArea1],
+      [assignment1, assignment2],
+      [coverageRequirement],
+      [monday],
+      [employee1, employee2],
+      shifts,
+      assignmentById,
+      undefined,
+      undefined,
+      {
+        now: new Date("2026-04-06T08:59:00.000Z"),
+        timeZone: "UTC",
+      },
+    );
+
+    expect(afterStart).toEqual([]);
+    expect(beforeStart).toHaveLength(1);
   });
 
   it("should use flexible coverage rules for totals and open shifts", () => {
@@ -410,7 +508,12 @@ describe("Dashboard Metrics", () => {
     const assignmentById = new Map([[101, assignment1]]);
 
     // Custom: 06:00 - 14:00 = 8 hours
-    const duration = computeShiftDurationHours([101], assignmentById, "06:00", "14:00");
+    const duration = computeShiftDurationHours(
+      [101],
+      assignmentById,
+      "06:00",
+      "14:00",
+    );
     expect(duration).toBe(8);
   });
 

@@ -6,6 +6,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -84,14 +85,14 @@ export async function POST(req: NextRequest) {
     // ── Audit log ───────────────────────────────────────────────────────
     // Best-effort audit via service client (server-side, not browser supabase)
     try {
-      await supabaseAdmin.from("audit_log").insert({
-        org_id: null,
-        actor_id: user.id,
-        actor_email: user.email ?? null,
+      await writeGridmasterAuditLog({
+        serviceClient: supabaseAdmin,
+        actor: user,
         action: "user.password_reset_sent",
-        resource_type: "user",
-        resource_id: data.user?.id ?? null,
-        details: { target_email: email, initiated_by: "gridmaster" },
+        resourceType: "user",
+        resourceId: data.user?.id ?? null,
+        details: { target_email: email },
+        request: req,
       });
     } catch (auditErr) {
       logger.error(

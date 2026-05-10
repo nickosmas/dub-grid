@@ -12,6 +12,7 @@ import type {
 } from "@dubgrid/db-types";
 import type { Employee } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import {
   rowToAbsenceType,
@@ -72,11 +73,11 @@ const JOB_COLS =
 const ABSENCE_TYPE_COLS =
   "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
+  "id, org_id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
 const RECURRING_SHIFT_COLS =
   "id, emp_id, org_id, day_of_week, state, effective_from, effective_until, created_at, updated_at, archived_at";
 const SCHEDULE_CELL_SELECT =
-  "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))";
+  "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))";
 
 export async function fetchSelfProfileSnapshot(
   userId: string,
@@ -520,6 +521,68 @@ export async function updateSelfProfileDetails(input: {
     },
     employee,
   };
+}
+
+export async function updateSelfLinkedEmployeePhone(input: {
+  userId: string;
+  userEmail: string | null;
+  orgId: string;
+  phone: string;
+  expectedVersion?: number;
+}): Promise<{ employee: Employee }> {
+  const serviceClient = getServiceClient();
+  const employee = await fetchLinkedEmployeeByUserId(input.userId, input.orgId);
+  if (!employee) {
+    throw new Error("This account is not linked to a staff profile.");
+  }
+
+  let query = serviceClient
+    .from("employees")
+    .update({
+      phone: input.phone.trim(),
+      updated_by: input.userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", employee.id)
+    .eq("org_id", input.orgId)
+    .eq("user_id", input.userId);
+
+  if (input.expectedVersion !== undefined) {
+    query = query.eq("version", input.expectedVersion);
+  }
+
+  const { data, error } = await query.select(EMPLOYEE_COLS).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    throw new Error(
+      "Your staff profile changed elsewhere. Refresh and try again.",
+    );
+  }
+
+  const updatedEmployee = rowToEmployee(data as DbEmployee);
+  await Promise.all([
+    cacheDel(
+      CacheKey.employees(input.orgId),
+      CacheKey.orgDirectory(input.orgId),
+      CacheKey.tenantStats(),
+    ),
+    serviceClient.from("audit_log").insert({
+      org_id: input.orgId,
+      actor_id: input.userId,
+      actor_email: input.userEmail,
+      action: "employee.updated",
+      resource_type: "employee",
+      resource_id: employee.id,
+      details: {
+        source: "self_phone_update",
+        changedFields: ["phone"],
+      },
+    }),
+  ]);
+
+  return { employee: updatedEmployee };
 }
 
 export async function updateSelfMfaStatus(

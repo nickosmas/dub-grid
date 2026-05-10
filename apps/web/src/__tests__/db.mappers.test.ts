@@ -548,6 +548,7 @@ const baseEmployeeRow: DbEmployee = {
   org_id: "org-1",
   first_name: "Alice",
   last_name: "Smith",
+  employment_type: "part_time",
   status: "active",
   status_changed_at: null,
   status_note: "",
@@ -572,6 +573,7 @@ describe("rowToEmployee", () => {
     expect(result.id).toBe("emp-1");
     expect(result.firstName).toBe("Alice");
     expect(result.lastName).toBe("Smith");
+    expect(result.employmentType).toBe("part_time");
     expect(result.certificationId).toBe(1);
     expect(result.roleIds).toEqual([2, 3]);
     expect(result.seniority).toBe(3);
@@ -609,6 +611,7 @@ describe("employeeToRow", () => {
   const baseEmployee: Omit<Employee, "id"> = {
     firstName: "Bob",
     lastName: "Jones",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -631,6 +634,7 @@ describe("employeeToRow", () => {
     expect(result.org_id).toBe("org-99");
     expect(result.first_name).toBe("Bob");
     expect(result.last_name).toBe("Jones");
+    expect(result.employment_type).toBe("full_time");
     expect(result.certification_id).toBe(2);
     expect(result.role_ids).toEqual([1]);
     expect(result.seniority).toBe(2);
@@ -660,6 +664,7 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     org_id: fc.string({ minLength: 1 }),
     first_name: fc.string({ minLength: 1 }),
     last_name: fc.string({ minLength: 1 }),
+    employment_type: fc.constantFrom("full_time" as const, "part_time" as const),
     status: fc.constantFrom("active" as const, "benched" as const, "terminated" as const),
     status_changed_at: fc.oneof(fc.constant(null as string | null), fc.constant("2026-01-01T00:00:00Z")),
     status_note: fc.string(),

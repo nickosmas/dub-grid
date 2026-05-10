@@ -17,8 +17,11 @@ import type {
 } from "@/types";
 import {
   buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
+  createCoverageCreditResolver,
   computeCoverageCategorySnapshots,
 } from "@/lib/schedule-logic";
+import { hasShiftStartedAtTimeRanges } from "@dubgrid/schedule-core";
+import type { CoverageRuleConfig } from "@dubgrid/domain";
 
 // ─── Exported Types ─────────────────────────────────────
 
@@ -59,8 +62,10 @@ export interface SectionCoverage {
   daily: Array<{
     dateKey: string;
     dayLabel: string;
+    filledCount: number;
+    requiredCount: number;
     staffCount: number;
-    status: "green" | "amber" | "red";
+    status: "green" | "amber" | "red" | "none";
   }>;
 }
 
@@ -69,6 +74,7 @@ export interface OpenShift {
   date: Date;
   dayOfWeek: string;
   dayOfMonth: number;
+  focusAreaId: number;
   requirementAssignmentDefinitionId: number;
   eligibleAssignmentDefinitionIds: number[];
   preferredOpenAssignmentDefinitionId: number;
@@ -109,6 +115,7 @@ export interface ActivityItem {
   highlight: string;
   timestamp: string;
   relativeTime: string;
+  href: string;
 }
 
 export interface TrendDataPoint {
@@ -433,6 +440,7 @@ export function computeCoveragePctAndSlots(
   weekDates: Date[],
   employees: Employee[],
   shifts: ShiftMap,
+  coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
 ): { pct: number; openSlots: number; totalRequired: number } {
   if (requirements.length === 0) {
     return { pct: 100, openSlots: 0, totalRequired: 0 };
@@ -447,6 +455,10 @@ export function computeCoveragePctAndSlots(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
+  const coverageCreditForKey = createCoverageCreditResolver(
+    shifts,
+    coverageRuleConfig,
+  );
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
@@ -457,6 +469,8 @@ export function computeCoveragePctAndSlots(
     (empId, lookupDate) =>
       shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
+    undefined,
+    coverageCreditForKey,
   );
   let totalRequired = 0;
   let totalFilled = 0;
@@ -537,6 +551,7 @@ export function computeCoverageBySection(
   employees: Employee[],
   coverageRequirements: CoverageRequirement[],
   assignments: AssignmentDefinition[],
+  coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
 ): SectionCoverage[] {
   const empsByFa = new Map<number, Employee[]>();
   for (const fa of focusAreas) {
@@ -547,6 +562,10 @@ export function computeCoverageBySection(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
+  const coverageCreditForKey = createCoverageCreditResolver(
+    shifts,
+    coverageRuleConfig,
+  );
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
@@ -557,6 +576,8 @@ export function computeCoverageBySection(
     (empId, lookupDate) =>
       shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
+    undefined,
+    coverageCreditForKey,
   );
 
   const allSections = focusAreas.map((fa) => {
@@ -592,11 +613,21 @@ export function computeCoverageBySection(
       }
 
       const ratio = dayRequired > 0 ? dayFilled / dayRequired : 1;
+      const status: SectionCoverage["daily"][number]["status"] =
+        dayRequired === 0
+          ? "none"
+          : ratio >= 1
+            ? "green"
+            : dayFilled > 0
+              ? "amber"
+              : "red";
       return {
         dateKey,
         dayLabel: DAY_LABELS[date.getDay()],
+        filledCount: dayFilled,
+        requiredCount: dayRequired,
         staffCount,
-        status: ratio >= 1 ? "green" : "red",
+        status,
       };
     });
 
@@ -628,6 +659,11 @@ export function computeOpenShifts(
   shifts: ShiftMap,
   assignmentById: Map<number, AssignmentDefinition>,
   assignmentLabelMap?: Map<number, string>,
+  coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
+  options?: {
+    now?: Date;
+    timeZone?: string | null;
+  },
 ): OpenShift[] {
   const openShifts: OpenShift[] = [];
 
@@ -640,6 +676,10 @@ export function computeOpenShifts(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
+  const coverageCreditForKey = createCoverageCreditResolver(
+    shifts,
+    coverageRuleConfig,
+  );
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
@@ -651,8 +691,9 @@ export function computeOpenShifts(
       shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
     assignmentLabelMap,
+    coverageCreditForKey,
   );
-  const today = new Date();
+  const today = options?.now ? new Date(options.now) : new Date();
   today.setHours(0, 0, 0, 0);
 
   for (const snapshot of snapshots) {
@@ -661,6 +702,18 @@ export function computeOpenShifts(
 
     const sc = assignmentById.get(snapshot.preferredOpenAssignmentDefinitionId);
     if (!sc) continue;
+    const dateKey = formatDateKey(snapshot.date);
+    if (
+      options?.now &&
+      hasShiftStartedAtTimeRanges({
+        shiftDate: dateKey,
+        timeRanges: [{ start: sc.defaultStartTime ?? "" }],
+        now: options.now,
+        timeZone: options.timeZone ?? null,
+      })
+    ) {
+      continue;
+    }
     const requirementAssignmentDefinitionId =
       snapshot.preferredOpenAssignmentDefinitionId;
 
@@ -687,10 +740,11 @@ export function computeOpenShifts(
         : (assignmentLabelMap?.get(sc.id) ?? sc.name ?? sc.label);
 
     openShifts.push({
-      id: `${snapshot.focusAreaId}_${requirementAssignmentDefinitionId}_${formatDateKey(snapshot.date)}`,
+      id: `${snapshot.focusAreaId}_${requirementAssignmentDefinitionId}_${dateKey}`,
       date: snapshot.date,
       dayOfWeek: SHORT_DAYS[snapshot.date.getDay()],
       dayOfMonth: snapshot.date.getDate(),
+      focusAreaId: snapshot.focusAreaId,
       requirementAssignmentDefinitionId,
       eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
       preferredOpenAssignmentDefinitionId:
@@ -791,6 +845,24 @@ function relativeTimeString(date: Date): string {
   return `${diffDays} days ago`;
 }
 
+function getShiftRequestDisplayShiftName(request: ShiftRequest): string {
+  const segmentNames =
+    request.requesterPresentation?.segments
+      ?.map((segment) => segment.shiftName?.trim())
+      .filter((name): name is string => Boolean(name)) ?? [];
+  const uniqueSegmentNames = [...new Set(segmentNames)];
+
+  if (uniqueSegmentNames.length > 0) {
+    return uniqueSegmentNames.join(" + ");
+  }
+
+  return (
+    request.requesterPresentation?.shiftName?.trim() ||
+    request.requesterPresentation?.label?.trim() ||
+    request.requesterShiftLabel
+  );
+}
+
 export function buildActivityFeed(
   publishHistory: Array<PublishHistoryEntry | PublishHistoryEntryWithName>,
   shiftRequests: ShiftRequest[],
@@ -808,6 +880,7 @@ export function buildActivityFeed(
       highlight: `${historyEntry.changeCount} changes`,
       timestamp: historyEntry.publishedAt,
       relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
+      href: "/schedule",
     });
 
     for (const change of historyEntry.changes.slice(0, 12)) {
@@ -829,12 +902,14 @@ export function buildActivityFeed(
         highlight: `Employee ${change.empId}`,
         timestamp: historyEntry.publishedAt,
         relativeTime: relativeTimeString(new Date(historyEntry.publishedAt)),
+        href: "/schedule",
       });
     }
   }
 
   for (const req of shiftRequests) {
     const isPickup = req.type === "pickup";
+    const shiftName = getShiftRequestDisplayShiftName(req);
     const statusLabel =
       req.status === "open"
         ? "Open"
@@ -852,11 +927,12 @@ export function buildActivityFeed(
             ? "success"
             : "neutral",
       description: isPickup
-        ? `Pickup request · ${req.requesterShiftLabel}`
+        ? `Pickup request · ${shiftName}`
         : `Swap request · ${req.requesterName}`,
       highlight: `${req.requesterShiftDate} · ${statusLabel}`,
       timestamp: req.createdAt,
       relativeTime: relativeTimeString(new Date(req.createdAt)),
+      href: "/schedule",
     });
   }
 
@@ -870,6 +946,7 @@ export function buildActivityFeed(
       highlight: invitation.roleToAssign,
       timestamp: invitation.acceptedAt,
       relativeTime: relativeTimeString(new Date(invitation.acceptedAt)),
+      href: "/people",
     });
   }
 
@@ -893,6 +970,7 @@ export function computeCoverageTrendData(
   allShifts: ShiftMap,
   periodStart: Date,
   periodDays: number,
+  coverageRuleConfig?: Partial<CoverageRuleConfig> | null,
 ): TrendDataPoint[] {
   const trend: TrendDataPoint[] = [];
   const activeEmployees = allEmployees.filter((e) => e.status === "active");
@@ -916,6 +994,7 @@ export function computeCoverageTrendData(
       periodDates,
       activeEmployees,
       periodShifts,
+      coverageRuleConfig,
     );
 
     const staffScheduled = countStaffScheduled(

@@ -108,11 +108,6 @@ export default function PrintOptionsModal({
                 </button>
               ))}
             </div>
-            {spanWeeks === "month" && (
-              <div className="dg-form-hint" style={{ marginTop: 6 }}>
-                Tip: Small font works best for month view
-              </div>
-            )}
           </div>
 
           {/* Font Size */}

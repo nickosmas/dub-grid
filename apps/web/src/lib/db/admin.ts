@@ -1,4 +1,5 @@
-import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, ORGANIZATION_COLS } from "./shared";
+import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
+import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, ORGANIZATION_WITH_BILLING_COLS } from "./shared";
 import type { DbInvitation, DbOrganization, TenantStats } from "./types";
 import { rowToInvitation, rowToOrganization } from "./mappers";
 import { removeOrganizationMembershipGuarded, revokeOrganizationInvitationGuarded } from "./access";
@@ -29,6 +30,12 @@ async function countScheduleCellsCreatedSince(
   return count ?? 0;
 }
 
+function defaultTrialEndFrom(date: Date): string {
+  return new Date(
+    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
+  ).toISOString();
+}
+
 export async function fetchAllOrganizations(
   options?: { limit?: number; offset?: number },
 ): Promise<Organization[]> {
@@ -40,7 +47,7 @@ export async function fetchAllOrganizations(
     async () => {
       const { data, error } = await supabase
         .from("organizations")
-        .select(ORGANIZATION_COLS)
+        .select(ORGANIZATION_WITH_BILLING_COLS)
         .order("name")
         .range(offset, offset + limit - 1);
       if (error) throw error;
@@ -72,7 +79,10 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
       shift_display_mode: data.shiftDisplayMode || 'code',
       timezone: data.timezone || null,
       pay_period_start_date: data.payPeriodStartDate || null,
+      subscription_status: "trialing",
+      trial_ends_at: defaultTrialEndFrom(new Date()),
       enforce_conflict_prevention: data.enforceConflictPrevention ?? false,
+      coverage_rule_config: data.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
       data_retention_days: data.dataRetentionDays ?? 365,
       feature_overrides: data.featureOverrides ?? {},
     })
@@ -219,9 +229,12 @@ export async function fetchFullAuditLog(options?: {
     orgId: (row.org_id as string | null) ?? null,
     actorId: (row.actor_id as string | null) ?? null,
     actorEmail: (row.actor_email as string | null) ?? null,
+    actorName: null,
     action: row.action as string,
     resourceType: row.resource_type as string,
     resourceId: (row.resource_id as string | null) ?? null,
+    targetLabel: null,
+    targetEmail: null,
     details: (row.details ?? {}) as Record<string, unknown>,
     createdAt: row.created_at as string,
   }));

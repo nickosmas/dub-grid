@@ -217,6 +217,15 @@ export function resolveShiftJobSegments(
       focusAreaId: shift?.focusAreaId ?? assignment?.focusAreaId ?? null,
       showJobOnGrid: shouldShowJobOnGrid(job),
       isShiftless: shift == null,
+      isShiftOnly: assignment != null
+        ? buildShiftDisplayParts({
+            shift,
+            job,
+            assignment,
+            shiftDisplayMode: maps.shiftDisplayMode,
+          }).isShiftOnly
+        : false,
+      isMentored: false,
       startTime: assignment?.defaultStartTime ?? resolvedJobTimes.startTime,
       endTime: assignment?.defaultEndTime ?? resolvedJobTimes.endTime,
     });

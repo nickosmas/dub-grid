@@ -6,6 +6,7 @@ import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
 import { EditModalState, AssignmentDefinition, ShiftCategory, JobDefinition, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode, Employee, ScheduleCellInput, ShiftJobSegment } from "@/types";
+import CustomSelect from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
 import {
   buildAssignableShiftDisplayMap,
@@ -17,6 +18,7 @@ import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { Check, ChevronLeft, ChevronRight, User } from "lucide-react";
 import {
   buildShiftDiffDescriptors,
   expandDelimitedTimeRanges,
@@ -95,19 +97,52 @@ interface ShiftEditPanelProps {
   /** True if there's already an active request for this shift. */
   hasActiveRequest?: boolean;
   /** Callback to submit an offer-for-pickup request for this shift. */
-  onMakeAvailable?: () => void;
+  onMakeAvailable?: (options?: {
+    targetEmpId?: string;
+    targetShiftDate?: string;
+    absenceTypeId?: number;
+    requesterSegmentIndex?: number;
+  }) => void | Promise<unknown>;
   /** Callback to submit a calloff request with the selected absence type. */
-  onCallOff?: (absenceType: AbsenceType) => void;
+  onCallOff?: (
+    absenceType: AbsenceType,
+    options?: { requesterSegmentIndex?: number },
+  ) => void | Promise<unknown>;
   /** Eligible employees available for swap selection. */
   employees?: Employee[];
   /** Returns the display label for an employee's shift on a given date. */
   shiftForKey?: (empId: string, date: Date) => string | null;
+  /** Returns a spelled-out shift label for request surfaces. */
+  shiftNameForKey?: (empId: string, date: Date) => string | null;
   /** True when the target shift can be requested in a swap flow. */
   isRequestableShift?: (empId: string, date: Date) => boolean;
+  /** Dates currently loaded in the broader schedule fetch window, used to bound swap week navigation. */
+  availableSwapDates?: string[];
+  /** True when the target shift is already in progress or in the past. */
+  isShiftStarted?: (empId: string, date: Date) => boolean;
+  /** True when a specific chronological segment is already in progress or in the past. */
+  isShiftSegmentStarted?: (
+    empId: string,
+    date: Date,
+    segmentIndex: number,
+  ) => boolean;
   /** Returns time ranges used to detect swap conflicts. */
   getShiftTimeRanges?: (empId: string, date: Date) => TimeRange[];
+  /** Returns focus area IDs required by the published shift on a given date. */
+  getShiftFocusAreaIds?: (empId: string, date: Date) => number[];
+  /** Returns published worked segments for request segment selection. */
+  getShiftSegments?: (empId: string, date: Date) => ShiftJobSegment[];
+  /** Returns the published absence type ID for an employee on a given date. */
+  getAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Submits a swap request for the selected target shift. */
-  onSubmitSwap?: (targetEmpId: string, targetShiftDate: string) => void;
+  onSubmitSwap?: (
+    targetEmpId: string,
+    targetShiftDate: string,
+    options?: {
+      requesterSegmentIndex?: number;
+      targetSegmentIndex?: number;
+    },
+  ) => void | Promise<unknown>;
   /** Available absence types for off-day selection. */
   absenceTypes?: AbsenceType[];
   /** Currently active absence type ID on this cell. */
@@ -146,6 +181,10 @@ function fmt12h(time24: string | null | undefined): string {
   return `${hour}:${minute} ${period}`;
 }
 
+function formatTimeRangeLabel(range: TimeRange): string {
+  return `${fmt12h(range.start)} - ${fmt12h(range.end)}`;
+}
+
 /** Normalize a time string to HH:MM (DB TIME columns may include seconds). */
 function normalizeTime(t: string): string {
   return t.slice(0, 5);
@@ -171,8 +210,42 @@ function formatDisplayDate(iso: string): string {
   });
 }
 
+function formatWeekRangeLabel(startIso: string): string {
+  const formatRangeDate = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+  return `${formatRangeDate(startIso)} - ${formatRangeDate(addDaysIso(startIso, 6))}`;
+}
+
 function todayIso(): string {
   return formatDateKey(new Date());
+}
+
+function getWeekDates(startIso: string): string[] {
+  return Array.from({ length: 7 }, (_, index) => addDaysIso(startIso, index));
+}
+
+function differenceInDaysIso(leftIso: string, rightIso: string): number {
+  const left = new Date(`${leftIso}T00:00:00`).getTime();
+  const right = new Date(`${rightIso}T00:00:00`).getTime();
+  return Math.round((left - right) / 86_400_000);
+}
+
+function getCalendarWeekStart(dateIso: string): string {
+  const date = new Date(`${dateIso}T00:00:00`);
+  return addDaysIso(dateIso, -date.getUTCDay());
+}
+
+function getAbsenceTypeDisplayName(absenceType: AbsenceType | null): string {
+  const name = absenceType?.name?.trim() ?? "";
+  if (name.length > 0) {
+    return name;
+  }
+
+  return absenceType?.label ?? "Absence";
 }
 
 // ── Color helper — darken a hex/rgb color for borders ─────────────────────
@@ -207,6 +280,9 @@ function getPanelDiffBadgeBackground(
   }
 }
 
+const shiftEditCardOuterRadius = "var(--dg-radius-md)";
+const shiftEditCardInnerRadius = "calc(var(--dg-radius-md) - 2px)";
+
 function getPanelDiffBorder(args: {
   diffKind: ShiftDiffBorderKind;
   fallback: string;
@@ -226,6 +302,12 @@ function joinMultiTimes(times: (string | null)[]): string | null {
   return times.map(t => t ?? '').join('|');
 }
 
+function getFirstTimeSegment(time: string | null | undefined): string | null {
+  if (!time) return null;
+  const segment = time.split("|")[0]?.trim();
+  return segment ? segment : null;
+}
+
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(':').map(Number);
   return h * 60 + m;
@@ -234,55 +316,6 @@ function timeToMinutes(t: string): number {
 // ── Per-pill custom time editor (custom dropdown views, immediate save) ───
 const HOURS = [1,2,3,4,5,6,7,8,9,10,11,12];
 const MINUTES = ["00","05","10","15","20","25","30","35","40","45","50","55"];
-
-const triggerStyle: React.CSSProperties = {
-  padding: "6px 8px",
-  border: "1.5px solid var(--color-border)",
-  borderRadius: "var(--dg-btn-radius)",
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 600,
-  fontFamily: "inherit",
-  background: "var(--color-surface)",
-  textAlign: "center",
-  cursor: "pointer",
-  outline: "none",
-  boxSizing: "border-box",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 2,
-  userSelect: "none",
-  position: "relative",
-};
-
-const dropdownStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 4px)",
-  left: "50%",
-  transform: "translateX(-50%)",
-  background: "var(--color-surface)",
-  border: "1.5px solid var(--color-border)",
-  borderRadius: "var(--dg-radius-lg)",
-  boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-  zIndex: 100,
-  maxHeight: 180,
-  overflowY: "auto",
-  overflowX: "hidden",
-  minWidth: 52,
-  padding: 4,
-  scrollbarWidth: "none",
-};
-
-const optionStyle: React.CSSProperties = {
-  padding: "9px 14px",
-  fontSize: "var(--dg-fs-caption)",
-  fontWeight: 500,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  textAlign: "center",
-  whiteSpace: "nowrap",
-  borderRadius: "var(--dg-radius-sm)",
-};
 
 function TimeDropdown({
   value,
@@ -297,55 +330,16 @@ function TimeDropdown({
   width: number;
   placeholder?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  const close = useCallback(() => setOpen(false), []);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open, close]);
-
-  const display = value || placeholder || "--";
-
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        style={{ ...triggerStyle, width, color: value ? "inherit" : "var(--color-text-muted)" }}
-      >
-        {display}
-        <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ marginLeft: 1, flexShrink: 0 }}>
-          <path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      {open && (
-        <div style={dropdownStyle}>
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              onClick={() => { onChange(opt.value); close(); }}
-              style={{
-                ...optionStyle,
-                background: opt.value === value ? "var(--color-border-light)" : "transparent",
-                color: opt.value === value ? "var(--color-text-primary)" : "var(--color-text-primary)",
-                fontWeight: opt.value === value ? 700 : 500,
-              }}
-              onMouseEnter={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "var(--color-bg-secondary)"); }}
-              onMouseLeave={(e) => { if (opt.value !== value) (e.currentTarget.style.background = "transparent"); }}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <CustomSelect
+      value={value}
+      options={options}
+      onChange={onChange}
+      placeholder={placeholder ?? "--"}
+      style={{ width }}
+      height={30}
+      fontSize="var(--dg-fs-caption)"
+    />
   );
 }
 
@@ -639,8 +633,15 @@ export default function ShiftEditPanel({
   onCallOff,
   employees = [],
   shiftForKey,
+  shiftNameForKey,
   isRequestableShift,
+  availableSwapDates,
+  isShiftStarted,
+  isShiftSegmentStarted,
   getShiftTimeRanges,
+  getShiftFocusAreaIds,
+  getShiftSegments,
+  getAbsenceTypeIdForKey,
   onSubmitSwap,
   absenceTypes = [],
   currentAbsenceTypeId,
@@ -674,24 +675,46 @@ export default function ShiftEditPanel({
   const [showCoverageCalloffOptions, setShowCoverageCalloffOptions] = useState(
     false,
   );
+  const [showPickupTargetOptions, setShowPickupTargetOptions] = useState(false);
+  const [selectedRequesterSegmentIndex, setSelectedRequesterSegmentIndex] =
+    useState(0);
   const [swapViewDate, setSwapViewDate] = useState(formatDateKey(modal.date));
+  const [hasExplicitSwapDateSelection, setHasExplicitSwapDateSelection] =
+    useState(false);
+  const [swapWeekStartDate, setSwapWeekStartDate] = useState(
+    getCalendarWeekStart(formatDateKey(modal.date)),
+  );
   const [selectedSwapTarget, setSelectedSwapTarget] = useState<{
     empId: string;
     name: string;
     shiftLabel: string;
+    timeLabel: string | null;
+    focusAreaLabel: string | null;
+    targetSegmentIndex?: number;
   } | null>(null);
   const [pendingRequestConfirmation, setPendingRequestConfirmation] = useState<
-    | { kind: "pickup" }
-    | { kind: "calloff"; absenceType: AbsenceType }
+    | { kind: "pickup"; requesterSegmentIndex?: number }
+    | {
+        kind: "targeted_pickup";
+        targetEmpId: string;
+        targetName: string;
+        absenceType: AbsenceType;
+        requesterSegmentIndex?: number;
+      }
+    | { kind: "calloff"; absenceType: AbsenceType; requesterSegmentIndex?: number }
     | {
         kind: "swap";
         targetEmpId: string;
         targetShiftDate: string;
         targetName: string;
         targetShiftLabel: string;
+        requesterSegmentIndex?: number;
+        targetSegmentIndex?: number;
       }
     | null
   >(null);
+  const [isSubmittingRequestConfirmation, setIsSubmittingRequestConfirmation] =
+    useState(false);
   const repeatFormRef = useRef<RepeatFormHandle | null>(null);
   const activeAbsenceTypes = absenceTypes.filter((at) => !at.archivedAt);
   const requestShiftDate = formatDateKey(modal.date);
@@ -704,6 +727,16 @@ export default function ShiftEditPanel({
     currentShift && currentShift !== "OFF"
       ? currentShift
       : shiftForKey?.(modal.empId, modal.date) ?? "";
+  const getSwapShiftLabel = useCallback(
+    (employeeId: string, date: Date) =>
+      shiftNameForKey?.(employeeId, date) ?? shiftForKey?.(employeeId, date) ?? "",
+    [shiftForKey, shiftNameForKey],
+  );
+  const focusAreaNameById = useMemo(
+    () =>
+      new Map((focusAreas ?? []).map((focusArea) => [focusArea.id, focusArea.name])),
+    [focusAreas],
+  );
 
   // Capture initial state at mount so Cancel can revert
   const [initialShift] = useState(() => currentShift);
@@ -792,8 +825,25 @@ export default function ShiftEditPanel({
     ],
   );
 
+  function segmentsMatchInitial(): boolean {
+    if (currentSegments.length !== initialSegments.length) return false;
+    return currentSegments.every((segment, index) => {
+      const initial = initialSegments[index];
+      return (
+        initial != null &&
+        segment.shiftId === initial.shiftId &&
+        segment.jobId === initial.jobId &&
+        (segment.position ?? index) === (initial.position ?? index) &&
+        (segment.isMentored ?? false) === (initial.isMentored ?? false)
+      );
+    });
+  }
+
   // Derive whether any edits have been made since panel opened
-  const hasShiftEdit = currentShift !== initialShift || (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId;
+  const hasShiftEdit =
+    currentShift !== initialShift ||
+    (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
+    !segmentsMatchInitial();
   const hasTimeEdit = (customStartTime ?? null) !== initialCustomStartTime
     || (customEndTime ?? null) !== initialCustomEndTime;
   const hasNoteEdit = (() => {
@@ -931,8 +981,8 @@ export default function ShiftEditPanel({
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
   const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
-  function buildPanelInput(args: {
-    segments: Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position">>;
+	  function buildPanelInput(args: {
+	    segments: Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
     absenceTypeId: number | null;
     customStartTime: string | null;
     customEndTime: string | null;
@@ -959,13 +1009,45 @@ export default function ShiftEditPanel({
         shiftId: segment.shiftId,
         jobId: segment.jobId,
         position: segment.position ?? index,
+        isMentored: segment.isMentored ?? false,
       })),
       absenceTypeId: null,
-      customStartTime: args.customStartTime,
-      customEndTime: args.customEndTime,
+      customStartTime:
+        args.segments.length === 1
+          ? getFirstTimeSegment(args.customStartTime)
+          : args.customStartTime,
+      customEndTime:
+        args.segments.length === 1
+          ? getFirstTimeSegment(args.customEndTime)
+          : args.customEndTime,
       seriesId: seriesId ?? null,
       fromRecurring,
     };
+	  }
+
+  const isMentoredAssignment =
+    currentSegments.length > 0 &&
+    currentSegments.every((segment) => segment.isMentored === true);
+
+  function handleMentoredToggleAtIndex(segmentIndex: number, nextMentored: boolean) {
+    onSelect(
+      buildPanelInput({
+        segments: currentSegments.map((segment, index) => ({
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: segment.position ?? index,
+          isMentored: index === segmentIndex ? nextMentored : (segment.isMentored ?? false),
+        })),
+        absenceTypeId: null,
+        customStartTime: customStartTime ?? null,
+        customEndTime: customEndTime ?? null,
+      }),
+      seriesId ? seriesScope : undefined,
+    );
+  }
+
+  function handleMentoredToggle() {
+    handleMentoredToggleAtIndex(0, !isMentoredAssignment);
   }
 
   function handleUndo() {
@@ -1077,9 +1159,104 @@ export default function ShiftEditPanel({
     ? currentShift.split("/").filter((l) => l !== "OFF")
     : [];
 
+  function getSegmentSortTime(segment: ShiftJobSegment): string {
+    return segment.startTime ?? "99:99:99";
+  }
+
+  function getRequestSegmentOptions(segments: ShiftJobSegment[]) {
+    return segments
+      .map((segment, originalIndex) => ({ segment, originalIndex }))
+      .sort((left, right) => {
+        const timeComparison = getSegmentSortTime(left.segment).localeCompare(
+          getSegmentSortTime(right.segment),
+        );
+        return timeComparison === 0
+          ? left.originalIndex - right.originalIndex
+          : timeComparison;
+      })
+      .map(({ segment }, index) => ({ segment, segmentIndex: index }));
+  }
+
+  function getSpelledOutSegmentLabel(
+    segment: ShiftJobSegment,
+    fallbackLabel: string,
+  ): string {
+    const explicitShiftName = segment.shiftName?.trim();
+    if (explicitShiftName) {
+      return explicitShiftName;
+    }
+
+    const assignment =
+      (segment.assignmentId != null
+        ? assignments.find((candidate) => candidate.id === segment.assignmentId)
+        : null) ??
+      assignments.find(
+        (candidate) =>
+          (candidate.shiftId ?? candidate.categoryId ?? null) ===
+            (segment.shiftId ?? null) &&
+          candidate.jobId === segment.jobId,
+      ) ??
+      null;
+    const shiftId =
+      segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
+    const shift =
+      shiftId != null
+        ? (shiftCategories.find((candidate) => candidate.id === shiftId) ?? null)
+        : null;
+
+    if (shift?.name?.trim()) {
+      return shift.name;
+    }
+
+    const job =
+      segment.jobId != null
+        ? (jobs.find((candidate) => candidate.id === segment.jobId) ?? null)
+        : null;
+
+    return (
+      segment.jobName?.trim() ||
+      job?.name?.trim() ||
+      assignment?.name?.trim() ||
+      segment.label?.trim() ||
+      fallbackLabel
+    );
+  }
+
+  function getRequestSegmentLabel(
+    segments: ShiftJobSegment[],
+    segmentIndex: number,
+    fallbackLabel: string,
+  ): string {
+    const option =
+      getRequestSegmentOptions(segments)[segmentIndex] ??
+      getRequestSegmentOptions(segments)[0] ??
+      null;
+    if (!option) return fallbackLabel;
+    const label = getSpelledOutSegmentLabel(option.segment, fallbackLabel);
+    const timeLabel =
+      option.segment.startTime && option.segment.endTime
+        ? `${fmt12h(option.segment.startTime)} - ${fmt12h(option.segment.endTime)}`
+        : null;
+    return timeLabel ? `${label} (${timeLabel})` : label;
+  }
+
+  const requesterSegmentOptions = getRequestSegmentOptions(currentSegments);
+  const isRequesterSegmentStarted = useCallback(
+    (segmentIndex: number): boolean =>
+      Boolean(isShiftSegmentStarted?.(modal.empId, modal.date, segmentIndex)),
+    [isShiftSegmentStarted, modal.date, modal.empId],
+  );
+  const firstRequestableRequesterSegmentIndex =
+    requesterSegmentOptions.find(
+      (option) => !isRequesterSegmentStarted(option.segmentIndex),
+    )?.segmentIndex ?? 0;
+  const requesterSegmentIndexForRequest =
+    requesterSegmentOptions.length > 1 ? selectedRequesterSegmentIndex : undefined;
+
   function resolveShiftPreview(
     codeId?: number | null,
     fallbackLabel?: string | null,
+    displayMode: ShiftDisplayMode = shiftDisplayMode,
   ) {
     const assignment =
       (codeId != null
@@ -1118,7 +1295,7 @@ export default function ShiftEditPanel({
         shift: shiftCategory,
         job,
         assignment,
-        shiftDisplayMode,
+        shiftDisplayMode: displayMode,
       }),
     };
   }
@@ -1131,6 +1308,37 @@ export default function ShiftEditPanel({
       ? `${input.primaryLabel} · ${input.secondaryLabel}`
       : input.primaryLabel;
   }
+
+  const requesterSwapShiftLabel = useMemo(() => {
+    const currentShiftDetailLabels = currentLabels
+      .map((label, index) =>
+        formatPreviewLabel(
+          resolveShiftPreview(currentAssignmentIds[index], label, "name").displayParts,
+        ),
+      )
+      .filter((label) => label.trim().length > 0);
+
+    if (currentShiftDetailLabels.length > 0) {
+      return currentShiftDetailLabels.join(" / ");
+    }
+
+    return getSwapShiftLabel(modal.empId, modal.date) || requesterShiftLabel;
+  }, [
+    currentAssignmentIds,
+    currentLabels,
+    getSwapShiftLabel,
+    modal.date,
+    modal.empId,
+    requesterShiftLabel,
+  ]);
+  const selectedRequesterLabel =
+    requesterSegmentOptions.length > 1
+      ? getRequestSegmentLabel(
+          currentSegments,
+          selectedRequesterSegmentIndex,
+          requesterSwapShiftLabel || requesterShiftLabel || "assigned",
+        )
+      : requesterSwapShiftLabel || requesterShiftLabel || "assigned";
 
   function getAssignmentDefinitionStyle(label: string, codeId?: number) {
     if (codeId != null) {
@@ -1157,13 +1365,13 @@ export default function ShiftEditPanel({
   };
 
   const hasSwapTimeConflict = useCallback(
-    (targetEmpId: string): boolean => {
+    (targetEmpId: string, targetDate: string): boolean => {
       if (!getShiftTimeRanges) return false;
 
-      const viewDateObj = new Date(`${swapViewDate}T00:00:00`);
+      const viewDateObj = new Date(`${targetDate}T00:00:00`);
       const requestDateObj = new Date(`${requestShiftDate}T00:00:00`);
 
-      if (swapViewDate === requestShiftDate) {
+      if (targetDate === requestShiftDate) {
         const requesterTimes = getShiftTimeRanges(modal.empId, requestDateObj);
         const targetTimes = getShiftTimeRanges(targetEmpId, viewDateObj);
         return timesOverlap(requesterTimes, targetTimes);
@@ -1187,44 +1395,264 @@ export default function ShiftEditPanel({
 
       return false;
     },
-    [getShiftTimeRanges, modal.empId, requestShiftDate, swapViewDate],
+    [getShiftTimeRanges, modal.empId, requestShiftDate],
   );
 
-  const eligibleSwapEmployees = useMemo(() => {
+  const canWorkRequiredFocusAreas = useCallback(
+    (employeeFocusAreaIds: number[], requiredFocusAreaIds: number[]) => {
+      if (requiredFocusAreaIds.length === 0) {
+        return true;
+      }
+
+      return requiredFocusAreaIds.every((focusAreaId) =>
+        employeeFocusAreaIds.includes(focusAreaId),
+      );
+    },
+    [],
+  );
+
+  const getSwapTimeLabel = useCallback(
+    (employeeId: string, date: Date) => {
+      const ranges = getShiftTimeRanges?.(employeeId, date) ?? [];
+      if (ranges.length === 0) {
+        return null;
+      }
+
+      return ranges.map((range) => formatTimeRangeLabel(range)).join(" / ");
+    },
+    [getShiftTimeRanges],
+  );
+
+  const getSwapFocusAreaLabel = useCallback(
+    (employeeId: string, date: Date) => {
+      const focusAreaIds = getShiftFocusAreaIds?.(employeeId, date) ?? [];
+      const names = focusAreaIds
+        .map((focusAreaId) => focusAreaNameById.get(focusAreaId) ?? null)
+        .filter((name): name is string => Boolean(name));
+
+      if (names.length === 0) {
+        return null;
+      }
+
+      return names.join(" / ");
+    },
+    [focusAreaNameById, getShiftFocusAreaIds],
+  );
+  const requesterSwapTimeLabel = getSwapTimeLabel(modal.empId, modal.date);
+  const requesterSwapFocusAreaLabel = getSwapFocusAreaLabel(modal.empId, modal.date);
+
+  const getFallbackRequiredFocusAreaIds = useCallback(
+    (assignmentIds: number[]) => {
+      const focusAreaIds = new Set<number>();
+
+      for (const assignmentId of assignmentIds) {
+        const assignment = assignments.find((item) => item.id === assignmentId);
+        if (assignment?.focusAreaId != null) {
+          focusAreaIds.add(assignment.focusAreaId);
+        }
+      }
+
+      return [...focusAreaIds];
+    },
+    [assignments],
+  );
+
+  const getEligibleSwapEmployeesForDate = useCallback((date: string) => {
     if (!canRenderSwap || !isRequestableShift) {
       return [];
     }
 
-    const viewDateObj = new Date(`${swapViewDate}T00:00:00`);
+    if (date < todayIso()) {
+      return [];
+    }
+
+    const viewDateObj = new Date(`${date}T00:00:00`);
+    const requestDateObj = new Date(`${requestShiftDate}T00:00:00`);
+    const requesterShiftFocusAreaIds =
+      getShiftFocusAreaIds?.(modal.empId, requestDateObj) ??
+      getFallbackRequiredFocusAreaIds(currentAssignmentIds);
 
     return employees.filter((employee) => {
+      const targetShiftFocusAreaIds =
+        getShiftFocusAreaIds?.(employee.id, viewDateObj) ?? [];
+
       return (
         employee.id !== modal.empId &&
         !employee.archivedAt &&
         employee.status === "active" &&
         isRequestableShift(employee.id, viewDateObj) &&
-        !hasSwapTimeConflict(employee.id)
+        !isShiftStarted?.(employee.id, viewDateObj) &&
+        canWorkRequiredFocusAreas(
+          modal.empFocusAreaIds,
+          targetShiftFocusAreaIds,
+        ) &&
+        canWorkRequiredFocusAreas(
+          employee.focusAreaIds,
+          requesterShiftFocusAreaIds,
+        ) &&
+        !hasSwapTimeConflict(employee.id, date)
       );
     });
   }, [
     canRenderSwap,
+    canWorkRequiredFocusAreas,
+    currentAssignmentIds,
     employees,
+    getFallbackRequiredFocusAreaIds,
+    getShiftFocusAreaIds,
     hasSwapTimeConflict,
     isRequestableShift,
+    isShiftStarted,
+    modal.empFocusAreaIds,
     modal.empId,
-    swapViewDate,
+    requestShiftDate,
   ]);
+
+  const swapNavigationDates = useMemo(() => {
+    const loadedDates = [...new Set(availableSwapDates ?? [])]
+      .filter((date) => date >= todayIso())
+      .sort();
+
+    return loadedDates.length > 0
+      ? loadedDates
+      : getWeekDates(getCalendarWeekStart(requestShiftDate));
+  }, [availableSwapDates, requestShiftDate]);
+  const eligibleSwapWeekStarts = useMemo(() => {
+    const seen = new Set<string>();
+    const weekStarts: string[] = [];
+
+    for (const date of swapNavigationDates) {
+      if (getEligibleSwapEmployeesForDate(date).length === 0) {
+        continue;
+      }
+
+      const weekStart = getCalendarWeekStart(date);
+      if (!seen.has(weekStart)) {
+        seen.add(weekStart);
+        weekStarts.push(weekStart);
+      }
+    }
+
+    return weekStarts.sort();
+  }, [getEligibleSwapEmployeesForDate, requestShiftDate, swapNavigationDates]);
+  const previousEligibleSwapWeekStart =
+    [...eligibleSwapWeekStarts].reverse().find(
+      (weekStart) => weekStart < swapWeekStartDate,
+    ) ?? null;
+  const nextEligibleSwapWeekStart =
+    eligibleSwapWeekStarts.find((weekStart) => weekStart > swapWeekStartDate) ??
+    null;
+  const swapWeekDates = useMemo(
+    () => getWeekDates(swapWeekStartDate),
+    [swapWeekStartDate],
+  );
+  const swapWeekCounts = useMemo(
+    () =>
+      new Map(
+        swapWeekDates.map((date) => [
+          date,
+          getEligibleSwapEmployeesForDate(date).length,
+        ]),
+      ),
+    [getEligibleSwapEmployeesForDate, swapWeekDates],
+  );
+  const firstEligibleSwapDate = useMemo(
+    () =>
+      swapWeekDates.find((date) => (swapWeekCounts.get(date) ?? 0) > 0) ??
+      swapWeekDates[0] ??
+      requestShiftDate,
+    [requestShiftDate, swapWeekCounts, swapWeekDates],
+  );
+  const swapViewDateIsInWeek = swapWeekDates.includes(swapViewDate);
+  const activeSwapViewDate =
+    hasExplicitSwapDateSelection && swapViewDateIsInWeek
+      ? swapViewDate
+      : firstEligibleSwapDate;
+  const eligibleSwapEmployees = useMemo(
+    () => getEligibleSwapEmployeesForDate(activeSwapViewDate),
+    [activeSwapViewDate, getEligibleSwapEmployeesForDate],
+  );
+
+  const getTargetedPickupTargetsForDate = useCallback((date: string) => {
+    if (!getAbsenceTypeIdForKey) {
+      return [];
+    }
+
+    const requestDateObj = new Date(`${date}T00:00:00`);
+    const requesterShiftFocusAreaIds =
+      getShiftFocusAreaIds?.(modal.empId, requestDateObj) ??
+      getFallbackRequiredFocusAreaIds(currentAssignmentIds);
+
+    return employees
+      .flatMap((employee) => {
+        const absenceTypeId = getAbsenceTypeIdForKey(employee.id, requestDateObj);
+        if (
+          employee.id === modal.empId ||
+          employee.archivedAt ||
+          employee.status !== "active" ||
+          absenceTypeId == null ||
+          !canWorkRequiredFocusAreas(
+            employee.focusAreaIds,
+            requesterShiftFocusAreaIds,
+          )
+        ) {
+          return [];
+        }
+
+        const absenceType =
+          absenceTypes.find((candidate) => candidate.id === absenceTypeId) ?? null;
+
+        return [
+          {
+            employee,
+            absenceType,
+            absenceTypeId,
+            absenceTypeLabel: getAbsenceTypeDisplayName(absenceType),
+          },
+        ];
+      })
+      .sort((left, right) => {
+        const seniorityComparison =
+          (left.employee.seniority ?? Number.MAX_SAFE_INTEGER) -
+          (right.employee.seniority ?? Number.MAX_SAFE_INTEGER);
+
+        if (seniorityComparison !== 0) {
+          return seniorityComparison;
+        }
+
+        return `${left.employee.firstName} ${left.employee.lastName}`.localeCompare(
+          `${right.employee.firstName} ${right.employee.lastName}`,
+        );
+      });
+  }, [
+    absenceTypes,
+    canWorkRequiredFocusAreas,
+    currentAssignmentIds,
+    employees,
+    getAbsenceTypeIdForKey,
+    getFallbackRequiredFocusAreaIds,
+    getShiftFocusAreaIds,
+    modal.empId,
+  ]);
+  const targetedPickupTargets = useMemo(
+    () => getTargetedPickupTargetsForDate(requestShiftDate),
+    [getTargetedPickupTargetsForDate, requestShiftDate],
+  );
 
   function resetSwapSelection(nextDate: string = requestShiftDate) {
     setSwapViewDate(nextDate);
+    setHasExplicitSwapDateSelection(false);
+    setSwapWeekStartDate(getCalendarWeekStart(nextDate));
     setSelectedSwapTarget(null);
   }
 
   function openRequestMode(nextMode: "coverage" | "swap") {
     setPendingRequestConfirmation(null);
     setActiveRequestMode(nextMode);
+    setSelectedRequesterSegmentIndex(firstRequestableRequesterSegmentIndex);
     if (nextMode !== "coverage") {
       setShowCoverageCalloffOptions(false);
+      setShowPickupTargetOptions(false);
     }
     if (nextMode !== "swap") {
       resetSwapSelection();
@@ -1234,6 +1662,7 @@ export default function ShiftEditPanel({
   function closeRequestSection() {
     setPendingRequestConfirmation(null);
     setShowCoverageCalloffOptions(false);
+    setShowPickupTargetOptions(false);
     resetSwapSelection();
     if (requestOnlyMode) {
       onClose();
@@ -1242,18 +1671,51 @@ export default function ShiftEditPanel({
     setActiveRequestMode(null);
   }
 
-  function handleSwapDay(delta: 1 | -1) {
-    resetSwapSelection(addDaysIso(swapViewDate, delta));
+  function handleSwapWeek(delta: 1 | -1) {
+    const nextWeekStart =
+      delta < 0 ? previousEligibleSwapWeekStart : nextEligibleSwapWeekStart;
+
+    if (!nextWeekStart) {
+      return;
+    }
+
+    const firstEligibleDate =
+      getWeekDates(nextWeekStart).find(
+        (date) => getEligibleSwapEmployeesForDate(date).length > 0,
+      ) ?? nextWeekStart;
+
+    setSwapWeekStartDate(nextWeekStart);
+    setSwapViewDate(firstEligibleDate);
+    setHasExplicitSwapDateSelection(false);
+    setSelectedSwapTarget(null);
   }
 
-  function handleSelectSwapEmployee(employee: Employee) {
+  function handleSwapDateSelect(date: string) {
+    setSwapViewDate(date);
+    setHasExplicitSwapDateSelection(true);
+    setSelectedSwapTarget(null);
+  }
+
+  function handleSelectSwapEmployee(employee: Employee, targetSegmentIndex?: number) {
     if (!shiftForKey) return;
 
-    const dateObj = new Date(`${swapViewDate}T00:00:00`);
+    const dateObj = new Date(`${activeSwapViewDate}T00:00:00`);
+    const targetSegments = getShiftSegments?.(employee.id, dateObj) ?? [];
+    const targetLabel =
+      targetSegmentIndex != null
+        ? getRequestSegmentLabel(
+            targetSegments,
+            targetSegmentIndex,
+            getSwapShiftLabel(employee.id, dateObj),
+          )
+        : getSwapShiftLabel(employee.id, dateObj);
     setSelectedSwapTarget({
       empId: employee.id,
       name: `${employee.firstName} ${employee.lastName}`,
-      shiftLabel: shiftForKey(employee.id, dateObj) ?? "",
+      shiftLabel: targetLabel,
+      timeLabel: getSwapTimeLabel(employee.id, dateObj),
+      focusAreaLabel: getSwapFocusAreaLabel(employee.id, dateObj),
+      targetSegmentIndex,
     });
   }
 
@@ -1262,32 +1724,99 @@ export default function ShiftEditPanel({
     setPendingRequestConfirmation({
       kind: "swap",
       targetEmpId: selectedSwapTarget.empId,
-      targetShiftDate: swapViewDate,
+      targetShiftDate: activeSwapViewDate,
       targetName: selectedSwapTarget.name,
       targetShiftLabel: selectedSwapTarget.shiftLabel,
+      requesterSegmentIndex: requesterSegmentIndexForRequest,
+      targetSegmentIndex: selectedSwapTarget.targetSegmentIndex,
     });
   }
 
-  function confirmPendingRequest() {
-    if (!pendingRequestConfirmation) return;
+  function didRequestActionComplete(result: unknown) {
+    return result !== false && result !== null;
+  }
+
+  async function confirmPendingRequest() {
+    if (!pendingRequestConfirmation || isSubmittingRequestConfirmation) return;
 
     const requestToConfirm = pendingRequestConfirmation;
-    setPendingRequestConfirmation(null);
+    setIsSubmittingRequestConfirmation(true);
 
-    if (requestToConfirm.kind === "pickup") {
-      onMakeAvailable?.();
-      return;
+    try {
+      if (requestToConfirm.kind === "pickup") {
+        let result: unknown;
+        if (requestToConfirm.requesterSegmentIndex != null) {
+          result = await onMakeAvailable?.({
+            requesterSegmentIndex: requestToConfirm.requesterSegmentIndex,
+          });
+        } else {
+          result = await onMakeAvailable?.();
+        }
+        if (didRequestActionComplete(result)) {
+          setPendingRequestConfirmation(null);
+        }
+        return;
+      }
+
+      if (requestToConfirm.kind === "targeted_pickup") {
+        const result = await onMakeAvailable?.({
+          targetEmpId: requestToConfirm.targetEmpId,
+          targetShiftDate: requestShiftDate,
+          absenceTypeId: requestToConfirm.absenceType.id,
+          ...(requestToConfirm.requesterSegmentIndex != null
+            ? { requesterSegmentIndex: requestToConfirm.requesterSegmentIndex }
+            : {}),
+        });
+        if (didRequestActionComplete(result)) {
+          setPendingRequestConfirmation(null);
+        }
+        return;
+      }
+
+      if (requestToConfirm.kind === "calloff") {
+        let result: unknown;
+        if (requestToConfirm.requesterSegmentIndex != null) {
+          result = await onCallOff?.(requestToConfirm.absenceType, {
+            requesterSegmentIndex: requestToConfirm.requesterSegmentIndex,
+          });
+        } else {
+          result = await onCallOff?.(requestToConfirm.absenceType);
+        }
+        if (didRequestActionComplete(result)) {
+          setPendingRequestConfirmation(null);
+        }
+        return;
+      }
+
+      const swapOptions =
+        requestToConfirm.requesterSegmentIndex != null ||
+        requestToConfirm.targetSegmentIndex != null
+          ? {
+              requesterSegmentIndex: requestToConfirm.requesterSegmentIndex,
+              targetSegmentIndex: requestToConfirm.targetSegmentIndex,
+            }
+          : undefined;
+      if (swapOptions) {
+        const result = await onSubmitSwap?.(
+          requestToConfirm.targetEmpId,
+          requestToConfirm.targetShiftDate,
+          swapOptions,
+        );
+        if (didRequestActionComplete(result)) {
+          setPendingRequestConfirmation(null);
+        }
+      } else {
+        const result = await onSubmitSwap?.(
+          requestToConfirm.targetEmpId,
+          requestToConfirm.targetShiftDate,
+        );
+        if (didRequestActionComplete(result)) {
+          setPendingRequestConfirmation(null);
+        }
+      }
+    } finally {
+      setIsSubmittingRequestConfirmation(false);
     }
-
-    if (requestToConfirm.kind === "calloff") {
-      onCallOff?.(requestToConfirm.absenceType);
-      return;
-    }
-
-    onSubmitSwap?.(
-      requestToConfirm.targetEmpId,
-      requestToConfirm.targetShiftDate,
-    );
   }
 
   function renderPendingRequestConfirmation() {
@@ -1298,20 +1827,26 @@ export default function ShiftEditPanel({
         title={
           pendingRequestConfirmation.kind === "pickup"
             ? "Offer shift for pickup?"
+            : pendingRequestConfirmation.kind === "targeted_pickup"
+              ? "Request pickup?"
             : pendingRequestConfirmation.kind === "calloff"
               ? "Submit call off request?"
               : "Submit swap request?"
         }
         message={
           pendingRequestConfirmation.kind === "pickup"
-            ? `Offer your ${requesterShiftLabel || "assigned"} shift on ${formatDate(modal.date)} for pickup?`
+            ? `Offer your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} for pickup?`
+            : pendingRequestConfirmation.kind === "targeted_pickup"
+              ? `Ask ${pendingRequestConfirmation.targetName} to pick up your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} while you use ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}?`
             : pendingRequestConfirmation.kind === "calloff"
-              ? `Submit a ${pendingRequestConfirmation.absenceType.name} absence request for your ${requesterShiftLabel || "assigned"} shift on ${formatDate(modal.date)}?`
-              : `Swap your ${requesterShiftLabel || "assigned"} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
+              ? `Submit a ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
+              : `Swap your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
         }
         confirmLabel={
           pendingRequestConfirmation.kind === "pickup"
             ? "Offer for pickup"
+            : pendingRequestConfirmation.kind === "targeted_pickup"
+              ? "Request pickup"
             : pendingRequestConfirmation.kind === "calloff"
               ? "Submit call off"
               : "Submit swap"
@@ -1319,8 +1854,13 @@ export default function ShiftEditPanel({
         variant={
           pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"
         }
-        onConfirm={confirmPendingRequest}
-        onCancel={() => setPendingRequestConfirmation(null)}
+        isLoading={isSubmittingRequestConfirmation}
+        onConfirm={() => void confirmPendingRequest()}
+        onCancel={() => {
+          if (!isSubmittingRequestConfirmation) {
+            setPendingRequestConfirmation(null);
+          }
+        }}
       />
     );
   }
@@ -1344,6 +1884,7 @@ export default function ShiftEditPanel({
       cursor: "pointer",
       background: "var(--color-surface)",
       border: "1px solid var(--color-border)",
+      position: "relative",
     };
 
     const choiceTitleStyle: React.CSSProperties = {
@@ -1365,6 +1906,8 @@ export default function ShiftEditPanel({
           display: "flex",
           flexDirection: "column",
           gap: 16,
+          minHeight: 0,
+          ...(standalone ? { flex: 1 } : null),
         }}
       >
         {!standalone && (
@@ -1385,16 +1928,54 @@ export default function ShiftEditPanel({
           <button
             type="button"
             data-tour="edit-panel-coverage-pickup-btn"
-            onClick={() => setPendingRequestConfirmation({ kind: "pickup" })}
+            onClick={() => {
+              setShowCoverageCalloffOptions(false);
+              setShowPickupTargetOptions(true);
+            }}
             disabled={!onMakeAvailable}
             style={{
               ...choiceButtonBaseStyle,
-              borderColor: "var(--color-border)",
+              borderColor: showPickupTargetOptions
+                ? "var(--color-brand)"
+                : "var(--color-border)",
+              background: showPickupTargetOptions
+                ? "var(--color-bg-secondary)"
+                : "var(--color-surface)",
               opacity: onMakeAvailable ? 1 : 0.6,
               cursor: onMakeAvailable ? "pointer" : "not-allowed",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {showPickupTargetOptions ? (
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  width: 20,
+                  height: 20,
+                  borderRadius: 999,
+                  background: "var(--color-brand)",
+                  color: "var(--color-text-inverse)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
+                }}
+              >
+                <Check size={13} strokeWidth={3} />
+              </span>
+            ) : null}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                maxHeight: 260,
+                overflowY: "auto",
+                paddingRight: 28,
+              }}
+            >
               <div style={choiceTitleStyle}>Offer for pickup</div>
               <div style={choiceBodyStyle}>
                 Post the shift for teammates to claim. It stays yours unless
@@ -1408,6 +1989,7 @@ export default function ShiftEditPanel({
             data-tour="edit-panel-coverage-calloff-btn"
             onClick={() => {
               if (activeAbsenceTypes.length === 0) return;
+              setShowPickupTargetOptions(false);
               setShowCoverageCalloffOptions(true);
             }}
             disabled={!onCallOff || activeAbsenceTypes.length === 0}
@@ -1424,11 +2006,33 @@ export default function ShiftEditPanel({
               opacity: onCallOff && activeAbsenceTypes.length > 0 ? 1 : 0.6,
             }}
           >
+            {showCoverageCalloffOptions ? (
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  width: 20,
+                  height: 20,
+                  borderRadius: 999,
+                  background: "var(--color-danger-text)",
+                  color: "var(--color-text-inverse)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
+                }}
+              >
+                <Check size={13} strokeWidth={3} />
+              </span>
+            ) : null}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <div
                 style={{
                   ...choiceTitleStyle,
                   color: "var(--color-danger-text)",
+                  paddingRight: 28,
                 }}
               >
                 Call off
@@ -1454,6 +2058,149 @@ export default function ShiftEditPanel({
             }}
           >
             Call off is unavailable until at least one active absence type is set up.
+          </div>
+        )}
+
+        {showPickupTargetOptions && onMakeAvailable && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              ...(standalone ? { flex: 1, minHeight: 0 } : null),
+            }}
+          >
+            <button
+              type="button"
+              className="dg-btn dg-btn-primary"
+              onClick={() =>
+                setPendingRequestConfirmation({
+                  kind: "pickup",
+                  requesterSegmentIndex: requesterSegmentIndexForRequest,
+                })
+              }
+            >
+              Offer to everyone
+            </button>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                ...(standalone ? { flex: 1, minHeight: 0 } : null),
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-label)",
+                  fontWeight: 700,
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                Request specific person
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                <div style={choiceBodyStyle}>
+                  Only teammates with an absence on this date are shown.
+                </div>
+              </div>
+	              <div
+	                style={{
+	                  display: "flex",
+	                  flexDirection: "column",
+	                  border: "1px solid var(--color-border)",
+	                  borderRadius: 12,
+	                  overflow: "hidden",
+                    flex: 1,
+                    minHeight: 0,
+	                  overflowY: "auto",
+	                }}
+	              >
+	                {targetedPickupTargets.length === 0 ? (
+	                  <div
+	                    style={{
+	                      padding: "18px 14px",
+                      textAlign: "center",
+                      color: "var(--color-text-muted)",
+                      fontSize: "var(--dg-fs-body-sm)",
+                    }}
+                  >
+	                    No absent teammates are available on this date.
+	                  </div>
+	                ) : (
+	                  targetedPickupTargets.map((target, index) => {
+	                    const { employee } = target;
+
+                    return (
+                      <button
+                        key={employee.id}
+                        type="button"
+                        onClick={() => {
+                          setPendingRequestConfirmation({
+                            kind: "targeted_pickup",
+                            targetEmpId: employee.id,
+                            targetName: `${employee.firstName} ${employee.lastName}`,
+                            requesterSegmentIndex: requesterSegmentIndexForRequest,
+                            absenceType:
+                              target.absenceType ??
+                              ({
+                                id: target.absenceTypeId,
+                                label: target.absenceTypeLabel,
+                                name: target.absenceTypeLabel,
+                                orgId: "",
+                                color: "",
+                                border: "",
+                                text: "",
+                                sortOrder: 0,
+                              } as AbsenceType),
+                          });
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+	                          gap: 10,
+	                          width: "100%",
+	                          padding: "12px 14px",
+	                          border: "none",
+	                          borderBottom:
+	                            index < targetedPickupTargets.length - 1
+	                              ? "1px solid var(--color-border)"
+	                              : "none",
+                          background: "var(--color-surface)",
+                          color: "var(--color-text-primary)",
+                          fontFamily: "inherit",
+                          fontSize: "var(--dg-fs-body-sm)",
+                          cursor: "pointer",
+                          opacity: 1,
+                          textAlign: "left",
+                        }}
+                      >
+	                        <span style={{ fontWeight: 600 }}>
+	                          {employee.firstName} {employee.lastName}
+	                        </span>
+	                        <span
+	                          style={{
+	                            color: "var(--color-text-secondary)",
+	                            fontSize: "var(--dg-fs-caption)",
+	                            fontWeight: 600,
+                            textAlign: "right",
+	                          }}
+	                        >
+	                          {target.absenceTypeLabel}
+	                        </span>
+	                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1487,6 +2234,7 @@ export default function ShiftEditPanel({
                     setPendingRequestConfirmation({
                       kind: "calloff",
                       absenceType: at,
+                      requesterSegmentIndex: requesterSegmentIndexForRequest,
                     })
                   }
                   style={{
@@ -1541,17 +2289,32 @@ export default function ShiftEditPanel({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={closeRequestSection}
-          className="dg-btn dg-btn-secondary"
-          style={{
-            width: "100%",
-            fontSize: "var(--dg-fs-caption)",
-          }}
-        >
-          Cancel
-        </button>
+        {!standalone ? (
+          <div
+            style={{
+              position: "sticky",
+              bottom: 0,
+              marginTop: "auto",
+              paddingTop: 12,
+              paddingBottom: 2,
+              background:
+                "linear-gradient(to bottom, rgba(255,255,255,0), var(--color-surface) 28px)",
+              zIndex: 1,
+            }}
+          >
+            <button
+              type="button"
+              onClick={closeRequestSection}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                width: "100%",
+                fontSize: "var(--dg-fs-caption)",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -1561,7 +2324,9 @@ export default function ShiftEditPanel({
   }: {
     standalone?: boolean;
   }) {
-    const canGoPrev = swapViewDate > todayIso();
+    const canGoPrev = previousEligibleSwapWeekStart != null;
+    const canGoNext = nextEligibleSwapWeekStart != null;
+    const swapWeekRangeLabel = formatWeekRangeLabel(swapWeekStartDate);
 
     return (
       <div
@@ -1594,7 +2359,7 @@ export default function ShiftEditPanel({
           >
             Your shift
           </div>
-          <MaybeHint content={requesterShiftLabel} side="bottom">
+          <MaybeHint content={selectedRequesterLabel} side="bottom">
             <div
               style={{
                 fontWeight: 700,
@@ -1603,19 +2368,32 @@ export default function ShiftEditPanel({
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-            >
-              {requesterShiftLabel || "Current shift"}
-              <span
-                style={{
-                  fontWeight: 500,
+              >
+                {selectedRequesterLabel || "Current shift"}
+                <span
+                  style={{
+                    fontWeight: 500,
                   color: "var(--color-text-secondary)",
                   marginLeft: 8,
                 }}
-              >
-                {requestShiftDate}
-              </span>
-            </div>
+                >
+                  {requestShiftDate}
+                </span>
+              </div>
           </MaybeHint>
+          {requesterSwapTimeLabel || requesterSwapFocusAreaLabel ? (
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-secondary)",
+                marginTop: 4,
+              }}
+            >
+              {[requesterSwapTimeLabel, requesterSwapFocusAreaLabel]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          ) : null}
         </div>
 
         {selectedSwapTarget ? (
@@ -1643,7 +2421,7 @@ export default function ShiftEditPanel({
               >
                 You give
               </div>
-              <MaybeHint content={requesterShiftLabel} side="bottom">
+              <MaybeHint content={selectedRequesterLabel} side="bottom">
                 <div
                   style={{
                     fontWeight: 700,
@@ -1653,7 +2431,7 @@ export default function ShiftEditPanel({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {requesterShiftLabel || "Current shift"}
+                  {selectedRequesterLabel || "Current shift"}
                   <span
                     style={{
                       fontWeight: 500,
@@ -1665,6 +2443,19 @@ export default function ShiftEditPanel({
                   </span>
                 </div>
               </MaybeHint>
+              {requesterSwapTimeLabel || requesterSwapFocusAreaLabel ? (
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-text-secondary)",
+                    marginTop: 4,
+                  }}
+                >
+                  {[requesterSwapTimeLabel, requesterSwapFocusAreaLabel]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              ) : null}
             </div>
 
             <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 12 }}>
@@ -1698,7 +2489,7 @@ export default function ShiftEditPanel({
                       marginLeft: 8,
                     }}
                   >
-                    on {swapViewDate}
+                    on {activeSwapViewDate}
                   </span>
                 </div>
               </MaybeHint>
@@ -1711,6 +2502,19 @@ export default function ShiftEditPanel({
               >
                 from {selectedSwapTarget.name}
               </div>
+              {selectedSwapTarget.timeLabel || selectedSwapTarget.focusAreaLabel ? (
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-text-secondary)",
+                    marginTop: 4,
+                  }}
+                >
+                  {[selectedSwapTarget.timeLabel, selectedSwapTarget.focusAreaLabel]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              ) : null}
             </div>
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -1731,43 +2535,190 @@ export default function ShiftEditPanel({
             </div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                flexWrap: "wrap",
                 gap: 12,
               }}
             >
-              <button
-                type="button"
-                className="dg-btn dg-btn-ghost"
-                onClick={() => handleSwapDay(-1)}
-                disabled={!canGoPrev}
-                aria-label="Go to previous day"
-                style={{ minWidth: 40, padding: "8px 10px" }}
-              >
-                ‹
-              </button>
               <div
                 style={{
-                  fontSize: "var(--dg-fs-body-sm)",
+                  fontSize: "var(--dg-fs-label)",
                   fontWeight: 700,
                   color: "var(--color-text-primary)",
                 }}
               >
-                {formatDisplayDate(swapViewDate)}
+                Eligible teammates
               </div>
-              <button
-                type="button"
-                className="dg-btn dg-btn-ghost"
-                onClick={() => handleSwapDay(1)}
-                aria-label="Go to next day"
-                style={{ minWidth: 40, padding: "8px 10px" }}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "var(--dg-toolbar-h) minmax(130px, 1fr) var(--dg-toolbar-h)",
+                  alignItems: "center",
+                  gap: 10,
+                  minWidth: 240,
+                }}
               >
-                ›
-              </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => handleSwapWeek(-1)}
+                  disabled={!canGoPrev}
+                  aria-label="Go to previous week"
+                  style={{
+                    minWidth: "var(--dg-toolbar-h)",
+                    width: "var(--dg-toolbar-h)",
+                    height: "var(--dg-toolbar-h)",
+                    padding: 0,
+                    borderRadius: "var(--dg-btn-radius)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <ChevronLeft
+                    aria-hidden="true"
+                    focusable="false"
+                    size={24}
+                    strokeWidth={2.5}
+                  />
+                </button>
+                <div
+                  aria-label={`Current swap week ${swapWeekRangeLabel}`}
+                  style={{
+                    textAlign: "center",
+                    color: "var(--color-text-primary)",
+                    fontSize: "var(--dg-fs-body-sm)",
+                    fontWeight: 800,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {swapWeekRangeLabel}
+                </div>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => handleSwapWeek(1)}
+                  disabled={!canGoNext}
+                  aria-label="Go to next week"
+                  style={{
+                    minWidth: "var(--dg-toolbar-h)",
+                    width: "var(--dg-toolbar-h)",
+                    height: "var(--dg-toolbar-h)",
+                    padding: 0,
+                    borderRadius: "var(--dg-btn-radius)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <ChevronRight
+                    aria-hidden="true"
+                    focusable="false"
+                    size={24}
+                    strokeWidth={2.5}
+                  />
+                </button>
+              </div>
+            </div>
+
+            <div
+              aria-label="Eligible swap dates"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+                gap: 6,
+              }}
+            >
+              {swapWeekDates.map((date) => {
+                const active = date === activeSwapViewDate;
+                const disabled = date < todayIso();
+                const count = swapWeekCounts.get(date) ?? 0;
+
+                return (
+                  <button
+                    key={date}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => handleSwapDateSelect(date)}
+                    aria-pressed={active}
+                    aria-label={`Show eligible teammates for ${formatDisplayDate(date)}`}
+                    style={{
+                      minHeight: 68,
+                      borderRadius: 10,
+                      border: `1px solid ${
+                        active
+                          ? "var(--color-brand)"
+                          : "var(--color-border)"
+                      }`,
+                      background: active
+                        ? "var(--color-bg-secondary)"
+                        : "var(--color-surface)",
+                      color: active
+                        ? "var(--color-brand)"
+                        : "var(--color-text-primary)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 3,
+                      fontFamily: "inherit",
+                      cursor: disabled ? "not-allowed" : "pointer",
+                      opacity: disabled ? 0.45 : 1,
+                      padding: "8px 4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        color: active
+                          ? "var(--color-brand)"
+                          : "var(--color-text-subtle)",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {formatDisplayDate(date).split(",")[0]}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {new Date(`${date}T00:00:00`).getDate()}
+                    </span>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 3,
+                        fontSize: "var(--dg-fs-badge)",
+                        fontWeight: 700,
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      <User
+                        aria-hidden="true"
+                        focusable="false"
+                        size={11}
+                        strokeWidth={2.4}
+                      />
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             <div
@@ -1778,7 +2729,8 @@ export default function ShiftEditPanel({
                 borderRadius: 12,
                 overflow: "hidden",
                 background: "var(--color-surface)",
-                maxHeight: 320,
+                flex: 1,
+                minHeight: 0,
                 overflowY: "auto",
               }}
             >
@@ -1790,9 +2742,9 @@ export default function ShiftEditPanel({
                     color: "var(--color-text-muted)",
                     fontSize: "var(--dg-fs-body-sm)",
                     lineHeight: 1.5,
-                  }}
-                >
-                  No eligible employees on this date.
+                    }}
+                  >
+                    No eligible employees on this date.
                   <div
                     style={{
                       fontSize: "var(--dg-fs-caption)",
@@ -1803,20 +2755,53 @@ export default function ShiftEditPanel({
                     Try another day.
                   </div>
                 </div>
-              ) : (
-                eligibleSwapEmployees.map((employee, index) => {
-                  const dateObj = new Date(`${swapViewDate}T00:00:00`);
-                  const targetLabel = shiftForKey?.(employee.id, dateObj) ?? "";
-                  return (
+	              ) : (
+	                eligibleSwapEmployees.map((employee, index) => {
+	                  const dateObj = new Date(`${activeSwapViewDate}T00:00:00`);
+                    const targetSegments = getShiftSegments?.(employee.id, dateObj) ?? [];
+                    const targetSegmentOptions = getRequestSegmentOptions(targetSegments);
+                    const renderTargetOptions =
+                      targetSegmentOptions.length > 1
+                        ? targetSegmentOptions.filter(
+                            (option) =>
+                              !isShiftSegmentStarted?.(
+                                employee.id,
+                                dateObj,
+                                option.segmentIndex,
+                              ),
+                          )
+                        : targetSegmentOptions[0]
+                          ? isShiftSegmentStarted?.(
+                              employee.id,
+                              dateObj,
+                              targetSegmentOptions[0].segmentIndex,
+                            )
+                            ? []
+                            : [targetSegmentOptions[0]]
+                          : [{ segment: null, segmentIndex: undefined }];
+	                  const targetLabel = getSwapShiftLabel(employee.id, dateObj);
+                    const timeLabel = getSwapTimeLabel(employee.id, dateObj);
+                    const focusAreaLabel = getSwapFocusAreaLabel(employee.id, dateObj);
+                  return renderTargetOptions.map((targetOption) => {
+                    const optionLabel =
+                      targetOption.segmentIndex != null
+                        ? getRequestSegmentLabel(
+                            targetSegments,
+                            targetOption.segmentIndex,
+                            targetLabel || "Selected shift",
+                          )
+                        : targetLabel;
+
+                    return (
                     <button
-                      key={employee.id}
+                      key={`${employee.id}-${targetOption.segmentIndex ?? "shift"}`}
                       type="button"
-                      onClick={() => handleSelectSwapEmployee(employee)}
+                      onClick={() => handleSelectSwapEmployee(employee, targetOption.segmentIndex)}
                       style={{
                         display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 10,
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        gap: 4,
                         width: "100%",
                         padding: "12px 14px",
                         border: "none",
@@ -1840,31 +2825,44 @@ export default function ShiftEditPanel({
                           color: "var(--color-text-secondary)",
                           fontSize: "var(--dg-fs-caption)",
                           fontWeight: 600,
-                          marginLeft: 8,
-                          flexShrink: 0,
                         }}
                       >
-                        {targetLabel}
+                        {targetOption.segmentIndex != null
+                          ? `Shift ${targetOption.segmentIndex + 1}: ${optionLabel}`
+                          : optionLabel}
                       </span>
+                      {timeLabel || focusAreaLabel ? (
+                        <span
+                          style={{
+                            color: "var(--color-text-muted)",
+                            fontSize: "var(--dg-fs-caption)",
+                          }}
+                        >
+                          {[timeLabel, focusAreaLabel].filter(Boolean).join(" · ")}
+                        </span>
+                      ) : null}
                     </button>
-                  );
+                    );
+                  });
                 })
               )}
             </div>
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={closeRequestSection}
-          className="dg-btn dg-btn-secondary"
-          style={{
-            width: "100%",
-            fontSize: "var(--dg-fs-caption)",
-          }}
-        >
-          Cancel
-        </button>
+        {!standalone ? (
+          <button
+            type="button"
+            onClick={closeRequestSection}
+            className="dg-btn dg-btn-secondary"
+            style={{
+              width: "100%",
+              fontSize: "var(--dg-fs-caption)",
+            }}
+          >
+            Cancel
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -1908,14 +2906,16 @@ export default function ShiftEditPanel({
       cursor: "pointer",
     });
 
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-        }}
-      >
+	    return (
+	      <div
+	        style={{
+	          display: "flex",
+	          flexDirection: "column",
+	          gap: 14,
+	          minHeight: 0,
+            ...(standalone ? { minHeight: "100%" } : null),
+	        }}
+	      >
         <div style={{ display: "flex", gap: 8 }}>
           {canRenderCoverage && (
             <button
@@ -1938,6 +2938,96 @@ export default function ShiftEditPanel({
             </button>
           )}
         </div>
+        {activeRequestMode && requesterSegmentOptions.length > 1 ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1px solid var(--color-brand)",
+              background: "var(--color-bg-secondary)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 700,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Choose shift
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {requesterSegmentOptions.map((option) => {
+                const isStarted = isRequesterSegmentStarted(option.segmentIndex);
+
+                return (
+                  <button
+                    key={option.segmentIndex}
+                    type="button"
+                    disabled={isStarted}
+                    onClick={() => setSelectedRequesterSegmentIndex(option.segmentIndex)}
+                    aria-pressed={selectedRequesterSegmentIndex === option.segmentIndex}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: `1px solid ${
+                        selectedRequesterSegmentIndex === option.segmentIndex
+                          ? "var(--color-brand)"
+                          : "var(--color-border)"
+                      }`,
+                      background:
+                        selectedRequesterSegmentIndex === option.segmentIndex
+                          ? "var(--color-surface)"
+                          : "transparent",
+                      color: "var(--color-text-primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      fontFamily: "inherit",
+                      fontSize: "var(--dg-fs-body-sm)",
+                      fontWeight: 700,
+                      textAlign: "left",
+                      cursor: isStarted ? "not-allowed" : "pointer",
+                      opacity: isStarted ? 0.55 : 1,
+                    }}
+                  >
+                    <span>
+                      Shift {option.segmentIndex + 1}:{" "}
+                      {getRequestSegmentLabel(
+                        currentSegments,
+                        option.segmentIndex,
+                        requesterShiftLabel || "assigned",
+                      )}
+                      {isStarted ? " · In progress" : ""}
+                    </span>
+                    {selectedRequesterSegmentIndex === option.segmentIndex ? (
+                      <span
+                        style={{
+                          flex: "0 0 auto",
+                          width: 22,
+                          height: 22,
+                          borderRadius: 999,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          background: "var(--color-brand)",
+                          color: "var(--color-surface)",
+                        }}
+                      >
+                        <Check aria-hidden="true" size={15} strokeWidth={3} />
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {activeRequestMode === "coverage" && canRenderCoverage
           ? renderCoverageChooser({ standalone })
           : null}
@@ -2079,11 +3169,19 @@ export default function ShiftEditPanel({
     }
 
     if (currentLabels.length === 1) {
-      const preview = resolveShiftPreview(currentAssignmentIds[0], currentLabels[0]);
+      const preview = resolveShiftPreview(
+        currentAssignmentIds[0],
+        currentLabels[0],
+        "name",
+      );
       const s =
         preview.assignment ??
         getAssignmentDefinitionStyle(currentLabels[0], currentAssignmentIds[0]);
       const previewLabel = formatPreviewLabel(preview.displayParts);
+      const focusAreaLabel =
+        preview.assignment?.focusAreaId != null
+          ? focusAreaNameById.get(preview.assignment.focusAreaId) ?? null
+          : null;
       return (
         <div
           style={{
@@ -2132,6 +3230,22 @@ export default function ShiftEditPanel({
               </span>
             </MaybeHint>
           ) : null}
+          {focusAreaLabel ? (
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: s.text,
+                opacity: 0.78,
+                lineHeight: 1,
+                maxWidth: "90%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {focusAreaLabel}
+            </span>
+          ) : null}
           {renderNoteDots(noteTypes)}
         </div>
       );
@@ -2141,7 +3255,7 @@ export default function ShiftEditPanel({
     return (
       <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {currentLabels.map((label, i) => {
-          const preview = resolveShiftPreview(currentAssignmentIds[i], label);
+          const preview = resolveShiftPreview(currentAssignmentIds[i], label, "name");
           const s =
             preview.assignment ?? getAssignmentDefinitionStyle(label, currentAssignmentIds[i]);
           const previewLabel = formatPreviewLabel(preview.displayParts);
@@ -2151,6 +3265,8 @@ export default function ShiftEditPanel({
               ? assignments.find((st) => st.id === currentAssignmentIds[i])
               : assignments.find((st) => st.label === label));
           const shiftFaId = assignment?.focusAreaId;
+          const focusAreaLabel =
+            shiftFaId != null ? focusAreaNameById.get(shiftFaId) ?? null : null;
           const shiftWingId = shiftFaId ?? activeTab;
           const pillNoteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(shiftWingId) : [];
           const pillDiff = panelDiff.pillDiffs[i] ?? {
@@ -2161,12 +3277,14 @@ export default function ShiftEditPanel({
           return (
             <div
               key={label + i}
+              data-shift-edit-card={i}
+              data-shift-edit-card-diff={pillDiff.borderKind ?? undefined}
               style={{
                 border: getPanelDiffBorder({
                   diffKind: pillDiff.borderKind,
                   fallback: `1.5px solid ${darkenColor(s.color, 0.25)}`,
                 }),
-                borderRadius: "var(--dg-radius-md)",
+                borderRadius: shiftEditCardOuterRadius,
                 overflow: "visible",
                 position: "relative",
               }}
@@ -2174,6 +3292,7 @@ export default function ShiftEditPanel({
               {renderShiftDiffBadge(pillDiff.badge, i)}
               {/* Pill header */}
               <div
+                data-shift-edit-card-header={i}
                 style={{
                   background: s.color,
                   borderBottom: `1px solid ${darkenColor(s.color, 0.2)}`,
@@ -2182,7 +3301,7 @@ export default function ShiftEditPanel({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: "10px 10px 0 0",
+                  borderRadius: `${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius} 0 0`,
                   position: "relative",
                   gap: 2,
                 }}
@@ -2246,7 +3365,7 @@ export default function ShiftEditPanel({
                 {renderNoteDots(pillNoteTypes, "left")}
               </div>
               {/* Card body: default time, per-pill custom time editor, + indicators */}
-              <div style={{ padding: "10px 12px", background: "var(--color-surface)", borderRadius: "0 0 10px 10px" }}>
+              <div data-shift-edit-card-body={i} style={{ padding: "10px 12px", background: "var(--color-surface)", borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}` }}>
                 {/* Default time info */}
                 {(defaultStart || defaultEnd) && (
                   <div
@@ -2269,6 +3388,82 @@ export default function ShiftEditPanel({
                     )}
                   </div>
                 )}
+                {focusAreaLabel ? (
+                  <div
+                    style={{
+                      marginTop: defaultStart || defaultEnd ? 6 : 0,
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-secondary)",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {focusAreaLabel}
+                  </div>
+                ) : null}
+                {allowShiftEdits && currentSegments[i] ? (
+                  <div
+                    style={{
+                      marginTop: defaultStart || defaultEnd || focusAreaLabel ? 10 : 0,
+                      paddingTop: defaultStart || defaultEnd || focusAreaLabel ? 10 : 0,
+                      borderTop:
+                        defaultStart || defaultEnd || focusAreaLabel
+                          ? "1px solid var(--color-border-light)"
+                          : "none",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 700,
+                        color: "var(--color-text-secondary)",
+                      }}
+                    >
+                      Mentored
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleMentoredToggleAtIndex(
+                          i,
+                          !(currentSegments[i]?.isMentored ?? false),
+                        )
+                      }
+                      aria-pressed={currentSegments[i]?.isMentored === true}
+                      aria-label={`Mentored assignment for ${previewLabel}`}
+                      style={{
+                        width: 44,
+                        height: 24,
+                        borderRadius: 12,
+                        border: "none",
+                        cursor: "pointer",
+                        background: currentSegments[i]?.isMentored
+                          ? "var(--color-brand)"
+                          : "var(--color-border)",
+                        position: "relative",
+                        transition: "background 0.2s",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          background: "#fff",
+                          position: "absolute",
+                          top: 3,
+                          left: currentSegments[i]?.isMentored ? 23 : 3,
+                          transition: "left 0.2s",
+                          boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                        }}
+                      />
+                    </button>
+                  </div>
+                ) : null}
                 {/* Per-pill custom time editor */}
                 {allowShiftEdits && onCustomTimeChange && (() => {
                   const pillStarts = parseMultiTimes(customStartTime, currentLabels.length);
@@ -2412,6 +3607,10 @@ export default function ShiftEditPanel({
   // Detail mode: show when we have an active shift and aren't in picker mode
   // (or when shift edits are not allowed)
   const inDetailMode = !allowShiftEdits || (!showPicker && hasActiveShift);
+  const showStandaloneRequestFlow =
+    !requestOnlyMode &&
+    activeRequestMode != null &&
+    (canRenderCoverage || canRenderSwap);
 
   // ── Request-only mode: show the shared request controls without edit UI ──
   if (requestOnlyMode && (canRenderCoverage || canRenderSwap)) {
@@ -2455,8 +3654,44 @@ export default function ShiftEditPanel({
               </svg>
             </button>
           </div>
-          <div style={{ padding: "20px" }}>
-            {renderRequestControls({ standalone: true })}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+            }}
+          >
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: "auto",
+                padding: "20px",
+              }}
+            >
+              {renderRequestControls({ standalone: true })}
+            </div>
+            <div
+              style={{
+                flexShrink: 0,
+                padding: "12px 20px 20px",
+                borderTop: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+              }}
+            >
+              <button
+                type="button"
+                onClick={closeRequestSection}
+                className="dg-btn dg-btn-secondary"
+                style={{
+                  width: "100%",
+                  fontSize: "var(--dg-fs-caption)",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
         {renderPendingRequestConfirmation()}
@@ -2565,7 +3800,9 @@ export default function ShiftEditPanel({
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
-          {showRepeatForm && onRepeatConfirm && empId ? (
+          {showStandaloneRequestFlow ? (
+            renderRequestControls({ standalone: true })
+          ) : showRepeatForm && onRepeatConfirm && empId ? (
             // ── Repeat form mode ─────────────────────────────────────────────
             <RepeatForm
               ref={repeatFormRef}
@@ -2589,23 +3826,95 @@ export default function ShiftEditPanel({
           ) : inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
             <>
-              {/* Current shift displayed prominently */}
-              {renderCurrentShiftPill()}
+	              {/* Current shift displayed prominently */}
+	              {renderCurrentShiftPill()}
 
-              {/* Custom time override — single-shift only (multi-shift has per-pill editors); hidden for absence types */}
-              {hasActiveShift && !currentAbsenceTypeId && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
-                const matchedCode = currentAssignmentIds[0] != null
-                  ? assignments.find(st => st.id === currentAssignmentIds[0])
-                  : assignments.find(st => st.label === currentLabels[0]);
-                const defaults = resolveDefaultTimes(matchedCode);
-                return (
-                  <div style={{ marginBottom: 16 }}>
-                    <PillTimeEditor
-                      customStart={customStartTime ?? null}
-                      customEnd={customEndTime ?? null}
-                      defaultStart={defaults.start}
-                      defaultEnd={defaults.end}
-                      minTime={getTimeBounds(matchedCode).minTime}
+              {allowShiftEdits && hasActiveShift && !currentAbsenceTypeId && currentSegments.length === 1 && (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "10px 12px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    background: "var(--color-surface)",
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 700,
+                        color: "var(--color-text-primary)",
+                      }}
+                    >
+                      Mentored
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--color-text-muted)",
+                        marginTop: 2,
+                      }}
+                    >
+                      Applies the organization&apos;s mentored coverage rule.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMentoredToggle}
+                    aria-pressed={isMentoredAssignment}
+                    aria-label="Mentored assignment"
+                    style={{
+                      width: 44,
+                      height: 24,
+                      borderRadius: 12,
+                      border: "none",
+                      cursor: "pointer",
+                      background: isMentoredAssignment
+                        ? "var(--color-brand)"
+                        : "var(--color-border)",
+                      position: "relative",
+                      transition: "background 0.2s",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        background: "#fff",
+                        position: "absolute",
+                        top: 3,
+                        left: isMentoredAssignment ? 23 : 3,
+                        transition: "left 0.2s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                      }}
+                    />
+                  </button>
+                </div>
+              )}
+
+	              {/* Custom time override — single-shift only (multi-shift has per-pill editors); hidden for absence types */}
+		              {hasActiveShift && !currentAbsenceTypeId && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
+	                const matchedCode = currentAssignmentIds[0] != null
+	                  ? assignments.find(st => st.id === currentAssignmentIds[0])
+	                  : assignments.find(st => st.label === currentLabels[0]);
+	                const defaults = resolveDefaultTimes(matchedCode);
+	                const singleCustomStart = getFirstTimeSegment(customStartTime);
+	                const singleCustomEnd = getFirstTimeSegment(customEndTime);
+	                return (
+	                  <div style={{ marginBottom: 16 }}>
+	                    <PillTimeEditor
+	                      customStart={singleCustomStart}
+	                      customEnd={singleCustomEnd}
+	                      defaultStart={defaults.start}
+	                      defaultEnd={defaults.end}
+	                      minTime={getTimeBounds(matchedCode).minTime}
                       maxTime={getTimeBounds(matchedCode).maxTime}
                       onSave={(start, end) => onCustomTimeChange(start, end)}
                       onRemove={() => onCustomTimeChange(null, null)}
@@ -2970,11 +4279,12 @@ export default function ShiftEditPanel({
                   absenceTypes={pickerAbsenceTypes}
                   focusAreas={focusAreas}
                   currentAssignmentDefinitionIds={currentAssignmentIds}
-                  currentSegments={currentSegments.map((segment, index) => ({
-                    shiftId: segment.shiftId,
-                    jobId: segment.jobId,
-                    position: segment.position ?? index,
-                  }))}
+	                  currentSegments={currentSegments.map((segment, index) => ({
+	                    shiftId: segment.shiftId,
+	                    jobId: segment.jobId,
+	                    position: segment.position ?? index,
+	                    isMentored: segment.isMentored ?? false,
+	                  }))}
                   currentAbsenceTypeId={currentAbsenceTypeId}
                   onSelect={(segments) => {
                     onSelect(
@@ -3013,6 +4323,29 @@ export default function ShiftEditPanel({
             </>
           )}
         </div>
+
+        {showStandaloneRequestFlow && (
+          <div
+            style={{
+              flexShrink: 0,
+              padding: "12px 20px 20px",
+              borderTop: "1px solid var(--color-border)",
+              background: "var(--color-surface)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={closeRequestSection}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                width: "100%",
+                fontSize: "var(--dg-fs-caption)",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {showRepeatForm && onRepeatConfirm && empId && (
           <div
@@ -3140,8 +4473,8 @@ export default function ShiftEditPanel({
               );
               // Realign pipe-delimited custom times by removing the deleted pill's entry
               if (onCustomTimeChange) {
-                const pillStarts = parseMultiTimes(customStartTime, currentAssignmentIds.length);
-                const pillEnds = parseMultiTimes(customEndTime, currentAssignmentIds.length);
+                const pillStarts = parseMultiTimes(customStartTime, currentSegments.length);
+                const pillEnds = parseMultiTimes(customEndTime, currentSegments.length);
                 pillStarts.splice(removedIdx, 1);
                 pillEnds.splice(removedIdx, 1);
                 onCustomTimeChange(joinMultiTimes(pillStarts), joinMultiTimes(pillEnds));

@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  getIsoDateInTimeZone,
+  hasShiftRequestStarted,
+} from "@dubgrid/schedule-core";
 import { queueNotification } from "@/lib/notify";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -24,9 +28,18 @@ import type {
 
 /** Extract message from Error or Supabase error objects. */
 function errMsg(err: unknown, fallback: string): string {
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === "object" && "message" in err) return (err as { message: string }).message;
-  return fallback;
+  const message =
+    err instanceof Error
+      ? err.message
+      : err && typeof err === "object" && "message" in err
+        ? (err as { message: string }).message
+        : fallback;
+
+  if (/already volunteered for this open shift/i.test(message)) {
+    return "You already volunteered for this open shift.";
+  }
+
+  return message;
 }
 
 export interface ShiftRequestsData {
@@ -52,7 +65,9 @@ export interface ShiftRequestsData {
     requesterShiftDate: string,
     targetEmpId?: string,
     targetShiftDate?: string,
-    absenceTypeId?: number
+    absenceTypeId?: number,
+    requesterSegmentIndex?: number,
+    targetSegmentIndex?: number
   ) => Promise<string | null>;
   /** Claim an open pickup request. */
   claim: (requestId: string, claimerEmpId: string) => Promise<boolean>;
@@ -83,7 +98,8 @@ export function useShiftRequests(
   orgId: string | null,
   assignmentLabelMap: Map<number, string>,
   currentEmpId: string | null,
-  canApprove: boolean
+  canApprove: boolean,
+  timeZone?: string | null,
 ): ShiftRequestsData {
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,24 +215,61 @@ export function useShiftRequests(
     };
   }, [requests]);
 
+  useEffect(() => {
+    const todayDate = getIsoDateInTimeZone(new Date(), timeZone);
+    const hasSameDayActiveRequest = requests.some((request) => {
+      if (["expired", "cancelled", "approved", "rejected"].includes(request.status)) {
+        return false;
+      }
+
+      return (
+        request.requesterShiftDate === todayDate ||
+        (request.type === "swap" && request.targetShiftDate === todayDate)
+      );
+    });
+
+    if (!hasSameDayActiveRequest) {
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [requests, timeZone]);
+
   // Filter expired at read time: must be a non-terminal status AND not past expiry.
   // Memoized so consumers get a stable array reference when the underlying data hasn't changed.
   const activeRequests = useMemo(
     () => {
-      const nowIso = new Date(now).toISOString();
+      const nowDate = new Date(now);
+      const nowIso = nowDate.toISOString();
       return requests.filter(
         (r) =>
           !["expired", "cancelled", "approved", "rejected"].includes(r.status) &&
-          r.expiresAt > nowIso,
+          r.expiresAt > nowIso &&
+          !hasShiftRequestStarted(r, nowDate, timeZone),
       );
     },
-    [requests, now],
+    [requests, now, timeZone],
   );
 
-  // BUG 1.13: Filter out user's own pickup requests from available shifts tab
+  const refetchAfterMutation = useCallback(async () => {
+    try {
+      await fetchRequestsRef.current();
+    } catch (err) {
+      Sentry.captureException(err);
+    }
+  }, []);
+
+  // Available pickups include public pickup offers plus targeted pickups for me.
   const openPickups = useMemo(
     () => activeRequests.filter(
-      (r) => r.type === "pickup" && r.status === "open" && r.requesterEmpId !== currentEmpId
+      (r) =>
+        r.type === "pickup" &&
+        r.status === "open" &&
+        r.requesterEmpId !== currentEmpId &&
+        (r.targetEmpId == null || r.targetEmpId === currentEmpId)
     ),
     [activeRequests, currentEmpId],
   );
@@ -240,15 +293,16 @@ export function useShiftRequests(
   // Badge count: for employees = swap proposals directed at them (open status);
   // for admins = pending_approval count
   const badgeCount = useMemo(() => {
-    const myPendingSwaps = currentEmpId
+    const myPendingTargetedRequests = currentEmpId
       ? activeRequests.filter(
           (r) =>
-            r.type === "swap" &&
+            (r.type === "swap" ||
+              (r.type === "pickup" && r.targetEmpId != null)) &&
             r.status === "open" &&
             r.targetEmpId === currentEmpId
         ).length
       : 0;
-    return myPendingSwaps + (canApprove ? pendingApproval.length : 0);
+    return myPendingTargetedRequests + (canApprove ? pendingApproval.length : 0);
   }, [activeRequests, currentEmpId, canApprove, pendingApproval]);
 
   const create = useCallback(
@@ -258,7 +312,9 @@ export function useShiftRequests(
       requesterShiftDate: string,
       targetEmpId?: string,
       targetShiftDate?: string,
-      absenceTypeId?: number
+      absenceTypeId?: number,
+      requesterSegmentIndex?: number,
+      targetSegmentIndex?: number
     ): Promise<string | null> => {
       if (!orgId) return null;
       try {
@@ -269,13 +325,17 @@ export function useShiftRequests(
           requesterShiftDate,
           targetEmpId,
           targetShiftDate,
-          absenceTypeId
+          absenceTypeId,
+          requesterSegmentIndex,
+          targetSegmentIndex
         );
         toast.success(
           type === "calloff"
             ? "Calloff submitted for approval"
             : type === "pickup"
-              ? "Shift posted as available"
+              ? targetEmpId
+                ? "Pickup request sent"
+                : "Shift posted as available"
               : "Swap request sent"
         );
         if (id) {
@@ -286,13 +346,14 @@ export function useShiftRequests(
             requestType: type,
           });
         }
+        await refetchAfterMutation();
         return id;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to create request"));
         return null;
       }
     },
-    [orgId]
+    [orgId, refetchAfterMutation]
   );
 
   const claim = useCallback(
@@ -307,13 +368,14 @@ export function useShiftRequests(
           requestId,
           requestType: "pickup",
         });
+        await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to claim shift"));
         return false;
       }
     },
-    [orgId]
+    [orgId, refetchAfterMutation]
   );
 
   const volunteer = useCallback(
@@ -341,13 +403,14 @@ export function useShiftRequests(
             requestType: "pickup",
           });
         }
+        await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to volunteer for shift"));
         return false;
       }
     },
-    [orgId]
+    [orgId, refetchAfterMutation]
   );
 
   const respond = useCallback(
@@ -364,13 +427,14 @@ export function useShiftRequests(
             ? "Swap accepted — awaiting admin approval"
             : "Swap declined"
         );
+        await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to respond"));
         return false;
       }
     },
-    []
+    [orgId, refetchAfterMutation]
   );
 
   const resolve = useCallback(
@@ -393,13 +457,14 @@ export function useShiftRequests(
           approved,
           adminNote: note,
         });
+        await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to resolve request"));
         return false;
       }
     },
-    [orgId]
+    [orgId, refetchAfterMutation]
   );
 
   const cancel = useCallback(
@@ -408,13 +473,14 @@ export function useShiftRequests(
       try {
         await cancelShiftRequest(requestId, empId, orgId);
         toast.success("Request cancelled");
+        await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
         toast.error(errMsg(err, "Failed to cancel"));
         return false;
       }
     },
-    [orgId]
+    [orgId, refetchAfterMutation]
   );
 
   return {

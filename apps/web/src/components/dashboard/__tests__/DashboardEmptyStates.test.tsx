@@ -12,6 +12,7 @@ const employees: Employee[] = [
     id: "emp-1",
     firstName: "Alex",
     lastName: "Rivera",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -73,6 +74,34 @@ describe("dashboard empty states", () => {
     expect(screen.getByText("All shifts covered this week")).toBeInTheDocument();
   });
 
+  it("renders open shift counts with the selected period label", () => {
+    render(
+      <OpenShiftsCard
+        periodLabel="these 2 weeks"
+        openShifts={[
+          {
+            id: "gap-1",
+            assignmentLabel: "Day shift",
+            date: new Date("2026-05-11T12:00:00.000Z"),
+            dayOfMonth: 11,
+            dayOfWeek: "MON",
+            eligibleAssignmentDefinitionIds: [101],
+            focusAreaId: 1,
+            focusAreaName: "Front Desk",
+            needed: 2,
+            preferredOpenAssignmentDefinitionId: 101,
+            requirementAssignmentDefinitionId: 101,
+            ruleLabel: "Day shift",
+            timeRange: "7am-3pm",
+            urgency: "high",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("2 unfilled these 2 weeks")).toBeInTheDocument();
+  });
+
   it("renders the open shifts unpublished state message", () => {
     render(
       <OpenShiftsCard
@@ -123,5 +152,49 @@ describe("dashboard empty states", () => {
         "Coverage details will appear after this period is published.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("renders coverage heatmap cells as filled over required", () => {
+    render(
+      <CoverageBySectionCard
+        sections={[
+          {
+            daily: [
+              {
+                dateKey: "2026-05-11",
+                dayLabel: "Mon",
+                filledCount: 1,
+                requiredCount: 2,
+                staffCount: 1,
+                status: "amber",
+              },
+              {
+                dateKey: "2026-05-12",
+                dayLabel: "Tue",
+                filledCount: 0,
+                requiredCount: 0,
+                staffCount: 0,
+                status: "none",
+              },
+            ],
+            filledTotal: 1,
+            focusAreaId: 1,
+            focusAreaName: "Front Desk",
+            pct: 50,
+            requiredTotal: 2,
+          },
+        ]}
+        focusAreaLabel="Wings"
+        isMobile={false}
+        hasRequirements
+      />,
+    );
+
+    expect(
+      screen.getByLabelText("Front Desk Mon: 1 of 2 required slots filled"),
+    ).toHaveTextContent("1/2");
+    expect(
+      screen.getByLabelText("Front Desk Tue: no coverage requirement"),
+    ).toHaveTextContent("\u2014");
   });
 });

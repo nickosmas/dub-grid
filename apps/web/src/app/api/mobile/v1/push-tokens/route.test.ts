@@ -69,7 +69,9 @@ describe("POST /api/mobile/v1/push-tokens", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload).toEqual({ error: "Invalid input" });
+    expect(payload).toEqual({
+      error: "Check the request details and try again.",
+    });
     expect(upsertMobilePushToken).not.toHaveBeenCalled();
   });
 });

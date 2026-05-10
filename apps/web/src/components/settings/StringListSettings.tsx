@@ -11,6 +11,13 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { SectionCard } from "./shared";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
+import {
+  getCodeError,
+  getLineTextError,
+  normalizeCode,
+  normalizeLineText,
+} from "@/lib/form-validation";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export default function StringListSettings({
   label,
@@ -65,6 +72,45 @@ export default function StringListSettings({
     (list: NamedItem[]) => list.filter((it) => it.name.trim()),
     [],
   );
+  const rowErrors = useMemo(
+    () =>
+      local.map((item) => ({
+        name:
+          item.name.trim().length > 0
+            ? getLineTextError(item.name, {
+                label: "Name",
+                maxLength: 80,
+                required: true,
+                disallowUrl: true,
+              })
+            : null,
+        abbr:
+          !hideAbbr && item.abbr.trim().length > 0
+            ? getCodeError(item.abbr, {
+                label: "Abbreviation",
+                maxLength: 20,
+              })
+            : null,
+      })),
+    [hideAbbr, local],
+  );
+  const duplicateName = useMemo(() => {
+    const normalizedNames = local
+      .map((item, index) => {
+        if (rowErrors[index]?.name) {
+          return "";
+        }
+        return item.name.trim().replace(/\s+/g, " ").toLowerCase();
+      })
+      .filter(Boolean);
+    const duplicate = normalizedNames.find(
+      (name, index) => normalizedNames.indexOf(name) !== index,
+    );
+    return duplicate ? `Duplicate name: "${duplicate}"` : null;
+  }, [local, rowErrors]);
+  const hasValidationErrors = rowErrors.some(
+    (row) => row.name || row.abbr,
+  ) || Boolean(duplicateName);
   const isDirty = useMemo(
     () => JSON.stringify(nonEmpty(local)) !== JSON.stringify(items),
     [local, items, nonEmpty],
@@ -123,10 +169,35 @@ export default function StringListSettings({
   };
 
   const handleSave = async () => {
+    if (hasValidationErrors) {
+      setError(
+        rowErrors.find((row) => row.name || row.abbr)?.name ??
+          rowErrors.find((row) => row.name || row.abbr)?.abbr ??
+          duplicateName ??
+          "Fix the invalid items and try again.",
+      );
+      return;
+    }
+
     const cleaned = nonEmpty(local).map((it, i) => ({
       ...it,
-      name: it.name.trim(),
-      abbr: it.abbr.trim() || it.name.trim(),
+      name: normalizeLineText(it.name, {
+        label: "Name",
+        maxLength: 80,
+        required: true,
+        disallowUrl: true,
+      }),
+      abbr:
+        normalizeCode(it.abbr, {
+          label: "Abbreviation",
+          maxLength: 20,
+        }) ||
+        normalizeLineText(it.name, {
+          label: "Name",
+          maxLength: 80,
+          required: true,
+          disallowUrl: true,
+        }),
       isScheduleRole: showScheduleRoleToggle ? (it.isScheduleRole ?? true) : it.isScheduleRole,
       sortOrder: i,
     }));
@@ -145,11 +216,7 @@ export default function StringListSettings({
       await onSave(cleaned);
       setIsEditing(false);
     } catch (err) {
-      const msg =
-        err && typeof err === "object" && "message" in err
-          ? (err as { message: string }).message
-          : JSON.stringify(err);
-      setError(msg || "Unknown error");
+      setError(formatClientErrorMessage(err, `We couldn't save ${label.toLowerCase()}.`));
     } finally {
       setSaving(false);
     }
@@ -300,7 +367,7 @@ export default function StringListSettings({
         </button>
       )}
       primaryAction={(
-        <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+        <button onClick={handleSave} disabled={saving || !isDirty || hasValidationErrors} className="dg-btn dg-btn-primary dg-btn-sm">
           {getEditorSaveLabel(saving)}
         </button>
       )}
@@ -389,6 +456,7 @@ export default function StringListSettings({
           {/* Item rows */}
           {displayList.map((item, i) => {
             const motion = reorder.getItemMotion(item);
+            const currentErrors = rowErrors[i] ?? { name: null, abbr: null };
             return (
               <div
                 key={item.id}
@@ -428,17 +496,36 @@ export default function StringListSettings({
                 )}
 
                 {isEditing ? (
-                  <input
-                    ref={(el) => { if (el) nameRefs.current.set(item.id, el); else nameRefs.current.delete(item.id); }}
-                    value={item.name}
-                    onChange={(e) => handleItemChange(i, "name", e.target.value)}
-                    onKeyDown={(e) => { handleNameBackspace(e, item, i); handleNameKeyDown(e, item, i); }}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    draggable={false}
-                    placeholder="Full name"
-                    style={fieldStyle}
-                  />
+                  <div>
+                    <input
+                      ref={(el) => { if (el) nameRefs.current.set(item.id, el); else nameRefs.current.delete(item.id); }}
+                      value={item.name}
+                      onChange={(e) => handleItemChange(i, "name", e.target.value)}
+                      onKeyDown={(e) => { handleNameBackspace(e, item, i); handleNameKeyDown(e, item, i); }}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      placeholder="Full name"
+                      style={{
+                        ...fieldStyle,
+                        ...(currentErrors.name
+                          ? { borderColor: "var(--color-danger)" }
+                          : {}),
+                      }}
+                    />
+                    {currentErrors.name ? (
+                      <div
+                        role="alert"
+                        style={{
+                          marginTop: 4,
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-danger)",
+                        }}
+                      >
+                        {currentErrors.name}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
                     {item.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Unnamed</span>}
@@ -446,17 +533,37 @@ export default function StringListSettings({
                 )}
 
                 {!hideAbbr && (isEditing ? (
-                  <input
-                    ref={(el) => { if (el) abbrRefs.current.set(item.id, el); else abbrRefs.current.delete(item.id); }}
-                    value={item.abbr}
-                    onChange={(e) => handleItemChange(i, "abbr", e.target.value)}
-                    onKeyDown={(e) => handleAbbrKeyDown(e, item, i)}
-                    onClick={(e) => e.stopPropagation()}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    draggable={false}
-                    placeholder="Abbreviation"
-                    style={{ ...fieldStyle, fontWeight: 600 }}
-                  />
+                  <div>
+                    <input
+                      ref={(el) => { if (el) abbrRefs.current.set(item.id, el); else abbrRefs.current.delete(item.id); }}
+                      value={item.abbr}
+                      onChange={(e) => handleItemChange(i, "abbr", e.target.value)}
+                      onKeyDown={(e) => handleAbbrKeyDown(e, item, i)}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      placeholder="Abbreviation"
+                      style={{
+                        ...fieldStyle,
+                        fontWeight: 600,
+                        ...(currentErrors.abbr
+                          ? { borderColor: "var(--color-danger)" }
+                          : {}),
+                      }}
+                    />
+                    {currentErrors.abbr ? (
+                      <div
+                        role="alert"
+                        style={{
+                          marginTop: 4,
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-danger)",
+                        }}
+                      >
+                        {currentErrors.abbr}
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-muted)" }}>
                     {item.abbr}
@@ -610,9 +717,10 @@ export default function StringListSettings({
         </div>
       )}
 
-      {error && (
+      {(duplicateName || error) && (
         <div style={{ marginTop: 12, padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--dg-radius-md)", color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          <strong>Save Error:</strong> {error}
+          <strong>{duplicateName ? "Validation Error:" : "Save Error:"}</strong>{" "}
+          {duplicateName ?? error}
         </div>
       )}
 

@@ -23,7 +23,8 @@ describe("OverviewTab", () => {
       />
     );
 
-    expect(screen.getByText("Care Units, certification, roles, and internal notes.")).toBeInTheDocument();
+    expect(screen.getByText("Employment, care units, certification, roles, and internal notes.")).toBeInTheDocument();
+    expect(screen.getByText("Full-time")).toBeInTheDocument();
     expect(screen.getByText("Care Units")).toBeInTheDocument();
     expect(screen.getByText("ICU, ED")).toBeInTheDocument();
   });

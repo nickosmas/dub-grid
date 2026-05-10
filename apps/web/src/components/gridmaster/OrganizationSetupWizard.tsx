@@ -3,8 +3,10 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { Organization, AssignableOrganizationRole } from "@/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { withComposedOrganizationAddress } from "@/lib/organization-profile";
 import {
   sectionStyle,
@@ -39,6 +41,12 @@ import { WizardStepper } from "./organization-setup/WizardStepper";
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 
+type SetupConfirmAction =
+  | "create-organization"
+  | "save-configuration"
+  | "create-employees"
+  | "send-invitations";
+
 export default function OrganizationSetupWizard({
   onCreated,
   onCancel,
@@ -49,6 +57,7 @@ export default function OrganizationSetupWizard({
   // ── Wizard state ──────────────────────────────────────────────────────────
   const [currentStep, setCurrentStep] = useState<StepKey>("details");
   const [saving, setSaving] = useState(false);
+  const [setupConfirmAction, setSetupConfirmAction] = useState<SetupConfirmAction | null>(null);
   const [createdOrg, setCreatedOrg] = useState<Organization | null>(null);
 
   // ── Step 1: Org Details ───────────────────────────────────────────────────
@@ -86,7 +95,7 @@ export default function OrganizationSetupWizard({
     { id: crypto.randomUUID(), name: "", abbr: "", type: "scheduled" },
   ]);
   const [focusAreas, setFocusAreas] = useState<FocusAreaRow[]>([
-    { id: crypto.randomUUID(), name: "" },
+    { id: crypto.randomUUID(), name: "", departmentId: null },
   ]);
   const [certifications, setCertifications] = useState<NamedItemRow[]>([
     { id: crypto.randomUUID(), name: "", abbr: "" },
@@ -100,11 +109,24 @@ export default function OrganizationSetupWizard({
       name: "",
       startTime: "",
       endTime: "",
+      focusAreaId: null,
     },
   ]);
   const [jobs, setJobs] = useState<JobRow[]>([
-    { id: crypto.randomUUID(), label: "", name: "", color: COLOR_PRESETS[0] },
+    {
+      id: crypto.randomUUID(),
+      label: "",
+      name: "",
+      color: COLOR_PRESETS[0],
+      departmentIds: [],
+      focusAreaIds: [],
+      shiftCategoryIds: [],
+    },
   ]);
+
+  const scheduledDepartments = departments.filter((department) => department.type === "scheduled");
+  const focusAreaOptions = focusAreas.filter((focusArea) => focusArea.name.trim());
+  const shiftCategoryOptions = shiftCategories.filter((category) => category.name.trim());
 
   // ── Step 4: Employees ─────────────────────────────────────────────────────
   const [employeeRows, setEmployeeRows] = useState<EmployeeRow[]>(
@@ -118,6 +140,8 @@ export default function OrganizationSetupWizard({
   );
   // ── Step 5: Invitations ───────────────────────────────────────────────────
   const [invitationRows, setInvitationRows] = useState<InvitationRow[]>([]);
+  const readyEmployeeCount = employeeRows.filter((r) => r.firstName.trim()).length;
+  const selectedInvitationCount = invitationRows.filter((r) => r.selected).length;
 
   // ── Slug helpers ──────────────────────────────────────────────────────────
 
@@ -188,17 +212,19 @@ export default function OrganizationSetupWizard({
         toast.info("Send the invitation email from the next screen.");
       } else if (superAdmin.kind === "invite-error") {
         toast.success("Organization created");
-        toast.error(`Failed to create invitation: ${superAdmin.message}`);
+        toast.error(
+          formatClientErrorMessage(
+            superAdmin.message,
+            "Failed to create invitation",
+          ),
+        );
       } else {
         toast.success("Organization created");
       }
 
       setCurrentStep("decision");
     } catch (err: unknown) {
-      toast.error(
-        (err instanceof Error ? err.message : null) ??
-          "Failed to create organization",
-      );
+      toast.error(formatClientErrorMessage(err, "Failed to create organization"));
     } finally {
       setSaving(false);
     }
@@ -246,7 +272,7 @@ export default function OrganizationSetupWizard({
       setCurrentStep("employees");
     } catch (err: unknown) {
       toast.error(
-        `Failed to save configuration: ${err instanceof Error ? err.message : "Unknown error"}`,
+        formatClientErrorMessage(err, "Failed to save configuration"),
       );
     } finally {
       setSaving(false);
@@ -297,7 +323,7 @@ export default function OrganizationSetupWizard({
       }
     } catch (err: unknown) {
       toast.error(
-        `Failed to create employees: ${err instanceof Error ? err.message : "Unknown error"}`,
+        formatClientErrorMessage(err, "Failed to create employees"),
       );
     } finally {
       setSaving(false);
@@ -337,10 +363,36 @@ export default function OrganizationSetupWizard({
     }
   }, [createdOrg, invitationRows, onCreated]);
 
+  async function handleConfirmSetupAction() {
+    const action = setupConfirmAction;
+    if (!action) return;
+
+    try {
+      if (action === "create-organization") {
+        await handleSuperAdminNext();
+      } else if (action === "save-configuration") {
+        await handleConfigNext();
+      } else if (action === "create-employees") {
+        await handleEmployeesNext();
+      } else {
+        await handleInvitationsFinish();
+      }
+    } finally {
+      setSetupConfirmAction(null);
+    }
+  }
+
   // ── Row helpers ───────────────────────────────────────────────────────────
 
   function addFocusAreaRow() {
-    setFocusAreas((prev) => [...prev, { id: crypto.randomUUID(), name: "" }]);
+    setFocusAreas((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        name: "",
+        departmentId: null,
+      },
+    ]);
   }
 
   function updateFocusArea(idx: number, updates: Partial<FocusAreaRow>) {
@@ -350,7 +402,68 @@ export default function OrganizationSetupWizard({
   }
 
   function removeFocusArea(idx: number) {
+    const removed = focusAreas[idx];
     setFocusAreas((prev) => prev.filter((_, i) => i !== idx));
+    if (!removed) return;
+    setShiftCategories((prev) =>
+      prev.map((shift) =>
+        shift.focusAreaId === removed.id ? { ...shift, focusAreaId: null } : shift,
+      ),
+    );
+    setJobs((prev) =>
+      prev.map((job) => ({
+        ...job,
+        focusAreaIds: job.focusAreaIds.filter((id) => id !== removed.id),
+      })),
+    );
+  }
+
+  function updateDepartmentRow(idx: number, updates: Partial<DeptRow>) {
+    const current = departments[idx];
+    if (!current) return;
+    setDepartments((prev) =>
+      prev.map((department, i) =>
+        i === idx ? { ...department, ...updates } : department,
+      ),
+    );
+    if (updates.type === "management") {
+      const fallbackDepartmentId =
+        departments.find((department, i) => i !== idx && department.type === "scheduled")?.id ?? null;
+      setFocusAreas((prev) =>
+        prev.map((focusArea) =>
+          focusArea.departmentId === current.id
+            ? { ...focusArea, departmentId: fallbackDepartmentId }
+            : focusArea,
+        ),
+      );
+      setJobs((prev) =>
+        prev.map((job) => ({
+          ...job,
+          departmentIds: job.departmentIds.filter((id) => id !== current.id),
+        })),
+      );
+    }
+  }
+
+  function removeDepartmentRow(idx: number) {
+    const removed = departments[idx];
+    if (!removed) return;
+    const fallbackDepartmentId =
+      departments.find((department, i) => i !== idx && department.type === "scheduled")?.id ?? null;
+    setDepartments((prev) => prev.filter((_, i) => i !== idx));
+    setFocusAreas((prev) =>
+      prev.map((focusArea) =>
+        focusArea.departmentId === removed.id
+          ? { ...focusArea, departmentId: fallbackDepartmentId }
+          : focusArea,
+      ),
+    );
+    setJobs((prev) =>
+      prev.map((job) => ({
+        ...job,
+        departmentIds: job.departmentIds.filter((id) => id !== removed.id),
+      })),
+    );
   }
 
   function addNamedItemRow(
@@ -768,7 +881,7 @@ export default function OrganizationSetupWizard({
               !superAdminLastName.trim() ||
               !superAdminEmail.trim()
             }
-            onClick={handleSuperAdminNext}
+            onClick={() => setSetupConfirmAction("create-organization")}
           >
             {saving ? "Creating…" : "Create Organization"}
           </button>
@@ -791,9 +904,7 @@ export default function OrganizationSetupWizard({
       toast.success(`Invitation email sent to ${pendingInvite.name}`);
       setPendingInvite(null);
     } catch (err: unknown) {
-      toast.error(
-        `Failed to send email: ${err instanceof Error ? err.message : "Unknown error"}`,
-      );
+      toast.error(formatClientErrorMessage(err, "Failed to send email"));
     } finally {
       setSendingEmail(false);
     }
@@ -1033,11 +1144,7 @@ export default function OrganizationSetupWizard({
                   className="dg-input"
                   value={dept.name}
                   onChange={(e) =>
-                    setDepartments((prev) =>
-                      prev.map((d, i) =>
-                        i === idx ? { ...d, name: e.target.value } : d,
-                      ),
-                    )
+                    updateDepartmentRow(idx, { name: e.target.value })
                   }
                   placeholder="e.g. Emergency"
                   style={{ flex: 2 }}
@@ -1046,11 +1153,7 @@ export default function OrganizationSetupWizard({
                   className="dg-input"
                   value={dept.abbr}
                   onChange={(e) =>
-                    setDepartments((prev) =>
-                      prev.map((d, i) =>
-                        i === idx ? { ...d, abbr: e.target.value } : d,
-                      ),
-                    )
+                    updateDepartmentRow(idx, { abbr: e.target.value })
                   }
                   placeholder="e.g. ER"
                   style={{ flex: 1, maxWidth: 100 }}
@@ -1062,13 +1165,9 @@ export default function OrganizationSetupWizard({
                     { value: "management", label: "Management" },
                   ]}
                   onChange={(val) =>
-                    setDepartments((prev) =>
-                      prev.map((d, i) =>
-                        i === idx
-                          ? { ...d, type: val as "scheduled" | "management" }
-                          : d,
-                      ),
-                    )
+                    updateDepartmentRow(idx, {
+                      type: val as "scheduled" | "management",
+                    })
                   }
                   style={{ width: 140 }}
                 />
@@ -1076,9 +1175,7 @@ export default function OrganizationSetupWizard({
                   <button
                     type="button"
                     className="dg-btn dg-btn-ghost"
-                    onClick={() =>
-                      setDepartments((prev) => prev.filter((_, i) => i !== idx))
-                    }
+                    onClick={() => removeDepartmentRow(idx)}
                     style={{ padding: "6px 8px" }}
                   >
                     <svg
@@ -1150,6 +1247,29 @@ export default function OrganizationSetupWizard({
                   }
                   placeholder={`${focusAreaLabel.replace(/s$/, "")} name`}
                   style={{ flex: 1 }}
+                />
+                <CustomSelect
+                  value={fa.departmentId ?? "__none__"}
+                  options={
+                    scheduledDepartments.length > 0
+                      ? [
+                          {
+                            value: "__none__",
+                            label: "Select scheduled department",
+                          },
+                          ...scheduledDepartments.map((department) => ({
+                            value: department.id,
+                            label: department.name.trim() || "Unnamed department",
+                          })),
+                        ]
+                      : [{ value: "__none__", label: "Add a scheduled department first" }]
+                  }
+                  onChange={(val) =>
+                    updateFocusArea(idx, {
+                      departmentId: val === "__none__" ? null : val,
+                    })
+                  }
+                  style={{ width: 220 }}
                 />
                 {focusAreas.length > 1 && (
                   <button
@@ -1407,6 +1527,30 @@ export default function OrganizationSetupWizard({
                   }
                   style={{ width: 120 }}
                 />
+                <CustomSelect
+                  value={cat.focusAreaId ?? "__none__"}
+                  options={
+                    focusAreaOptions.length > 0
+                      ? [
+                          { value: "__none__", label: `Select ${focusAreaLabel.replace(/s$/, "").toLowerCase()}` },
+                          ...focusAreaOptions.map((focusArea) => ({
+                            value: focusArea.id,
+                            label: focusArea.name,
+                          })),
+                        ]
+                      : [{ value: "__none__", label: `Add ${focusAreaLabel.toLowerCase()} first` }]
+                  }
+                  onChange={(val) =>
+                    setShiftCategories((prev) =>
+                      prev.map((c, i) =>
+                        i === idx
+                          ? { ...c, focusAreaId: val === "__none__" ? null : val }
+                          : c,
+                      ),
+                    )
+                  }
+                  style={{ width: 190 }}
+                />
                 {shiftCategories.length > 1 && (
                   <button
                     type="button"
@@ -1446,6 +1590,7 @@ export default function OrganizationSetupWizard({
                     name: "",
                     startTime: "",
                     endTime: "",
+                    focusAreaId: null,
                   },
                 ])
               }
@@ -1469,85 +1614,201 @@ export default function OrganizationSetupWizard({
             >
               Responsibilities that can sit on a shift or stand alone, like Supervisor, Mentor, Nurse, or Office.
             </p>
-            {jobs.map((job, idx) => (
-              <div
-                key={job.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                <input
-                  type="color"
-                  value={job.color}
-                  onChange={(e) =>
-                    setJobs((prev) =>
-                      prev.map((item, i) =>
-                        i === idx ? { ...item, color: e.target.value } : item,
-                      ),
-                    )
-                  }
+            {jobs.map((job, idx) => {
+              const selectedDepartmentId = job.departmentIds[0] ?? "__none__";
+              const selectableFocusAreas =
+                selectedDepartmentId === "__none__"
+                  ? []
+                  : focusAreaOptions.filter((focusArea) =>
+                      focusArea.departmentId === selectedDepartmentId,
+                    );
+              const selectedFocusAreaId = job.focusAreaIds[0] ?? "__none__";
+              const selectableShifts =
+                selectedFocusAreaId === "__none__"
+                  ? []
+                  : shiftCategoryOptions.filter((shift) =>
+                      shift.focusAreaId === selectedFocusAreaId,
+                    );
+
+              return (
+                <div
+                  key={job.id}
                   style={{
-                    width: 36,
-                    height: 36,
                     border: "1px solid var(--color-border)",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    padding: 2,
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 10,
+                    background: "var(--color-bg-secondary)",
                   }}
-                />
-                <input
-                  className="dg-input"
-                  value={job.label}
-                  onChange={(e) =>
-                    setJobs((prev) =>
-                      prev.map((item, i) =>
-                        i === idx ? { ...item, label: e.target.value } : item,
-                      ),
-                    )
-                  }
-                  placeholder="e.g. SUP"
-                  style={{ flex: 1, maxWidth: 80 }}
-                />
-                <input
-                  className="dg-input"
-                  value={job.name}
-                  onChange={(e) =>
-                    setJobs((prev) =>
-                      prev.map((item, i) =>
-                        i === idx ? { ...item, name: e.target.value } : item,
-                      ),
-                    )
-                  }
-                  placeholder="e.g. Supervisor"
-                  style={{ flex: 2 }}
-                />
-                {jobs.length > 1 && (
-                  <button
-                    type="button"
-                    className="dg-btn dg-btn-ghost"
-                    onClick={() => setJobs((prev) => prev.filter((_, i) => i !== idx))}
-                    style={{ padding: "6px 8px" }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 10,
+                    }}
                   >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-            ))}
+                    <input
+                      type="color"
+                      value={job.color}
+                      onChange={(e) =>
+                        setJobs((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, color: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      style={{
+                        width: 36,
+                        height: 36,
+                        border: "1px solid var(--color-border)",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        padding: 2,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <input
+                      className="dg-input"
+                      value={job.label}
+                      onChange={(e) =>
+                        setJobs((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, label: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      placeholder="e.g. SUP"
+                      style={{ flex: 1, maxWidth: 90 }}
+                    />
+                    <input
+                      className="dg-input"
+                      value={job.name}
+                      onChange={(e) =>
+                        setJobs((prev) =>
+                          prev.map((item, i) =>
+                            i === idx ? { ...item, name: e.target.value } : item,
+                          ),
+                        )
+                      }
+                      placeholder="e.g. Supervisor"
+                      style={{ flex: 2 }}
+                    />
+                    {jobs.length > 1 && (
+                      <button
+                        type="button"
+                        className="dg-btn dg-btn-ghost"
+                        onClick={() => setJobs((prev) => prev.filter((_, i) => i !== idx))}
+                        style={{ padding: "6px 8px" }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <label style={labelStyle}>Departments</label>
+                      <CustomSelect
+                        value={selectedDepartmentId}
+                        options={[
+                          { value: "__none__", label: "Select scheduled department" },
+                          ...scheduledDepartments.map((department) => ({
+                            value: department.id,
+                            label: department.name.trim() || "Unnamed department",
+                          })),
+                        ]}
+                        onChange={(val) =>
+                          setJobs((prev) =>
+                            prev.map((item, i) =>
+                              i === idx
+                                ? {
+                                    ...item,
+                                    departmentIds: val === "__none__" ? [] : [val],
+                                    focusAreaIds: [],
+                                    shiftCategoryIds: [],
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>{focusAreaLabel}</label>
+                      <CustomSelect
+                        value={selectedFocusAreaId}
+                        options={[
+                          { value: "__none__", label: `Select ${focusAreaLabel.replace(/s$/, "").toLowerCase()}` },
+                          ...selectableFocusAreas.map((focusArea) => ({
+                            value: focusArea.id,
+                            label: focusArea.name,
+                          })),
+                        ]}
+                        onChange={(val) =>
+                          setJobs((prev) =>
+                            prev.map((item, i) =>
+                              i === idx
+                                ? {
+                                    ...item,
+                                    focusAreaIds: val === "__none__" ? [] : [val],
+                                    shiftCategoryIds: [],
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                        style={{ width: "100%" }}
+                        disabled={selectedDepartmentId === "__none__"}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Shifts</label>
+                      <CustomSelect
+                        value={job.shiftCategoryIds[0] ?? "__none__"}
+                        options={[
+                          { value: "__none__", label: "Select shift" },
+                          ...selectableShifts.map((shift) => ({
+                            value: shift.id,
+                            label: shift.name,
+                          })),
+                        ]}
+                        onChange={(val) =>
+                          setJobs((prev) =>
+                            prev.map((item, i) =>
+                              i === idx
+                                ? { ...item, shiftCategoryIds: val === "__none__" ? [] : [val] }
+                                : item,
+                            ),
+                          )
+                        }
+                        style={{ width: "100%" }}
+                        disabled={selectedFocusAreaId === "__none__"}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
             <button
               type="button"
               className="dg-btn dg-btn-ghost"
@@ -1559,6 +1820,9 @@ export default function OrganizationSetupWizard({
                     label: "",
                     name: "",
                     color: COLOR_PRESETS[prev.length % COLOR_PRESETS.length],
+                    departmentIds: [],
+                    focusAreaIds: [],
+                    shiftCategoryIds: [],
                   },
                 ])
               }
@@ -1581,7 +1845,7 @@ export default function OrganizationSetupWizard({
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={saving}
-            onClick={handleConfigNext}
+            onClick={() => setSetupConfirmAction("save-configuration")}
           >
             {saving ? "Saving…" : "Next"}
           </button>
@@ -1593,14 +1857,12 @@ export default function OrganizationSetupWizard({
   // ── Render: Step 4 — Employees ────────────────────────────────────────────
 
   function renderEmployees() {
-    const validCount = employeeRows.filter((r) => r.firstName.trim()).length;
-
     return (
       <>
         <div style={{ ...sectionStyle, marginBottom: 20 }}>
           <div style={sectionHeaderStyle}>
             Add Employees
-            {validCount > 0 && (
+            {readyEmployeeCount > 0 && (
               <span
                 style={{
                   fontWeight: 500,
@@ -1608,7 +1870,7 @@ export default function OrganizationSetupWizard({
                   marginLeft: 8,
                 }}
               >
-                ({validCount} ready)
+                ({readyEmployeeCount} ready)
               </span>
             )}
           </div>
@@ -1632,7 +1894,7 @@ export default function OrganizationSetupWizard({
                 <input
                   id="wizard-employees-ready-count"
                   className="dg-input"
-                  value={String(validCount)}
+                  value={String(readyEmployeeCount)}
                   readOnly
                   aria-readonly="true"
                 />
@@ -1767,12 +2029,12 @@ export default function OrganizationSetupWizard({
           <button
             type="button"
             className="dg-btn dg-btn-brand"
-            disabled={saving || validCount === 0}
-            onClick={handleEmployeesNext}
+            disabled={saving || readyEmployeeCount === 0}
+            onClick={() => setSetupConfirmAction("create-employees")}
           >
             {saving
               ? "Creating…"
-              : `Create ${validCount} Employee${validCount !== 1 ? "s" : ""}`}
+              : `Create ${readyEmployeeCount} Employee${readyEmployeeCount !== 1 ? "s" : ""}`}
           </button>
         </ActionBar>
       </>
@@ -1963,7 +2225,7 @@ export default function OrganizationSetupWizard({
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={saving || selectedCount === 0}
-            onClick={handleInvitationsFinish}
+            onClick={() => setSetupConfirmAction("send-invitations")}
           >
             {saving
               ? "Sending…"
@@ -1976,8 +2238,39 @@ export default function OrganizationSetupWizard({
 
   // ── Main render ───────────────────────────────────────────────────────────
 
+  const setupConfirmCopy =
+    setupConfirmAction === "create-organization"
+      ? {
+          title: "Create Organization",
+          message: `Create "${name.trim()}" and assign "${superAdminEmail.trim()}" as the initial super admin?`,
+          confirmLabel: "Create Organization",
+          variant: "warning" as const,
+        }
+      : setupConfirmAction === "save-configuration"
+        ? {
+            title: "Save Configuration",
+            message: `Save configuration items for ${createdOrg?.name ?? "this organization"} and continue to employees?`,
+            confirmLabel: "Save Configuration",
+            variant: "warning" as const,
+          }
+        : setupConfirmAction === "create-employees"
+          ? {
+              title: "Create Employees",
+              message: `Create ${readyEmployeeCount} employee${readyEmployeeCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
+              confirmLabel: "Create Employees",
+              variant: "warning" as const,
+            }
+          : setupConfirmAction === "send-invitations"
+            ? {
+                title: "Send Invitations",
+                message: `Send ${selectedInvitationCount} invitation${selectedInvitationCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
+                confirmLabel: "Send Invitations",
+                variant: "warning" as const,
+              }
+            : null;
+
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: currentStep === "config" ? 960 : 720 }}>
       <div
         style={{
           display: "flex",
@@ -2017,6 +2310,17 @@ export default function OrganizationSetupWizard({
       {currentStep === "config" && renderConfig()}
       {currentStep === "employees" && renderEmployees()}
       {currentStep === "invitations" && renderInvitations()}
+      {setupConfirmCopy && (
+        <ConfirmDialog
+          title={setupConfirmCopy.title}
+          message={setupConfirmCopy.message}
+          confirmLabel={setupConfirmCopy.confirmLabel}
+          variant={setupConfirmCopy.variant}
+          isLoading={saving}
+          onConfirm={handleConfirmSetupAction}
+          onCancel={() => setSetupConfirmAction(null)}
+        />
+      )}
     </div>
   );
 }

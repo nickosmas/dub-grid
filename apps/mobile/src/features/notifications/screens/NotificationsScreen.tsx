@@ -18,7 +18,11 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii } from "../../../shared/theme/tokens";
+import {
+  mobileColors,
+  mobileRadii,
+  mobileText,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 
 type NotificationDestination =
@@ -93,13 +97,17 @@ function getNotificationDestination(input: {
   type: string;
 }): NotificationNavigationTarget {
   const requestId = getRequestIdFromMetadata(input.metadata);
+  const requestTab =
+    input.metadata.tab === "mine" || input.metadata.tab === "approval"
+      ? input.metadata.tab
+      : null;
 
   if (input.type === "shift_request_new" && requestId) {
     return {
       pathname: "/(tabs)/requests",
       params: {
         requestId,
-        tab: "approval",
+        tab: requestTab ?? "approval",
       },
     };
   }
@@ -365,6 +373,8 @@ export default function NotificationsScreen() {
               {unreadNotifications.map((notification) => (
                 <Pressable
                   key={notification.id}
+                  accessibilityRole="button"
+                  android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
                   onPress={() => {
                     void handleOpenNotification(notification);
                   }}
@@ -400,6 +410,8 @@ export default function NotificationsScreen() {
               {readNotifications.map((notification) => (
                 <Pressable
                   key={notification.id}
+                  accessibilityRole="button"
+                  android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
                   onPress={() => {
                     void handleOpenNotification(notification);
                   }}
@@ -440,28 +452,23 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   loadingTitle: {
+    ...mobileText.screenTitle,
     color: mobileColors.textPrimary,
-    fontSize: 22,
-    fontWeight: "800",
   },
   loadingBody: {
+    ...mobileText.body,
     color: mobileColors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
   },
   actionCopy: {
+    ...mobileText.sectionTitle,
     color: mobileColors.textPrimary,
-    fontSize: 16,
-    fontWeight: "800",
   },
   section: {
     gap: 10,
   },
   sectionTitle: {
+    ...mobileText.label,
     color: mobileColors.textSubtle,
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   alertCard: {
@@ -515,24 +522,21 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.brand,
   },
   alertTitle: {
+    ...mobileText.cardTitle,
     flex: 1,
     color: mobileColors.textPrimary,
-    fontSize: 16,
-    fontWeight: "800",
   },
   alertTitleMuted: {
+    ...mobileText.cardTitle,
     color: mobileColors.textSecondary,
-    fontSize: 16,
-    fontWeight: "700",
     flex: 1,
   },
   alertMessage: {
+    ...mobileText.body,
     color: mobileColors.textSecondary,
-    lineHeight: 21,
   },
   alertMeta: {
+    ...mobileText.caption,
     color: mobileColors.textSubtle,
-    fontSize: 12,
-    fontWeight: "600",
   },
 });

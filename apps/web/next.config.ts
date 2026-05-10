@@ -95,11 +95,20 @@ const composed = withBundleAnalyzer(withNextIntl(nextConfig));
 if (process.env.NODE_ENV === "production") {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { withSentryConfig } = require("@sentry/nextjs");
+  const sentryOrg = process.env.SENTRY_ORG || "dubgrid";
+  const sentryProject = process.env.SENTRY_PROJECT || "javascript-nextjs";
+
   module.exports = withSentryConfig(composed, {
-    org: "dubgrid",
-    project: "javascript-nextjs",
+    org: sentryOrg,
+    project: sentryProject,
     silent: !process.env.CI,
     widenClientFileUpload: true,
+    errorHandler: (err: Error) => {
+      console.warn(
+        "Sentry release/source-map upload failed; continuing production build.",
+        err.message,
+      );
+    },
     tunnelRoute: "/monitoring",
     webpack: {
       automaticVercelMonitors: true,

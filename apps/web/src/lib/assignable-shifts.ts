@@ -19,6 +19,10 @@ import {
   resolveJobTimesForShift,
   shouldShowJobOnGrid,
 } from "@/lib/job-placement";
+import {
+  isDefaultShiftSystemJob,
+  isRegularStaffSystemJob,
+} from "@/lib/system-jobs";
 
 type EmployeeEligibilityInput = Pick<
   Employee,
@@ -142,7 +146,7 @@ export function buildScheduleAssignmentOptions(input: {
   );
   const jobs = input.jobs.filter(
     (job) =>
-      job.systemKey !== "regular_staff" && (includeArchived || !job.archivedAt),
+      !isRegularStaffSystemJob(job) && (includeArchived || !job.archivedAt),
   );
   const options: Array<{
     shiftId: number | null;
@@ -439,7 +443,7 @@ function isAssignmentDefinitionBackedByCurrentJobs(input: {
     return false;
   }
 
-  if (job.systemKey === "regular_staff") {
+  if (isRegularStaffSystemJob(job)) {
     return false;
   }
 
@@ -498,7 +502,8 @@ export function buildShiftDisplayParts(input: {
 }): ShiftDisplayParts {
   const { shift, job, assignment, shiftDisplayMode } = input;
   const resolvedAssignmentDefinition = assignment ?? null;
-  const showJobOnGrid = deriveShowJobOnGrid(
+  const isShiftOnly = shift != null && isDefaultShiftSystemJob(job);
+  const showJobOnGrid = isShiftOnly ? false : deriveShowJobOnGrid(
     job,
     resolvedAssignmentDefinition ?? {
       id: -1,
@@ -550,13 +555,14 @@ export function buildShiftDisplayParts(input: {
               : resolvedAssignmentDefinition?.label || ""
             : resolvedAssignmentDefinition?.label || jobAbbr)),
     secondaryLabel:
-      shift && showJobOnGrid
+      shift && showJobOnGrid && !isShiftOnly
         ? shiftDisplayMode === "name"
           ? jobName
           : jobAbbr
         : null,
     showJobOnGrid,
     isShiftless,
+    isShiftOnly,
   };
 }
 
@@ -797,6 +803,7 @@ export function buildAssignableShiftOptions({
       jobAbbr,
       showJobOnGrid: displayParts.showJobOnGrid,
       isShiftless: displayParts.isShiftless,
+      isShiftOnly: displayParts.isShiftOnly,
       primaryLabel: displayParts.primaryLabel,
       secondaryLabel: displayParts.secondaryLabel,
       groupLabel,

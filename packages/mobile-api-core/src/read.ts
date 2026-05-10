@@ -1,7 +1,9 @@
 import type {
   MobileAbsenceType,
   MobileBootstrapResponse,
+  MobileDepartment,
   MobileFocusArea,
+  MobileNamedItem,
   MobileNotification,
   MobilePerson,
   MobileScheduleEntry,
@@ -39,6 +41,7 @@ type MobileMembershipLike = {
 type MobilePermissionsLike = MobileBootstrapResponse["permissions"] & {
   role: string;
   level: number;
+  canEditShifts: boolean;
   canApproveShiftRequests: boolean;
   canManageEmployees: boolean;
   canViewStaff: boolean;
@@ -68,12 +71,15 @@ export type MobileMeScheduleContext = MobileServiceContext & {
 export type MobileOrgScheduleContext = MobileServiceContext & {
   permissions: Pick<
     MobilePermissionsLike,
-    "level" | "canApproveShiftRequests" | "canManageEmployees"
+    | "canViewSchedule"
+    | "canEditShifts"
+    | "canApproveShiftRequests"
+    | "canManageEmployees"
   >;
 };
 
 export type MobilePeopleContext = MobileServiceContext & {
-  permissions: Pick<MobilePermissionsLike, "canViewStaff">;
+  permissions: Pick<MobilePermissionsLike, "canManageEmployees" | "canViewStaff">;
 };
 
 export type MobileNotificationsContext = MobileNotificationContext;
@@ -82,14 +88,24 @@ type MobilePersonSource = {
   id: string;
   firstName: string;
   lastName: string;
+  employmentType: MobilePerson["employmentType"];
   phone: string;
   email: string;
   status: MobilePerson["status"];
+  certificationId: number | null;
+  roleIds: number[];
+  seniority: number;
   focusAreaIds: number[];
+  departmentIds: number[];
+  deptAdminIds: number[];
+  managementDepartmentIds: number[];
+  managementDeptAdminIds: number[];
   contactNotes: string;
   statusChangedAt: string | null;
   statusNote: string;
+  userId: string | null;
   version: number;
+  pendingInvitation: MobilePerson["pendingInvitation"];
 };
 
 type FetchLinkedEmployeeForUser = (
@@ -111,6 +127,16 @@ type FetchMobileFocusAreas = (
   serviceClient: SupabaseClient,
   orgId: string,
 ) => Promise<MobileFocusArea[]>;
+
+type FetchMobileNamedItems = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+) => Promise<MobileNamedItem[]>;
+
+type FetchMobileDepartments = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+) => Promise<MobileDepartment[]>;
 
 type FetchMobileScheduleEntries = (
   serviceClient: SupabaseClient,
@@ -166,12 +192,14 @@ export function getEffectiveMobileRole(role: string): "super_admin" | "admin" | 
 }
 
 export function canViewMobileOrgSchedule(input: {
-  level: number;
+  canViewSchedule: boolean;
+  canEditShifts: boolean;
   canApproveShiftRequests: boolean;
   canManageEmployees: boolean;
 }): boolean {
   return (
-    input.level >= 2 ||
+    input.canViewSchedule ||
+    input.canEditShifts ||
     input.canApproveShiftRequests ||
     input.canManageEmployees
   );
@@ -184,10 +212,21 @@ export async function loadMobileBootstrapPayload(
     fetchMobileUnreadNotificationCount: FetchMobileUnreadNotificationCount;
     fetchMobileAbsenceTypes: FetchMobileAbsenceTypes;
     fetchMobileFocusAreas: FetchMobileFocusAreas;
+    fetchMobileRoles: FetchMobileNamedItems;
+    fetchMobileCertifications: FetchMobileNamedItems;
+    fetchMobileDepartments: FetchMobileDepartments;
     mapOrganizationToMobileConfig: MapOrganizationToMobileConfig;
   },
 ): Promise<MobileBootstrapResponse> {
-  const [linkedEmployee, unreadNotificationCount, absenceTypes, focusAreas] =
+  const [
+    linkedEmployee,
+    unreadNotificationCount,
+    absenceTypes,
+    focusAreas,
+    roles,
+    certifications,
+    departments,
+  ] =
     await Promise.all([
       deps.fetchLinkedEmployeeForUser(
         auth.serviceClient,
@@ -197,6 +236,9 @@ export async function loadMobileBootstrapPayload(
       deps.fetchMobileUnreadNotificationCount(auth.userClient),
       deps.fetchMobileAbsenceTypes(auth.serviceClient, auth.currentOrg.id),
       deps.fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
+      deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
+      deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
+      deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
     ]);
 
   return {
@@ -230,6 +272,9 @@ export async function loadMobileBootstrapPayload(
       : null,
     absenceTypes,
     focusAreas,
+    roles,
+    certifications,
+    departments,
     unreadNotificationCount,
   };
 }
@@ -284,7 +329,8 @@ export async function loadMobileOrgSchedulePayload(
 ): Promise<MobileOrgScheduleResponse> {
   if (
     !canViewMobileOrgSchedule({
-      level: auth.permissions.level,
+      canViewSchedule: auth.permissions.canViewSchedule,
+      canEditShifts: auth.permissions.canEditShifts,
       canApproveShiftRequests: auth.permissions.canApproveShiftRequests,
       canManageEmployees: auth.permissions.canManageEmployees,
     })
@@ -318,9 +364,31 @@ export async function loadMobilePeoplePayload(
     auth.serviceClient,
     auth.currentOrg.id,
   );
+  const visiblePeople = auth.permissions.canManageEmployees
+    ? people
+    : people.filter((person) => person.status === "active");
 
   return {
-    people: people.map(deps.mapEmployeeToMobilePerson),
+    people: visiblePeople.map((person) => {
+      const mobilePerson = deps.mapEmployeeToMobilePerson(person);
+
+      if (auth.permissions.canManageEmployees) {
+        return mobilePerson;
+      }
+
+      return {
+        ...mobilePerson,
+        contactNotes: "",
+        deptAdminIds: [],
+        departmentIds: [],
+        managementDepartmentIds: [],
+        managementDeptAdminIds: [],
+        pendingInvitation: null,
+        roleIds: [],
+        statusNote: "",
+        userId: null,
+      };
+    }),
   };
 }
 

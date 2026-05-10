@@ -88,8 +88,18 @@ export type AuditAction =
   | "schedule_note.upserted"
   | "schedule_note.deleted"
   // Billing
+  | "billing.subscription_created"
+  | "billing.subscription_updated"
+  | "billing.subscription_cancel_scheduled"
   | "billing.trial_extended"
   | "billing.subscription_canceled"
+  | "billing.payment_failed"
+  | "billing.payment_succeeded"
+  | "billing.payment_method_updated"
+  | "billing.billing_details_updated"
+  | "billing.portal_opened"
+  | "billing.seats_synced"
+  | "billing.status_overridden"
   | "billing.synced"
   // Data export
   | "data.exported"

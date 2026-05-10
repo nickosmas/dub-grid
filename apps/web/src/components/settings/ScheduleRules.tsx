@@ -7,6 +7,7 @@ import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
 } from "@/features/organization/client";
+import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 
@@ -17,19 +18,28 @@ export default function ScheduleRules({
   organization: Organization;
   onOrganizationSave: (o: Organization) => void;
 }) {
+  const organizationMentoredCredit =
+    organization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100;
   const [enforceConflictPrevention, setEnforceConflictPrevention] = useState(
     organization.enforceConflictPrevention,
   );
   const [payPeriodStartDate, setPayPeriodStartDate] = useState(
     organization.payPeriodStartDate ?? "",
   );
+  const [mentoredCoverageCreditPercent, setMentoredCoverageCreditPercent] =
+    useState(organizationMentoredCredit);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnforceConflictPrevention(organization.enforceConflictPrevention);
     setPayPeriodStartDate(organization.payPeriodStartDate ?? "");
+    setMentoredCoverageCreditPercent(
+      organizationMentoredCredit,
+    );
   }, [
+    organization.coverageRuleConfig,
+    organizationMentoredCredit,
     organization.enforceConflictPrevention,
     organization.payPeriodStartDate,
     organization.updatedAt,
@@ -37,7 +47,8 @@ export default function ScheduleRules({
 
   const isModified =
     enforceConflictPrevention !== organization.enforceConflictPrevention
-    || payPeriodStartDate !== (organization.payPeriodStartDate ?? "");
+    || payPeriodStartDate !== (organization.payPeriodStartDate ?? "")
+    || mentoredCoverageCreditPercent !== organizationMentoredCredit;
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -52,6 +63,10 @@ export default function ScheduleRules({
         expectedUpdatedAt: organization.updatedAt,
         enforceConflictPrevention,
         payPeriodStartDate: payPeriodStartDate || null,
+        coverageRuleConfig: {
+          ...(organization.coverageRuleConfig ?? {}),
+          mentoredCoverageCreditPercent,
+        },
       });
       onOrganizationSave(updated);
       toast.success("Schedule rules saved");
@@ -60,6 +75,9 @@ export default function ScheduleRules({
         onOrganizationSave(err.latestOrganization);
         setEnforceConflictPrevention(err.latestOrganization.enforceConflictPrevention);
         setPayPeriodStartDate(err.latestOrganization.payPeriodStartDate ?? "");
+        setMentoredCoverageCreditPercent(
+          err.latestOrganization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100,
+        );
         toast.error("Schedule rules changed elsewhere. Review the latest values and try again.");
       } else {
         toast.error("Failed to update setting");
@@ -70,8 +88,11 @@ export default function ScheduleRules({
     }
   }, [
     enforceConflictPrevention,
+    mentoredCoverageCreditPercent,
     onOrganizationSave,
+    organization.coverageRuleConfig,
     organization.id,
+    organizationMentoredCredit,
     organization.updatedAt,
     payPeriodStartDate,
   ]);
@@ -124,6 +145,31 @@ export default function ScheduleRules({
             allowClear
           />
         </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div>
+          <label
+            htmlFor="mentored-coverage-credit"
+            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
+          >
+            Mentored coverage credit
+          </label>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
+            Controls how mentored assignments count toward coverage requirements.
+          </div>
+        </div>
+        <CustomSelect
+          id="mentored-coverage-credit"
+          value={mentoredCoverageCreditPercent}
+          onChange={setMentoredCoverageCreditPercent}
+          options={[
+            { value: 100, label: "Counts fully" },
+            { value: 50, label: "Counts as half" },
+            { value: 0, label: "Does not count" },
+          ]}
+          style={{ maxWidth: 260, width: "100%" }}
+        />
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>

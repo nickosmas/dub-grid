@@ -138,6 +138,22 @@ describe("queryKeys factory", () => {
       expect(queryKeys.org.focusAreas("org-1")).toEqual(["org", "org-1", "focusAreas"]);
     });
 
+    it("org.bootstrap produces correct keys", () => {
+      expect(queryKeys.org.bootstrapAll()).toEqual(["org", "bootstrap"]);
+      expect(queryKeys.org.bootstrap("org-1", true)).toEqual([
+        "org",
+        "bootstrap",
+        "org-1",
+        true,
+      ]);
+      expect(queryKeys.org.bootstrap(null, false)).toEqual([
+        "org",
+        "bootstrap",
+        "auto",
+        false,
+      ]);
+    });
+
     it("org.assignments produces correct key", () => {
       expect(queryKeys.org.assignments("org-1")).toEqual(["org", "org-1", "assignments"]);
     });
@@ -196,6 +212,7 @@ describe("queryKeys factory", () => {
       // Collect all keys that take an orgId
       const allKeys = [
         queryKeys.org.all(orgId),
+        queryKeys.org.bootstrap(orgId, true),
         queryKeys.org.detail(orgId),
         queryKeys.org.focusAreas(orgId),
         queryKeys.org.assignments(orgId),

@@ -31,6 +31,26 @@ describe("schedule view fallback", () => {
     expect(formatDateKey(start!)).toBe("2026-04-20");
   });
 
+  it("anchors 2-week schedule starts to the configured pay period", () => {
+    const start = getScheduleStartForSpan({
+      date: new Date(2026, 4, 1),
+      span: 2,
+      payPeriodStartDate: "2026-04-20",
+    });
+
+    expect(formatDateKey(start)).toBe("2026-04-20");
+  });
+
+  it("keeps 1-week schedule starts aligned to calendar weeks", () => {
+    const start = getScheduleStartForSpan({
+      date: new Date(2026, 4, 1),
+      span: 1,
+      payPeriodStartDate: "2026-04-20",
+    });
+
+    expect(formatDateKey(start)).toBe("2026-04-26");
+  });
+
   it("falls back to calendar weeks when no pay-period anchor is configured", () => {
     const start = getScheduleStartForSpan({
       date: new Date(2026, 4, 1),

@@ -1,0 +1,212 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+} from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { getServiceClient } from "@/lib/supabase-service";
+import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import type { GridmasterAccount } from "@/types";
+
+const accountActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("promote"),
+    email: z.string().email(),
+  }),
+  z.object({
+    action: z.literal("demote"),
+    userId: z.string().uuid(),
+    orgId: z.string().uuid(),
+    orgRole: z.enum(["super_admin", "admin", "user"]),
+  }),
+  z.object({
+    action: z.literal("setActivation"),
+    userId: z.string().uuid(),
+    deactivate: z.boolean(),
+  }),
+]);
+
+function getRpcPayload(data: unknown): Record<string, unknown> {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return {};
+}
+
+async function loadGridmasterAccounts(): Promise<GridmasterAccount[]> {
+  const serviceClient = getServiceClient();
+  const { data: profiles, error } = await serviceClient
+    .from("profiles")
+    .select("id, first_name, last_name, created_at, deactivated_at, deactivated_by")
+    .eq("platform_role", "gridmaster");
+
+  if (error) {
+    throw error;
+  }
+
+  const accounts = await Promise.all(
+    ((profiles ?? []) as Record<string, unknown>[]).map(async (profile) => {
+      const id = profile.id as string;
+      const authResult = await serviceClient.auth.admin.getUserById(id);
+      if (authResult.error) {
+        throw authResult.error;
+      }
+      const user = authResult.data.user;
+      return {
+        id,
+        email: user?.email ?? null,
+        firstName: (profile.first_name as string | null) ?? null,
+        lastName: (profile.last_name as string | null) ?? null,
+        createdAt:
+          (profile.created_at as string | null) ??
+          user?.created_at ??
+          new Date(0).toISOString(),
+        lastSignInAt: user?.last_sign_in_at ?? null,
+        deactivatedAt: (profile.deactivated_at as string | null) ?? null,
+        deactivatedBy: (profile.deactivated_by as string | null) ?? null,
+      };
+    }),
+  );
+
+  return accounts.sort((left, right) => {
+    const leftInactive = left.deactivatedAt ? 1 : 0;
+    const rightInactive = right.deactivatedAt ? 1 : 0;
+    if (leftInactive !== rightInactive) return leftInactive - rightInactive;
+    return (left.email ?? "").localeCompare(right.email ?? "");
+  });
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const auth = await requireGridmasterSession(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+    void auth;
+
+    return NextResponse.json({
+      accounts: await loadGridmasterAccounts(),
+    });
+  } catch (error) {
+    console.error("gridmaster accounts GET failed", error);
+    return NextResponse.json(
+      { error: "Failed to load gridmaster accounts" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) {
+    return csrfError;
+  }
+
+  try {
+    const auth = await requireGridmasterSession(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const parsed = accountActionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+
+    const requestClient = createRequestSupabaseClient(req);
+    const serviceClient = getServiceClient();
+
+    if (parsed.data.action === "promote") {
+      const result = await requestClient.rpc("promote_gridmaster_by_email", {
+        p_email: parsed.data.email,
+      });
+      if (result.error) {
+        return NextResponse.json(
+          { error: result.error.message ?? "Failed to promote gridmaster account" },
+          { status: 400 },
+        );
+      }
+      const payload = getRpcPayload(result.data);
+      const userId = (payload.user_id as string | undefined) ?? null;
+      await writeGridmasterAuditLog({
+        serviceClient,
+        actor: auth.user,
+        action: "gridmaster_account.promoted",
+        resourceType: "user",
+        resourceId: userId,
+        details: { targetEmail: parsed.data.email, targetUserId: userId },
+        request: req,
+      });
+      return NextResponse.json({ success: true, userId });
+    }
+
+    if (parsed.data.action === "demote") {
+      const result = await requestClient.rpc("demote_gridmaster_account", {
+        p_target_user_id: parsed.data.userId,
+        p_org_id: parsed.data.orgId,
+        p_org_role: parsed.data.orgRole,
+      });
+      if (result.error) {
+        return NextResponse.json(
+          { error: result.error.message ?? "Failed to demote gridmaster account" },
+          { status: 400 },
+        );
+      }
+      await writeGridmasterAuditLog({
+        serviceClient,
+        actor: auth.user,
+        action: "gridmaster_account.demoted",
+        resourceType: "user",
+        resourceId: parsed.data.userId,
+        orgId: parsed.data.orgId,
+        details: {
+          targetUserId: parsed.data.userId,
+          targetOrgId: parsed.data.orgId,
+          orgRole: parsed.data.orgRole,
+        },
+        request: req,
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    const result = await requestClient.rpc("set_gridmaster_account_deactivated", {
+      p_target_user_id: parsed.data.userId,
+      p_deactivate: parsed.data.deactivate,
+    });
+    if (result.error) {
+      return NextResponse.json(
+        { error: result.error.message ?? "Failed to update gridmaster account" },
+        { status: 400 },
+      );
+    }
+    await writeGridmasterAuditLog({
+      serviceClient,
+      actor: auth.user,
+      action: parsed.data.deactivate
+        ? "gridmaster_account.deactivated"
+        : "gridmaster_account.reactivated",
+      resourceType: "user",
+      resourceId: parsed.data.userId,
+      details: {
+        targetUserId: parsed.data.userId,
+        deactivate: parsed.data.deactivate,
+      },
+      request: req,
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("gridmaster accounts POST failed", error);
+    return NextResponse.json(
+      { error: "Failed to update gridmaster account" },
+      { status: 500 },
+    );
+  }
+}

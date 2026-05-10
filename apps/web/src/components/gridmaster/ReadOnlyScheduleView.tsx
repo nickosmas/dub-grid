@@ -1,10 +1,17 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays, formatDateKey } from "@/lib/utils";
 import { getScheduleStartForSpan } from "@/lib/schedule-view";
+import { queryKeys } from "@/lib/query-keys";
+import {
+  formatClientErrorMessage,
+  formatShiftRequestStatusLabel,
+  formatShiftRequestTypeLabel,
+} from "@/lib/client-facing";
 import {
   fetchGridmasterReadOnlySchedule,
   type GridmasterReadOnlyShiftRow as ShiftRow,
@@ -14,6 +21,19 @@ function formatDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+function getAssignmentStyle(assignment: ShiftRow["assignmentDetails"][number]) {
+  return {
+    background: assignment.color ?? "var(--color-bg-secondary)",
+    borderColor: assignment.border ?? "var(--color-border)",
+    color: assignment.text ?? "var(--color-text-primary)",
+  };
+}
+
+function formatRequestIndicator(request: ShiftRow["requestIndicators"][number]) {
+  const relation = request.relation === "target" ? "target person" : "requester";
+  return `${formatShiftRequestTypeLabel(request.type)} request - ${formatShiftRequestStatusLabel(request.status).toLowerCase()} (${relation})`;
+}
+
 export default function ReadOnlyScheduleView({
   orgId,
   payPeriodStartDate,
@@ -21,9 +41,6 @@ export default function ReadOnlyScheduleView({
   orgId: string;
   payPeriodStartDate: string | null;
 }) {
-  const [shifts, setShifts] = useState<ShiftRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [periodOffset, setPeriodOffset] = useState(0);
 
   const { startDate, endDate } = useMemo(() => {
@@ -40,29 +57,18 @@ export default function ReadOnlyScheduleView({
     };
   }, [payPeriodStartDate, periodOffset]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-
-    (async () => {
-      try {
-        const { shifts: nextShifts } = await fetchGridmasterReadOnlySchedule({
-          orgId,
-          startDate,
-          endDate,
-        });
-        if (cancelled) return;
-        setShifts(nextShifts);
-      } catch (err: unknown) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load shifts");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [orgId, startDate, endDate]);
+  const scheduleQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgSchedule(orgId, startDate, endDate),
+    queryFn: () => fetchGridmasterReadOnlySchedule({ orgId, startDate, endDate }),
+    staleTime: 30_000,
+  });
+  const shifts = scheduleQuery.data?.shifts ?? [];
+  const error = scheduleQuery.error
+    ? formatClientErrorMessage(
+        scheduleQuery.error,
+        "We couldn't load this schedule right now.",
+      )
+    : null;
 
   // Group by date
   const byDate = useMemo(() => {
@@ -102,7 +108,7 @@ export default function ReadOnlyScheduleView({
           </button>
         </div>
         <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-          {startDate} — {endDate} ({shifts.length} shifts)
+          {formatDate(startDate)} - {formatDate(endDate)} ({shifts.length} shifts)
         </span>
       </div>
 
@@ -112,7 +118,7 @@ export default function ReadOnlyScheduleView({
         </div>
       )}
 
-      {loading ? (
+      {scheduleQuery.isLoading ? (
         <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
           Loading schedule…
         </div>
@@ -146,15 +152,21 @@ export default function ReadOnlyScheduleView({
                     <tr key={`${r.empId}-${i}`}>
                       <td style={{ ...tdStyle, fontWeight: 600 }}>{r.empName}</td>
                       <td style={tdStyle}>
-                        {r.assignments.length > 0 ? (
-                          <span style={{ display: "inline-flex", gap: 4 }}>
-                            {r.assignments.map((c, j) => (
-                              <span key={j} style={{
+                        {r.assignmentDetails.length > 0 ? (
+                          <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+                            {r.assignmentDetails.map((assignment) => (
+                              <span key={assignment.id} title={[
+                                assignment.name,
+                                assignment.coverageStatus
+                                  ? `Coverage ${assignment.coverageStatus.actual}/${assignment.coverageStatus.required}`
+                                  : null,
+                              ].filter(Boolean).join(" · ")} style={{
                                 display: "inline-block", padding: "1px 6px", borderRadius: 4,
                                 fontSize: "var(--dg-fs-caption)", fontWeight: 700,
-                                background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)",
+                                border: "1px solid",
+                                ...getAssignmentStyle(assignment),
                               }}>
-                                {c}
+                                {assignment.label}
                               </span>
                             ))}
                           </span>
@@ -171,14 +183,33 @@ export default function ReadOnlyScheduleView({
                         )}
                       </td>
                       <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                        {r.focusAreaName ?? "—"}
+                        {r.focusAreaName ??
+                          r.assignmentDetails.find((assignment) => assignment.focusAreaName)
+                            ?.focusAreaName ??
+                          "—"}
                       </td>
                       <td style={tdStyle}>
-                        {r.isDraft ? (
-                          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-warning)", background: "var(--color-warning-bg)", padding: "1px 6px", borderRadius: 4 }}>Draft</span>
-                        ) : (
-                          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-success)", background: "var(--color-success-bg)", padding: "1px 6px", borderRadius: 4 }}>Published</span>
-                        )}
+                        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {r.isDraft ? (
+                            <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-warning)", background: "var(--color-warning-bg)", padding: "1px 6px", borderRadius: 4 }}>Draft</span>
+                          ) : (
+                            <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-success)", background: "var(--color-success-bg)", padding: "1px 6px", borderRadius: 4 }}>Published</span>
+                          )}
+                          {r.requestIndicators.map((request) => (
+                            <span
+                              key={request.id}
+                              title={formatRequestIndicator(request)}
+                              style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-today-text)", background: "var(--color-today-bg)", padding: "1px 6px", borderRadius: 4 }}
+                            >
+                              {formatShiftRequestTypeLabel(request.type)}
+                            </span>
+                          ))}
+                          {r.assignmentDetails.some((assignment) => assignment.coverageStatus && !assignment.coverageStatus.isMet) && (
+                            <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-danger)", background: "var(--color-danger-bg)", padding: "1px 6px", borderRadius: 4 }}>
+                              Coverage
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

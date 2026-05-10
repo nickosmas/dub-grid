@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterImpersonationHistory } from "@/features/gridmaster/client";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { MaybeHint } from "@/components/ui/hint";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+import { queryKeys } from "@/lib/query-keys";
 
 function useNow(intervalMs = 60_000) {
   const [now, setNow] = useState(() => Date.now());
@@ -74,23 +77,22 @@ function formatReason(reason: string | null): string {
 
 export default function ImpersonationHistory() {
   const now = useNow();
-  const [entries, setEntries] = useState<ImpersonationHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
-
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    setError(null);
-    fetchGridmasterImpersonationHistory({ limit: PAGE_SIZE, offset: page * PAGE_SIZE })
-      .then((data) => { if (!cancelled) setEntries(data); })
-      .catch((err: unknown) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load impersonation history"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [page]);
+  const historyQuery = useQuery({
+    queryKey: queryKeys.gridmaster.impersonationHistory(page, PAGE_SIZE),
+    queryFn: () =>
+      fetchGridmasterImpersonationHistory({
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      }),
+    staleTime: 30_000,
+  });
+  const entries = historyQuery.data ?? [];
+  const error =
+    historyQuery.error
+      ? formatClientErrorMessage(historyQuery.error, "Failed to load impersonation history")
+      : null;
 
   return (
     <>
@@ -107,7 +109,7 @@ export default function ImpersonationHistory() {
         </div>
       )}
 
-      {loading ? (
+      {historyQuery.isLoading ? (
         <div style={sectionStyle}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} style={{ display: "flex", gap: 12, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>

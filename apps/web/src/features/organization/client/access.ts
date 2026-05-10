@@ -8,6 +8,7 @@ import type {
   OrganizationRole,
   OrganizationUser,
 } from "@/types";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
 
 export interface UpdateOrganizationSettingsInput
@@ -65,7 +66,7 @@ async function parseBody(response: Response): Promise<ErrorBody | null> {
 }
 
 function getErrorMessage(body: ErrorBody | null, fallback: string): string {
-  return body?.error || fallback;
+  return formatClientErrorMessage(body?.error, fallback);
 }
 
 async function requestOrganizationJson<T>(
@@ -80,9 +81,7 @@ async function requestOrganizationJson<T>(
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "Organization request failed.",
+      formatClientErrorMessage(body?.error, "Organization request failed."),
     );
   }
 

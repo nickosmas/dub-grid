@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { canManageProfileChangeRequests } from "@/features/account/server";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { extractJwtClaims } from "@/features/permissions/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -20,9 +22,28 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) return auth.response;
     const { user } = auth;
+    const { orgId } = extractJwtClaims(auth.session.access_token);
+
+    const canEraseDirectly = orgId
+      ? await canManageProfileChangeRequests({
+          serviceClient: getServiceClient(),
+          actorId: user.id,
+          orgId,
+        })
+      : false;
+
+    if (!canEraseDirectly) {
+      return NextResponse.json(
+        {
+          error:
+            "Account erasure must be requested and approved by an admin from People requests.",
+        },
+        { status: 403 },
+      );
+    }
 
     let body: { confirmation?: string } = {};
     try {
@@ -50,6 +71,31 @@ export async function POST(req: NextRequest) {
         { error: "Gridmaster accounts cannot be self-erased. Contact support." },
         { status: 403 },
       );
+    }
+
+    const { data: memberships } = await serviceClient
+      .from("organization_memberships")
+      .select("org_id, org_role")
+      .eq("user_id", userId)
+      .is("archived_at", null);
+
+    for (const membership of memberships ?? []) {
+      if ((membership as Record<string, unknown>).org_role !== "super_admin") {
+        continue;
+      }
+      const membershipOrgId = (membership as Record<string, unknown>).org_id as string;
+      const { count } = await serviceClient
+        .from("organization_memberships")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", membershipOrgId)
+        .eq("org_role", "super_admin")
+        .is("archived_at", null);
+      if ((count ?? 0) <= 1) {
+        return NextResponse.json(
+          { error: "You are the only super admin of an organization. Transfer ownership first." },
+          { status: 409 },
+        );
+      }
     }
 
     // Call the GDPR erasure function

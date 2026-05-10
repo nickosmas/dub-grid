@@ -33,11 +33,16 @@ interface ShiftSwapModalProps {
   requesterName: string;
   shiftDate: string;
   shiftLabel: string;
+  requesterFocusAreaIds?: number[];
   employees: Employee[];
   shiftForKey: (empId: string, date: Date) => string | null;
   isRequestableShift: (empId: string, date: Date) => boolean;
+  /** True when the target shift is already in progress or in the past. */
+  isShiftStarted?: (empId: string, date: Date) => boolean;
   /** Returns time ranges (from shift categories) for an employee's shift on a given date */
   getShiftTimeRanges: (empId: string, date: Date) => TimeRange[];
+  /** Returns focus area IDs required by an employee's published shift. */
+  getShiftFocusAreaIds?: (empId: string, date: Date) => number[];
   onSubmit: (targetEmpId: string, targetShiftDate: string) => void;
   onClose: () => void;
 }
@@ -48,10 +53,13 @@ export default function ShiftSwapModal({
   requesterEmpId,
   shiftDate,
   shiftLabel,
+  requesterFocusAreaIds = [],
   employees,
   shiftForKey,
   isRequestableShift,
+  isShiftStarted,
   getShiftTimeRanges,
+  getShiftFocusAreaIds,
   onSubmit,
   onClose,
 }: ShiftSwapModalProps) {
@@ -114,18 +122,65 @@ export default function ShiftSwapModal({
     [viewDate, shiftDate, requesterEmpId, getShiftTimeRanges],
   );
 
+  const canWorkRequiredFocusAreas = useCallback(
+    (employeeFocusAreaIds: number[], requiredFocusAreaIds: number[]) => {
+      if (requiredFocusAreaIds.length === 0) {
+        return true;
+      }
+
+      return requiredFocusAreaIds.every((focusAreaId) =>
+        employeeFocusAreaIds.includes(focusAreaId),
+      );
+    },
+    [],
+  );
+
   /** Employees who have a requestable shift on the viewed date with no time conflicts */
   const eligibleEmployees = useMemo(() => {
+    if (viewDate < todayIso()) {
+      return [];
+    }
+
     const viewDateObj = new Date(viewDate + "T00:00:00");
+    const shiftDateObj = new Date(shiftDate + "T00:00:00");
+    const requesterShiftFocusAreaIds =
+      getShiftFocusAreaIds?.(requesterEmpId, shiftDateObj) ?? [];
+
     return employees.filter(
-      (emp) =>
-        emp.id !== requesterEmpId &&
-        !emp.archivedAt &&
-        emp.status === "active" &&
-        isRequestableShift(emp.id, viewDateObj) &&
-        !hasTimeConflict(emp.id),
+      (emp) => {
+        const targetShiftFocusAreaIds =
+          getShiftFocusAreaIds?.(emp.id, viewDateObj) ?? [];
+
+        return (
+          emp.id !== requesterEmpId &&
+          !emp.archivedAt &&
+          emp.status === "active" &&
+          isRequestableShift(emp.id, viewDateObj) &&
+          !isShiftStarted?.(emp.id, viewDateObj) &&
+          canWorkRequiredFocusAreas(
+            requesterFocusAreaIds,
+            targetShiftFocusAreaIds,
+          ) &&
+          canWorkRequiredFocusAreas(
+            emp.focusAreaIds,
+            requesterShiftFocusAreaIds,
+          ) &&
+          !hasTimeConflict(emp.id)
+        );
+      },
     );
-  }, [employees, requesterEmpId, viewDate, isRequestableShift, hasTimeConflict]);
+  }, [
+    canWorkRequiredFocusAreas,
+    employees,
+    getShiftFocusAreaIds,
+    hasTimeConflict,
+    isRequestableShift,
+    isShiftStarted,
+    requesterEmpId,
+    requesterFocusAreaIds,
+    shiftDate,
+    viewDate,
+  ]);
 
   function handleSelectEmployee(emp: Employee) {
     const dateObj = new Date(viewDate + "T00:00:00");

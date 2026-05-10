@@ -9,10 +9,15 @@ import {
   type PropsWithChildren,
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -32,8 +37,7 @@ const DEFAULT_TOAST_DURATION_MS = 4500;
 const OFFLINE_TOAST_TITLE = "Network connection issue";
 const OFFLINE_TOAST_MESSAGE = "Check your internet connection and try again.";
 const TOAST_MESSAGE_COLOR = "rgba(255, 255, 255, 0.82)";
-const TOAST_CLOSE_BACKGROUND = "rgba(255, 255, 255, 0.18)";
-const TOAST_CLOSE_BORDER = "rgba(255, 255, 255, 0.28)";
+const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
 
 const TOAST_TONE = {
   error: {
@@ -66,10 +70,35 @@ const ToastContext = createContext<{
   pushToast: (toast: ToastInput) => void;
 } | null>(null);
 
+function getTouchEventY(event: GestureResponderEvent): number | null {
+  const nativeEvent = event.nativeEvent;
+  const webNativeEvent = nativeEvent as typeof nativeEvent & {
+    changedTouches?: Array<{ pageY?: number }>;
+    touches?: Array<{ pageY?: number }>;
+  };
+
+  if (typeof nativeEvent.pageY === "number") {
+    return nativeEvent.pageY;
+  }
+
+  const changedTouchY = webNativeEvent.changedTouches?.[0]?.pageY;
+  if (typeof changedTouchY === "number") {
+    return changedTouchY;
+  }
+
+  const touchY = webNativeEvent.touches?.[0]?.pageY;
+  if (typeof touchY === "number") {
+    return touchY;
+  }
+
+  return null;
+}
+
 export function ToastProvider({ children }: PropsWithChildren) {
   const insets = useSafeAreaInsets();
   const { isOffline } = useNetworkStatus();
   const idRef = useRef(0);
+  const swipeStartYRef = useRef<number | null>(null);
   const [queue, setQueue] = useState<ToastDescriptor[]>([]);
   const [activeToast, setActiveToast] = useState<ToastDescriptor | null>(null);
 
@@ -135,9 +164,36 @@ export function ToastProvider({ children }: PropsWithChildren) {
       return;
     }
 
+    swipeStartYRef.current = null;
     setActiveToast(null);
     setQueue([]);
   }, [isOffline]);
+
+  function handleToastTouchStart(event: GestureResponderEvent) {
+    swipeStartYRef.current = getTouchEventY(event);
+  }
+
+  function handleToastTouchCancel() {
+    swipeStartYRef.current = null;
+  }
+
+  function handleToastTouchEnd(event: GestureResponderEvent) {
+    const startY = swipeStartYRef.current;
+    swipeStartYRef.current = null;
+
+    if (startY == null || !activeToast) {
+      return;
+    }
+
+    const endY = getTouchEventY(event);
+    if (endY == null) {
+      return;
+    }
+
+    if (endY - startY <= -TOAST_SWIPE_DISMISS_THRESHOLD) {
+      dismissToast(activeToast.id);
+    }
+  }
 
   const value = useMemo(
     () => ({
@@ -181,6 +237,10 @@ export function ToastProvider({ children }: PropsWithChildren) {
       {activeToast && palette ? (
         <View pointerEvents="box-none" style={styles.host}>
           <View
+            testID="toast-notification"
+            onTouchCancel={handleToastTouchCancel}
+            onTouchEnd={handleToastTouchEnd}
+            onTouchStart={handleToastTouchStart}
             style={[
               styles.toast,
               {
@@ -199,14 +259,6 @@ export function ToastProvider({ children }: PropsWithChildren) {
                 <Text style={styles.toastMessage}>{activeToast.message}</Text>
               </View>
             </View>
-            <Pressable
-              accessibilityLabel="Dismiss notification"
-              accessibilityRole="button"
-              onPress={() => dismissToast(activeToast.id)}
-              style={styles.closeButton}
-            >
-              <Ionicons color={mobileColors.textInverse} name="close" size={18} />
-            </Pressable>
           </View>
         </View>
       ) : null}
@@ -242,7 +294,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 14,
     paddingLeft: 20,
-    paddingRight: 48,
+    paddingRight: 20,
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
@@ -259,28 +311,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   toastTitle: {
+    ...mobileText.bodyStrong,
     color: mobileColors.textInverse,
-    fontSize: 14,
-    fontWeight: "600",
   },
   toastMessage: {
+    ...mobileText.meta,
     color: TOAST_MESSAGE_COLOR,
-    fontSize: 13,
     fontWeight: "500",
-    lineHeight: 20,
-  },
-  closeButton: {
-    position: "absolute",
-    top: "50%",
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginTop: -14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: TOAST_CLOSE_BACKGROUND,
-    borderWidth: 1,
-    borderColor: TOAST_CLOSE_BORDER,
   },
 });

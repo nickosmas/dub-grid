@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -41,36 +42,16 @@ function getRequestIp(req: NextRequest): string | null {
 }
 
 async function requirePrivilegedActor(
+  req: NextRequest,
   orgId: string,
-  actorId: string,
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-  const serviceClient = getServiceClient();
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role")
-      .eq("user_id", actorId)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", actorId)
-      .maybeSingle(),
-  ]);
-
-  const isGridmaster = profile?.platform_role === "gridmaster";
-  const isSuperAdmin = membership?.org_role === "super_admin";
-
-  if (!isGridmaster && !isSuperAdmin) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Insufficient permissions" },
-        { status: 403 },
-      ),
-    };
+  const auth = await requireOrgPermissions(
+    req,
+    orgId,
+    (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
+  );
+  if ("response" in auth) {
+    return { ok: false, response: auth.response };
   }
 
   return { ok: true };
@@ -99,6 +80,10 @@ async function fetchOrganizationUser(
       .maybeSingle(),
     serviceClient.auth.admin.getUserById(userId),
   ]);
+
+  if (profile?.platform_role === "gridmaster") {
+    return null;
+  }
 
   return membershipRowToOrganizationUser(
     membership as DbOrganizationMembership,
@@ -197,7 +182,7 @@ export async function PATCH(req: NextRequest) {
   const { orgId, userId, expectedUpdatedAt, orgRole, adminPermissions } = parsed.data;
 
   try {
-    const allowed = await requirePrivilegedActor(orgId, user.id);
+    const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
@@ -334,7 +319,7 @@ export async function DELETE(req: NextRequest) {
   const { orgId, userId, expectedUpdatedAt } = parsed.data;
 
   try {
-    const allowed = await requirePrivilegedActor(orgId, user.id);
+    const allowed = await requirePrivilegedActor(req, orgId);
     if (!allowed.ok) return allowed.response;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);

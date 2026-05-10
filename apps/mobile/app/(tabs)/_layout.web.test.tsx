@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useSessionState = vi.fn();
 const useBootstrap = vi.fn();
+const handleExpiredMobileSession = vi.fn();
 
 vi.mock("expo-router", async () => {
   const React = await import("react");
@@ -34,8 +35,44 @@ vi.mock("../../src/shared/components/LoadingScreen", async () => {
   };
 });
 
+vi.mock("../../src/features/auth/screens/WorkspaceLockedScreen", async () => {
+  const React = await import("react");
+
+  return {
+    WorkspaceLockedScreen: ({
+      message,
+      onRetry,
+      onSignOut,
+    }: {
+      message: string;
+      onRetry: () => void;
+      onSignOut: () => void;
+    }) =>
+      React.createElement(
+        "section",
+        {},
+        React.createElement("h1", {}, "Workspace unavailable"),
+        React.createElement("p", {}, message),
+        React.createElement(
+          "button",
+          { type: "button", onClick: onRetry },
+          "Try again",
+        ),
+        React.createElement(
+          "button",
+          { type: "button", onClick: onSignOut },
+          "Sign out",
+        ),
+      ),
+  };
+});
+
 vi.mock("../../src/features/auth/hooks/useBootstrap", () => ({
   useBootstrap,
+}));
+
+vi.mock("../../src/shared/lib/auth-reset", () => ({
+  handleExpiredMobileSession,
 }));
 
 vi.mock("../../src/shared/providers/AuthSessionProvider", () => ({
@@ -52,6 +89,7 @@ describe("TabsLayoutWeb", () => {
   beforeEach(() => {
     useSessionState.mockReset();
     useBootstrap.mockReset();
+    handleExpiredMobileSession.mockReset();
 
     useSessionState.mockReturnValue({
       accessToken: "token-123",
@@ -61,10 +99,15 @@ describe("TabsLayoutWeb", () => {
       data: {
         effectiveRole: "admin",
         permissions: {
+          canViewSchedule: true,
+          canEditShifts: false,
           canApproveShiftRequests: true,
           canManageEmployees: true,
         },
       },
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
     });
   });
 
@@ -84,6 +127,8 @@ describe("TabsLayoutWeb", () => {
       data: {
         effectiveRole: "user",
         permissions: {
+          canViewSchedule: false,
+          canEditShifts: false,
           canApproveShiftRequests: false,
           canManageEmployees: false,
         },
@@ -94,5 +139,75 @@ describe("TabsLayoutWeb", () => {
 
     expect(screen.getByText("me:Me")).toBeInTheDocument();
     expect(screen.queryByText("team:Schedule")).not.toBeInTheDocument();
+  });
+
+  it("shows the Schedule tab for regular users with schedule view access", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        effectiveRole: "user",
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: false,
+          canApproveShiftRequests: false,
+          canManageEmployees: false,
+        },
+      },
+    });
+
+    render(<TabsLayoutWeb />);
+
+    expect(screen.getByText("team:Schedule")).toBeInTheDocument();
+  });
+
+  it("shows the Schedule tab for schedule editors without approval permission", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        effectiveRole: "user",
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canApproveShiftRequests: false,
+          canManageEmployees: false,
+        },
+      },
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    render(<TabsLayoutWeb />);
+
+    expect(screen.getByText("team:Schedule")).toBeInTheDocument();
+  });
+
+  it("shows the workspace lock instead of web tabs when bootstrap reports the workspace is unavailable", () => {
+    const refetch = vi.fn();
+    useBootstrap.mockReturnValue({
+      data: {
+        effectiveRole: "super_admin",
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canApproveShiftRequests: true,
+          canManageEmployees: true,
+        },
+      },
+      error: new Error(
+        "Workspace unavailable. Sign in on the web to manage billing.",
+      ),
+      isFetching: false,
+      refetch,
+    });
+
+    render(<TabsLayoutWeb />);
+
+    expect(screen.getByText("Workspace unavailable")).toBeInTheDocument();
+    expect(screen.queryByText("team:Schedule")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Try again"));
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText("Sign out"));
+    expect(handleExpiredMobileSession).toHaveBeenCalledTimes(1);
   });
 });

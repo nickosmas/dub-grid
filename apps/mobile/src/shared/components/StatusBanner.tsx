@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 
@@ -9,7 +9,7 @@ const STATUS_BANNER_TONE = {
   error: {
     backgroundColor: mobileColors.dangerSoft,
     borderColor: mobileColors.dangerBorder,
-    iconColor: mobileColors.danger,
+    iconColor: mobileColors.dangerText,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
     iconName: "alert-circle-outline" as const,
@@ -18,7 +18,7 @@ const STATUS_BANNER_TONE = {
   warning: {
     backgroundColor: mobileColors.warningSoft,
     borderColor: mobileColors.warningBorder,
-    iconColor: mobileColors.warning,
+    iconColor: mobileColors.warningText,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
     iconName: "warning-outline" as const,
@@ -36,7 +36,7 @@ const STATUS_BANNER_TONE = {
   success: {
     backgroundColor: mobileColors.successSoft,
     borderColor: mobileColors.successBorder,
-    iconColor: mobileColors.success,
+    iconColor: mobileColors.successText,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
     iconName: "checkmark-circle-outline" as const,
@@ -128,12 +128,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   title: {
-    fontSize: 16,
-    fontWeight: "800",
+    ...mobileText.cardTitle,
   },
   body: {
-    fontSize: 14,
-    lineHeight: 21,
+    ...mobileText.body,
   },
   actionRow: {
     alignItems: "flex-start",

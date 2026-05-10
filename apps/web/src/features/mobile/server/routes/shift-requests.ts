@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   mobileCreateShiftRequestBodySchema,
+  mobileScheduleQuerySchema,
   mobileCreateShiftRequestResponseSchema,
   mobileShiftRequestsResponseSchema,
+  normalizeMobileScheduleRange,
 } from "@dubgrid/contracts";
 import {
   createMobileShiftRequest,
@@ -33,9 +35,19 @@ export async function GET(req: NextRequest) {
 
   const startDate = req.nextUrl.searchParams.get("startDate") ?? undefined;
   const endDate = req.nextUrl.searchParams.get("endDate") ?? undefined;
+  const queryResult = mobileScheduleQuerySchema.safeParse({ startDate, endDate });
+  if (!queryResult.success) {
+    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+  }
+  let range: { startDate: string; endDate: string };
+  try {
+    range = normalizeMobileScheduleRange(queryResult.data);
+  } catch {
+    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+  }
   const payload = await loadMobileShiftRequestsPayload(
     auth,
-    { startDate, endDate },
+    range,
     {
       fetchLinkedEmployeeForUser,
       fetchMobileOpenShifts,
@@ -58,14 +70,17 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
+      { error: "We couldn't read that request. Try again." },
       { status: 400 },
     );
   }
 
   const parsed = mobileCreateShiftRequestBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Check the request details and try again." },
+      { status: 400 },
+    );
   }
 
   try {

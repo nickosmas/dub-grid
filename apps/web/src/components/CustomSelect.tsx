@@ -9,10 +9,14 @@ export interface SelectOption<T extends string | number> {
 }
 
 interface CustomSelectProps<T extends string | number> {
+  id?: string;
+  ariaLabel?: string;
   value: T;
   options: SelectOption<T>[];
   onChange: (value: T) => void;
   disabled?: boolean;
+  placeholder?: string;
+  height?: React.CSSProperties["height"];
   /** Extra style on the trigger button */
   style?: React.CSSProperties;
   /** Font size override (default 13) */
@@ -20,10 +24,14 @@ interface CustomSelectProps<T extends string | number> {
 }
 
 export default function CustomSelect<T extends string | number>({
+  id,
+  ariaLabel,
   value,
   options,
   onChange,
   disabled,
+  placeholder,
+  height,
   style,
   fontSize = 13,
 }: CustomSelectProps<T>) {
@@ -39,7 +47,8 @@ export default function CustomSelect<T extends string | number>({
   }, []);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const selected = useMemo(() => options.find((o) => o.value === value) ?? options[0], [options, value]);
+  const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
+  const displayLabel = selected?.label ?? placeholder ?? "—";
 
   const setMenuRef = useCallback((node: HTMLDivElement | null) => {
     menuRef.current = node;
@@ -51,7 +60,9 @@ export default function CustomSelect<T extends string | number>({
   const trigger = (
     <div ref={ref} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
       <button
+        id={id}
         type="button"
+        aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-disabled={disabled || undefined}
@@ -73,7 +84,7 @@ export default function CustomSelect<T extends string | number>({
           alignItems: "center",
           gap: 8,
           width: "100%",
-          height: "var(--dg-toolbar-h)",
+          height: height ?? "var(--dg-toolbar-h)",
           background: disabled ? "var(--color-bg)" : "var(--color-surface)",
           border: "1px solid var(--color-border)",
           borderRadius: "var(--dg-btn-radius)",
@@ -92,7 +103,7 @@ export default function CustomSelect<T extends string | number>({
         }}
       >
         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-          {selected?.label ?? "—"}
+          {displayLabel}
         </span>
         <svg
           width="12"
@@ -134,7 +145,7 @@ export default function CustomSelect<T extends string | number>({
         ref={setMenuRef}
         role="listbox"
         tabIndex={-1}
-        aria-label={`${selected?.label ?? "Select"} options`}
+        aria-label={`${ariaLabel ?? displayLabel} options`}
         aria-activedescendant={focusedIndex >= 0 ? `option-${String(options[focusedIndex]?.value)}` : undefined}
         className="dg-menu"
         onKeyDown={(e) => {

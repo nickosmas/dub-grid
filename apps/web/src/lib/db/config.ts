@@ -29,6 +29,7 @@ import {
   shouldShowJobOnGrid,
 } from "@/lib/job-placement";
 import { normalizePresetBg } from "@/lib/colors";
+import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-jobs";
 
 // ── Dependency Checks ────────────────────────────────────────────────────────
 // Before archiving any config item, check if it's referenced elsewhere.
@@ -846,7 +847,12 @@ export async function fetchCoverageRequirements(orgId: string): Promise<Coverage
     const rows = (data as DbCoverageRequirement[] | null) ?? [];
     const visibleJobIds = new Set(
       jobs
-        .filter((job) => !job.archivedAt && shouldShowJobOnGrid(job))
+        .filter(
+          (job) =>
+            !job.archivedAt &&
+            !isRegularStaffSystemJob(job) &&
+            (shouldShowJobOnGrid(job) || isDefaultShiftSystemJob(job)),
+        )
         .map((job) => job.id),
     );
     return rows

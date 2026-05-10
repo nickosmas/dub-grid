@@ -41,6 +41,17 @@ export function appendQueryParams(
   return serialized ? `${path}?${serialized}` : path;
 }
 
+export class ApiResponseError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly payload: unknown,
+  ) {
+    super(message);
+    this.name = "ApiResponseError";
+  }
+}
+
 export async function createJsonApiRequest<T>(input: {
   baseUrl: string;
   path: string;
@@ -106,7 +117,7 @@ export async function createJsonApiRequest<T>(input: {
       await onAuthFailure?.();
     }
 
-    throw new Error(message);
+    throw new ApiResponseError(message, response.status, payload);
   }
 
   return parse(payload);

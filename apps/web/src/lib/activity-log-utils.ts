@@ -103,7 +103,81 @@ function nameFromDetails(details: Record<string, unknown>): string {
 }
 
 function titleCase(s: string): string {
-  return s.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return s
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function friendlyLabel(key: string): string {
+  const labels: Record<string, string> = {
+    actorEmail: "Actor",
+    actor_email: "Actor",
+    deactivate: "Status change",
+    email: "Email",
+    fromRole: "Previous role",
+    from_role: "Previous role",
+    initiated_by: "Initiated by",
+    justification: "Justification",
+    name: "Name",
+    newRole: "New role",
+    new_role: "New role",
+    note: "Note",
+    orgRole: "Organization role",
+    reason: "Reason",
+    role: "Role",
+    startDate: "Start date",
+    start_date: "Start date",
+    endDate: "End date",
+    end_date: "End date",
+    targetEmail: "Target",
+    target_email: "Target",
+    targetName: "Target",
+    targetOrgId: "Organization",
+    targetUserId: "User",
+    toRole: "New role",
+    to_role: "New role",
+  };
+  return labels[key] ?? titleCase(key);
+}
+
+function friendlyValue(key: string, value: unknown): string {
+  if (typeof value === "boolean") {
+    if (key === "deactivate") return value ? "Deactivate account" : "Reactivate account";
+    return value ? "Yes" : "No";
+  }
+  if (value instanceof Date) {
+    return value.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+  if (typeof value === "string") {
+    const normalizedKey = key.toLowerCase();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return formatShortDate(value);
+    }
+    if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      }
+    }
+    if (
+      normalizedKey.includes("role") ||
+      normalizedKey === "initiated_by" ||
+      normalizedKey === "status" ||
+      normalizedKey === "type" ||
+      normalizedKey.endsWith("_type") ||
+      normalizedKey.endsWith("type")
+    ) {
+      return titleCase(value);
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => friendlyValue(key, item)).join(", ");
+  }
+  return String(value);
 }
 
 export function describeAction(entry: FullAuditLogEntry): string {
@@ -227,8 +301,18 @@ export function describeAction(entry: FullAuditLogEntry): string {
     case "schedule_note.deleted": return "Deleted a schedule note";
 
     // Billing
+    case "billing.subscription_created": return "Started subscription";
+    case "billing.subscription_updated": return "Updated subscription";
+    case "billing.subscription_cancel_scheduled": return "Scheduled subscription cancellation";
     case "billing.trial_extended": return "Extended trial period";
     case "billing.subscription_canceled": return "Canceled subscription";
+    case "billing.payment_failed": return "Recorded a failed payment";
+    case "billing.payment_succeeded": return "Recorded a successful payment";
+    case "billing.payment_method_updated": return "Updated payment method";
+    case "billing.billing_details_updated": return "Updated billing details";
+    case "billing.portal_opened": return "Opened billing portal";
+    case "billing.seats_synced": return "Synced billing seats";
+    case "billing.status_overridden": return "Overrode billing status";
     case "billing.synced": return "Synced billing data";
 
     // Data export
@@ -237,6 +321,13 @@ export function describeAction(entry: FullAuditLogEntry): string {
 
     default: return titleCase(action);
   }
+}
+
+export function describeAuditEvent(
+  action: string,
+  details: Record<string, unknown> = {},
+): string {
+  return describeAction({ action, details } as FullAuditLogEntry);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,11 +455,24 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
 
   const items: DetailItem[] = [];
 
+  if (action === "role.changed") {
+    const fromRole = details.fromRole ?? details.from_role;
+    const toRole = details.toRole ?? details.to_role ?? details.newRole ?? details.new_role;
+    if (fromRole && toRole) {
+      return [
+        {
+          label: "Role change",
+          value: `${friendlyValue("role", fromRole)} to ${friendlyValue("role", toRole)}`,
+        },
+      ];
+    }
+  }
+
   // Action-specific formatting for actions with extra data worth showing
   if (action === "permissions.updated" && details.permissions) {
     const perms = details.permissions as Record<string, boolean>;
-    const enabled = Object.entries(perms).filter(([, v]) => v).map(([k]) => titleCase(k));
-    const disabled = Object.entries(perms).filter(([, v]) => !v).map(([k]) => titleCase(k));
+    const enabled = Object.entries(perms).filter(([, v]) => v).map(([k]) => friendlyLabel(k));
+    const disabled = Object.entries(perms).filter(([, v]) => !v).map(([k]) => friendlyLabel(k));
     if (enabled.length) items.push({ label: "Enabled", value: enabled.join(", ") });
     if (disabled.length) items.push({ label: "Disabled", value: disabled.join(", ") });
     return items;
@@ -377,22 +481,23 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
   // Generic fallback: show all values, but skip raw IDs (UUIDs, arrays of UUIDs)
   for (const [key, val] of Object.entries(details)) {
     if (val === null || val === undefined) continue;
+    if (key === "initiated_by") continue;
     // Skip keys that are raw IDs — not useful to display
     if (isIdKey(key)) continue;
     if (Array.isArray(val)) {
       // Skip arrays of UUIDs (e.g. assignmentIds)
       if (val.length > 0 && val.every((v) => isUuid(String(v)))) continue;
-      items.push({ label: titleCase(key), value: val.map(String).join(", ") });
+      items.push({ label: friendlyLabel(key), value: friendlyValue(key, val) });
     } else if (typeof val === "object") {
       for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
         if (subVal === null || subVal === undefined) continue;
         if (isIdKey(subKey)) continue;
-        items.push({ label: titleCase(`${key} ${subKey}`), value: String(subVal) });
+        items.push({ label: friendlyLabel(`${key} ${subKey}`), value: friendlyValue(subKey, subVal) });
       }
     } else {
       // Skip individual UUID values
       if (isUuid(String(val))) continue;
-      items.push({ label: titleCase(key), value: String(val) });
+      items.push({ label: friendlyLabel(key), value: friendlyValue(key, val) });
     }
   }
 
@@ -409,6 +514,23 @@ export function summarizeDetails(entry: FullAuditLogEntry): string {
   return items.map((i) => `${i.label}: ${i.value}`).join(" · ");
 }
 
+export function getAuditActorLabel(entry: FullAuditLogEntry): string {
+  const initiatedBy = entry.details?.initiated_by;
+  if (initiatedBy === "gridmaster" || initiatedBy === "gridmaster_sync") {
+    return "Gridmaster";
+  }
+  return entry.actorName ?? entry.actorEmail ?? "System";
+}
+
+export function getAuditActorSecondaryLabel(entry: FullAuditLogEntry): string | null {
+  if (getAuditActorLabel(entry) === "Gridmaster") return null;
+  return entry.actorName ? entry.actorEmail : null;
+}
+
+export function getAuditTargetLabel(entry: FullAuditLogEntry): string {
+  return entry.targetLabel ?? titleCase(entry.resourceType);
+}
+
 // ---------------------------------------------------------------------------
 // Search matching
 // ---------------------------------------------------------------------------
@@ -418,7 +540,10 @@ export function matchesSearch(entry: FullAuditLogEntry, query: string, descripti
   const q = query.toLowerCase();
   return (
     description.toLowerCase().includes(q) ||
+    (entry.actorName ?? "").toLowerCase().includes(q) ||
     (entry.actorEmail ?? "").toLowerCase().includes(q) ||
+    (entry.targetLabel ?? "").toLowerCase().includes(q) ||
+    (entry.targetEmail ?? "").toLowerCase().includes(q) ||
     entry.action.toLowerCase().includes(q) ||
     entry.resourceType.toLowerCase().includes(q)
   );

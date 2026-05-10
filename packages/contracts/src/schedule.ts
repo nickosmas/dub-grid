@@ -6,17 +6,72 @@ export const scheduleCellSegmentSchema = z.object({
   shiftId: z.number().int().nullable(),
   jobId: z.number().int(),
   position: z.number().int().nonnegative(),
+  isMentored: z.boolean().optional(),
 });
 
-export const scheduleCellStateSchema = z.object({
-  kind: scheduleCellKindSchema,
-  segments: z.array(scheduleCellSegmentSchema).default([]),
-  absenceTypeId: z.number().int().nullable().default(null),
-  customStartTime: z.string().nullable().default(null),
-  customEndTime: z.string().nullable().default(null),
-  seriesId: z.string().nullable().default(null),
-  fromRecurring: z.boolean().default(false),
-});
+export const scheduleCellStateSchema = z
+  .object({
+    kind: scheduleCellKindSchema,
+    segments: z.array(scheduleCellSegmentSchema).default([]),
+    focusAreaId: z.number().int().nullable().optional(),
+    absenceTypeId: z.number().int().nullable().default(null),
+    customStartTime: z.string().nullable().default(null),
+    customEndTime: z.string().nullable().default(null),
+    seriesId: z.string().nullable().default(null),
+    fromRecurring: z.boolean().default(false),
+  })
+  .superRefine((state, ctx) => {
+    if (state.kind === "worked") {
+      if (state.segments.length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Worked schedule cells require at least one segment",
+          path: ["segments"],
+        });
+      }
+      if (state.absenceTypeId != null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Worked schedule cells cannot include an absence type",
+          path: ["absenceTypeId"],
+        });
+      }
+      return;
+    }
+
+    if (state.kind === "absence") {
+      if (state.absenceTypeId == null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Absence schedule cells require an absence type",
+          path: ["absenceTypeId"],
+        });
+      }
+      if (state.segments.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Absence schedule cells cannot include worked segments",
+          path: ["segments"],
+        });
+      }
+      return;
+    }
+
+    if (state.segments.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deleted schedule cells cannot include worked segments",
+        path: ["segments"],
+      });
+    }
+    if (state.absenceTypeId != null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Deleted schedule cells cannot include an absence type",
+        path: ["absenceTypeId"],
+      });
+    }
+  });
 
 export const resolvedSchedulePresentationSegmentSchema = z.object({
   shiftId: z.number().int().nullable().optional(),
@@ -35,7 +90,9 @@ export const resolvedSchedulePresentationSegmentSchema = z.object({
   defaultDurationHours: z.number().nullable().optional(),
   defaultDurationMinutes: z.number().nullable().optional(),
   breakMinutes: z.number().int().nonnegative().nullable().optional(),
+  focusAreaId: z.number().int().nullable().optional(),
   displayFocusAreaName: z.string().nullable().optional(),
+  isMentored: z.boolean().optional(),
 });
 
 export const resolvedSchedulePresentationSchema = z.object({

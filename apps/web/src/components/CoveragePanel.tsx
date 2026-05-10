@@ -5,7 +5,6 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
-import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
 import DashboardEmptyState from "@/components/dashboard/DashboardEmptyState";
 
 interface CoveragePanelProps {
@@ -53,23 +52,6 @@ export default function CoveragePanel({
       return true;
     });
   }, [gaps, filterFocusArea, filterCategory]);
-  const explainerCategoryName = filterCategory === "all"
-    ? shiftCategories[0]?.name ?? "Day"
-    : shiftCategories.find((category) => category.id === filterCategory)?.name ?? "Day";
-  const explainerPoints = [
-    {
-      title: "Coverage is checked by category total",
-      description: `For each focus area, date, and ${explainerCategoryName} category, DubGrid compares the total required headcount to the unique staff scheduled anywhere in that category.`,
-    },
-    {
-      title: "Green means the category total is met",
-      description: "If scheduled staff is equal to or greater than the category total required, coverage is considered met.",
-    },
-    {
-      title: "Red shows the missing mix",
-      description: "If the category total is short, shortage details call out which shift lines are still light.",
-    },
-  ];
 
   // Group by focus area
   const grouped = useMemo(() => {
@@ -204,115 +186,6 @@ export default function CoveragePanel({
                 Showing published dates only.
               </div>
             )}
-            <div style={{ marginBottom: 12 }}>
-              <ExplainerSection
-                title="How coverage is scored"
-                points={explainerPoints}
-                compact
-                defaultOpen={false}
-                storageKey="dg-explainer-coverage-panel"
-                preview={(
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                    <PreviewFrame
-                      title="Green"
-                      subtitle={`${explainerCategoryName} category`}
-                      compact
-                      badge={(
-                        <span
-                          style={{
-                            padding: "3px 8px",
-                            borderRadius: 999,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            background: "rgba(16, 185, 129, 0.08)",
-                            color: "var(--color-success-text)",
-                            border: "1px solid var(--color-success-border)",
-                          }}
-                        >
-                          Covered
-                        </span>
-                      )}
-                    >
-                      <div
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: "var(--dg-radius-sm)",
-                          background: "var(--color-bg)",
-                          border: "1px solid var(--color-border-light)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                        }}
-                      >
-                        <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Required</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>4 staff</span>
-                      </div>
-                      <div
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: "var(--dg-radius-sm)",
-                          background: "rgba(16, 185, 129, 0.08)",
-                          border: "1px solid var(--color-success-border)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                        }}
-                      >
-                        <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Scheduled</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-success-text)" }}>5 staff</span>
-                      </div>
-                    </PreviewFrame>
-
-                    <PreviewFrame
-                      title="Red"
-                      subtitle={`${explainerCategoryName} category`}
-                      compact
-                      badge={(
-                        <span
-                          style={{
-                            padding: "3px 8px",
-                            borderRadius: 999,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            background: "rgba(220, 38, 38, 0.06)",
-                            color: "var(--color-danger-dark)",
-                            border: "1px solid var(--color-danger-border)",
-                          }}
-                        >
-                          Short
-                        </span>
-                      )}
-                    >
-                      <div
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: "var(--dg-radius-sm)",
-                          background: "rgba(220, 38, 38, 0.06)",
-                          border: "1px solid var(--color-danger-border)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 6,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Required</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-primary)" }}>4 staff</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                          <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>Scheduled</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-danger-dark)" }}>3 staff</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--color-danger-dark)", lineHeight: 1.4 }}>
-                          Shortage detail explains which shift lines are still missing.
-                        </div>
-                      </div>
-                    </PreviewFrame>
-                  </div>
-                )}
-              />
-            </div>
             {filtered.length === 0 ? (
               <div
                 style={{

@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import Header from "@/components/Header";
+import { fetchOrganizationBilling } from "@/features/billing/client";
 
 const mockSignOut = vi.fn();
 let mockPathname = "/schedule";
@@ -12,6 +14,8 @@ const mockPermissions = {
   isLoading: false,
   isGridmaster: false,
   isSuperAdmin: false,
+  isUserViewActive: false,
+  actualLevel: 2,
   canManageOrg: true,
   canAccessSettings: true,
   canEditShifts: true,
@@ -61,11 +65,54 @@ vi.mock("@/features/account/client", () => ({
   }),
 }));
 
+vi.mock("@/features/billing/client", () => ({
+  fetchOrganizationBilling: vi.fn(),
+}));
+
+function renderHeader(ui: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(fetchOrganizationBilling).mockResolvedValue({
+    orgId: "org-1",
+    orgName: "Acme",
+    orgSlug: "acme",
+    status: "trialing",
+    trialEndsAt: "2026-05-16T00:00:00.000Z",
+    currentPeriodEnd: null,
+    cancelAt: null,
+    canceledAt: null,
+    subscriptionSeats: null,
+    appUserCount: 4,
+    seatDelta: null,
+    hasStripeCustomer: false,
+    hasStripeSubscription: false,
+    stripeConfigured: true,
+    canManageBilling: true,
+    billingAccess: {
+      state: "trialing",
+      reason: "trial_active",
+      isLocked: false,
+      shouldNotifyAdmins: false,
+      daysUntilTrialEnd: 14,
+      trialGraceEndsAt: "2026-05-19T00:00:00.000Z",
+    },
+  });
   mockPathname = "/schedule";
+  mockPermissions.role = "admin";
   mockPermissions.isGridmaster = false;
   mockPermissions.isSuperAdmin = false;
+  mockPermissions.isUserViewActive = false;
   mockPermissions.canEditShifts = true;
   mockPermissions.canViewStaff = true;
   mockPermissions.canManageOrg = true;
@@ -74,19 +121,20 @@ beforeEach(() => {
 
 describe("Header rendering", () => {
   it("renders orgName when provided", () => {
-    render(<Header orgName="Acme Corp" />);
+    renderHeader(<Header orgName="Acme Corp" />);
     expect(screen.getByText("Acme Corp")).toBeInTheDocument();
   });
 
   it("does NOT render org name when omitted", () => {
-    render(<Header />);
+    renderHeader(<Header />);
     expect(screen.queryByText(/Acme/)).not.toBeInTheDocument();
   });
 
-  it('renders nav links: "Schedule", "People", "Settings"', () => {
-    render(<Header />);
+  it('renders nav links: "Schedule", "People", "Reports", "Settings"', () => {
+    renderHeader(<Header />);
     expect(screen.getByRole("link", { name: /Schedule/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /People/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Reports/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
   });
 });
@@ -94,28 +142,35 @@ describe("Header rendering", () => {
 describe("Header active nav link", () => {
   it("active nav link (schedule) has active class", () => {
     mockPathname = "/schedule";
-    render(<Header />);
+    renderHeader(<Header />);
     const link = screen.getByRole("link", { name: /Schedule/i });
     expect(link.className).toContain("active");
   });
 
   it("active nav link (staff) has active class", () => {
     mockPathname = "/people";
-    render(<Header />);
+    renderHeader(<Header />);
     const link = screen.getByRole("link", { name: /People/i });
     expect(link.className).toContain("active");
   });
 
   it("active nav link (settings) has active class", () => {
     mockPathname = "/settings";
-    render(<Header />);
+    renderHeader(<Header />);
     const link = screen.getByRole("link", { name: /Settings/i });
+    expect(link.className).toContain("active");
+  });
+
+  it("active nav link (reports) has active class", () => {
+    mockPathname = "/reports";
+    renderHeader(<Header />);
+    const link = screen.getByRole("link", { name: /Reports/i });
     expect(link.className).toContain("active");
   });
 
   it("inactive nav links do not have active class", () => {
     mockPathname = "/schedule";
-    render(<Header />);
+    renderHeader(<Header />);
     const staffLink = screen.getByRole("link", { name: /People/i });
     expect(staffLink.className).not.toContain("active");
   });
@@ -123,28 +178,34 @@ describe("Header active nav link", () => {
 
 describe("Header nav link hrefs", () => {
   it("Schedule link points to /schedule", () => {
-    render(<Header />);
+    renderHeader(<Header />);
     const link = screen.getByRole("link", { name: /Schedule/i });
     expect(link).toHaveAttribute("href", "/schedule");
   });
 
   it("People link points to /people", () => {
-    render(<Header />);
+    renderHeader(<Header />);
     const link = screen.getByRole("link", { name: /People/i });
     expect(link).toHaveAttribute("href", "/people");
   });
 
   it("Settings link points to /settings", () => {
-    render(<Header />);
+    renderHeader(<Header />);
     const link = screen.getByRole("link", { name: /Settings/i });
     expect(link).toHaveAttribute("href", "/settings");
+  });
+
+  it("Reports link points to /reports", () => {
+    renderHeader(<Header />);
+    const link = screen.getByRole("link", { name: /Reports/i });
+    expect(link).toHaveAttribute("href", "/reports");
   });
 });
 
 describe("Header permission-based tab visibility", () => {
   it("hides Staff tab when user cannot view staff", () => {
     mockPermissions.canViewStaff = false;
-    render(<Header />);
+    renderHeader(<Header />);
     expect(screen.queryByRole("link", { name: /People/i })).not.toBeInTheDocument();
   });
 
@@ -153,7 +214,17 @@ describe("Header permission-based tab visibility", () => {
     mockPermissions.canAccessSettings = false;
     mockPermissions.isSuperAdmin = false;
     mockPermissions.isGridmaster = false;
-    render(<Header />);
+    renderHeader(<Header />);
+    expect(screen.queryByRole("link", { name: /Settings/i })).not.toBeInTheDocument();
+  });
+
+  it("hides Settings tab for regular users even if view permissions are present", () => {
+    mockPermissions.role = "user";
+    mockPermissions.canManageOrg = false;
+    mockPermissions.canAccessSettings = true;
+    mockPermissions.isSuperAdmin = false;
+    mockPermissions.isGridmaster = false;
+    renderHeader(<Header />);
     expect(screen.queryByRole("link", { name: /Settings/i })).not.toBeInTheDocument();
   });
 
@@ -161,15 +232,52 @@ describe("Header permission-based tab visibility", () => {
     mockPermissions.canManageOrg = false;
     mockPermissions.canAccessSettings = false;
     mockPermissions.isSuperAdmin = true;
-    render(<Header />);
+    renderHeader(<Header />);
     expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
+  });
+
+  it("shows Reports tab for organization admins and super admins", () => {
+    renderHeader(<Header />);
+    expect(screen.getByRole("link", { name: /Reports/i })).toBeInTheDocument();
+
+    mockPermissions.role = "super_admin";
+    mockPermissions.isSuperAdmin = true;
+    renderHeader(<Header />);
+    expect(screen.getAllByRole("link", { name: /Reports/i })).toHaveLength(2);
+  });
+
+  it("hides Reports tab for regular users and user view", () => {
+    mockPermissions.role = "user";
+    renderHeader(<Header />);
+    expect(screen.queryByRole("link", { name: /Reports/i })).not.toBeInTheDocument();
+
+    mockPermissions.role = "admin";
+    mockPermissions.isUserViewActive = true;
+    renderHeader(<Header />);
+    expect(screen.queryByRole("link", { name: /Reports/i })).not.toBeInTheDocument();
+  });
+
+  it("shows trial time left to super admins in the app header", async () => {
+    mockPermissions.isSuperAdmin = true;
+
+    renderHeader(<Header />);
+
+    expect(
+      await screen.findByRole("link", { name: "Trial time left: 14 days" }),
+    ).toHaveAttribute("href", "/settings?section=org-billing");
+  });
+
+  it("does not load billing status for regular admins", () => {
+    renderHeader(<Header />);
+
+    expect(fetchOrganizationBilling).not.toHaveBeenCalled();
   });
 });
 
 describe("Header Gridmaster button", () => {
   it('"Gridmaster" button is hidden for non-gridmaster users', () => {
     mockPermissions.isGridmaster = false;
-    render(<Header />);
+    renderHeader(<Header />);
     expect(
       screen.queryByRole("button", { name: /Gridmaster/i }),
     ).not.toBeInTheDocument();
@@ -177,7 +285,7 @@ describe("Header Gridmaster button", () => {
 
   it('"Gridmaster" button is visible for gridmaster users', () => {
     mockPermissions.isGridmaster = true;
-    render(<Header />);
+    renderHeader(<Header />);
     expect(
       screen.getByRole("button", { name: /Gridmaster/i }),
     ).toBeInTheDocument();

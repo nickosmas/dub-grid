@@ -32,6 +32,7 @@ ALTER TABLE public.role_change_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.jwt_refresh_locks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.impersonation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profile_change_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mobile_device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
@@ -51,17 +52,12 @@ CREATE POLICY "own_profile_select"
   ON public.profiles FOR SELECT TO authenticated
   USING (id = auth.uid());
 
--- own_profile_update: users can update their own profile (name, preferences, etc.)
--- but CANNOT change platform_role or org_id — those are managed exclusively by
--- SECURITY DEFINER functions (assign_gridmaster_by_email, switch_org).
+-- Self-service profile writes are handled by server routes so regular users
+-- cannot directly edit names or work-profile data through the client.
 CREATE POLICY "own_profile_update"
   ON public.profiles FOR UPDATE TO authenticated
-  USING (id = auth.uid())
-  WITH CHECK (
-    id = auth.uid()
-    AND platform_role = (SELECT p.platform_role FROM public.profiles p WHERE p.id = auth.uid())
-    AND (org_id IS NOT DISTINCT FROM (SELECT p.org_id FROM public.profiles p WHERE p.id = auth.uid()))
-  );
+  USING (FALSE)
+  WITH CHECK (FALSE);
 
 CREATE POLICY "org_member_profiles_select"
   ON public.profiles FOR SELECT TO authenticated
@@ -74,7 +70,13 @@ CREATE POLICY "admin_profiles_update"
   ON public.profiles FOR UPDATE TO authenticated
   USING (
     org_id = public.caller_org_id()
-    AND public.caller_org_role() IN ('admin', 'super_admin')
+    AND (
+      public.caller_org_role() = 'super_admin'
+      OR (
+        public.caller_org_role() = 'admin'
+        AND public.check_admin_permission('canManageEmployees')
+      )
+    )
   )
   WITH CHECK (
     org_id = public.caller_org_id()
@@ -816,7 +818,79 @@ CREATE POLICY "notifications_delete_blocked"
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- 17. MOBILE DEVICE TOKENS
+-- 17. PROFILE CHANGE REQUESTS
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE POLICY "gridmaster_all_profile_change_requests"
+  ON public.profile_change_requests FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "own_profile_change_requests_select"
+  ON public.profile_change_requests FOR SELECT TO authenticated
+  USING (requester_user_id = auth.uid());
+
+CREATE POLICY "own_profile_change_requests_insert"
+  ON public.profile_change_requests FOR INSERT TO authenticated
+  WITH CHECK (
+    requester_user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+    AND status = 'pending'
+    AND resolver_user_id IS NULL
+    AND resolved_at IS NULL
+    AND cancelled_at IS NULL
+  );
+
+CREATE POLICY "own_profile_change_requests_cancel"
+  ON public.profile_change_requests FOR UPDATE TO authenticated
+  USING (
+    requester_user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+    AND status = 'pending'
+  )
+  WITH CHECK (
+    requester_user_id = auth.uid()
+    AND org_id = public.caller_org_id()
+    AND status = 'cancelled'
+    AND cancelled_at IS NOT NULL
+    AND resolver_user_id IS NULL
+    AND resolved_at IS NULL
+  );
+
+CREATE POLICY "admin_profile_change_requests_select"
+  ON public.profile_change_requests FOR SELECT TO authenticated
+  USING (
+    org_id = public.caller_org_id()
+    AND (
+      public.caller_org_role() = 'super_admin'
+      OR public.check_admin_permission('canManageEmployees')
+    )
+  );
+
+CREATE POLICY "admin_profile_change_requests_update"
+  ON public.profile_change_requests FOR UPDATE TO authenticated
+  USING (
+    org_id = public.caller_org_id()
+    AND status = 'pending'
+    AND (
+      public.caller_org_role() = 'super_admin'
+      OR public.check_admin_permission('canManageEmployees')
+    )
+  )
+  WITH CHECK (
+    org_id = public.caller_org_id()
+    AND status IN ('approved', 'rejected')
+    AND resolver_user_id = auth.uid()
+    AND resolved_at IS NOT NULL
+  );
+
+CREATE POLICY "profile_change_requests_delete_blocked"
+  ON public.profile_change_requests FOR DELETE TO authenticated
+  USING (FALSE);
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 18. MOBILE DEVICE TOKENS
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE POLICY "gridmaster_all_mobile_device_tokens"
@@ -905,10 +979,13 @@ CREATE POLICY "gridmaster_all_terms_acceptances"
 
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
--- Org members can read their org's subscription
+-- Super admins can read their org's subscription
 CREATE POLICY "org_members_read_subscription"
   ON public.subscriptions FOR SELECT TO authenticated
-  USING (org_id = public.caller_org_id());
+  USING (
+    org_id = public.caller_org_id()
+    AND public.caller_org_role() = 'super_admin'
+  );
 
 -- Gridmaster can manage all
 CREATE POLICY "gridmaster_all_subscriptions"

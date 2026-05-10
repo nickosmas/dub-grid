@@ -1,6 +1,7 @@
 "use client";
 
 import { parseNameMismatchResponse } from "@/lib/account-linking";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import type {
   AuditLogEntry,
   Employee,
@@ -51,6 +52,16 @@ export class EmployeeStatusConflictError extends Error {
   }
 }
 
+export class EmployeeContactConflictError extends Error {
+  constructor(
+    message: string,
+    public readonly field: "email" | "phone",
+  ) {
+    super(message);
+    this.name = "EmployeeContactConflictError";
+  }
+}
+
 function resolveClientUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path;
@@ -67,15 +78,31 @@ async function requestEmployeesJson<T>(
 ): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const payload = await response.json().catch(() => null) as
-    | { error?: string; employee?: Employee; status?: string }
+    | {
+        code?: string;
+        error?: string;
+        employee?: Employee;
+        field?: "email" | "phone";
+        message?: string;
+        status?: string;
+      }
     | null;
   const mismatchError = parseNameMismatchResponse(payload);
   if (mismatchError) {
     throw mismatchError;
   }
+  if (
+    payload?.code === "EMPLOYEE_CONTACT_CONFLICT" &&
+    (payload.field === "email" || payload.field === "phone")
+  ) {
+    throw new EmployeeContactConflictError(
+      payload.message ?? payload.error ?? "Contact details are already in use.",
+      payload.field,
+    );
+  }
 
   if (!response.ok) {
-    throw new Error(payload?.error || "Employee request failed.");
+    throw new Error(formatClientErrorMessage(payload?.error, "Employee request failed."));
   }
 
   return payload as T;
@@ -195,8 +222,25 @@ export async function updateEmployee(
   });
 
   const body = (await response.json().catch(() => null)) as
-    | { error?: string; employee?: Employee }
+    | {
+        code?: string;
+        error?: string;
+        employee?: Employee;
+        field?: "email" | "phone";
+        message?: string;
+      }
     | null;
+
+  if (
+    response.status === 409 &&
+    body?.code === "EMPLOYEE_CONTACT_CONFLICT" &&
+    (body.field === "email" || body.field === "phone")
+  ) {
+    throw new EmployeeContactConflictError(
+      body.message ?? body.error ?? "Contact details are already in use.",
+      body.field,
+    );
+  }
 
   if (response.status === 409) {
     throw new OptimisticLockError(
@@ -207,7 +251,7 @@ export async function updateEmployee(
   }
 
   if (!response.ok) {
-    throw new Error(body?.error || "Failed to update employee");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to update employee"));
   }
 }
 
@@ -296,7 +340,7 @@ async function updateEmployeeStatus(input: {
   }
 
   if (!response.ok || !body?.employee) {
-    throw new Error(body?.error || "Failed to update employee status");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to update employee status"));
   }
 
   return body.employee;

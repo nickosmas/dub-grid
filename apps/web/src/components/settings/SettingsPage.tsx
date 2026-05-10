@@ -31,6 +31,7 @@ import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getM
 import { SectionCard } from "./shared";
 import OrganizationGeneral from "./OrganizationGeneral";
 import OrganizationLabels from "./OrganizationLabels";
+import BillingSettings from "./BillingSettings";
 import DisplayMode from "./DisplayMode";
 import ScheduleRules from "./ScheduleRules";
 import ShiftCategories from "./ShiftCategories";
@@ -154,7 +155,10 @@ export default function SettingsPage({
   const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
   const sectionFromPath = resolveSection(searchParams.get("section"));
-  const activeSection: SectionId = sectionFromPath && allItems.some(i => i.id === sectionFromPath) ? sectionFromPath : defaultSection;
+  const billingReturnSection =
+    !sectionFromPath && searchParams.get("billing") ? "org-billing" : null;
+  const requestedSection = sectionFromPath ?? billingReturnSection;
+  const activeSection: SectionId = requestedSection && allItems.some(i => i.id === requestedSection) ? requestedSection : defaultSection;
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -294,6 +298,12 @@ export default function SettingsPage({
                 onSave={onOrganizationSave}
               />
             </SectionCard>
+          </div>
+        )}
+
+        {activeSection === "org-billing" && (isSuperAdmin || isGridmaster) && (
+          <div style={{ width: "100%", maxWidth }}>
+            <BillingSettings organization={organization} />
           </div>
         )}
 

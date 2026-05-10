@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  normalizeOptionalUsPhone,
+  normalizeRequiredStaffEmail,
+  normalizeStaffName,
+} from "@dubgrid/contracts";
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import type { AssignableOrganizationRole } from "@/types";
+import {
+  buildStaffValidationErrorResponse,
+  getStaffFieldErrors,
+} from "@/lib/staff-validation";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -57,14 +66,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
+    const fieldErrors = getStaffFieldErrors({
+      email,
+      ...(firstName !== undefined ? { firstName } : {}),
+      ...(lastName !== undefined ? { lastName } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+    });
+    if (Object.keys(fieldErrors).length > 0) {
+      return buildStaffValidationErrorResponse(fieldErrors);
+    }
+
     const { data, error } = await serviceClient.rpc("send_invitation", {
-      p_email: email,
+      p_email: normalizeRequiredStaffEmail(email),
       p_role: role as AssignableOrganizationRole,
       p_org_id: orgId,
       p_employee_id: employeeId ?? null,
-      p_first_name: firstName ?? null,
-      p_last_name: lastName ?? null,
-      p_phone: phone ?? null,
+      p_first_name:
+        typeof firstName === "string"
+          ? firstName.trim()
+            ? normalizeStaffName(firstName)
+            : null
+          : null,
+      p_last_name:
+        typeof lastName === "string"
+          ? lastName.trim()
+            ? normalizeStaffName(lastName)
+            : null
+          : null,
+      p_phone:
+        typeof phone === "string" ? normalizeOptionalUsPhone(phone) || null : null,
       p_department_ids: departmentIds ?? [],
       p_dept_admin_ids: deptAdminIds ?? [],
     });

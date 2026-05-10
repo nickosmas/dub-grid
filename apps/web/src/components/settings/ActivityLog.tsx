@@ -15,8 +15,12 @@ import {
   formatRelativeTime,
   formatDetails,
   groupByDate,
+  getAuditActorLabel,
+  getAuditActorSecondaryLabel,
+  getAuditTargetLabel,
 } from "@/lib/activity-log-utils";
 import type { DetailItem } from "@/lib/activity-log-utils";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { EmptyState } from "@/components/EmptyState";
 
 
@@ -206,6 +210,28 @@ function DetailsCell({
   );
 }
 
+function IdentityStack({
+  primary,
+  secondary,
+}: {
+  primary: string;
+  secondary?: string | null;
+}) {
+  const showSecondary = secondary && secondary !== primary;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+        {primary}
+      </div>
+      {showSecondary && (
+        <div style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)" }}>
+          {secondary}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Pagination({
   page,
   onPageChange,
@@ -269,10 +295,10 @@ function SkeletonTable() {
             borderBottom: "1px solid var(--color-border-light)",
           }}
         >
-          <div style={{ width: 80, height: 12, borderRadius: 4, background: "var(--color-border-light)" }} />
-          <div style={{ width: 70, height: 12, borderRadius: 4, background: "var(--color-border-light)" }} />
-          <div style={{ flex: 1, height: 12, borderRadius: 4, background: "var(--color-border-light)" }} />
-          <div style={{ width: 120, height: 12, borderRadius: 4, background: "var(--color-border-light)" }} />
+          <div className="dg-skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
+          <div className="dg-skeleton" style={{ width: 70, height: 12, borderRadius: 4 }} />
+          <div className="dg-skeleton" style={{ flex: 1, height: 12, borderRadius: 4 }} />
+          <div className="dg-skeleton" style={{ width: 120, height: 12, borderRadius: 4 }} />
         </div>
       ))}
     </div>
@@ -310,7 +336,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
       actionPrefix: serverPrefix,
     })
       .then((data) => { if (!cancelled) setEntries(data); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load"); })
+      .catch((err) => { if (!cancelled) setError(formatClientErrorMessage(err, "We couldn't load activity right now.")); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
@@ -345,7 +371,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   const groups = useMemo(() => groupByDate(filteredEntries), [filteredEntries]);
 
-  const COL_COUNT = isMobile ? 3 : 4;
+  const COL_COUNT = isMobile ? 3 : 5;
 
   if (error) {
     return (
@@ -391,6 +417,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                   <th style={TH_STYLE}>When</th>
                   <th style={TH_STYLE}>Category</th>
                   {!isMobile && <th style={TH_STYLE}>Who</th>}
+                  {!isMobile && <th style={TH_STYLE}>Target</th>}
                   <th style={{ ...TH_STYLE, width: "100%" }}>Details</th>
                 </tr>
               </thead>
@@ -401,6 +428,9 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                     {group.entries.map((entry) => {
                       const details = detailsMap.get(entry.id) ?? [];
                       const description = descriptions.get(entry.id) ?? "";
+                      const actorLabel = getAuditActorLabel(entry);
+                      const targetLabel = getAuditTargetLabel(entry);
+                      const mobileDescription = `${description} — ${actorLabel} -> ${targetLabel}`;
 
                       return (
                         <tr key={entry.id} style={{ transition: "background 150ms ease" }}>
@@ -416,14 +446,27 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
                           {/* Who (desktop only) */}
                           {!isMobile && (
-                            <td style={{ ...TD_STYLE, whiteSpace: "nowrap", color: "var(--color-text-muted)" }}>
-                              {entry.actorEmail ?? "System"}
+                            <td style={{ ...TD_STYLE, whiteSpace: "nowrap" }}>
+                              <IdentityStack
+                                primary={actorLabel}
+                                secondary={getAuditActorSecondaryLabel(entry)}
+                              />
+                            </td>
+                          )}
+
+                          {/* Target (desktop only) */}
+                          {!isMobile && (
+                            <td style={{ ...TD_STYLE, whiteSpace: "nowrap" }}>
+                              <IdentityStack
+                                primary={targetLabel}
+                                secondary={entry.targetLabel ? entry.targetEmail : null}
+                              />
                             </td>
                           )}
 
                           {/* Details — description + inline data */}
                           <DetailsCell
-                            description={isMobile ? `${description}${entry.actorEmail ? ` — ${entry.actorEmail}` : ""}` : description}
+                            description={isMobile ? mobileDescription : description}
                             details={details}
                           />
 

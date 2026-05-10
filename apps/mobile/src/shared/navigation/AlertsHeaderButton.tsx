@@ -14,6 +14,7 @@ export function AlertsHeaderButton() {
     <Pressable
       accessibilityLabel="Open alerts"
       accessibilityRole="button"
+      android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
       hitSlop={10}
       onPress={() => router.push("/alerts")}
       style={({ pressed }) => [
@@ -39,8 +40,8 @@ export function AlertsHeaderButton() {
 
 const styles = StyleSheet.create({
   button: {
-    minWidth: 34,
-    minHeight: 34,
+    minWidth: 44,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -49,8 +50,8 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: "absolute",
-    top: 2,
-    right: -2,
+    top: 7,
+    right: 4,
     minWidth: 16,
     height: 16,
     borderRadius: 999,

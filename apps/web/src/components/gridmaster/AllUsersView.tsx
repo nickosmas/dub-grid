@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { PlatformUser, Organization } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
+import {
+  formatClientErrorMessage,
+  formatOrganizationRoleLabel,
+} from "@/lib/client-facing";
 import { MaybeHint } from "@/components/ui/hint";
 import {
   fetchGridmasterUserMemberships,
@@ -14,6 +19,7 @@ import {
   forceLogoutGridmasterUser,
   updateGridmasterUserActivation,
 } from "@/features/gridmaster/client";
+import { queryKeys } from "@/lib/query-keys";
 
 function RoleBadge({ role }: { role: string }) {
   const c = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
@@ -32,7 +38,7 @@ function RoleBadge({ role }: { role: string }) {
         letterSpacing: "0.03em",
       }}
     >
-      {role.replace("_", " ")}
+      {formatOrganizationRoleLabel(role)}
     </span>
   );
 }
@@ -80,12 +86,11 @@ export default function AllUsersView({
   onNavigateToOrg: (orgId: string) => void;
   onImpersonate: (userId: string, orgId?: string) => void;
 }) {
-  const [users, setUsers] = useState<PlatformUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [orgFilter, setOrgFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Action states
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -94,8 +99,31 @@ export default function AllUsersView({
   const [resetConfirm, setResetConfirm] = useState<PlatformUser | null>(null);
   const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
   const [closing, setClosing] = useState(false);
-  const [memberships, setMemberships] = useState<Array<{ org_id: string; org_role: string; joined_at: string; org_name?: string }>>([]);
-  const [membershipsLoading, setMembershipsLoading] = useState(false);
+  const usersQuery = useQuery({
+    queryKey: queryKeys.gridmaster.allUsers(),
+    queryFn: fetchGridmasterUsers,
+    staleTime: 30_000,
+  });
+  const users = usersQuery.data?.users ?? [];
+  const membershipsQuery = useQuery({
+    queryKey: selectedUser
+      ? queryKeys.gridmaster.userMemberships(selectedUser.id)
+      : queryKeys.gridmaster.userMemberships("none"),
+    queryFn: async () => {
+      if (!selectedUser) return [];
+      const { memberships: data } = await fetchGridmasterUserMemberships(selectedUser.id);
+      return (data ?? []).map((row) => ({
+        org_id: row.orgId,
+        org_role: row.orgRole,
+        joined_at: row.joinedAt,
+        org_name: row.orgName,
+      }));
+    },
+    enabled: selectedUser != null,
+    staleTime: 30_000,
+  });
+  const memberships = membershipsQuery.data ?? [];
+  const membershipsLoading = membershipsQuery.isLoading;
 
   const handleClosePanel = useCallback(() => {
     setClosing(true);
@@ -115,27 +143,24 @@ export default function AllUsersView({
   }, [selectedUser, handleClosePanel]);
 
   function reload() {
-    setLoading(true);
-    fetchGridmasterUsers()
-      .then((data) => setUsers(data.users))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.allUsers() });
   }
-
-  useEffect(() => { reload(); }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return users.filter((u) => {
+      if (u.platformRole === "gridmaster") return false;
       if (q && !(u.email ?? "").toLowerCase().includes(q)) return false;
       if (roleFilter !== "all") {
-        if (roleFilter === "gridmaster" && u.platformRole !== "gridmaster") return false;
-        if (roleFilter !== "gridmaster" && u.orgRole !== roleFilter) return false;
+        if (u.orgRole !== roleFilter) return false;
       }
       if (orgFilter !== "all" && u.orgId !== orgFilter) return false;
+      if (statusFilter === "active" && u.deactivatedAt) return false;
+      if (statusFilter === "deactivated" && !u.deactivatedAt) return false;
+      if (statusFilter === "inactive" && u.lastSignInAt) return false;
       return true;
     });
-  }, [users, search, roleFilter, orgFilter]);
+  }, [users, search, roleFilter, orgFilter, statusFilter]);
 
   async function handleDeactivate(user: PlatformUser) {
     if (!user.orgId) return;
@@ -158,7 +183,7 @@ export default function AllUsersView({
       setDeactivateConfirm(null);
       reload();
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Action failed");
+      toast.error(formatClientErrorMessage(err, "Action failed"));
     } finally {
       setActionLoading(null);
     }
@@ -171,7 +196,7 @@ export default function AllUsersView({
       toast.success("User sessions terminated");
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to force logout");
+      toast.error(formatClientErrorMessage(err, "Failed to force logout"));
     } finally {
       setActionLoading(null);
     }
@@ -188,39 +213,24 @@ export default function AllUsersView({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to send password reset");
+        throw new Error(
+          formatClientErrorMessage(body.error, "We couldn't send that password reset."),
+        );
       }
       toast.success(`Password reset email sent to ${user.email}`);
       setResetConfirm(null);
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to send password reset");
+      toast.error(formatClientErrorMessage(err, "We couldn't send that password reset."));
     } finally {
       setActionLoading(null);
     }
   }
 
-  async function handleSelectUser(user: PlatformUser) {
+  function handleSelectUser(user: PlatformUser) {
     setSelectedUser(user);
-    setMembershipsLoading(true);
-    try {
-      const { memberships: data } = await fetchGridmasterUserMemberships(user.id);
-      setMemberships(
-        (data ?? []).map((row) => ({
-          org_id: row.orgId,
-          org_role: row.orgRole,
-          joined_at: row.joinedAt,
-          org_name: row.orgName,
-        })),
-      );
-    } catch {
-      toast.error("Failed to load memberships");
-      setSelectedUser(null);
-    } finally {
-      setMembershipsLoading(false);
-    }
   }
 
-  if (loading) {
+  if (usersQuery.isLoading) {
     return (
       <div>
         <div className="dg-skeleton dg-skeleton--heading" style={{ marginBottom: 16 }} />
@@ -247,9 +257,9 @@ export default function AllUsersView({
         All Users
       </h2>
 
-      {error && (
+      {usersQuery.error instanceof Error && (
         <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
-          {error}
+          {formatClientErrorMessage(usersQuery.error, "Failed to load users")}
         </div>
       )}
 
@@ -261,7 +271,6 @@ export default function AllUsersView({
             value={roleFilter}
             options={[
               { value: "all", label: "All Roles" },
-              { value: "gridmaster", label: "Gridmaster" },
               { value: "super_admin", label: "Super Admin" },
               { value: "admin", label: "Admin" },
               { value: "user", label: "User" },
@@ -280,9 +289,21 @@ export default function AllUsersView({
             style={{ width: "auto", minWidth: 160 }}
             fontSize={12}
           />
-          {(search || roleFilter !== "all" || orgFilter !== "all") && (
+          <CustomSelect
+            value={statusFilter}
+            options={[
+              { value: "all", label: "All Statuses" },
+              { value: "active", label: "Active" },
+              { value: "deactivated", label: "Deactivated" },
+              { value: "inactive", label: "Never Logged In" },
+            ]}
+            onChange={setStatusFilter}
+            style={{ width: "auto", minWidth: 150 }}
+            fontSize={12}
+          />
+          {(search || roleFilter !== "all" || orgFilter !== "all" || statusFilter !== "all") && (
             <button
-              onClick={() => { setSearch(""); setRoleFilter("all"); setOrgFilter("all"); }}
+              onClick={() => { setSearch(""); setRoleFilter("all"); setOrgFilter("all"); setStatusFilter("all"); }}
               style={{
                 background: "none", border: "none", color: "var(--color-today-text)", fontSize: "var(--dg-fs-caption)",
                 fontWeight: 600, cursor: "pointer", padding: "4px 8px",
@@ -328,6 +349,9 @@ export default function AllUsersView({
                   <th style={thStyle}>Platform Role</th>
                   <th style={thStyle}>Organization Role</th>
                   <th style={thStyle}>Organization</th>
+                  <th style={thStyle}>Sessions</th>
+                  <th style={thStyle}>Mobile</th>
+                  <th style={thStyle}>Memberships</th>
                   <th style={thStyle}>Last Login</th>
                   <th style={thStyle}>Joined</th>
                 </tr>
@@ -361,6 +385,15 @@ export default function AllUsersView({
                         ) : (
                           <span style={{ color: "var(--color-text-muted)" }}>—</span>
                         )}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace" }}>
+                        {u.activeSessionCount ?? 0}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace" }}>
+                        {u.mobileDeviceCount ?? 0}
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace" }}>
+                        {u.membershipCount ?? (u.orgId ? 1 : 0)}
                       </td>
                       <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
                         <MaybeHint
@@ -508,6 +541,18 @@ export default function AllUsersView({
                     <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>User ID</span>
                     <div style={{ color: "var(--color-text-muted)", marginTop: 2, fontSize: "var(--dg-fs-footnote)", fontFamily: "var(--font-dm-mono), monospace" }}>{u.id.slice(0, 8)}…</div>
                   </div>
+                  <div>
+                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Active Sessions</span>
+                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{u.activeSessionCount ?? 0}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Mobile Devices</span>
+                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{u.mobileDeviceCount ?? 0}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Last Force Logout</span>
+                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{formatRelativeDate(u.lastForceLogoutAt)}</div>
+                  </div>
                 </div>
 
                 {/* Memberships */}
@@ -518,6 +563,10 @@ export default function AllUsersView({
                     </h4>
                     {membershipsLoading ? (
                       <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>Loading…</div>
+                    ) : membershipsQuery.error instanceof Error ? (
+                      <div style={{ padding: 16, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+                        {formatClientErrorMessage(membershipsQuery.error, "Failed to load memberships")}
+                      </div>
                     ) : (
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>

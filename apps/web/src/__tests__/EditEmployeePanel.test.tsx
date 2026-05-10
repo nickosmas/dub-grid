@@ -18,8 +18,20 @@ const ROLES: NamedItem[] = [
   { id: 4, orgId: "org-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
   { id: 5, orgId: "org-1", name: "CN", abbr: "CN", sortOrder: 4 },
   { id: 6, orgId: "org-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
-  { id: 7, orgId: "org-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
-  { id: 8, orgId: "org-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
+  {
+    id: 7,
+    orgId: "org-1",
+    name: "Activity Coordinator",
+    abbr: "Activity Coordinator",
+    sortOrder: 6,
+  },
+  {
+    id: 8,
+    orgId: "org-1",
+    name: "SC/Asst/Act/Cor",
+    abbr: "SC/Asst/Act/Cor",
+    sortOrder: 7,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -47,6 +59,7 @@ const employee: Employee = {
   id: "emp-42",
   firstName: "Alice",
   lastName: "Smith",
+  employmentType: "full_time",
   status: "active",
   statusChangedAt: null,
   statusNote: "",
@@ -54,7 +67,7 @@ const employee: Employee = {
   roleIds: [],
   seniority: 3,
   focusAreaIds: [1],
-  phone: "555-1234",
+  phone: "(415) 425-3334",
   email: "alice@example.com",
   contactNotes: "",
   userId: null,
@@ -107,7 +120,7 @@ describe("EditEmployeePanel", () => {
 
     it("phone input is pre-populated with employee.phone", () => {
       renderPanel();
-      const phoneInput = screen.getByDisplayValue("555-1234");
+      const phoneInput = screen.getByDisplayValue("(415) 425-3334");
       expect(phoneInput).toBeInTheDocument();
     });
 
@@ -124,9 +137,7 @@ describe("EditEmployeePanel", () => {
   describe("isModified / Save button state", () => {
     it("Save button is disabled when form is unmodified", () => {
       renderPanel();
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
 
     it("Save becomes enabled after changing the first name field", async () => {
@@ -135,9 +146,7 @@ describe("EditEmployeePanel", () => {
       const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
       await user.type(nameInput, "Bob");
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
     });
 
     it("Save becomes enabled after changing the designation", async () => {
@@ -146,9 +155,21 @@ describe("EditEmployeePanel", () => {
       // Certification is a CustomSelect — open dropdown and pick a different option
       await user.click(screen.getByRole("button", { name: /STAFF/ }));
       await user.click(screen.getByRole("option", { name: "CSN II" }));
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+    });
+
+    it("saves the selected employment type", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave });
+
+      await user.click(screen.getByRole("button", { name: /Full-time/ }));
+      await user.click(screen.getByRole("option", { name: "Part-time" }));
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ employmentType: "part_time" }),
+      );
     });
 
     it("Save is disabled when first name is cleared even if other fields are modified", async () => {
@@ -160,9 +181,7 @@ describe("EditEmployeePanel", () => {
       // Then clear the first name
       const nameInput = screen.getByDisplayValue("Alice");
       await user.clear(nameInput);
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
 
     it("Save is disabled when last name is cleared even if other fields are modified", async () => {
@@ -170,9 +189,7 @@ describe("EditEmployeePanel", () => {
       renderPanel();
       const lastNameInput = screen.getByDisplayValue("Smith");
       await user.clear(lastNameInput);
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
 
     it("Save is disabled when all focus areas are deselected", async () => {
@@ -184,9 +201,7 @@ describe("EditEmployeePanel", () => {
       await user.type(nameInput, "Bob");
       // Deselect the only assigned focus area (North)
       await user.click(screen.getByRole("button", { name: "North" }));
-      expect(
-        screen.getByRole("button", { name: "Save" }),
-      ).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
   });
 
@@ -213,7 +228,7 @@ describe("EditEmployeePanel", () => {
           lastName: "Smith",
           certificationId: 4,
           focusAreaIds: [1],
-          phone: "555-1234",
+          phone: "(415) 425-3334",
           email: "alice@example.com",
         }),
       );
@@ -228,6 +243,23 @@ describe("EditEmployeePanel", () => {
       await user.tab();
 
       expect(screen.getByText("Last name is required")).toBeInTheDocument();
+    });
+
+    it("shows an inline error for an invalid phone number and blocks save", async () => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      renderPanel({ onSave });
+
+      const phoneInput = screen.getByDisplayValue("(415) 425-3334");
+      await user.clear(phoneInput);
+      await user.type(phoneInput, "123");
+      await user.tab();
+
+      expect(
+        screen.getByText("Enter a 10-digit US phone number"),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      expect(onSave).not.toHaveBeenCalled();
     });
   });
 
@@ -256,15 +288,22 @@ describe("EditEmployeePanel", () => {
       const saveButton = screen.getByRole("button", { name: "Save" });
 
       expect(cancelButton).toBeInTheDocument();
-      expect(cancelButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+      expect(
+        cancelButton.compareDocumentPosition(saveButton) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: "Close" }),
+      ).not.toBeInTheDocument();
 
       await user.click(cancelButton);
 
       expect(onCancel).not.toHaveBeenCalled();
       expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Discard" }),
+      ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
   });
@@ -287,21 +326,36 @@ describe("EditEmployeePanel", () => {
   describe("Property-based tests", () => {
     // Feature: ui-ux-test-suite, Property 7: isModified correctness
     it("isModified is false when unmodified and true after mutating a field", () => {
+      const validNameArb = fc
+        .array(
+          fc.constantFrom(
+            ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
+          ),
+          { minLength: 1, maxLength: 20 },
+        )
+        .map((chars) => chars.join(""));
+
       // Arbitrary Employee generator
       const arbEmployee = fc.record({
         id: fc.uuid(),
-        firstName: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.trim().length > 0),
-        lastName: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => s.trim().length > 0),
+        firstName: validNameArb,
+        lastName: validNameArb,
+        employmentType: fc.constant("full_time" as const),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),
-        certificationId: fc.oneof(fc.constant(null as number | null), fc.constantFrom(...DESIGNATIONS.map((d) => d.id))),
+        certificationId: fc.oneof(
+          fc.constant(null as number | null),
+          fc.constantFrom(...DESIGNATIONS.map((d) => d.id)),
+        ),
         roleIds: fc.array(fc.constantFrom(...ROLES.map((r) => r.id))),
         seniority: fc.integer({ min: 1, max: 999 }),
-        focusAreaIds: fc.array(fc.integer({ min: 1, max: 5 }), { minLength: 1, maxLength: 5 }).map(ids => [...new Set(ids)]),
-        phone: fc.string({ maxLength: 20 }),
-        email: fc.string({ maxLength: 30 }),
-        contactNotes: fc.string({ maxLength: 50 }),
+        focusAreaIds: fc
+          .array(fc.integer({ min: 1, max: 5 }), { minLength: 1, maxLength: 5 })
+          .map((ids) => [...new Set(ids)]),
+        phone: fc.constant(""),
+        email: fc.constant(""),
+        contactNotes: fc.constant(""),
         userId: fc.constant(null as string | null),
         departmentIds: fc.constant([] as number[]),
         deptAdminIds: fc.constant([] as number[]),

@@ -54,6 +54,7 @@ function renderBoard({
   approvalQueue,
   currentEmpId = "emp-2",
   canApprove = false,
+  canViewAllRequests = false,
 }: {
   openPickups?: ShiftRequest[];
   myRequests?: ShiftRequest[];
@@ -61,6 +62,7 @@ function renderBoard({
   approvalQueue?: ShiftRequest[];
   currentEmpId?: string | null;
   canApprove?: boolean;
+  canViewAllRequests?: boolean;
 } = {}) {
   const onClaim = vi.fn();
   const onRespond = vi.fn();
@@ -73,6 +75,7 @@ function renderBoard({
       myRequests={myRequests}
       pendingApproval={pendingApproval}
       approvalQueue={approvalQueue}
+      canViewAllRequests={canViewAllRequests}
       loading={false}
       currentEmpId={currentEmpId}
       canApprove={canApprove}
@@ -87,6 +90,11 @@ function renderBoard({
   return { onClaim, onRespond, onResolve, onCancel };
 }
 
+async function confirmDialogAction(user: ReturnType<typeof userEvent.setup>, label: string) {
+  const buttons = screen.getAllByRole("button", { name: label });
+  await user.click(buttons[buttons.length - 1]);
+}
+
 describe("ShiftRequestBoard", () => {
   it("claims an available open pickup", async () => {
     const user = userEvent.setup();
@@ -94,6 +102,9 @@ describe("ShiftRequestBoard", () => {
     const { onClaim } = renderBoard({ openPickups: [request] });
 
     await user.click(screen.getByRole("button", { name: "Claim" }));
+    expect(onClaim).not.toHaveBeenCalled();
+    expect(screen.getByText("Claim this shift?")).toBeInTheDocument();
+    await confirmDialogAction(user, "Claim");
 
     expect(onClaim).toHaveBeenCalledWith("req-1");
   });
@@ -119,7 +130,9 @@ describe("ShiftRequestBoard", () => {
 
     await user.click(screen.getByRole("button", { name: /my requests/i }));
     await user.click(screen.getByRole("button", { name: "Accept" }));
+    await confirmDialogAction(user, "Accept");
     await user.click(screen.getByRole("button", { name: "Decline" }));
+    await confirmDialogAction(user, "Decline");
 
     expect(onRespond).toHaveBeenNthCalledWith(1, "swap-1", true);
     expect(onRespond).toHaveBeenNthCalledWith(2, "swap-1", false);
@@ -140,9 +153,11 @@ describe("ShiftRequestBoard", () => {
 
     await user.click(screen.getByRole("button", { name: /approval queue/i }));
     await user.click(screen.getByRole("button", { name: "Approve" }));
+    await confirmDialogAction(user, "Approve");
     await user.click(screen.getByRole("button", { name: "Reject" }));
     await user.type(screen.getByPlaceholderText("Optional note..."), "Need more coverage");
     await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
+    await confirmDialogAction(user, "Reject");
 
     expect(onResolve).toHaveBeenNthCalledWith(1, "approve-1", true);
     expect(onResolve).toHaveBeenNthCalledWith(2, "approve-1", false, "Need more coverage");
@@ -174,6 +189,33 @@ describe("ShiftRequestBoard", () => {
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
   });
 
+  it("shows the full request queue for schedule editors without approval permission", async () => {
+    const user = userEvent.setup();
+    const request = makeRequest({
+      id: "swap-open-2",
+      type: "swap",
+      status: "open",
+      targetEmpId: "emp-9",
+      targetName: "Bob Jones",
+      targetShiftDate: "2026-04-17",
+      targetAssignmentDefinitionIds: [2],
+      targetShiftLabel: "Night",
+    });
+
+    renderBoard({
+      approvalQueue: [request],
+      canApprove: false,
+      canViewAllRequests: true,
+      currentEmpId: "editor-1",
+    });
+
+    await user.click(screen.getByRole("button", { name: /all requests/i }));
+
+    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
   it("lets a requester cancel their own open request", async () => {
     const user = userEvent.setup();
     const request = makeRequest({
@@ -187,6 +229,7 @@ describe("ShiftRequestBoard", () => {
 
     await user.click(screen.getByRole("button", { name: /my requests/i }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await confirmDialogAction(user, "Cancel request");
 
     expect(onCancel).toHaveBeenCalledWith("mine-1");
   });

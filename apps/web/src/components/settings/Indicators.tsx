@@ -13,6 +13,7 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { inputStyle } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -153,13 +154,31 @@ export default function Indicators({
   };
 
   const handleSave = async (indicator: LocalIndicator) => {
-    if (!indicator.name.trim()) return;
+    const nameError = getLineTextError(indicator.name, {
+      label: "Indicator name",
+      maxLength: 50,
+      required: true,
+      disallowUrl: true,
+    });
+    const duplicateName =
+      indicator.name.trim().length > 0 &&
+      local.some(
+        (candidate) =>
+          candidate.id !== indicator.id &&
+          candidate.name.trim().toLowerCase() === indicator.name.trim().toLowerCase(),
+      );
+    if (nameError || duplicateName) return;
     setSaving(indicator.id);
     try {
       const saved = await upsertIndicatorType({
         id: indicator.isNew ? undefined : indicator.id,
         orgId,
-        name: indicator.name.trim(),
+        name: normalizeLineText(indicator.name, {
+          label: "Indicator name",
+          maxLength: 50,
+          required: true,
+          disallowUrl: true,
+        }),
         color: indicator.color,
         sortOrder: indicator.sortOrder,
       });
@@ -242,6 +261,22 @@ export default function Indicators({
         const isSavingThis = saving === indicator.id;
         const isDeletingThis = deleting === indicator.id;
         const isDirty = isIndicatorDirty(indicator);
+        const nameError =
+          indicator.name.trim().length > 0
+            ? getLineTextError(indicator.name, {
+                label: "Indicator name",
+                maxLength: 50,
+                required: true,
+                disallowUrl: true,
+              })
+            : null;
+        const duplicateName =
+          indicator.name.trim().length > 0 &&
+          local.some(
+            (candidate) =>
+              candidate.id !== indicator.id &&
+              candidate.name.trim().toLowerCase() === indicator.name.trim().toLowerCase(),
+          );
 
         if (!isEditing) {
           return (
@@ -316,8 +351,26 @@ export default function Indicators({
                 onChange={(event) => handleChange(indicator.id, "name", event.target.value)}
                 placeholder="Indicator name (e.g. Readings)"
                 maxLength={50}
-                style={{ ...inputStyle, ...(isMobile ? { width: "100%" } : {}) }}
+                style={{
+                  ...inputStyle,
+                  ...(isMobile ? { width: "100%" } : {}),
+                  ...(nameError || duplicateName
+                    ? { borderColor: "var(--color-danger)" }
+                    : {}),
+                }}
               />
+              {(nameError || duplicateName) ? (
+                <p
+                  role="alert"
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-danger)",
+                  }}
+                >
+                  {nameError ?? "Another indicator already uses that name."}
+                </p>
+              ) : null}
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <input
                   type="color"
@@ -367,7 +420,7 @@ export default function Indicators({
                 primaryAction={(
                   <button
                     onClick={() => handleSave(indicator)}
-                    disabled={isSavingThis || !indicator.name.trim() || !isDirty}
+                    disabled={isSavingThis || !indicator.name.trim() || !isDirty || Boolean(nameError) || duplicateName}
                     className="dg-btn dg-btn-primary dg-btn-sm"
                   >
                     {getEditorSaveLabel(isSavingThis)}

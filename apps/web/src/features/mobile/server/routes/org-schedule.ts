@@ -32,7 +32,12 @@ export async function GET(req: NextRequest) {
     return json({ error: "Invalid query" }, { status: 400 });
   }
 
-  const range = resolveMobileDateRange(queryResult.data);
+  let range: ReturnType<typeof resolveMobileDateRange>;
+  try {
+    range = resolveMobileDateRange(queryResult.data);
+  } catch {
+    return json({ error: "Invalid query" }, { status: 400 });
+  }
   try {
     const payload = await loadMobileOrgSchedulePayload(auth, range, {
       fetchMobileScheduleEntries,
@@ -40,7 +45,10 @@ export async function GET(req: NextRequest) {
     return json(mobileOrgScheduleResponseSchema.parse(payload));
   } catch (error) {
     if (error instanceof MobileApiAuthorizationError) {
-      return json({ error: "Unauthorized" }, { status: 403 });
+      return json(
+        { error: "You don't have permission to view the workspace schedule." },
+        { status: 403 },
+      );
     }
 
     throw error;

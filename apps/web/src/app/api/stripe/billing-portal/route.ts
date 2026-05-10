@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServiceClient } from "@/lib/supabase-service";
-import { createBillingPortalSession } from "@/lib/stripe";
+import { z } from "zod";
+import {
+  createBillingPortalSession,
+  writeBillingPortalOpenedAuditLog,
+} from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { resolveBillingReturnUrl } from "@/features/billing/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+
+const bodySchema = z.object({
+  orgId: z.string().uuid(),
+  returnUrl: z.string().url(),
+});
 
 export async function POST(req: NextRequest) {
   // ── CSRF: validate Origin header ──────────────────────────────────
@@ -12,44 +22,56 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    // Auth check
-    const auth = await requireAuthenticatedUser(req);
-    if ("response" in auth) return auth.response;
-    const { user } = auth;
-
-    const { orgId, returnUrl } = await req.json();
-    if (!orgId || !returnUrl) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
     }
-
-    // Validate returnUrl against allowed site URL to prevent open redirects
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    if (!siteUrl || !returnUrl.startsWith(siteUrl)) {
+    const parsed = bodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+    const { orgId } = parsed.data;
+    const returnUrl = resolveBillingReturnUrl(parsed.data.returnUrl, [
+      req.headers.get("origin"),
+      req.nextUrl.origin,
+    ]);
+    if (!returnUrl) {
       return NextResponse.json({ error: "Invalid return URL" }, { status: 400 });
     }
 
-    const supabase = getServiceClient();
+    const auth = await requireOrgPermissions(
+      req,
+      orgId,
+      (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
+      { allowLockedWorkspace: true },
+    );
+    if ("response" in auth) return auth.response;
+    const supabase = auth.serviceClient;
 
-    // Verify user belongs to this org with admin+ role
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      supabase
-        .from("organization_memberships")
-        .select("org_role")
-        .eq("user_id", user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      supabase
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
-    ]);
-
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    const isAdminPlus = membership?.org_role && ["super_admin", "admin"].includes(membership.org_role);
-
-    if (!isGridmaster && !isAdminPlus) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    const { limited, reset, misconfigured } = await checkRateLimit(
+      apiLimiter,
+      `billing-portal:${auth.actor.id}:${orgId}`,
+    );
+    if (misconfigured) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              Math.max(1, Math.ceil(((reset ?? Date.now()) - Date.now()) / 1000)),
+            ),
+          },
+        },
+      );
     }
 
     const { data: org, error: orgError } = await supabase
@@ -63,6 +85,13 @@ export async function POST(req: NextRequest) {
     }
 
     const portalSession = await createBillingPortalSession(org.stripe_customer_id, returnUrl);
+    await writeBillingPortalOpenedAuditLog(supabase, {
+      orgId,
+      actor: {
+        id: auth.actor.id,
+        email: auth.actor.email,
+      },
+    });
     return NextResponse.json({ url: portalSession.url });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "billing-portal" } });

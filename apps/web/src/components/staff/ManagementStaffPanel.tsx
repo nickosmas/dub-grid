@@ -6,7 +6,8 @@ import { DirectoryPerson, NamedItem } from "@/types";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
-import { validateRequired } from "@/components/FormField";
+import { validatePhone, validateRequired } from "@/components/FormField";
+import { normalizeOptionalUsPhone, normalizeStaffName } from "@dubgrid/contracts";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
@@ -187,12 +188,13 @@ export function ManagementStaffPanel({
         !isEmployee && touched.lastName
           ? validateRequired(lastName, "Last name")
           : null,
+      phone: touched.phone ? validatePhone(phone) : null,
       managementDepartmentIds:
         !isEmployee && touched.managementDepartmentIds && deptIds.length === 0
           ? "People who are not on the schedule must stay assigned to at least one management department."
           : null,
     }),
-    [deptIds.length, firstName, isEmployee, lastName, touched],
+    [deptIds.length, firstName, isEmployee, lastName, phone, touched],
   );
 
   const showScheduleOnlyHint = isEmployee && deptIds.length === 0;
@@ -207,12 +209,31 @@ export function ManagementStaffPanel({
   }, [markTouched]);
 
   const handleSave = async () => {
-    const nextDraft = normalizeManagementStaffDraft({
-      firstName,
-      lastName,
-      phone,
+    if (
+      !isEmployee &&
+      (validateRequired(firstName, "First name") ||
+        validateRequired(lastName, "Last name"))
+    ) {
+      setTouched((prev) => ({
+        ...prev,
+        firstName: true,
+        lastName: true,
+      }));
+      return;
+    }
+    if (validatePhone(phone)) {
+      setTouched((prev) => ({
+        ...prev,
+        phone: true,
+      }));
+      return;
+    }
+    const nextDraft = {
+      firstName: normalizeStaffName(firstName),
+      lastName: normalizeStaffName(lastName),
+      phone: normalizeOptionalUsPhone(phone),
       managementDepartmentIds: deptIds,
-    });
+    };
     if (!isEmployee && (!nextDraft.firstName || !nextDraft.lastName)) {
       setTouched((prev) => ({
         ...prev,
@@ -671,9 +692,31 @@ export function ManagementStaffPanel({
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => {
+                    markTouched("phone");
+                    if (!validatePhone(phone)) {
+                      setPhone(normalizeOptionalUsPhone(phone));
+                    }
+                  }}
                   placeholder="Optional"
-                  style={inputStyle}
+                  style={
+                    fieldErrors.phone
+                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      : inputStyle
+                  }
                 />
+                {fieldErrors.phone && (
+                  <div
+                    style={{
+                      color: "var(--color-danger)",
+                      fontSize: "var(--dg-fs-footnote)",
+                      marginTop: 4,
+                    }}
+                    role="alert"
+                  >
+                    {fieldErrors.phone}
+                  </div>
+                )}
               </div>
 
               {departments.length > 0 && (
@@ -1124,6 +1167,7 @@ export function ManagementStaffPanel({
                   id: person.employeeId,
                   firstName: person.firstName,
                   lastName: person.lastName,
+                  employmentType: "full_time",
                   email: person.email,
                   phone: person.phone,
                   status: person.employeeStatus ?? "active",

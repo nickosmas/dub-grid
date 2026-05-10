@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { OnlineUser } from "@/hooks/useCellLocks";
+import { getAvatarInitials } from "@/lib/utils";
 
 const MAX_VISIBLE = 4;
 
@@ -14,15 +15,6 @@ const AVATAR_GRADIENTS = [
   "linear-gradient(135deg, #0066FF, #66B3FF)",
   "linear-gradient(135deg, #FBBF24, #F97316)",
 ];
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 function avatarGradient(userId: string): string {
   let hash = 0;
@@ -111,7 +103,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             zIndex: MAX_VISIBLE - i,
           }}
         >
-          {getInitials(user.userName)}
+          {getAvatarInitials(user.userName)}
           <span
             style={{
               position: "absolute",

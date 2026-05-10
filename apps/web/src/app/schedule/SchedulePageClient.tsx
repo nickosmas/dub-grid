@@ -17,8 +17,16 @@ import DraftBanner from "@/components/DraftBanner";
 import DraftReviewSummary from "@/components/DraftReviewSummary";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import ScheduleOperationModal from "@/components/ScheduleOperationModal";
+import BulkDeleteReviewContent, {
+  type BulkDeleteReviewTarget,
+} from "./_components/BulkDeleteReviewContent";
 import { resolveGridAuditLabel } from "./_lib/grid-audit-label";
-import { buildGridCalloffOpenShiftsFromRequests } from "./_lib/open-shifts";
+import {
+  buildGridCalloffOpenShiftsFromRequests,
+  countPendingVolunteerRequestsForCoverageGap,
+  hasPendingVolunteerRequestForCoverageGap,
+  selectVisibleCoverageGaps,
+} from "./_lib/open-shifts";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 
@@ -51,11 +59,15 @@ import {
   iterateDateRange,
 } from "@/lib/utils";
 import {
+  hasShiftStartedAtTimeRanges,
+} from "@dubgrid/schedule-core";
+import {
   filterAndSortEmployees,
   hasVisibleGridShiftEntry,
   buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
   buildPublishedDateSet,
   computeCoverageGaps,
+  createCoverageCreditResolver,
   filterPublishedDates,
   getPublishedWindowState,
   timesOverlap,
@@ -64,6 +76,8 @@ import {
 } from "@/lib/schedule-logic";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
+  buildShiftDisplayParts,
+  formatAssignableShiftOptionLabel,
   formatShiftAssignmentDisqualificationMessage,
   getAssignmentDefinitionDisqualificationReasons as getAssignmentDisqualificationReasons,
   isEmployeeQualifiedForAssignmentDefinition as isEmployeeQualifiedForAssignment,
@@ -82,6 +96,7 @@ import {
   createShiftSeries,
   deleteScheduleNote,
   deleteShift,
+  deleteShiftBatch,
   deleteShiftSeries,
   discardScheduleDrafts,
   fetchCalloffOpenShifts,
@@ -99,7 +114,10 @@ import {
   updateSeriesAllShifts,
   upsertScheduleNote,
   upsertShift,
+  upsertShiftBatch,
   upsertShiftTimes,
+  type DeleteShiftBatchItem,
+  type UpsertShiftBatchItem,
 } from "@/features/schedule/client";
 import {
   computeDraftBreakdown,
@@ -150,8 +168,10 @@ import {
 import {
   cloneDraftNotes,
   cloneShiftEntry,
+  computeScheduleEntryDraftKind,
   serializeNotesSnapshot,
   serializeShiftSnapshot,
+  shiftEditableIdentityMatches,
   type DraftNoteState,
   type EditSessionDraft,
 } from "./_lib/editor-session";
@@ -178,11 +198,28 @@ import {
   PublishHistoryEntry,
   GridOpenShift,
   ScheduleCellInput,
+  ShiftJobSegment,
 } from "@/types";
+
+type CoverageGap = ReturnType<typeof computeCoverageGaps>[number];
 
 type ContextMenuState = {
   anchorEl: HTMLElement;
   cellId: GridCellId;
+};
+
+type BulkDeleteTarget = BulkDeleteReviewTarget & {
+  key: string;
+  empId: string;
+  dateKey: string;
+};
+
+type ShiftDeleteUpdate = {
+  key: string;
+  empId: string;
+  dateKey: string;
+  value: ShiftMap[string] | null;
+  expectedVersion: number | undefined;
 };
 
 export type SchedulePageInitialState = {
@@ -190,6 +227,22 @@ export type SchedulePageInitialState = {
   orgId: string | null;
   serverLoadedAt: string;
 };
+
+function getFirstCustomTimeSegment(time: string | null | undefined): string | null {
+  if (!time) return null;
+  const segment = time.split("|")[0]?.trim();
+  return segment ? segment : null;
+}
+
+function normalizeCustomTimeForSegmentCount(
+  time: string | null | undefined,
+  segmentCount: number,
+): string | null {
+  if (segmentCount === 1) {
+    return getFirstCustomTimeSegment(time);
+  }
+  return time ?? null;
+}
 
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
@@ -243,6 +296,7 @@ function SchedulerContent() {
   );
 
   const [today, setToday] = useState(() => new Date());
+  const [currentTimeTick, setCurrentTimeTick] = useState(() => Date.now());
   const payPeriodStartDate = org?.payPeriodStartDate ?? null;
 
   // Refresh `today` if the app stays open past midnight
@@ -254,6 +308,11 @@ function SchedulerContent() {
     const timer = setTimeout(() => setToday(new Date()), msUntilMidnight + 500);
     return () => clearTimeout(timer);
   }, [today]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setCurrentTimeTick(Date.now()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   // Date range for shift fetching: ±90 days from today.
   // Shifts outside this window are not loaded — keeps payload small for mature orgs.
@@ -303,7 +362,7 @@ function SchedulerContent() {
     shouldAutoUseOneWeek,
   );
   useEffect(() => {
-    if (preferredSpan !== 2) return;
+    if (spanWeeks !== 2) return;
     setWeekStart((prev) =>
       getScheduleStartForSpan({
         date: prev,
@@ -311,7 +370,7 @@ function SchedulerContent() {
         payPeriodStartDate,
       }),
     );
-  }, [payPeriodStartDate, preferredSpan]);
+  }, [payPeriodStartDate, spanWeeks]);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
   // My Schedule mode: for regular users, default to showing only their own shifts
@@ -399,6 +458,7 @@ function SchedulerContent() {
     assignmentLabelMap,
     currentEmpId,
     canApproveShiftRequests,
+    org?.timezone ?? null,
   );
 
   // ── Open shifts (calloff-spawned pickups) ──
@@ -785,6 +845,12 @@ function SchedulerContent() {
     empName: string;
     shiftLabel: string;
   } | null>(null);
+  const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
+  const [bulkDeleteSelectedKeys, setBulkDeleteSelectedKeys] = useState<
+    Set<string>
+  >(() => new Set());
+  const [showBulkDeleteReview, setShowBulkDeleteReview] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pendingPasteOver, setPendingPasteOver] = useState<{
     empId: string;
     date: Date;
@@ -793,6 +859,15 @@ function SchedulerContent() {
   } | null>(null);
   const [pendingClaimShift, setPendingClaimShift] =
     useState<GridOpenShift | null>(null);
+  const [isClaimShiftPending, setIsClaimShiftPending] = useState(false);
+  const [pendingCoverageGapVolunteer, setPendingCoverageGapVolunteer] = useState<{
+    assignmentLabel: string;
+    date: string;
+    focusAreaId: number;
+    input: ScheduleCellInput;
+  } | null>(null);
+  const [isCoverageGapVolunteerPending, setIsCoverageGapVolunteerPending] =
+    useState(false);
 
   const realtimeChannelRef = useRef<BrowserRealtimeChannel | null>(null);
   const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -1537,6 +1612,17 @@ function SchedulerContent() {
           ),
     [weekStart, spanWeeks],
   );
+  const availableSwapDates = useMemo(
+    () =>
+      Array.from(
+        iterateDateRange(
+          new Date(`${shiftFetchStart}T00:00:00`),
+          new Date(`${shiftFetchEnd}T00:00:00`),
+        ),
+        ({ dateKey }) => dateKey,
+      ),
+    [shiftFetchEnd, shiftFetchStart],
+  );
   const week1 = useMemo(() => dates.slice(0, 7), [dates]);
   const week2 = useMemo(
     () => (spanWeeks === 2 ? dates.slice(7, 14) : []),
@@ -1628,29 +1714,48 @@ function SchedulerContent() {
   // ── Shift helpers ────────────────────────────────────────────────────────────
 
   const buildEntryPayload = useCallback(
-    (entry: ShiftMap[string]): ScheduleCellInput =>
-      scheduleCellSnapshotToInput(
+    (entry: ShiftMap[string]): ScheduleCellInput => {
+      const input =
+        scheduleCellSnapshotToInput(
         entry.effective ?? entry.draft ?? entry.published,
-      ) ?? {
-        kind:
-          entry.isDelete
-            ? "deleted"
-            : entry.absenceTypeId != null
-              ? "absence"
-              : "worked",
-        segments: (entry.segments ?? []).map((segment, index) => ({
-          shiftId: segment.shiftId,
-          jobId: segment.jobId,
-          position: segment.position ?? index,
-        })),
-        absenceTypeId: entry.absenceTypeId ?? null,
-        customStartTime:
-          entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
-        customEndTime:
-          entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
-        seriesId: entry.seriesId ?? null,
-        fromRecurring: entry.fromRecurring ?? false,
-      },
+        ) ?? {
+          kind:
+            entry.isDelete
+              ? "deleted"
+              : entry.absenceTypeId != null
+                ? "absence"
+                : "worked",
+          segments: (entry.segments ?? []).map((segment, index) => ({
+            shiftId: segment.shiftId,
+            jobId: segment.jobId,
+            position: segment.position ?? index,
+            isMentored: segment.isMentored ?? false,
+          })),
+          absenceTypeId: entry.absenceTypeId ?? null,
+          customStartTime:
+            entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
+          customEndTime:
+            entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
+          seriesId: entry.seriesId ?? null,
+          fromRecurring: entry.fromRecurring ?? false,
+        };
+
+      if (input.kind !== "worked") {
+        return input;
+      }
+
+      return {
+        ...input,
+        customStartTime: normalizeCustomTimeForSegmentCount(
+          input.customStartTime,
+          input.segments.length,
+        ),
+        customEndTime: normalizeCustomTimeForSegmentCount(
+          input.customEndTime,
+          input.segments.length,
+        ),
+      };
+    },
     [],
   );
 
@@ -1701,6 +1806,7 @@ function SchedulerContent() {
             shiftId: segment.shiftId,
             jobId: segment.jobId,
             position: segment.position ?? index,
+            isMentored: segment.isMentored ?? false,
           })),
           absenceTypeId: entry.publishedAbsenceTypeId ?? null,
           customStartTime: entry.publishedCustomStartTime ?? null,
@@ -1733,10 +1839,96 @@ function SchedulerContent() {
     [shifts, assignmentLabelMap, absenceTypeMap],
   );
 
+  const shiftNameForKey = useCallback(
+    (empId: string, date: Date): string | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry || entry.isDelete) return null;
+
+      const absenceTypeId =
+        entry.absenceTypeId ?? entry.publishedAbsenceTypeId ?? null;
+      if (absenceTypeId != null) {
+        return absenceTypeMap.get(absenceTypeId) ?? "?";
+      }
+
+      const assignmentIds =
+        (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0
+          ? entry.publishedAssignmentDefinitionIds
+          : entry.assignmentIds;
+      if (assignmentIds.length > 0) {
+        return assignmentIds
+          .map((id) => {
+            const assignment = assignments.find((item) => item.id === id);
+            if (!assignment) {
+              return assignmentLabelMap.get(id) ?? "?";
+            }
+
+            const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
+            const shift =
+              shiftId != null
+                ? (shiftCategories.find((item) => item.id === shiftId) ?? null)
+                : null;
+            const job =
+              assignment.jobId != null
+                ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
+                : null;
+            const displayParts = buildShiftDisplayParts({
+              shift,
+              job,
+              assignment,
+              shiftDisplayMode: "name",
+            });
+
+            return formatAssignableShiftOptionLabel(displayParts);
+          })
+          .join(" / ");
+      }
+
+      return entry.label ?? null;
+    },
+    [
+      absenceTypeMap,
+      assignmentLabelMap,
+      assignments,
+      jobs,
+      shiftCategories,
+      shifts,
+    ],
+  );
+
+  const getAbsenceTypeIdForKey = useCallback(
+    (empId: string, date: Date): number | null => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry || entry.isDelete) return null;
+      return entry.absenceTypeId ?? null;
+    },
+    [shifts],
+  );
+
   const assignmentIdsForKey = useCallback(
     (empId: string, date: Date): number[] =>
       shifts[`${empId}_${formatDateKey(date)}`]?.assignmentIds ?? [],
     [shifts],
+  );
+
+  const segmentsForKey = useCallback(
+    (empId: string, date: Date) => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry || entry.isDelete || entry.absenceTypeId != null) {
+        return [];
+      }
+      return (entry.segments ?? []).map((segment, index) => ({
+        shiftId: segment.shiftId,
+        jobId: segment.jobId,
+        position: segment.position ?? index,
+        isMentored: segment.isMentored ?? false,
+      }));
+    },
+    [shifts],
+  );
+
+  const coverageCreditForKey = useMemo(
+    () => createCoverageCreditResolver(shifts, org?.coverageRuleConfig),
+    [org?.coverageRuleConfig, shifts],
   );
 
   const editSessionCellKey = editPanel
@@ -1828,6 +2020,26 @@ function SchedulerContent() {
     [shifts, assignments, shiftCategories],
   );
 
+  const getShiftFocusAreaIds = useCallback(
+    (empId: string, date: Date): number[] => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry) {
+        return [];
+      }
+
+      const focusAreaIds = new Set<number>();
+      for (const assignmentId of entry.publishedAssignmentDefinitionIds ?? []) {
+        const assignment = assignments.find((item) => item.id === assignmentId);
+        if (assignment?.focusAreaId != null) {
+          focusAreaIds.add(assignment.focusAreaId);
+        }
+      }
+
+      return [...focusAreaIds];
+    },
+    [assignments, shifts],
+  );
+
   const getOpenShiftTimeRanges = useCallback(
     (
       assignmentIds: number[],
@@ -1881,11 +2093,13 @@ function SchedulerContent() {
               shiftId: segment.shiftId ?? null,
               jobId: segment.jobId,
               position: index,
+              isMentored: segment.isMentored ?? false,
             }))
           : explicitJobIds.map((jobId, index) => ({
               shiftId: explicitShiftIds[index] ?? null,
               jobId,
               position: index,
+              isMentored: false,
             }));
 
       if (segments.length === 0) {
@@ -1923,6 +2137,47 @@ function SchedulerContent() {
       return openShiftRanges.length > 0 && timesOverlap(myRanges, openShiftRanges);
     },
     [currentEmpId, getOpenShiftTimeRanges, getShiftTimeRanges],
+  );
+
+  const hasDateAndTimeStarted = useCallback(
+    (dateKey: string, timeRanges: TimeRange[]): boolean =>
+      hasShiftStartedAtTimeRanges({
+        shiftDate: dateKey,
+        timeRanges,
+        now: new Date(currentTimeTick),
+        timeZone: org?.timezone ?? null,
+      }),
+    [currentTimeTick, org?.timezone],
+  );
+
+  const isCoverageGapStarted = useCallback(
+    (gap: CoverageGap, assignmentIds: number[]): boolean =>
+      hasDateAndTimeStarted(
+        formatDateKey(gap.date),
+        getOpenShiftTimeRanges(assignmentIds, null, null),
+      ),
+    [getOpenShiftTimeRanges, hasDateAndTimeStarted],
+  );
+
+  const getActionableCoverageGapAssignmentIds = useCallback(
+    (gap: CoverageGap): number[] =>
+      gap.eligibleAssignmentDefinitionIds.filter(
+        (assignmentId) => !isCoverageGapStarted(gap, [assignmentId]),
+      ),
+    [isCoverageGapStarted],
+  );
+
+  const isOpenShiftStarted = useCallback(
+    (openShift: GridOpenShift): boolean =>
+      hasDateAndTimeStarted(
+        openShift.date,
+        getOpenShiftTimeRanges(
+          openShift.assignmentIds ?? [],
+          openShift.customStartTime ?? null,
+          openShift.customEndTime ?? null,
+        ),
+      ),
+    [getOpenShiftTimeRanges, hasDateAndTimeStarted],
   );
 
   // ── Coverage gaps ──────────────────────────────────────────────────────────
@@ -2072,6 +2327,7 @@ function SchedulerContent() {
       assignmentById,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
+      coverageCreditForKey,
     );
   }, [
     coverageRequirements,
@@ -2084,9 +2340,10 @@ function SchedulerContent() {
     assignmentById,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
+    coverageCreditForKey,
   ]);
 
-  const visibleCoverageGaps = useMemo(() => {
+  const publishedCoverageGaps = useMemo(() => {
     if (
       !coverageRequirements.length ||
       !focusAreas.length ||
@@ -2106,6 +2363,9 @@ function SchedulerContent() {
       assignmentById,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
+      coverageCreditForKey,
+    ).filter(
+      (gap) => getActionableCoverageGapAssignmentIds(gap).length > 0,
     );
   }, [
     coverageRequirements,
@@ -2118,31 +2378,102 @@ function SchedulerContent() {
     assignmentById,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
+    coverageCreditForKey,
+    getActionableCoverageGapAssignmentIds,
   ]);
+
+  const visibleCoverageGaps = useMemo(
+    () =>
+      selectVisibleCoverageGaps({
+        allCoverageGaps: allCoverageGaps.filter(
+          (gap) => getActionableCoverageGapAssignmentIds(gap).length > 0,
+        ),
+        publishedCoverageGaps,
+        canEditShifts,
+      }),
+    [
+      allCoverageGaps,
+      canEditShifts,
+      getActionableCoverageGapAssignmentIds,
+      publishedCoverageGaps,
+    ],
+  );
 
   // ── Merge calloff open shifts + coverage-gap open shifts ──
   const openShifts = useMemo<GridOpenShift[]>(() => {
-    const gapShifts: GridOpenShift[] = visibleCoverageGaps
-      .map((gap) => {
-        const sc = assignmentById.get(gap.preferredOpenAssignmentDefinitionId);
-        return {
+    const gapShifts = visibleCoverageGaps.reduce<GridOpenShift[]>(
+      (items, gap) => {
+        const actionableAssignmentIds = getActionableCoverageGapAssignmentIds(gap);
+
+        if (
+          hasPendingVolunteerRequestForCoverageGap({
+            actionableAssignmentIds,
+            employeeId: currentEmpId,
+            gap,
+            requests: shiftRequests.requests,
+          })
+        ) {
+          return items;
+        }
+
+        const remainingNeeded =
+          gap.status.required -
+          gap.status.actual -
+          countPendingVolunteerRequestsForCoverageGap({
+            actionableAssignmentIds,
+            gap,
+            requests: shiftRequests.requests,
+          });
+
+        if (remainingNeeded <= 0) {
+          return items;
+        }
+
+        const representativeAssignmentId =
+          actionableAssignmentIds.find(
+            (assignmentId) =>
+              assignmentId === gap.preferredOpenAssignmentDefinitionId,
+          ) ??
+          actionableAssignmentIds[0];
+        if (!representativeAssignmentId) {
+          return items;
+        }
+        const sc = assignmentById.get(representativeAssignmentId);
+        const representativeShiftId = sc?.shiftId ?? sc?.categoryId ?? null;
+        const representativeJobId = sc?.jobId ?? null;
+        items.push({
           id: `gap_${gap.focusAreaId}_${gap.requirementAssignmentDefinitionId}_${formatDateKey(gap.date)}`,
           source: "coverage_gap" as const,
           date: formatDateKey(gap.date),
           focusAreaId: gap.focusAreaId,
           requirementAssignmentDefinitionId: gap.requirementAssignmentDefinitionId,
-          assignmentIds: [gap.preferredOpenAssignmentDefinitionId],
-          eligibleAssignmentDefinitionIds: gap.eligibleAssignmentDefinitionIds,
-          preferredOpenAssignmentDefinitionId: gap.preferredOpenAssignmentDefinitionId,
+          shiftIds: representativeJobId != null ? [representativeShiftId] : [],
+          jobIds: representativeJobId != null ? [representativeJobId] : [],
+          assignmentIds: [representativeAssignmentId],
+          eligibleAssignmentDefinitionIds: actionableAssignmentIds,
+          preferredOpenAssignmentDefinitionId: representativeAssignmentId,
           ruleLabel: gap.ruleLabel,
           assignmentLabel: gap.assignmentLabel,
           customStartTime: sc?.defaultStartTime ?? null,
           customEndTime: sc?.defaultEndTime ?? null,
-          needed: gap.status.required - gap.status.actual,
-        };
-      });
-    return [...resolvedCalloffOpenShifts, ...gapShifts];
-  }, [resolvedCalloffOpenShifts, visibleCoverageGaps, assignmentById]);
+          needed: remainingNeeded,
+        });
+        return items;
+      },
+      [],
+    );
+    return [...resolvedCalloffOpenShifts, ...gapShifts].filter(
+      (openShift) => !isOpenShiftStarted(openShift),
+    );
+  }, [
+    assignmentById,
+    currentEmpId,
+    getActionableCoverageGapAssignmentIds,
+    isOpenShiftStarted,
+    resolvedCalloffOpenShifts,
+    shiftRequests.requests,
+    visibleCoverageGaps,
+  ]);
 
   const draftKindForKey = useCallback(
     (empId: string, date: Date): DraftKind => {
@@ -2286,6 +2617,7 @@ function SchedulerContent() {
       if (!entry) return null;
       return {
         publishedAssignmentDefinitionIds: entry.publishedAssignmentDefinitionIds ?? [],
+        publishedSegments: entry.publishedSegments ?? entry.segments ?? [],
         publishedCustomStartTime: entry.publishedCustomStartTime ?? null,
         publishedCustomEndTime: entry.publishedCustomEndTime ?? null,
       };
@@ -2293,41 +2625,121 @@ function SchedulerContent() {
     [shifts],
   );
 
-  /** True if the published shift date is in the past, or it's today and the published shift has already started. */
-  const isPublishedShiftStarted = useCallback(
-    (empId: string, date: Date): boolean => {
-      const todayStr = formatDateKey(today);
-      const dateStr = formatDateKey(date);
-      if (dateStr < todayStr) return true;
-      if (dateStr > todayStr) return false;
-      const publishedShift = getPublishedRequestShift(empId, date);
-      if (!publishedShift || publishedShift.publishedAssignmentDefinitionIds.length === 0)
-        return true;
-      // Resolve earliest start time from custom times or shift code defaults
-      let earliest: string | null = null;
-      if (publishedShift.publishedCustomStartTime) {
-        // customStartTime can be pipe-delimited for multi-pill shifts
-        for (const t of publishedShift.publishedCustomStartTime.split("|")) {
-          if (t && (!earliest || t < earliest)) earliest = t;
-        }
+  const getPublishedShiftSegments = useCallback(
+    (empId: string, date: Date): ShiftJobSegment[] => {
+      const entry = shifts[`${empId}_${formatDateKey(date)}`];
+      if (!entry || entry.isDelete || entry.publishedAbsenceTypeId != null) {
+        return [];
       }
-      if (!earliest) {
-        for (const codeId of publishedShift.publishedAssignmentDefinitionIds) {
-          const sc = assignments.find((c) => c.id === codeId);
-          if (
-            sc?.defaultStartTime &&
-            (!earliest || sc.defaultStartTime < earliest)
-          ) {
-            earliest = sc.defaultStartTime;
+      return entry.publishedSegments ?? entry.segments ?? [];
+    },
+    [shifts],
+  );
+
+  const getPublishedShiftSegmentOptions = useCallback(
+    (empId: string, date: Date) =>
+      getPublishedShiftSegments(empId, date)
+        .map((segment, originalIndex) => ({ segment, originalIndex }))
+        .sort((left, right) => {
+          const leftStart = left.segment.startTime ?? "99:99:99";
+          const rightStart = right.segment.startTime ?? "99:99:99";
+          const timeComparison = leftStart.localeCompare(rightStart);
+
+          return timeComparison === 0
+            ? left.originalIndex - right.originalIndex
+            : timeComparison;
+        })
+        .map(({ segment }, index) => ({ segment, segmentIndex: index })),
+    [getPublishedShiftSegments],
+  );
+
+  const getPublishedShiftTimeRanges = useCallback(
+    (empId: string, date: Date): { start: string; end: string }[] => {
+      const publishedShift = getPublishedRequestShift(empId, date);
+      if (!publishedShift) {
+        return [];
+      }
+
+      const startParts = publishedShift.publishedCustomStartTime?.split("|") ?? [];
+      const endParts = publishedShift.publishedCustomEndTime?.split("|") ?? [];
+      const ranges: { start: string; end: string }[] = [];
+
+      for (let i = 0; i < publishedShift.publishedAssignmentDefinitionIds.length; i++) {
+        const customStart = startParts[i] || null;
+        const customEnd = endParts[i] || null;
+        if (customStart && customEnd) {
+          ranges.push({ start: customStart, end: customEnd });
+          continue;
+        }
+
+        const assignment = assignments.find(
+          (item) => item.id === publishedShift.publishedAssignmentDefinitionIds[i],
+        );
+        if (assignment?.defaultStartTime && assignment?.defaultEndTime) {
+          ranges.push({
+            start: assignment.defaultStartTime,
+            end: assignment.defaultEndTime,
+          });
+          continue;
+        }
+
+        if (assignment?.categoryId != null) {
+          const category = shiftCategories.find(
+            (item) => item.id === assignment.categoryId,
+          );
+          if (category?.startTime && category?.endTime) {
+            ranges.push({ start: category.startTime, end: category.endTime });
           }
         }
       }
-      if (!earliest) return true; // no start time defined — treat as started (safe default)
-      const now = new Date();
-      const nowTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-      return nowTime >= earliest;
+
+      return ranges;
     },
-    [getPublishedRequestShift, assignments, today],
+    [assignments, getPublishedRequestShift, shiftCategories],
+  );
+
+  const isPublishedShiftSegmentStarted = useCallback(
+    (empId: string, date: Date, segmentIndex: number): boolean => {
+      const option = getPublishedShiftSegmentOptions(empId, date)[segmentIndex];
+      const sortedRanges = [...getPublishedShiftTimeRanges(empId, date)].sort(
+        (left, right) => {
+          const startComparison = left.start.localeCompare(right.start);
+          return startComparison === 0
+            ? left.end.localeCompare(right.end)
+            : startComparison;
+        },
+      );
+      const range =
+        option?.segment.startTime != null
+          ? { start: option.segment.startTime, end: option.segment.endTime ?? "" }
+          : (sortedRanges[segmentIndex] ?? null);
+
+      return hasDateAndTimeStarted(formatDateKey(date), range ? [range] : []);
+    },
+    [
+      getPublishedShiftSegmentOptions,
+      getPublishedShiftTimeRanges,
+      hasDateAndTimeStarted,
+    ],
+  );
+
+  /** True if the published shift date is in the past, or it's today and the published shift has already started. */
+  const isPublishedShiftStarted = useCallback(
+    (empId: string, date: Date): boolean => {
+      const dateStr = formatDateKey(date);
+      const publishedShift = getPublishedRequestShift(empId, date);
+      if (!publishedShift || publishedShift.publishedAssignmentDefinitionIds.length === 0)
+        return true;
+      const ranges = getPublishedShiftTimeRanges(empId, date);
+      if (ranges.length === 0) {
+        return true;
+      }
+
+      return ranges.every((range) =>
+        hasDateAndTimeStarted(dateStr, [range]),
+      );
+    },
+    [getPublishedRequestShift, getPublishedShiftTimeRanges, hasDateAndTimeStarted],
   );
 
   /** True if the published shift has at least one categorized, non-off-day shift code. */
@@ -2488,7 +2900,7 @@ function SchedulerContent() {
           customStartTime: start,
           customEndTime: end,
         };
-        const draftKind = computeDraftKind(updated);
+        const draftKind = computeScheduleEntryDraftKind(updated);
         return {
           draftShift: {
             ...updated,
@@ -2502,43 +2914,159 @@ function SchedulerContent() {
     [updateEditSessionDraft],
   );
 
-  /** Compare current shift values against published state to determine correct draftKind. */
-  function computeDraftKind(entry: {
-    assignmentIds: number[];
-    publishedAssignmentDefinitionIds?: number[];
-    absenceTypeId?: number | null;
-    publishedAbsenceTypeId?: number | null;
-    customStartTime?: string | null;
-    customEndTime?: string | null;
-    publishedCustomStartTime?: string | null;
-    publishedCustomEndTime?: string | null;
-  }): DraftKind {
-    const pubCodes = entry.publishedAssignmentDefinitionIds ?? [];
-    const hasPub = pubCodes.length > 0 || entry.publishedAbsenceTypeId != null;
+  const buildShiftDeleteUpdate = useCallback(
+    (empId: string, dateKey: string): ShiftDeleteUpdate | null => {
+      const key = `${empId}_${dateKey}`;
+      const existing = shiftsRef.current[key];
+      const hasContent =
+        existing &&
+        (existing.assignmentIds.length > 0 ||
+          existing.publishedAssignmentDefinitionIds?.length ||
+          existing.absenceTypeId != null ||
+          existing.publishedAbsenceTypeId != null);
+      if (!existing || !hasContent) return null;
 
-    if (!hasPub) {
-      return entry.assignmentIds.length > 0 || entry.absenceTypeId != null
-        ? "new"
-        : null;
-    }
+      const expectedVersion = existing.version;
+      const hasPublishedBacking =
+        (existing.publishedAssignmentDefinitionIds?.length ?? 0) > 0 ||
+        existing.publishedAbsenceTypeId != null;
 
-    const codesMatch =
-      entry.assignmentIds.length === pubCodes.length &&
-      entry.assignmentIds.every((id, i) => id === pubCodes[i]);
-    const absMatch =
-      (entry.absenceTypeId ?? null) === (entry.publishedAbsenceTypeId ?? null);
-    const startMatch =
-      (entry.customStartTime ?? null) ===
-      (entry.publishedCustomStartTime ?? null);
-    const endMatch =
-      (entry.customEndTime ?? null) === (entry.publishedCustomEndTime ?? null);
+      if (!hasPublishedBacking) {
+        return {
+          key,
+          empId,
+          dateKey,
+          value: null,
+          expectedVersion,
+        };
+      }
 
-    if (codesMatch && absMatch && startMatch && endMatch) return null;
+      const deleteValue = buildScheduleCellEntryFromInput({
+        input: {
+          kind: "deleted",
+          segments: [],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: existing.seriesId ?? null,
+          fromRecurring: existing.fromRecurring ?? false,
+        },
+        published: getPublishedSnapshot(existing),
+        segmentCompatibility,
+        absenceTypeMap,
+        draftKind: "deleted",
+        isDelete: true,
+        version: expectedVersion != null ? expectedVersion + 1 : undefined,
+        createdBy: existing.createdBy ?? null,
+        updatedBy: currentUserRef.current?.id ?? null,
+        createdAt: existing.createdAt ?? null,
+        updatedAt: existing.updatedAt ?? null,
+      });
+      if (!deleteValue) return null;
 
-    return entry.assignmentIds.length === 0 && entry.absenceTypeId == null
-      ? "deleted"
-      : "modified";
-  }
+      return {
+        key,
+        empId,
+        dateKey,
+        value: deleteValue,
+        expectedVersion,
+      };
+    },
+    [absenceTypeMap, getPublishedSnapshot, segmentCompatibility],
+  );
+
+  const applyShiftDeleteUpdates = useCallback(
+    async (
+      updates: ShiftDeleteUpdate[],
+      options: { broadcast: boolean; failureMessage: string },
+    ): Promise<void> => {
+      if (updates.length === 0) return;
+      const orgId = org?.id;
+      if (!orgId) {
+        console.error("Cannot modify shifts before org is loaded");
+        return;
+      }
+
+      setShifts((prev) => {
+        const next = { ...prev };
+        for (const update of updates) {
+          if (update.value) {
+            next[update.key] = update.value;
+          } else {
+            delete next[update.key];
+          }
+        }
+        return next;
+      });
+
+      if (options.broadcast) {
+        const broadcastPayload: Record<string, ShiftMap[string] | null> = {};
+        for (const update of updates) {
+          broadcastPayload[update.key] = update.value;
+        }
+        broadcastDraftChanged({ shifts: broadcastPayload });
+      }
+
+      if (updates.length > 1) {
+        try {
+          await Promise.all(
+            updates.map(
+              (update) =>
+                pendingShiftWrites.current.get(update.key) ?? Promise.resolve(),
+            ),
+          );
+          const deleteItems: DeleteShiftBatchItem[] = updates.map((update) => ({
+            employeeId: update.empId,
+            date: update.dateKey,
+            expectedVersion: update.expectedVersion,
+          }));
+          for (let i = 0; i < deleteItems.length; i += IMPORT_PREVIOUS_BATCH_SIZE) {
+            await deleteShiftBatch(
+              orgId,
+              deleteItems.slice(i, i + IMPORT_PREVIOUS_BATCH_SIZE),
+            );
+          }
+        } catch (err) {
+          if (err instanceof OptimisticLockError) {
+            await handleShiftWriteConflict();
+          } else {
+            toast.error(options.failureMessage);
+            Sentry.captureException(err);
+          }
+        }
+        return;
+      }
+
+      await Promise.all(
+        updates.map((update) =>
+          enqueueShiftWrite(update.key, async () => {
+            try {
+              await deleteShift(
+                update.empId,
+                update.dateKey,
+                orgId,
+                update.expectedVersion,
+              );
+            } catch (err) {
+              if (err instanceof OptimisticLockError) {
+                await handleShiftWriteConflict();
+              } else {
+                toast.error(options.failureMessage);
+                Sentry.captureException(err);
+              }
+            }
+          }),
+        ),
+      );
+    },
+    [
+      broadcastDraftChanged,
+      deleteShiftBatch,
+      enqueueShiftWrite,
+      handleShiftWriteConflict,
+      org?.id,
+    ],
+  );
 
   const setShift = useCallback(
     (
@@ -2565,78 +3093,12 @@ function SchedulerContent() {
           entry.absenceTypeId == null);
 
       if (isDelete) {
-        const ex = shiftsRef.current[key];
-        // Nothing to delete — cell is already empty (no worked assignment AND no absence type)
-        const hasContent =
-          ex &&
-          (ex.assignmentIds.length > 0 ||
-            ex.publishedAssignmentDefinitionIds?.length ||
-            ex.absenceTypeId != null ||
-            ex.publishedAbsenceTypeId != null);
-        if (!hasContent) return;
-
-        if (
-          ex.publishedAssignmentDefinitionIds?.length ||
-          ex.publishedAbsenceTypeId != null
-        ) {
-          // Published shift/absence being deleted → mark as draft-deleted
-          const deleteValue = buildScheduleCellEntryFromInput({
-            input: {
-              kind: "deleted",
-              segments: [],
-              absenceTypeId: null,
-              customStartTime: null,
-              customEndTime: null,
-              seriesId: ex.seriesId ?? null,
-              fromRecurring: ex.fromRecurring ?? false,
-            },
-            published: getPublishedSnapshot(ex),
-            segmentCompatibility,
-            absenceTypeMap,
-            draftKind: "deleted",
-            isDelete: true,
-            version: existingVersion != null ? existingVersion + 1 : undefined,
-            createdBy: ex.createdBy ?? null,
-            updatedBy: currentUserRef.current?.id ?? null,
-            createdAt: ex.createdAt ?? null,
-            updatedAt: ex.updatedAt ?? null,
-          });
-          if (!deleteValue) return;
-          setShifts((prev) => ({ ...prev, [key]: deleteValue }));
-          void enqueueShiftWrite(key, async () => {
-            try {
-              await deleteShift(empId, dateKey, orgId ?? undefined, existingVersion);
-            } catch (err) {
-              if (err instanceof OptimisticLockError) {
-                await handleShiftWriteConflict();
-              } else {
-                toast.error("Failed to delete shift");
-                Sentry.captureException(err);
-              }
-            }
-          });
-          broadcastDraftChanged({ shifts: { [key]: deleteValue } });
-        } else {
-          // Never-published draft being cleared → remove from map entirely
-          setShifts((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-          });
-          void enqueueShiftWrite(key, async () => {
-            try {
-              await deleteShift(empId, dateKey, orgId ?? undefined, existingVersion);
-            } catch (err) {
-              if (err instanceof OptimisticLockError) {
-                await handleShiftWriteConflict();
-              } else {
-                toast.error("Failed to delete shift");
-                Sentry.captureException(err);
-              }
-            }
-          });
-          broadcastDraftChanged({ shifts: { [key]: null } });
-        }
+        const deleteUpdate = buildShiftDeleteUpdate(empId, dateKey);
+        if (!deleteUpdate) return;
+        void applyShiftDeleteUpdates([deleteUpdate], {
+          broadcast: true,
+          failureMessage: "Failed to delete shift",
+        });
       } else {
         const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
         // Filter out any stale/archived shift code IDs
@@ -2695,7 +3157,7 @@ function SchedulerContent() {
           toast.error("That assignment could not be resolved.");
           return;
         }
-        const dk = computeDraftKind(provisional);
+        const dk = computeScheduleEntryDraftKind(provisional);
         const upsertValue = buildScheduleCellEntryFromInput({
           input: normalizedEntry,
           published: getPublishedSnapshot(ex),
@@ -2734,6 +3196,8 @@ function SchedulerContent() {
     [
       absenceTypeMapRef,
       org?.id,
+      applyShiftDeleteUpdates,
+      buildShiftDeleteUpdate,
       broadcastDraftChanged,
       enqueueShiftWrite,
       getInputAssignmentDefinitionIds,
@@ -2912,7 +3376,7 @@ function SchedulerContent() {
         return currentShift;
       }
 
-      const draftKind = computeDraftKind(provisional);
+      const draftKind = computeScheduleEntryDraftKind(provisional);
       return buildScheduleCellEntryFromInput({
         input,
         published,
@@ -2959,24 +3423,10 @@ function SchedulerContent() {
         return;
       }
 
-      const idsMatch = (a: number[], b: number[]) =>
-        a.length === b.length && a.every((id, index) => id === b[index]);
       const shiftIsDeleted = (shift: ShiftMap[string] | null) =>
         !shift ||
         shift.isDelete ||
         (shift.assignmentIds.length === 0 && shift.absenceTypeId == null);
-      const shiftIdentityMatches = (
-        left: ShiftMap[string] | null,
-        right: ShiftMap[string] | null,
-      ) => {
-        const leftDeleted = shiftIsDeleted(left);
-        const rightDeleted = shiftIsDeleted(right);
-        if (leftDeleted || rightDeleted) return leftDeleted === rightDeleted;
-        return (
-          idsMatch(left!.assignmentIds, right!.assignmentIds) &&
-          (left!.absenceTypeId ?? null) === (right!.absenceTypeId ?? null)
-        );
-      };
 
       try {
         isApplyingEditSessionRef.current = true;
@@ -3006,7 +3456,7 @@ function SchedulerContent() {
 
         let workingShift = currentShift;
         let workingBaseShift = session.baseShift;
-        const initialIdentityChanged = !shiftIdentityMatches(
+        const initialIdentityChanged = !shiftEditableIdentityMatches(
           session.baseShift,
           session.draftShift,
         );
@@ -3042,7 +3492,7 @@ function SchedulerContent() {
         }
 
         const expectedVersion = workingShift?.version;
-        const remainingIdentityChanged = !shiftIdentityMatches(
+        const remainingIdentityChanged = !shiftEditableIdentityMatches(
           workingBaseShift,
           session.draftShift,
         );
@@ -3478,11 +3928,12 @@ function SchedulerContent() {
       }
 
       const sourceEntry = shifts[sourceKey];
+      const targetEntry = shifts[targetKey];
       const targetPublishedAssignmentDefinitionIds =
-        shifts[targetKey]?.publishedAssignmentDefinitionIds ?? [];
+        targetEntry?.publishedAssignmentDefinitionIds ?? [];
       const targetPublishedAbsenceTypeId =
-        shifts[targetKey]?.publishedAbsenceTypeId ?? null;
-      const targetPublishedLabel = shifts[targetKey]?.publishedLabel ?? "";
+        targetEntry?.publishedAbsenceTypeId ?? null;
+      const targetPublishedLabel = targetEntry?.publishedLabel ?? "";
       const targetHasPublished =
         targetPublishedAssignmentDefinitionIds.length > 0 ||
         targetPublishedAbsenceTypeId != null;
@@ -3587,6 +4038,8 @@ function SchedulerContent() {
             payload,
             mode,
             sourceEntry?.version,
+            targetEntry?.version,
+            targetEntry == null,
           ),
         )
         .then(() => {
@@ -3728,6 +4181,10 @@ function SchedulerContent() {
   >(
     ({ event, anchorEl, cellId, date }) => {
       event.preventDefault();
+      if (isBulkDeleteMode) {
+        setContextMenu(null);
+        return;
+      }
       const cellKey = `${cellId.empId}_${formatDateKey(date)}`;
       const shiftEntry = shifts[cellKey];
       const hasShift = !!(
@@ -3759,6 +4216,7 @@ function SchedulerContent() {
       canEditShifts,
       clipboard,
       hasActiveRequestForShift,
+      isBulkDeleteMode,
       shifts,
     ],
   );
@@ -3995,7 +4453,7 @@ function SchedulerContent() {
 
     try {
       const shiftUpdates: Record<string, ShiftMap[string]> = {};
-      const upsertTasks: Array<() => Promise<void>> = [];
+      const upsertItems: UpsertShiftBatchItem[] = [];
       // BUG 1.11: Track disqualified shifts to show warning
       const disqualifiedShifts: Array<{
         empName: string;
@@ -4049,16 +4507,11 @@ function SchedulerContent() {
               updatedBy: currentUserRef.current?.id ?? null,
             };
 
-            // Queue DB upsert
-            upsertTasks.push(() =>
-              upsertShift(
-                emp.id,
-                targetDateKey,
-                buildEntryPayload(sourceShift),
-                org.id,
-                undefined,
-              )
-            );
+            upsertItems.push({
+              employeeId: emp.id,
+              date: targetDateKey,
+              input: buildEntryPayload(sourceShift),
+            });
           }
         }
       }
@@ -4082,7 +4535,7 @@ function SchedulerContent() {
       setShifts((prev) => ({ ...prev, ...shiftUpdates }));
       broadcastDraftChanged({ shifts: shiftUpdates });
 
-      const count = upsertTasks.length;
+      const count = upsertItems.length;
       if (count === 0) {
         finishScheduleOperation(
           "import_previous",
@@ -4100,13 +4553,13 @@ function SchedulerContent() {
       });
 
       // Persist to DB in batches so the modal can reflect real progress.
-      for (let i = 0; i < upsertTasks.length; i += IMPORT_PREVIOUS_BATCH_SIZE) {
-        const batch = upsertTasks.slice(i, i + IMPORT_PREVIOUS_BATCH_SIZE);
-        await Promise.all(batch.map((task) => task()));
-        const completed = Math.min(upsertTasks.length, i + batch.length);
+      for (let i = 0; i < upsertItems.length; i += IMPORT_PREVIOUS_BATCH_SIZE) {
+        const batch = upsertItems.slice(i, i + IMPORT_PREVIOUS_BATCH_SIZE);
+        await upsertShiftBatch(org.id, batch);
+        const completed = Math.min(upsertItems.length, i + batch.length);
         updateScheduleOperation("import_previous", {
-          progress: 16 + Math.round((completed / upsertTasks.length) * 74),
-          detail: `Imported ${completed} of ${upsertTasks.length} shift${upsertTasks.length === 1 ? "" : "s"}...`,
+          progress: 16 + Math.round((completed / upsertItems.length) * 74),
+          detail: `Imported ${completed} of ${upsertItems.length} shift${upsertItems.length === 1 ? "" : "s"}...`,
         });
       }
       // Always refetch to reconcile — catches race conditions where another user
@@ -4200,9 +4653,15 @@ function SchedulerContent() {
       );
     } else {
       const step = isMobile ? 7 : spanWeeks * 7;
-      setWeekStart((prev) => addDays(prev, -step));
+      setWeekStart((prev) =>
+        getScheduleStartForSpan({
+          date: addDays(prev, -step),
+          span: spanWeeks,
+          payPeriodStartDate,
+        }),
+      );
     }
-  }, [spanWeeks, isMobile]);
+  }, [spanWeeks, isMobile, payPeriodStartDate]);
 
   const handleNext = useCallback(() => {
     if (spanWeeks === "month") {
@@ -4211,9 +4670,15 @@ function SchedulerContent() {
       );
     } else {
       const step = isMobile ? 7 : spanWeeks * 7;
-      setWeekStart((prev) => addDays(prev, step));
+      setWeekStart((prev) =>
+        getScheduleStartForSpan({
+          date: addDays(prev, step),
+          span: spanWeeks,
+          payPeriodStartDate,
+        }),
+      );
     }
-  }, [spanWeeks, isMobile]);
+  }, [spanWeeks, isMobile, payPeriodStartDate]);
 
   const handleToday = useCallback(
     () => {
@@ -4225,12 +4690,12 @@ function SchedulerContent() {
       setWeekStart(
         getScheduleStartForSpan({
           date: today,
-          span: preferredSpan === 2 ? 2 : spanWeeks,
+          span: spanWeeks,
           payPeriodStartDate,
         }),
       );
     },
-    [payPeriodStartDate, preferredSpan, spanWeeks, today],
+    [payPeriodStartDate, spanWeeks, today],
   );
 
   const handleSpanChange = useCallback((next: 1 | 2 | "month") => {
@@ -4413,6 +4878,13 @@ function SchedulerContent() {
         ? (openShift: GridOpenShift) => {
             const dateObj = new Date(openShift.date + "T00:00:00");
             if (openShift.source === "coverage_gap" && currentEmployee) {
+              if (!currentEmployee.focusAreaIds.includes(openShift.focusAreaId)) {
+                toast.error(
+                  "You are not assigned to the focus area required for this shift.",
+                );
+                return;
+              }
+
               const eligibleAssignmentDefinitions = (
                 openShift.eligibleAssignmentDefinitionIds?.length
                   ? openShift.eligibleAssignmentDefinitionIds
@@ -4464,6 +4936,15 @@ function SchedulerContent() {
                 setPendingClaimShift({
                   ...openShift,
                   assignmentIds: [selectedAssignmentDefinition.id],
+                  shiftIds: [
+                    selectedAssignmentDefinition.shiftId ??
+                      selectedAssignmentDefinition.categoryId ??
+                      null,
+                  ],
+                  jobIds:
+                    selectedAssignmentDefinition.jobId != null
+                      ? [selectedAssignmentDefinition.jobId]
+                      : [],
                   customStartTime: selectedRange?.start ?? null,
                   customEndTime: selectedRange?.end ?? null,
                 });
@@ -4547,6 +5028,8 @@ function SchedulerContent() {
         accessors: {
           shiftForKey,
           assignmentIdsForKey,
+          segmentsForKey,
+          publishedSegmentsForKey: getPublishedShiftSegments,
           getShiftStyle,
           activeIndicatorIdsForKey,
           getCustomShiftTimes,
@@ -4596,6 +5079,8 @@ function SchedulerContent() {
       showAudit,
       shiftForKey,
       assignmentIdsForKey,
+      segmentsForKey,
+      getPublishedShiftSegments,
       getShiftStyle,
       activeIndicatorIdsForKey,
       getCustomShiftTimes,
@@ -4611,6 +5096,206 @@ function SchedulerContent() {
       absenceTypeIdForKey,
     ],
   );
+
+  const visibleBulkDeleteTargets = useMemo<BulkDeleteTarget[]>(() => {
+    if (!canEditShifts || isMobile || spanWeeks === "month") return [];
+    const targetsByKey = new Map<string, BulkDeleteTarget>();
+
+    for (const department of scheduleGridModel.departments) {
+      for (const section of department.sections) {
+        for (const emp of section.employees) {
+          for (const column of scheduleGridModel.columns) {
+            const key = `${emp.id}_${column.dateKey}`;
+            if (targetsByKey.has(key) || lockedCells.has(key)) continue;
+
+            const entry = shifts[key];
+            const hasEntry =
+              entry &&
+              !entry.isDelete &&
+              (entry.assignmentIds.length > 0 ||
+                entry.publishedAssignmentDefinitionIds?.length ||
+                entry.absenceTypeId != null ||
+                entry.publishedAbsenceTypeId != null);
+            if (!entry || !hasEntry) continue;
+
+            const date = new Date(`${column.dateKey}T00:00:00`);
+            targetsByKey.set(key, {
+              key,
+              empId: emp.id,
+              dateKey: column.dateKey,
+              date,
+              empName: getEmployeeDisplayName(emp),
+              shiftLabel: shiftForKey(emp.id, date) ?? entry.label ?? "Entry",
+              isPublishedBacked:
+                (entry.publishedAssignmentDefinitionIds?.length ?? 0) > 0 ||
+                entry.publishedAbsenceTypeId != null,
+            });
+          }
+        }
+      }
+    }
+
+    return Array.from(targetsByKey.values()).sort((left, right) => {
+      if (left.dateKey !== right.dateKey) {
+        return left.dateKey.localeCompare(right.dateKey);
+      }
+      return left.empName.localeCompare(right.empName);
+    });
+  }, [
+    canEditShifts,
+    isMobile,
+    lockedCells,
+    scheduleGridModel.columns,
+    scheduleGridModel.departments,
+    shiftForKey,
+    shifts,
+    spanWeeks,
+  ]);
+
+  const visibleBulkDeleteTargetByKey = useMemo(
+    () =>
+      new Map(
+        visibleBulkDeleteTargets.map((target) => [target.key, target]),
+      ),
+    [visibleBulkDeleteTargets],
+  );
+
+  const visibleBulkDeleteCellKeys = useMemo(
+    () => new Set(visibleBulkDeleteTargets.map((target) => target.key)),
+    [visibleBulkDeleteTargets],
+  );
+
+  const hasVisibleScheduleEntries = useMemo(() => {
+    for (const department of scheduleGridModel.departments) {
+      for (const section of department.sections) {
+        for (const emp of section.employees) {
+          for (const column of scheduleGridModel.columns) {
+            const entry = shifts[`${emp.id}_${column.dateKey}`];
+            if (
+              entry &&
+              !entry.isDelete &&
+              (entry.assignmentIds.length > 0 ||
+                entry.publishedAssignmentDefinitionIds?.length ||
+                entry.absenceTypeId != null ||
+                entry.publishedAbsenceTypeId != null)
+            ) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }, [scheduleGridModel.columns, scheduleGridModel.departments, shifts]);
+
+  const bulkDeleteSelectedTargets = useMemo(
+    () =>
+      Array.from(bulkDeleteSelectedKeys)
+        .map((key) => visibleBulkDeleteTargetByKey.get(key))
+        .filter((target): target is BulkDeleteTarget => !!target)
+        .sort((left, right) => {
+          if (left.dateKey !== right.dateKey) {
+            return left.dateKey.localeCompare(right.dateKey);
+          }
+          return left.empName.localeCompare(right.empName);
+        }),
+    [bulkDeleteSelectedKeys, visibleBulkDeleteTargetByKey],
+  );
+
+  useEffect(() => {
+    if (!isBulkDeleteMode) return;
+    setBulkDeleteSelectedKeys((prev) => {
+      const next = new Set<string>();
+      for (const key of prev) {
+        if (visibleBulkDeleteTargetByKey.has(key)) next.add(key);
+      }
+      if (next.size === prev.size) return prev;
+      return next;
+    });
+  }, [isBulkDeleteMode, visibleBulkDeleteTargetByKey]);
+
+  useEffect(() => {
+    if (canEditShifts && !isMobile && spanWeeks !== "month") return;
+    setIsBulkDeleteMode(false);
+    setShowBulkDeleteReview(false);
+    setBulkDeleteSelectedKeys(new Set());
+  }, [canEditShifts, isMobile, spanWeeks]);
+
+  const handleToggleBulkDeleteMode = useCallback(() => {
+    setContextMenu(null);
+    setPendingClearShift(null);
+    setShowBulkDeleteReview(false);
+    if (isBulkDeleteMode) {
+      setIsBulkDeleteMode(false);
+      setBulkDeleteSelectedKeys(new Set());
+      return;
+    }
+
+    closeEditPanel();
+    setBulkDeleteSelectedKeys(new Set());
+    setIsBulkDeleteMode(true);
+  }, [closeEditPanel, isBulkDeleteMode]);
+
+  const handleToggleBulkDeleteCell = useCallback((cellId: GridCellId) => {
+    const key = `${cellId.empId}_${cellId.dateKey}`;
+    setBulkDeleteSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectVisibleBulkDeleteEntries = useCallback(() => {
+    setBulkDeleteSelectedKeys(new Set(visibleBulkDeleteCellKeys));
+  }, [visibleBulkDeleteCellKeys]);
+
+  const handleCancelBulkDeleteMode = useCallback(() => {
+    setIsBulkDeleteMode(false);
+    setShowBulkDeleteReview(false);
+    setBulkDeleteSelectedKeys(new Set());
+  }, []);
+
+  const handleConfirmBulkDelete = useCallback(async () => {
+    if (bulkDeleteSelectedTargets.length === 0) {
+      setShowBulkDeleteReview(false);
+      return;
+    }
+
+    const updates = bulkDeleteSelectedTargets
+      .map((target) => buildShiftDeleteUpdate(target.empId, target.dateKey))
+      .filter((update): update is ShiftDeleteUpdate => !!update);
+
+    if (updates.length === 0) {
+      toast.info("No selected entries are still removable.");
+      setShowBulkDeleteReview(false);
+      setBulkDeleteSelectedKeys(new Set());
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    try {
+      await applyShiftDeleteUpdates(updates, {
+        broadcast: true,
+        failureMessage: "Failed to remove one or more entries",
+      });
+      toast.success(
+        `${updates.length} selected entr${updates.length === 1 ? "y" : "ies"} removed`,
+      );
+      setShowBulkDeleteReview(false);
+      setIsBulkDeleteMode(false);
+      setBulkDeleteSelectedKeys(new Set());
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }, [
+    applyShiftDeleteUpdates,
+    buildShiftDeleteUpdate,
+    bulkDeleteSelectedTargets,
+  ]);
 
   const scheduleGridInteractionState = useMemo<ScheduleGridInteractionState>(() => {
     const editPanelSectionId =
@@ -4629,18 +5314,33 @@ function SchedulerContent() {
       activeCellId,
       contextMenuCellId: contextMenu?.cellId ?? null,
       hasClipboard: !!clipboard,
+      bulkDeleteMode: isBulkDeleteMode,
+      bulkSelectedCellKeys: bulkDeleteSelectedKeys,
+      bulkSelectableCellKeys: visibleBulkDeleteCellKeys,
     };
-  }, [contextMenu, editPanel, clipboard]);
+  }, [
+    bulkDeleteSelectedKeys,
+    clipboard,
+    contextMenu,
+    editPanel,
+    isBulkDeleteMode,
+    visibleBulkDeleteCellKeys,
+  ]);
 
   const scheduleGridHandlers = useMemo<ScheduleGridHandlers>(
     () => ({
       onActivateCell: handleGridCellActivate,
-      onOpenCellMenu: handleGridCellContextMenu,
-      onMoveEntry: handleMoveGridEntry,
-      onCopyCell: canEditShifts ? handleCopyGridCell : undefined,
-      onPasteCell: canEditShifts ? handlePasteGridCell : undefined,
-      onClearCell: canEditShifts
+      onOpenCellMenu: isBulkDeleteMode ? undefined : handleGridCellContextMenu,
+      onMoveEntry: isBulkDeleteMode ? undefined : handleMoveGridEntry,
+      onCopyCell:
+        canEditShifts && !isBulkDeleteMode ? handleCopyGridCell : undefined,
+      onPasteCell:
+        canEditShifts && !isBulkDeleteMode ? handlePasteGridCell : undefined,
+      onClearCell: canEditShifts && !isBulkDeleteMode
         ? (cellId) => handleClearShift(cellId.empId, getDateFromCellId(cellId))
+        : undefined,
+      onToggleBulkDeleteCell: isBulkDeleteMode
+        ? handleToggleBulkDeleteCell
         : undefined,
       onClaimOpenShift: handleClaimOpenShift,
     }),
@@ -4649,10 +5349,12 @@ function SchedulerContent() {
       handleGridCellContextMenu,
       handleMoveGridEntry,
       canEditShifts,
+      isBulkDeleteMode,
       handleCopyGridCell,
       handlePasteGridCell,
       handleClearShift,
       getDateFromCellId,
+      handleToggleBulkDeleteCell,
       handleClaimOpenShift,
     ],
   );
@@ -4837,7 +5539,78 @@ function SchedulerContent() {
               background: "var(--color-bg)",
             }}
           >
-            {canEditShifts && hasUnpublishedChanges && (
+            {isBulkDeleteMode && (
+              <div
+                className="dg-draft-banner no-print"
+                style={{
+                  background: "var(--color-danger-bg)",
+                  borderColor: "var(--color-danger-border)",
+                  color: "var(--color-danger-text)",
+                }}
+              >
+                <div
+                  className="dg-draft-banner-dot"
+                  style={{ background: "var(--color-danger)" }}
+                />
+                <span style={{ fontWeight: 700 }}>Bulk delete</span>
+                <span
+                  style={{
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-danger-text)",
+                    opacity: 0.82,
+                    marginLeft: 4,
+                  }}
+                >
+                  {`${bulkDeleteSelectedKeys.size} selected of ${visibleBulkDeleteTargets.length} removable visible entr${visibleBulkDeleteTargets.length === 1 ? "y" : "ies"}`}
+                </span>
+                <div className="dg-draft-banner-actions">
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-danger"
+                    onClick={handleSelectVisibleBulkDeleteEntries}
+                    disabled={visibleBulkDeleteTargets.length === 0}
+                    style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-secondary"
+                    onClick={() => setBulkDeleteSelectedKeys(new Set())}
+                    disabled={bulkDeleteSelectedKeys.size === 0}
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      padding: "5px 12px",
+                      color: "var(--color-danger-text)",
+                      borderColor: "var(--color-danger-border)",
+                    }}
+                  >
+                    Clear selection
+                  </button>
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-danger-filled"
+                    onClick={() => setShowBulkDeleteReview(true)}
+                    disabled={bulkDeleteSelectedKeys.size === 0}
+                    style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
+                  >
+                    Review removal
+                  </button>
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-ghost"
+                    onClick={handleCancelBulkDeleteMode}
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--color-danger-text)",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            {!isBulkDeleteMode && canEditShifts && hasUnpublishedChanges && (
               <DraftBanner
                 onPublish={() => setShowPublishConfirm(true)}
                 onCancel={openDiscardConfirm}
@@ -4849,7 +5622,7 @@ function SchedulerContent() {
                 canPublish={canPublishSchedule}
               />
             )}
-            {publishHistory.length > 0 &&
+            {!isBulkDeleteMode && publishHistory.length > 0 &&
               (() => {
                 const latest = publishHistory[0];
                 const totalChanges = publishHistory.reduce(
@@ -4995,7 +5768,7 @@ function SchedulerContent() {
                 isImportingPrevious={isImportingPrevious}
                 onPrintOpen={() => setShowPrintOptions(true)}
                 onExportCSV={
-                  dates.length > 0
+                  dates.length > 0 && filteredEmployees.length > 0
                     ? () =>
                         exportScheduleCSV(filteredEmployees, dates, shiftForKey)
                     : undefined
@@ -5017,7 +5790,16 @@ function SchedulerContent() {
                 onCoverageToggle={() => setShowCoveragePanel((prev) => !prev)}
                 hideTwoWeek={shouldAutoUseOneWeek}
                 onPublishHistory={() => setShowPublishHistory(true)}
+                onBulkDeleteToggle={
+                  canEditShifts && !isMobile && spanWeeks !== "month"
+                    ? handleToggleBulkDeleteMode
+                    : undefined
+                }
+                isBulkDeleteMode={isBulkDeleteMode}
                 hasData={employees.length > 0}
+                hasVisibleGridRows={dates.length > 0 && filteredEmployees.length > 0}
+                hasVisibleScheduleEntries={hasVisibleScheduleEntries}
+                hasRemovableVisibleEntries={visibleBulkDeleteTargets.length > 0}
               />
             </div>
           </div>
@@ -5184,6 +5966,28 @@ function SchedulerContent() {
               />
             )}
 
+            {showBulkDeleteReview && (
+              <ConfirmDialog
+                title="Review Bulk Removal"
+                message={
+                  <BulkDeleteReviewContent
+                    targets={bulkDeleteSelectedTargets}
+                  />
+                }
+                confirmLabel="Remove selected entries"
+                cancelLabel="Back"
+                variant="danger"
+                maxWidth={620}
+                wrapActions
+                isLoading={isBulkDeleting}
+                confirmDisabled={bulkDeleteSelectedTargets.length === 0}
+                onConfirm={() => {
+                  void handleConfirmBulkDelete();
+                }}
+                onCancel={() => setShowBulkDeleteReview(false)}
+              />
+            )}
+
             {/* Confirm dialog for claiming / volunteering for an open shift */}
             {coverageGapSelection && currentEmpId && (
               <Modal
@@ -5270,16 +6074,18 @@ function SchedulerContent() {
                           customEndTime: selectedRange?.end ?? null,
                         });
                         if (!volunteerInput) {
-                          toast.error("That assignment is no longer available.");
+                          toast.error("That open shift is no longer available.");
                           return;
                         }
                         setCoverageGapSelection(null);
-                        shiftRequests.volunteer(
-                          currentEmpId,
-                          coverageGapSelection.openShift.date,
-                          volunteerInput,
-                          coverageGapSelection.openShift.focusAreaId,
-                        );
+                        setPendingCoverageGapVolunteer({
+                          assignmentLabel:
+                            selectedAssignmentDefinition.label ??
+                            coverageGapSelection.openShift.assignmentLabel,
+                          date: coverageGapSelection.openShift.date,
+                          focusAreaId: coverageGapSelection.openShift.focusAreaId,
+                          input: volunteerInput,
+                        });
                       }}
                     >
                       Volunteer
@@ -5287,6 +6093,47 @@ function SchedulerContent() {
                   </div>
                 </div>
               </Modal>
+            )}
+            {pendingCoverageGapVolunteer && currentEmpId && (
+              <ConfirmDialog
+                confirmLabel="Volunteer"
+                isLoading={isCoverageGapVolunteerPending}
+                message={
+                  <>
+                    Volunteer for{" "}
+                    <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong>{" "}
+                    on <strong>{pendingCoverageGapVolunteer.date}</strong>? This will be sent to your admin for approval.
+                  </>
+                }
+                title="Volunteer for this shift?"
+                variant="info"
+                onCancel={() => {
+                  if (!isCoverageGapVolunteerPending) {
+                    setPendingCoverageGapVolunteer(null);
+                  }
+                }}
+                onConfirm={() => {
+                  if (isCoverageGapVolunteerPending) return;
+
+                  const pendingVolunteer = pendingCoverageGapVolunteer;
+                  setIsCoverageGapVolunteerPending(true);
+                  void (async () => {
+                    try {
+                      const completed = await shiftRequests.volunteer(
+                        currentEmpId,
+                        pendingVolunteer.date,
+                        pendingVolunteer.input,
+                        pendingVolunteer.focusAreaId,
+                      );
+                      if (completed) {
+                        setPendingCoverageGapVolunteer(null);
+                      }
+                    } finally {
+                      setIsCoverageGapVolunteerPending(false);
+                    }
+                  })();
+                }}
+              />
             )}
             {pendingClaimShift && currentEmpId && (
               <ConfirmDialog
@@ -5310,37 +6157,60 @@ function SchedulerContent() {
                   pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"
                 }
                 variant="info"
+                isLoading={isClaimShiftPending}
                 onConfirm={() => {
+                  if (isClaimShiftPending) return;
+
                   const os = pendingClaimShift;
-                  setPendingClaimShift(null);
-                  if (os.source === "calloff" && os.requestId) {
-                    shiftRequests.claim(os.requestId, currentEmpId);
-                  } else if (os.source === "coverage_gap") {
-                    const volunteerInput = buildOpenShiftInput({
-                      segments:
-                        os.segments?.map((segment, index) => ({
-                          shiftId: segment.shiftId ?? null,
-                          jobId: segment.jobId,
-                          position: index,
-                        })) ?? [],
-                      shiftIds: os.shiftIds,
-                      jobIds: os.jobIds,
-                      customStartTime: os.customStartTime,
-                      customEndTime: os.customEndTime,
-                    });
-                    if (!volunteerInput) {
-                      toast.error("That assignment is no longer available.");
-                      return;
+                  setIsClaimShiftPending(true);
+                  void (async () => {
+                    try {
+                      let completed = false;
+                      if (os.source === "calloff" && os.requestId) {
+                        completed = await shiftRequests.claim(
+                          os.requestId,
+                          currentEmpId,
+                        );
+                      } else if (os.source === "coverage_gap") {
+                        const volunteerInput = buildOpenShiftInput({
+                          segments:
+                            os.segments?.map((segment, index) => ({
+                              shiftId: segment.shiftId ?? null,
+                              jobId: segment.jobId,
+                              position: index,
+                              isMentored: segment.isMentored ?? false,
+                            })) ?? [],
+                          shiftIds: os.shiftIds,
+                          jobIds: os.jobIds,
+                          customStartTime: os.customStartTime,
+                          customEndTime: os.customEndTime,
+                        });
+                        if (!volunteerInput) {
+                          toast.error("That open shift is no longer available.");
+                          setPendingClaimShift(null);
+                          return;
+                        }
+                        completed = await shiftRequests.volunteer(
+                          currentEmpId,
+                          os.date,
+                          volunteerInput,
+                          os.focusAreaId,
+                        );
+                      }
+
+                      if (completed) {
+                        setPendingClaimShift(null);
+                      }
+                    } finally {
+                      setIsClaimShiftPending(false);
                     }
-                    shiftRequests.volunteer(
-                      currentEmpId,
-                      os.date,
-                      volunteerInput,
-                      os.focusAreaId,
-                    );
+                  })();
+                }}
+                onCancel={() => {
+                  if (!isClaimShiftPending) {
+                    setPendingClaimShift(null);
                   }
                 }}
-                onCancel={() => setPendingClaimShift(null)}
               />
             )}
 
@@ -5463,46 +6333,70 @@ function SchedulerContent() {
               )}
               onMakeAvailable={
                 canCreateOwnShiftRequest(editPanel.empId, editPanel.date)
-                  ? () => {
-                      shiftRequests.create(
+                  ? async (options) => {
+                      const requestId = await shiftRequests.create(
                         "pickup",
                         editPanel.empId,
                         formatDateKey(editPanel.date),
+                        options?.targetEmpId,
+                        options?.targetShiftDate,
+                        options?.absenceTypeId,
+                        options?.requesterSegmentIndex,
                       );
-                      closeEditPanel();
+                      if (requestId) {
+                        closeEditPanel();
+                      }
+                      return requestId;
                     }
                   : undefined
               }
               onCallOff={
                 canCreateOwnShiftRequest(editPanel.empId, editPanel.date)
-                  ? (absenceType) => {
-                      shiftRequests.create(
+                  ? async (absenceType, options) => {
+                      const requestId = await shiftRequests.create(
                         "calloff",
                         editPanel.empId,
                         formatDateKey(editPanel.date),
                         undefined,
                         undefined,
                         absenceType.id,
+                        options?.requesterSegmentIndex,
                       );
-                      closeEditPanel();
+                      if (requestId) {
+                        closeEditPanel();
+                      }
+                      return requestId;
                     }
                   : undefined
               }
               employees={employees}
               shiftForKey={shiftForKey}
+              shiftNameForKey={shiftNameForKey}
               isRequestableShift={isPublishedRequestableShift}
+              availableSwapDates={availableSwapDates}
+              isShiftStarted={isPublishedShiftStarted}
+              isShiftSegmentStarted={isPublishedShiftSegmentStarted}
               getShiftTimeRanges={getShiftTimeRanges}
+              getShiftFocusAreaIds={getShiftFocusAreaIds}
+              getShiftSegments={getPublishedShiftSegments}
+              getAbsenceTypeIdForKey={getAbsenceTypeIdForKey}
               onSubmitSwap={
                 canCreateOwnShiftRequest(editPanel.empId, editPanel.date)
-                  ? (targetEmpId, targetShiftDate) => {
-                      shiftRequests.create(
+                  ? async (targetEmpId, targetShiftDate, options) => {
+                      const requestId = await shiftRequests.create(
                         "swap",
                         editPanel.empId,
                         formatDateKey(editPanel.date),
                         targetEmpId,
                         targetShiftDate,
+                        undefined,
+                        options?.requesterSegmentIndex,
+                        options?.targetSegmentIndex,
                       );
-                      closeEditPanel();
+                      if (requestId) {
+                        closeEditPanel();
+                      }
+                      return requestId;
                     }
                   : undefined
               }
@@ -5515,7 +6409,9 @@ function SchedulerContent() {
           {/* ── Shift Request Board (slide-out panel) ── */}
           {showRequestBoard && (
             <ShiftRequestBoard
-              openPickups={shiftRequests.openPickups.filter((req) => {
+              openPickups={(canEditShifts
+                ? shiftRequests.openPickups
+                : shiftRequests.openPickups.filter((req) => {
                 if (!currentEmpId) return true;
                 const dateObj = new Date(req.requesterShiftDate + "T00:00:00");
                 const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
@@ -5553,27 +6449,29 @@ function SchedulerContent() {
                 }
                 if (pickupRanges.length === 0) return true;
                 return !timesOverlap(myRanges, pickupRanges);
-              })}
+              }))}
               myRequests={shiftRequests.myRequests}
               pendingApproval={shiftRequests.pendingApproval}
-              approvalQueue={
-                canApproveShiftRequests ? shiftRequests.requests : undefined
-              }
+              approvalQueue={canEditShifts ? shiftRequests.requests : undefined}
+              canViewAllRequests={canEditShifts}
               loading={shiftRequests.loading}
               currentEmpId={currentEmpId}
               canApprove={canApproveShiftRequests}
-              onClaim={(id) =>
-                currentEmpId && shiftRequests.claim(id, currentEmpId)
-              }
-              onRespond={(id, accept) =>
-                currentEmpId && shiftRequests.respond(id, currentEmpId, accept)
-              }
+              onClaim={(id) => {
+                if (!currentEmpId) return;
+                return shiftRequests.claim(id, currentEmpId);
+              }}
+              onRespond={(id, accept) => {
+                if (!currentEmpId) return;
+                return shiftRequests.respond(id, currentEmpId, accept);
+              }}
               onResolve={(id, approved, note) =>
                 shiftRequests.resolve(id, approved, note)
               }
-              onCancel={(id) =>
-                currentEmpId && shiftRequests.cancel(id, currentEmpId)
-              }
+              onCancel={(id) => {
+                if (!currentEmpId) return;
+                return shiftRequests.cancel(id, currentEmpId);
+              }}
               onClose={() => setShowRequestBoard(false)}
               absenceTypeMap={absenceTypeObjectMap}
             />
@@ -5790,7 +6688,13 @@ function SchedulerContent() {
               onSelectEntry={(entry) => {
                 // Navigate grid to the publish's date range
                 const publishStart = new Date(entry.startDate + "T00:00:00");
-                setWeekStart(publishStart);
+                setWeekStart(
+                  getScheduleStartForSpan({
+                    date: publishStart,
+                    span: spanWeeks,
+                    payPeriodStartDate,
+                  }),
+                );
                 setPublishHistory([entry]);
                 setShowPublishDiff(true);
                 setShowPublishHistory(false);

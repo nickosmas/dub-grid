@@ -17,10 +17,10 @@ import {
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type { getServiceClient } from "@/lib/supabase-service";
 
-export async function fetchAssignmentIdByPairMap(
+async function fetchAssignmentOptions(
   serviceClient: ReturnType<typeof getServiceClient>,
   orgId: string,
-): Promise<Map<string, number>> {
+) {
   const [focusAreaResult, shiftCategoryResult, jobResult] = await Promise.all([
     serviceClient
       .from("focus_areas")
@@ -49,7 +49,7 @@ export async function fetchAssignmentIdByPairMap(
     throw jobResult.error;
   }
 
-  const assignments = buildScheduleAssignmentOptions({
+  return buildScheduleAssignmentOptions({
     orgId,
     focusAreas: ((focusAreaResult.data ?? []) as DbFocusArea[]).map(
       rowToFocusArea,
@@ -60,6 +60,27 @@ export async function fetchAssignmentIdByPairMap(
     jobs: ((jobResult.data ?? []) as DbJobDefinition[]).map(rowToJobDefinition),
     includeArchived: true,
   });
+}
+
+export async function fetchAssignmentIdByPairMap(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
+): Promise<Map<string, number>> {
+  const assignments = await fetchAssignmentOptions(serviceClient, orgId);
 
   return createAssignmentDefinitionIdByPairMap(assignments);
+}
+
+export async function fetchAssignmentLabelMap(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
+): Promise<Map<number, string>> {
+  const assignments = await fetchAssignmentOptions(serviceClient, orgId);
+
+  return new Map(
+    assignments.map((assignment) => [
+      assignment.id,
+      assignment.label || assignment.name,
+    ]),
+  );
 }

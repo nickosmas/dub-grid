@@ -196,8 +196,6 @@ DECLARE
   role_supv bigint;
   role_mentor bigint;
   role_cn bigint;
-  role_actcor bigint;
-  role_scasst bigint;
 BEGIN
   SELECT id INTO dept_nursing FROM public.departments WHERE org_id = target_org AND name = 'Nursing';
   SELECT id INTO dept_visiting FROM public.departments WHERE org_id = target_org AND name = 'Visiting';
@@ -218,8 +216,6 @@ BEGIN
   SELECT id INTO role_supv FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Supv';
   SELECT id INTO role_mentor FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Mentor';
   SELECT id INTO role_cn FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Nurse';
-  SELECT id INTO role_actcor FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Act Cor';
-  SELECT id INTO role_scasst FROM public.organization_roles WHERE org_id = target_org AND abbr = 'SC/Act. Cor';
 
   DELETE FROM public.jobs WHERE org_id = target_org;
 
@@ -271,26 +267,15 @@ BEGIN
       NULL, NULL, 3, 0, 1, NULL
     ),
     (
-      target_org, 'Nurse', 'Nurse', true, 'with_shift', 'and',
-      ARRAY[fa_snw, fa_sc, fa_ns, fa_vcsn],
-      ARRAY[dept_nursing, dept_visiting],
-      ARRAY[shift_snw_d, shift_snw_e, shift_sc_d, shift_sc_e, shift_ns_n, shift_vcsn_vn],
+      target_org, 'Default shift job', 'SHIFT', false, 'with_shift', 'and',
       '{}'::bigint[],
       '{}'::bigint[],
-      '#E2E8F0', 'transparent', '#1E293B',
-      '{}'::jsonb, '{}'::jsonb,
-      NULL, NULL, NULL, NULL, 2, NULL
-    ),
-    (
-      target_org, 'Staff', 'Staff', true, 'with_shift', 'and',
-      ARRAY[fa_sc],
-      ARRAY[dept_nursing],
-      ARRAY[shift_sc_d, shift_sc_e],
-      ARRAY[role_actcor, role_scasst],
+      '{}'::bigint[],
+      '{}'::bigint[],
       '{}'::bigint[],
       '#E2E8F0', 'transparent', '#1E293B',
       '{}'::jsonb, '{}'::jsonb,
-      NULL, NULL, NULL, NULL, 3, NULL
+      NULL, NULL, NULL, NULL, -1000, 'default_shift_job'
     ),
     (
       target_org, 'Supervisor', 'S', true, 'with_shift', 'and',
@@ -427,12 +412,10 @@ DECLARE
   shift_vcsn_vn bigint;
   job_office bigint;
   job_partial bigint;
-  job_nurse bigint;
-  job_staff bigint;
+  job_default_shift bigint;
   job_supervisor bigint;
   job_mentor bigint;
-  role_actcor bigint;
-  role_scasst bigint;
+  role_mentor bigint;
   work_row RECORD;
   absence_row RECORD;
 BEGIN
@@ -448,12 +431,10 @@ BEGIN
   SELECT id INTO shift_vcsn_vn FROM public.shift_categories WHERE org_id = target_org AND focus_area_id = fa_vcsn AND name = 'Visiting Nursing';
   SELECT id INTO job_office FROM public.jobs WHERE org_id = target_org AND name = 'Office';
   SELECT id INTO job_partial FROM public.jobs WHERE org_id = target_org AND name = 'Partial';
-  SELECT id INTO job_nurse FROM public.jobs WHERE org_id = target_org AND name = 'Nurse';
-  SELECT id INTO job_staff FROM public.jobs WHERE org_id = target_org AND name = 'Staff';
+  SELECT id INTO job_default_shift FROM public.jobs WHERE org_id = target_org AND system_key = 'default_shift_job';
   SELECT id INTO job_supervisor FROM public.jobs WHERE org_id = target_org AND name = 'Supervisor';
   SELECT id INTO job_mentor FROM public.jobs WHERE org_id = target_org AND name = 'Mentor';
-  SELECT id INTO role_actcor FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Act Cor';
-  SELECT id INTO role_scasst FROM public.organization_roles WHERE org_id = target_org AND abbr = 'SC/Act. Cor';
+  SELECT id INTO role_mentor FROM public.organization_roles WHERE org_id = target_org AND abbr = 'Mentor';
 
   FOR work_row IN
     SELECT
@@ -485,17 +466,22 @@ BEGIN
           WHEN 'Ds' THEN job_supervisor
           WHEN 'Es' THEN job_supervisor
           WHEN 'Ns' THEN job_supervisor
-          WHEN '(D)' THEN job_mentor
-          WHEN 'Dcn' THEN job_nurse
-          WHEN 'Ecn' THEN job_nurse
-          ELSE CASE
-            WHEN employee.role_ids && ARRAY[role_actcor, role_scasst] THEN job_staff
-            ELSE job_nurse
+          WHEN '(D)' THEN CASE
+            WHEN employee.role_ids && ARRAY[role_mentor] THEN job_mentor
+            ELSE job_default_shift
           END
+          WHEN 'Dcn' THEN job_default_shift
+          WHEN 'Ecn' THEN job_default_shift
+          ELSE job_default_shift
         END
         FROM unnest(work_seed.code_labels) WITH ORDINALITY AS selected(code_label, ord)
         ORDER BY selected.ord
       ) AS job_ids,
+      ARRAY(
+        SELECT selected.code_label = '(D)' AND NOT (employee.role_ids && ARRAY[role_mentor])
+        FROM unnest(work_seed.code_labels) WITH ORDINALITY AS selected(code_label, ord)
+        ORDER BY selected.ord
+      ) AS is_mentored_flags,
       focus_area.id AS focus_area_id,
       work_seed.custom_start::text AS custom_start_time,
       work_seed.custom_end::text AS custom_end_time
@@ -745,7 +731,8 @@ BEGIN
       FALSE,
       work_row.focus_area_id,
       NULL,
-      NULL
+      NULL,
+      work_row.is_mentored_flags
     );
   END LOOP;
 

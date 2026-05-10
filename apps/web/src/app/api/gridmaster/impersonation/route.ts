@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { requireGridmasterSession } from "@/lib/api-auth";
+import {
+  createRequestSupabaseClient,
+  requireGridmasterSession,
+} from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
+import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 
 const historyQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -23,26 +28,6 @@ const endSchema = z.object({
   targetOrgId: z.string().uuid().nullable().optional(),
 });
 
-async function insertAuditLog(input: {
-  actorId: string;
-  actorEmail: string | null;
-  action: "impersonation.started" | "impersonation.ended";
-  resourceId: string;
-  orgId?: string | null;
-  details?: Record<string, unknown>;
-}) {
-  const service = getServiceClient();
-  await service.from("audit_log").insert({
-    org_id: input.orgId ?? null,
-    actor_id: input.actorId,
-    actor_email: input.actorEmail,
-    action: input.action,
-    resource_type: "impersonation_session",
-    resource_id: input.resourceId,
-    details: input.details ?? {},
-  });
-}
-
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireGridmasterSession(req);
@@ -59,10 +44,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid query" }, { status: 400 });
     }
 
-    const { data, error } = await getServiceClient().rpc("get_impersonation_history", {
-      p_limit: parsed.data.limit ?? 50,
-      p_offset: parsed.data.offset ?? 0,
-    });
+    const { data, error } = await createRequestSupabaseClient(req).rpc(
+      "get_impersonation_history",
+      {
+        p_limit: parsed.data.limit ?? 50,
+        p_offset: parsed.data.offset ?? 0,
+      },
+    );
     if (error) {
       throw error;
     }
@@ -95,6 +83,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) {
+    return csrfError;
+  }
+
   try {
     const auth = await requireGridmasterSession(req);
     if ("response" in auth) {
@@ -113,6 +106,7 @@ export async function POST(req: NextRequest) {
         ? (body as { action?: unknown }).action
         : undefined;
 
+    const requestClient = createRequestSupabaseClient(req);
     const service = getServiceClient();
 
     if (action === "start") {
@@ -123,7 +117,7 @@ export async function POST(req: NextRequest) {
 
       const ipAddress =
         req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-      const { data, error } = await service.rpc("start_impersonation", {
+      const { data, error } = await requestClient.rpc("start_impersonation", {
         p_target_user_id: parsed.data.targetUserId,
         p_justification: parsed.data.justification,
         p_ip_address: ipAddress,
@@ -135,16 +129,18 @@ export async function POST(req: NextRequest) {
       }
 
       const result = data as { session_id: string; expires_at: string };
-      await insertAuditLog({
-        actorId: auth.user.id,
-        actorEmail: auth.user.email ?? null,
+      await writeGridmasterAuditLog({
+        serviceClient: service,
+        actor: auth.user,
         action: "impersonation.started",
+        resourceType: "impersonation_session",
         resourceId: result.session_id,
         orgId: parsed.data.targetOrgId ?? null,
         details: {
           targetUserId: parsed.data.targetUserId,
           justification: parsed.data.justification,
         },
+        request: req,
       });
 
       return NextResponse.json({
@@ -159,7 +155,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid input" }, { status: 400 });
       }
 
-      const { error } = await service.rpc("end_impersonation", {
+      const { error } = await requestClient.rpc("end_impersonation", {
         p_session_id: parsed.data.sessionId,
         p_reason: parsed.data.reason ?? "manual",
       });
@@ -167,15 +163,17 @@ export async function POST(req: NextRequest) {
         throw error;
       }
 
-      await insertAuditLog({
-        actorId: auth.user.id,
-        actorEmail: auth.user.email ?? null,
+      await writeGridmasterAuditLog({
+        serviceClient: service,
+        actor: auth.user,
         action: "impersonation.ended",
+        resourceType: "impersonation_session",
         resourceId: parsed.data.sessionId,
         orgId: parsed.data.targetOrgId ?? null,
         details: {
           reason: parsed.data.reason ?? "manual",
         },
+        request: req,
       });
 
       return NextResponse.json({ success: true });

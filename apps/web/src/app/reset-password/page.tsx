@@ -292,7 +292,7 @@ function ResetPasswordContent() {
                   showPassword={showPassword}
                   onToggle={() => setShowPassword((v) => !v)}
                   autoComplete="new-password"
-                  ariaDescribedBy="password-strength-label"
+                  ariaDescribedBy="password-strength-label password-strength-hints"
                   disabled={loading}
                 />
                 {password.length > 0 && (

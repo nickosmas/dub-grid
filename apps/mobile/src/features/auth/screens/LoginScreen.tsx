@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { Redirect, router } from "expo-router";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Image,
   Linking,
   Platform,
   Pressable,
@@ -19,7 +22,12 @@ import {
 import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
-import { loginToWorkspace, lookupWorkspace } from "../../../shared/lib/api";
+import {
+  loginToWorkspace,
+  lookupWorkspace,
+  registerMobileSessionPresence,
+  verifyMobileTotpFactor,
+} from "../../../shared/lib/api";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import {
@@ -29,25 +37,7 @@ import {
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-
-const LOGO_CELL_OPACITY = [
-  1,
-  1,
-  1,
-  1,
-  1,
-  0.75,
-  0.75,
-  0.75,
-  1,
-  0.75,
-  0.75,
-  0.3,
-  1,
-  0.75,
-  0.3,
-  0.3,
-] as const;
+import { mobileText } from "../../../shared/theme/tokens";
 
 function getWorkspaceSuffixLabel(apiBaseUrl: string) {
   try {
@@ -66,32 +56,37 @@ function getWorkspaceSuffixLabel(apiBaseUrl: string) {
   return ".workspace";
 }
 
-function getBackendHostLabel(apiBaseUrl: string) {
-  try {
-    return new URL(apiBaseUrl).host;
-  } catch {
-    return apiBaseUrl;
-  }
-}
+type PendingMfaLogin = MobileAuthLoginResponse & {
+  mfaRequired: true;
+  mfa: NonNullable<MobileAuthLoginResponse["mfa"]>;
+};
 
 export default function LoginScreen() {
   const { accessToken, isLoading } = useSessionState();
   const insets = useSafeAreaInsets();
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
+  const mfaInputRef = useRef<TextInput>(null);
   const [workspaceSlug, setWorkspaceSlug] = useState("");
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
-  const [stage, setStage] = useState<"workspace" | "credentials">("workspace");
+  const [stage, setStage] =
+    useState<"workspace" | "credentials" | "mfa">("workspace");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [pendingMfaLogin, setPendingMfaLogin] =
+    useState<PendingMfaLogin | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWorkspaceHelp, setShowWorkspaceHelp] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState<
+    "workspace" | "email" | "password" | null
+  >(null);
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const workspaceSuffix = getWorkspaceSuffixLabel(apiBaseUrl);
-  const backendHost = getBackendHostLabel(apiBaseUrl);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +115,30 @@ export default function LoginScreen() {
 
   if (accessToken) {
     return <Redirect href="/(tabs)/me" />;
+  }
+
+  async function finishLogin(
+    response: MobileAuthLoginResponse,
+    session = response.session,
+  ) {
+    await saveLastWorkspaceSlug(response.workspace.slug);
+
+    const { error: sessionError } = await getSupabaseClient().auth.setSession({
+      access_token: session.accessToken,
+      refresh_token: session.refreshToken,
+    });
+
+    if (sessionError) {
+      const nextError = getInlineErrorMessageOrToast(pushToast, {
+        error: sessionError,
+        fallbackMessage: "We couldn't finish signing you in right now.",
+      });
+      setError(nextError);
+      return;
+    }
+
+    registerMobileSessionPresence(session.accessToken).catch(() => {});
+    router.replace("/(tabs)/me");
   }
 
   async function handleWorkspaceContinue() {
@@ -151,6 +170,7 @@ export default function LoginScreen() {
         error: workspaceError,
         fallbackMessage:
           "We couldn't verify that workspace. Check the subdomain and try again.",
+        preferInlineNetworkError: true,
       });
       setError(nextError);
     } finally {
@@ -172,29 +192,54 @@ export default function LoginScreen() {
         password,
       });
 
-      await saveLastWorkspaceSlug(response.workspace.slug);
-
-      const { error: sessionError } = await getSupabaseClient().auth.setSession({
-        access_token: response.session.accessToken,
-        refresh_token: response.session.refreshToken,
-      });
-
-      if (sessionError) {
-        const nextError = getInlineErrorMessageOrToast(pushToast, {
-          error: sessionError,
-          fallbackMessage: "We couldn't finish signing you in right now.",
-        });
-        setError(nextError);
+      if (response.mfaRequired && response.mfa) {
+        setPendingMfaLogin(response as PendingMfaLogin);
+        setMfaCode("");
+        setPassword("");
+        setStage("mfa");
+        setTimeout(() => {
+          mfaInputRef.current?.focus();
+        }, 0);
         return;
       }
 
-      router.replace("/(tabs)/me");
+      await finishLogin(response);
     } catch (loginError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: loginError,
         fallbackMessage: "We couldn't sign you in right now. Try again in a moment.",
       });
       setError(nextError);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleMfaVerify() {
+    if (submitting || !pendingMfaLogin || mfaCode.length !== 6) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const verifiedSession = await verifyMobileTotpFactor({
+        session: pendingMfaLogin.session,
+        factorId: pendingMfaLogin.mfa.factorId,
+        code: mfaCode,
+      });
+
+      await finishLogin(pendingMfaLogin, verifiedSession);
+    } catch (mfaError) {
+      const nextError = getInlineErrorMessageOrToast(pushToast, {
+        error: mfaError,
+        fallbackMessage: "We couldn't verify that code right now. Try again in a moment.",
+      });
+      setError(nextError);
+      setMfaCode("");
+      setTimeout(() => {
+        mfaInputRef.current?.focus();
+      }, 0);
     } finally {
       setSubmitting(false);
     }
@@ -213,18 +258,17 @@ export default function LoginScreen() {
               paddingBottom: getScreenBottomPadding("stack", insets.bottom),
             },
           ]}
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.logoBlock}>
             <View style={styles.logoRow}>
-              <View style={styles.logoMark}>
-                {LOGO_CELL_OPACITY.map((opacity, index) => (
-                  <View
-                    key={`logo-cell-${index}`}
-                    style={[styles.logoCell, { opacity }]}
-                  />
-                ))}
-              </View>
+              <Image
+                accessibilityIgnoresInvertColors
+                accessibilityLabel="DubGrid logo"
+                source={require("../../../../assets/images/logo-blue.png")}
+                style={styles.logoMark}
+              />
               <Text style={styles.wordmark}>DubGrid</Text>
             </View>
             <Text style={styles.logoCaption}>Mobile sign in</Text>
@@ -240,8 +284,16 @@ export default function LoginScreen() {
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Workspace</Text>
-                  <View style={styles.workspaceInputRow}>
+                  <View
+                    style={[
+                      styles.workspaceInputRow,
+                      focusedField === "workspace" &&
+                        styles.workspaceInputRowFocused,
+                      error && stage === "workspace" && styles.inputError,
+                    ]}
+                  >
                     <TextInput
+                      accessibilityLabel="Workspace"
                       autoCapitalize="none"
                       autoCorrect={false}
                       placeholder="yourorg"
@@ -249,6 +301,7 @@ export default function LoginScreen() {
                       returnKeyType="go"
                       style={[styles.input, styles.workspaceInput]}
                       value={workspaceSlug}
+                      onBlur={() => setFocusedField(null)}
                       onChangeText={(value) => {
                         setWorkspaceSlug(
                           value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
@@ -258,6 +311,7 @@ export default function LoginScreen() {
                       onSubmitEditing={() => {
                         void handleWorkspaceContinue();
                       }}
+                      onFocus={() => setFocusedField("workspace")}
                     />
                     <View style={styles.workspaceSuffix}>
                       <Text style={styles.workspaceSuffixText}>
@@ -276,6 +330,15 @@ export default function LoginScreen() {
                 ) : null}
 
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    disabled: workspaceLoading || !workspaceSlug.trim(),
+                  }}
+                  android_ripple={
+                    workspaceLoading || !workspaceSlug.trim()
+                      ? undefined
+                      : { color: "rgba(255, 255, 255, 0.22)" }
+                  }
                   disabled={workspaceLoading || !workspaceSlug.trim()}
                   style={[
                     styles.button,
@@ -294,6 +357,9 @@ export default function LoginScreen() {
                 </Pressable>
 
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showWorkspaceHelp }}
+                  android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
                   style={styles.linkButton}
                   onPress={() => {
                     setShowWorkspaceHelp((current) => !current);
@@ -314,7 +380,7 @@ export default function LoginScreen() {
                   </View>
                 ) : null}
               </>
-            ) : (
+            ) : stage === "credentials" ? (
               <>
                 <Text style={styles.panelTitle}>Sign in to your workspace</Text>
                 <Text style={styles.panelBody}>
@@ -335,6 +401,7 @@ export default function LoginScreen() {
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Email</Text>
                   <TextInput
+                    accessibilityLabel="Email"
                     ref={emailInputRef}
                     autoCapitalize="none"
                     autoComplete="email"
@@ -344,33 +411,67 @@ export default function LoginScreen() {
                     placeholder="Email"
                     placeholderTextColor="#8b95a3"
                     returnKeyType="next"
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      focusedField === "email" && styles.inputFocused,
+                      error && stage === "credentials" && styles.inputError,
+                    ]}
                     textContentType="emailAddress"
                     value={email}
+                    onBlur={() => setFocusedField(null)}
                     onChangeText={setEmail}
+                    onFocus={() => setFocusedField("email")}
                     onSubmitEditing={() => passwordInputRef.current?.focus()}
                   />
                 </View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.fieldLabel}>Password</Text>
-                  <TextInput
-                    ref={passwordInputRef}
-                    autoCapitalize="none"
-                    autoComplete="password"
-                    autoCorrect={false}
-                    placeholder="Password"
-                    placeholderTextColor="#8b95a3"
-                    returnKeyType="done"
-                    secureTextEntry
-                    style={styles.input}
-                    textContentType="password"
-                    value={password}
-                    onChangeText={setPassword}
-                    onSubmitEditing={() => {
-                      void handleLogin();
-                    }}
-                  />
+                  <View
+                    style={[
+                      styles.passwordInputRow,
+                      focusedField === "password" && styles.inputFocused,
+                      error && stage === "credentials" && styles.inputError,
+                    ]}
+                  >
+                    <TextInput
+                      accessibilityLabel="Password"
+                      ref={passwordInputRef}
+                      autoCapitalize="none"
+                      autoComplete="password"
+                      autoCorrect={false}
+                      placeholder="Password"
+                      placeholderTextColor="#8b95a3"
+                      returnKeyType="done"
+                      secureTextEntry={!showPassword}
+                      style={[styles.input, styles.passwordInput]}
+                      textContentType="password"
+                      value={password}
+                      onBlur={() => setFocusedField(null)}
+                      onChangeText={setPassword}
+                      onFocus={() => setFocusedField("password")}
+                      onSubmitEditing={() => {
+                        void handleLogin();
+                      }}
+                    />
+                    <Pressable
+                      accessibilityLabel={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      style={styles.passwordVisibilityButton}
+                      onPress={() => {
+                        setShowPassword((current) => !current);
+                      }}
+                    >
+                      <Ionicons
+                        color="#6b7280"
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={22}
+                      />
+                    </Pressable>
+                  </View>
                 </View>
 
                 {error ? (
@@ -382,6 +483,13 @@ export default function LoginScreen() {
                 ) : null}
 
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: submitting || !email || !password }}
+                  android_ripple={
+                    submitting || !email || !password
+                      ? undefined
+                      : { color: "rgba(255, 255, 255, 0.22)" }
+                  }
                   disabled={submitting || !email || !password}
                   style={[
                     styles.button,
@@ -400,15 +508,21 @@ export default function LoginScreen() {
 
                 <View style={styles.secondaryActions}>
                   <Pressable
+                    accessibilityRole="button"
+                    android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
                     style={styles.linkButton}
                     onPress={() => {
                       setStage("workspace");
                       setError(null);
+                      setPendingMfaLogin(null);
+                      setMfaCode("");
                     }}
                   >
                     <Text style={styles.linkButtonText}>Change workspace</Text>
                   </Pressable>
                   <Pressable
+                    accessibilityRole="button"
+                    android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
                     style={styles.linkButton}
                     onPress={() => {
                       void Linking.openURL(`${apiBaseUrl}/forgot-password`);
@@ -418,10 +532,91 @@ export default function LoginScreen() {
                   </Pressable>
                 </View>
               </>
+            ) : (
+              <>
+                <Text style={styles.panelTitle}>Two-factor authentication</Text>
+                <Text style={styles.panelBody}>
+                  Enter the 6-digit code from your authenticator app.
+                </Text>
+
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.fieldLabel}>Verification code</Text>
+                  <TextInput
+                    ref={mfaInputRef}
+                    accessibilityLabel="Verification code"
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    onChangeText={(value) => {
+                      setMfaCode(value.replace(/\D/g, "").slice(0, 6));
+                      setError(null);
+                    }}
+                    placeholder="000000"
+                    placeholderTextColor="#8b95a3"
+                    returnKeyType="done"
+                    style={[styles.input, styles.codeInput]}
+                    textContentType="oneTimeCode"
+                    value={mfaCode}
+                    onSubmitEditing={() => {
+                      void handleMfaVerify();
+                    }}
+                  />
+                </View>
+
+                {error ? (
+                  <StatusBanner
+                    body={error}
+                    title="Could not verify code"
+                    tone="error"
+                  />
+                ) : null}
+
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{
+                    disabled: submitting || mfaCode.length !== 6,
+                  }}
+                  android_ripple={
+                    submitting || mfaCode.length !== 6
+                      ? undefined
+                      : { color: "rgba(255, 255, 255, 0.22)" }
+                  }
+                  disabled={submitting || mfaCode.length !== 6}
+                  style={[
+                    styles.button,
+                    (submitting || mfaCode.length !== 6) &&
+                      styles.buttonDisabled,
+                  ]}
+                  onPress={() => {
+                    void handleMfaVerify();
+                  }}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Verify and Sign In</Text>
+                  )}
+                </Pressable>
+
+                <View style={styles.secondaryActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+                    style={styles.linkButton}
+                    onPress={() => {
+                      setStage("credentials");
+                      setPendingMfaLogin(null);
+                      setMfaCode("");
+                      setError(null);
+                    }}
+                  >
+                    <Text style={styles.linkButtonText}>Back to sign in</Text>
+                  </Pressable>
+                </View>
+              </>
             )}
           </View>
-
-          <Text style={styles.backendHint}>Backend: {backendHost}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -455,27 +650,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   logoMark: {
-    width: 32,
-    height: 32,
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  logoCell: {
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-    backgroundColor: "#2563eb",
+    width: 34,
+    height: 34,
   },
   wordmark: {
+    ...mobileText.heroMetric,
     color: "#111827",
     fontSize: 30,
-    fontWeight: "800",
-    letterSpacing: -0.8,
+    lineHeight: 36,
   },
   logoCaption: {
+    ...mobileText.bodyStrong,
     color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "600",
   },
   authCard: {
     width: "100%",
@@ -495,24 +681,23 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   panelTitle: {
+    ...mobileText.heroMetric,
     color: "#111827",
     fontSize: 28,
-    fontWeight: "800",
+    lineHeight: 34,
     textAlign: "center",
   },
   panelBody: {
+    ...mobileText.body,
     color: "#6b7280",
-    fontSize: 15,
-    lineHeight: 22,
     textAlign: "center",
   },
   fieldGroup: {
     gap: 8,
   },
   fieldLabel: {
+    ...mobileText.bodyStrong,
     color: "#374151",
-    fontSize: 14,
-    fontWeight: "700",
   },
   workspaceInputRow: {
     flexDirection: "row",
@@ -520,6 +705,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#d1d5db",
     borderRadius: 12,
+    backgroundColor: "#ffffff",
+  },
+  workspaceInputRowFocused: {
+    borderColor: "#2563eb",
     backgroundColor: "#ffffff",
   },
   workspaceInput: {
@@ -535,19 +724,53 @@ const styles = StyleSheet.create({
     borderLeftColor: "#e5e7eb",
   },
   workspaceSuffixText: {
+    ...mobileText.bodyStrong,
     color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "700",
   },
   input: {
+    ...mobileText.sectionTitle,
+    fontWeight: "400",
     borderWidth: 1.5,
     borderColor: "#d1d5db",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    fontSize: 16,
     color: "#111827",
     backgroundColor: "#ffffff",
+  },
+  inputFocused: {
+    borderColor: "#2563eb",
+    backgroundColor: "#ffffff",
+  },
+  codeInput: {
+    fontSize: 24,
+    letterSpacing: 8,
+    lineHeight: 30,
+    textAlign: "center",
+  },
+  inputError: {
+    borderColor: "#b91c1c",
+  },
+  passwordInputRow: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#d1d5db",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    flexDirection: "row",
+  },
+  passwordInput: {
+    borderWidth: 0,
+    flex: 1,
+    paddingRight: 8,
+  },
+  passwordVisibilityButton: {
+    alignItems: "center",
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    marginRight: 6,
+    width: 40,
   },
   button: {
     borderRadius: 999,
@@ -560,18 +783,18 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
+    ...mobileText.sectionTitle,
     color: "#ffffff",
-    fontWeight: "700",
-    fontSize: 16,
   },
   linkButton: {
     alignItems: "center",
-    paddingVertical: 2,
+    justifyContent: "center",
+    minHeight: 44,
+    paddingVertical: 8,
   },
   linkButtonText: {
+    ...mobileText.bodyStrong,
     color: "#6b7280",
-    fontSize: 14,
-    fontWeight: "600",
     textDecorationLine: "underline",
   },
   helperCard: {
@@ -583,12 +806,11 @@ const styles = StyleSheet.create({
     borderColor: "#e5e7eb",
   },
   helperText: {
+    ...mobileText.meta,
     color: "#4b5563",
-    fontSize: 13,
-    lineHeight: 18,
   },
   helperStrong: {
-    fontWeight: "800",
+    fontWeight: "700",
     color: "#111827",
   },
   workspaceSlug: {
@@ -605,16 +827,11 @@ const styles = StyleSheet.create({
     borderColor: "#bfdbfe",
   },
   workspaceBadgeText: {
+    ...mobileText.meta,
     color: "#1d4ed8",
-    fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   secondaryActions: {
     gap: 8,
-  },
-  backendHint: {
-    color: "#9ca3af",
-    fontSize: 12,
-    fontWeight: "600",
   },
 });

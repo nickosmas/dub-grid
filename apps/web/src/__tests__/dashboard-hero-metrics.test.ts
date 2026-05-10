@@ -1,6 +1,6 @@
 /**
  * dashboard-hero-metrics.test.ts — Verify hero metrics display accurate data
- * 
+ *
  * REGRESSION TEST: Draft deletion counts must stay visible in dashboard totals.
  *
  * The dashboard should count new, modified, and deleted draft cells consistently
@@ -48,8 +48,11 @@ describe("Dashboard Hero Metrics", () => {
       },
     ];
 
-    const openGapCount = openShifts.length;
-    expect(openGapCount).toBe(2);
+    const openGapCount = openShifts.reduce(
+      (total, shift) => total + shift.needed,
+      0,
+    );
+    expect(openGapCount).toBe(3);
   });
 
   it("should count draft shifts accurately", () => {
@@ -64,11 +67,35 @@ describe("Dashboard Hero Metrics", () => {
   it("should display pending approvals when user can approve", () => {
     const shiftRequests = {
       requests: [
-        { id: "1", type: "swap" as const, status: "open" as const, requesterEmpId: "emp1", targetEmpId: "emp2", expiresAt: "2026-04-20", createdAt: "" },
-        { id: "2", type: "swap" as const, status: "open" as const, requesterEmpId: "emp2", targetEmpId: "emp1", expiresAt: "2026-04-20", createdAt: "" },
+        {
+          id: "1",
+          type: "swap" as const,
+          status: "open" as const,
+          requesterEmpId: "emp1",
+          targetEmpId: "emp2",
+          expiresAt: "2026-04-20",
+          createdAt: "",
+        },
+        {
+          id: "2",
+          type: "swap" as const,
+          status: "open" as const,
+          requesterEmpId: "emp2",
+          targetEmpId: "emp1",
+          expiresAt: "2026-04-20",
+          createdAt: "",
+        },
       ],
       pendingApproval: [
-        { id: "1", type: "swap" as const, status: "open" as const, requesterEmpId: "emp1", targetEmpId: "emp2", expiresAt: "2026-04-20", createdAt: "" },
+        {
+          id: "1",
+          type: "swap" as const,
+          status: "open" as const,
+          requesterEmpId: "emp1",
+          targetEmpId: "emp2",
+          expiresAt: "2026-04-20",
+          createdAt: "",
+        },
       ],
       openPickups: [],
       myRequests: [],
@@ -165,13 +192,16 @@ describe("Dashboard Hero Metrics", () => {
   it("should include pending approvals metric only for admins", () => {
     const permissions = { canApproveShiftRequests: true };
     const coveragePct = 92;
-    const openShifts = [{ needed: 1 }];
+    const openShifts = [{ needed: 2 }];
     const draftTotal = 2;
     const shiftRequests = { pendingApproval: { length: 1 } };
 
     const metrics = [
       { label: "Coverage", value: `${coveragePct}%` },
-      { label: "Open gaps", value: `${openShifts.length}` },
+      {
+        label: "Open gaps",
+        value: `${openShifts.reduce((total, shift) => total + shift.needed, 0)}`,
+      },
       { label: "Draft shifts", value: `${draftTotal}` },
     ];
 
@@ -189,12 +219,15 @@ describe("Dashboard Hero Metrics", () => {
   it("should not include pending approvals metric for regular users", () => {
     const permissions = { canApproveShiftRequests: false };
     const coveragePct = 92;
-    const openShifts = [{ needed: 1 }];
+    const openShifts = [{ needed: 2 }];
     const draftTotal = 2;
 
     const metrics = [
       { label: "Coverage", value: `${coveragePct}%` },
-      { label: "Open gaps", value: `${openShifts.length}` },
+      {
+        label: "Open gaps",
+        value: `${openShifts.reduce((total, shift) => total + shift.needed, 0)}`,
+      },
       { label: "Draft shifts", value: `${draftTotal}` },
     ];
 

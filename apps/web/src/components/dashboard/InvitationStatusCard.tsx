@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { fetchOrganizationInvitations } from "@/features/organization/client";
+import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import type { Invitation } from "@/types";
 
 interface InvitationStatusCardProps {
@@ -123,7 +124,7 @@ export default function InvitationStatusCard({ orgId }: InvitationStatusCardProp
                     {inv.email}
                   </div>
                   <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 1 }}>
-                    Sent {formatRelativeTime(inv.createdAt)} &middot; {inv.roleToAssign}
+                    Sent {formatRelativeTime(inv.createdAt)} &middot; {formatOrganizationRoleLabel(inv.roleToAssign)}
                   </div>
                 </div>
                 <span

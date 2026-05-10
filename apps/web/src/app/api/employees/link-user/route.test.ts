@@ -97,6 +97,12 @@ function makeRequest(body: Record<string, unknown>) {
   });
 }
 
+const activeBillingRow = {
+  suspended_at: null,
+  subscription_status: "active",
+  trial_ends_at: null,
+};
+
 describe("POST /api/employees/link-user", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,6 +124,7 @@ describe("POST /api/employees/link-user", () => {
     from
       .mockImplementationOnce(() => makeSelectBuilder({ org_role: "admin", admin_permissions: { canManageEmployees: true } }))
       .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"))
+      .mockImplementationOnce(() => makeSelectBuilder(activeBillingRow))
       .mockImplementationOnce(() => makeSelectBuilder({ id: "emp-1", user_id: null, first_name: "Alice", last_name: "Smith" }))
       .mockImplementationOnce(() => makeSelectBuilder({ user_id: "user-1" }))
       .mockImplementationOnce(() => makeSelectBuilder([], "limit"))
@@ -147,6 +154,7 @@ describe("POST /api/employees/link-user", () => {
     from
       .mockImplementationOnce(() => makeSelectBuilder({ org_role: "admin", admin_permissions: { canManageEmployees: true } }))
       .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"))
+      .mockImplementationOnce(() => makeSelectBuilder(activeBillingRow))
       .mockImplementationOnce(() => makeSelectBuilder({ id: "emp-1", user_id: null, first_name: "Alice", last_name: "Smith" }))
       .mockImplementationOnce(() => makeSelectBuilder({ user_id: "user-1" }))
       .mockImplementationOnce(() => makeSelectBuilder([], "limit"))
@@ -193,6 +201,7 @@ describe("POST /api/employees/link-user/reconcile", () => {
     from
       .mockImplementationOnce(() => makeSelectBuilder({ org_role: "admin", admin_permissions: { canManageEmployees: true } }))
       .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"))
+      .mockImplementationOnce(() => makeSelectBuilder(activeBillingRow))
       .mockImplementationOnce(() => makeSelectBuilder({ id: "emp-1", user_id: null, first_name: "Alyce", last_name: "Smyth" }))
       .mockImplementationOnce(() => makeSelectBuilder({ user_id: "user-1" }))
       .mockImplementationOnce(() => makeSelectBuilder([], "limit"))
@@ -228,7 +237,8 @@ describe("POST /api/employees/link-user/reconcile", () => {
   it("rejects callers without employee-management permission", async () => {
     from
       .mockImplementationOnce(() => makeSelectBuilder({ org_role: "user", admin_permissions: null }))
-      .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"));
+      .mockImplementationOnce(() => makeSelectBuilder({ platform_role: "none" }, "single"))
+      .mockImplementationOnce(() => makeSelectBuilder(activeBillingRow));
 
     const response = await reconcileLinkUser(makeRequest({
       employeeId: "11111111-1111-4111-8111-111111111111",

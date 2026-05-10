@@ -2,14 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
 const fetchMobileAbsenceTypes = vi.fn();
+const fetchMobileCertifications = vi.fn();
+const fetchMobileDepartments = vi.fn();
 const fetchMobileFocusAreas = vi.fn();
+const fetchMobileRoles = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileUnreadNotificationCount = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   fetchMobileAbsenceTypes,
+  fetchMobileCertifications,
+  fetchMobileDepartments,
   fetchMobileFocusAreas,
+  fetchMobileRoles,
   requireMobileAuth,
   fetchLinkedEmployeeForUser,
   fetchMobileUnreadNotificationCount,
@@ -97,12 +103,38 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         id: 1,
         label: "Sick",
         name: "Sick leave",
+        color: "#FEE2E2",
+        borderColor: "#FCA5A5",
+        textColor: "#991B1B",
       },
     ]);
     fetchMobileFocusAreas.mockResolvedValue([
       {
         id: 2,
         name: "ICU",
+        departmentId: 5,
+      },
+    ]);
+    fetchMobileRoles.mockResolvedValue([
+      {
+        id: 3,
+        name: "Charge Nurse",
+        abbr: "CN",
+      },
+    ]);
+    fetchMobileCertifications.mockResolvedValue([
+      {
+        id: 4,
+        name: "Registered Nurse",
+        abbr: "RN",
+      },
+    ]);
+    fetchMobileDepartments.mockResolvedValue([
+      {
+        id: 5,
+        name: "Nursing",
+        abbr: "NUR",
+        type: "scheduled",
       },
     ]);
     fetchMobileUnreadNotificationCount.mockResolvedValue(4);
@@ -154,12 +186,38 @@ describe("GET /api/mobile/v1/bootstrap", () => {
           id: 1,
           label: "Sick",
           name: "Sick leave",
+          color: "#FEE2E2",
+          borderColor: "#FCA5A5",
+          textColor: "#991B1B",
         },
       ],
       focusAreas: [
         {
           id: 2,
           name: "ICU",
+          departmentId: 5,
+        },
+      ],
+      roles: [
+        {
+          id: 3,
+          name: "Charge Nurse",
+          abbr: "CN",
+        },
+      ],
+      certifications: [
+        {
+          id: 4,
+          name: "Registered Nurse",
+          abbr: "RN",
+        },
+      ],
+      departments: [
+        {
+          id: 5,
+          name: "Nursing",
+          abbr: "NUR",
+          type: "scheduled",
         },
       ],
     });
