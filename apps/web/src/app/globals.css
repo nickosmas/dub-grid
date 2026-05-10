@@ -1588,6 +1588,47 @@ textarea {
   background: var(--color-bg-secondary) !important;
 }
 
+.dg-grid-cell[data-bulk-mode="true"] {
+  cursor: default;
+}
+
+.dg-grid-cell[data-bulk-mode="true"][data-bulk-selectable="true"] {
+  cursor: pointer;
+}
+
+.dg-grid-cell[data-bulk-mode="true"][data-bulk-selected="true"] {
+  background: var(--color-brand-bg) !important;
+}
+
+.dg-grid-cell__bulk-selection-ring {
+  position: absolute;
+  z-index: 7;
+  pointer-events: none;
+  border: 2px solid var(--color-danger);
+  box-shadow: 0 0 0 1px var(--color-surface);
+}
+
+.dg-grid-cell__bulk-selected-indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--color-danger);
+  color: var(--color-surface);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.22);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .dg-grid-cell:focus-visible .dg-grid-cell__chrome::after {
   content: "";
   position: absolute;
@@ -1953,11 +1994,26 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   4. Spinner:      .dg-spinner                         — rotating icon for inline/blocking states
 */
 
-.dg-skeleton {
-  background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-border-light) 50%, var(--color-bg-secondary) 75%);
-  background-size: 200% 100%;
-  animation: dg-shimmer 1.5s ease-in-out infinite;
+:where(.dg-skeleton) {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
   border-radius: var(--dg-radius-sm);
+}
+
+:where(.dg-skeleton)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.62),
+    transparent
+  );
+  animation: dg-shimmer 1.5s linear infinite;
 }
 
 .dg-skeleton--text    { height: 14px; width: 60%; }
@@ -1966,8 +2022,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .dg-skeleton--card    { height: 120px; border-radius: var(--dg-radius-md); }
 
 @keyframes dg-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  100% { transform: translateX(100%); }
 }
 
 /* ── Modal / Panel Exit Animations ─────────────────────── */

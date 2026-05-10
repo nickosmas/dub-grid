@@ -1,5 +1,6 @@
 import {
   useState,
+  type ComponentProps,
   type PropsWithChildren,
   type ReactNode,
   type RefObject,
@@ -8,14 +9,18 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Platform,
   Text,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   mobileColors,
   mobileRadii,
   mobileSpacing,
+  mobileText,
 } from "../theme/tokens";
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
@@ -25,31 +30,43 @@ import {
 
 export type ScreenScrollHandle = ScrollView;
 export type { ScreenBottomPaddingMode } from "./screen-layout";
+type ScreenScrollViewProps = ComponentProps<typeof ScrollView>;
 
 export function Screen({
   title: _title,
   subtitle: _subtitle,
   stickyHeader,
+  stickyHeaderShellStyle,
+  stickyHeaderTopPadding,
   renderOverlay,
   scrollViewRef,
   children,
   refreshing = false,
   onRefresh,
+  onScroll,
+  scrollEventThrottle,
   bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
 }: PropsWithChildren<{
   title?: string;
   subtitle?: string;
   stickyHeader?: ReactNode;
+  stickyHeaderShellStyle?: StyleProp<ViewStyle>;
+  stickyHeaderTopPadding?: number;
   renderOverlay?: (options: { stickyHeaderHeight: number }) => ReactNode;
   scrollViewRef?: RefObject<ScreenScrollHandle | null>;
   refreshing?: boolean;
   onRefresh?: () => void;
+  onScroll?: ScreenScrollViewProps["onScroll"];
+  scrollEventThrottle?: number;
   bottomPaddingMode?: ScreenBottomPaddingMode;
 }>) {
   const insets = useSafeAreaInsets();
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
+  const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay;
+  const resolvedStickyHeaderTopPadding =
+    stickyHeaderTopPadding ?? Math.max(insets.top, 8);
   const scrollView = (
     <ScrollView
       ref={scrollViewRef}
@@ -62,7 +79,9 @@ export function Screen({
       contentInsetAdjustmentBehavior={
         useNativeContentInsets ? "automatic" : "never"
       }
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
+      onScroll={onScroll}
       refreshControl={
         onRefresh ? (
           <RefreshControl
@@ -72,6 +91,7 @@ export function Screen({
           />
         ) : undefined
       }
+      scrollEventThrottle={scrollEventThrottle}
       style={styles.scrollView}
     >
       <View
@@ -84,8 +104,13 @@ export function Screen({
       </View>
     </ScrollView>
   );
+  const overlayLayer = (
+    <View pointerEvents="box-none" style={styles.overlayLayer}>
+      {overlay}
+    </View>
+  );
 
-  if (!stickyHeader && !overlay) {
+  if (shouldExposeNativeScrollRoot) {
     return scrollView;
   }
 
@@ -95,7 +120,8 @@ export function Screen({
         <View
           style={[
             styles.stickyHeaderShell,
-            { paddingTop: Math.max(insets.top, 8) },
+            stickyHeaderShellStyle,
+            { paddingTop: resolvedStickyHeaderTopPadding },
           ]}
           onLayout={(event) => {
             const nextHeight = event.nativeEvent.layout.height;
@@ -109,7 +135,7 @@ export function Screen({
         </View>
       ) : null}
       {scrollView}
-      {overlay ? <View style={styles.overlayLayer}>{overlay}</View> : null}
+      {overlay == null ? null : overlayLayer}
     </View>
   );
 }
@@ -209,13 +235,11 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: "700",
+    ...mobileText.sectionTitle,
     color: mobileColors.textPrimary,
   },
   cardBody: {
-    fontSize: 14,
+    ...mobileText.body,
     color: mobileColors.textMuted,
-    lineHeight: 21,
   },
 });

@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const useSessionState = vi.fn();
@@ -6,6 +6,7 @@ const useBootstrap = vi.fn();
 const usePushRegistration = vi.fn();
 const triggerIconMock = vi.fn();
 const stackScreenMock = vi.fn();
+const handleExpiredMobileSession = vi.fn();
 
 vi.mock("react-native", async () => {
   const React = await import("react");
@@ -82,6 +83,38 @@ vi.mock("../shared/components/LoadingScreen", async () => {
   };
 });
 
+vi.mock("../features/auth/screens/WorkspaceLockedScreen", async () => {
+  const React = await import("react");
+
+  return {
+    WorkspaceLockedScreen: ({
+      message,
+      onRetry,
+      onSignOut,
+    }: {
+      message: string;
+      onRetry: () => void;
+      onSignOut: () => void;
+    }) =>
+      React.createElement(
+        "section",
+        {},
+        React.createElement("h1", {}, "Workspace unavailable"),
+        React.createElement("p", {}, message),
+        React.createElement(
+          "button",
+          { type: "button", onClick: onRetry },
+          "Try again",
+        ),
+        React.createElement(
+          "button",
+          { type: "button", onClick: onSignOut },
+          "Sign out",
+        ),
+      ),
+  };
+});
+
 vi.mock("../shared/navigation/AlertsHeaderButton", async () => {
   const React = await import("react");
 
@@ -96,6 +129,10 @@ vi.mock("../features/auth/hooks/useBootstrap", () => ({
 
 vi.mock("../features/notifications/hooks/usePushRegistration", () => ({
   usePushRegistration,
+}));
+
+vi.mock("../shared/lib/auth-reset", () => ({
+  handleExpiredMobileSession,
 }));
 
 vi.mock("../shared/providers/AuthSessionProvider", () => ({
@@ -118,6 +155,7 @@ describe("TabsLayout", () => {
   beforeEach(() => {
     triggerIconMock.mockReset();
     stackScreenMock.mockReset();
+    handleExpiredMobileSession.mockReset();
     usePushRegistration.mockReset();
     useSessionState.mockReturnValue({
       accessToken: "token-123",
@@ -128,10 +166,14 @@ describe("TabsLayout", () => {
         currentOrg: { id: "org-123" },
         effectiveRole: "admin",
         permissions: {
+          canViewSchedule: true,
+          canEditShifts: false,
           canApproveShiftRequests: true,
           canManageEmployees: true,
         },
       },
+      error: null,
+      isFetching: false,
       refetch: vi.fn(),
     });
   });
@@ -159,10 +201,10 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(3);
+    expect(stackScreenMock).toHaveBeenCalledTimes(7);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
-    const profileOptions = stackScreenMock.mock.calls[2]?.[0].options;
+    const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
 
     expect(stackScreenMock.mock.calls[0]?.[0]).toMatchObject({
       name: "index",
@@ -184,16 +226,114 @@ describe("TabsLayout", () => {
       },
     });
     expect(peopleOptions).not.toHaveProperty("headerLargeStyle");
+    const peopleDetailOptions = stackScreenMock.mock.calls[2]?.[0].options;
     expect(stackScreenMock.mock.calls[2]?.[0]).toMatchObject({
+      name: "[id]",
+      options: {
+        headerLargeTitle: false,
+        headerLargeTitleEnabled: false,
+        headerStyle: {
+          backgroundColor: expect.any(String),
+        },
+        title: "Person",
+      },
+    });
+    expect(peopleDetailOptions).not.toHaveProperty("headerLargeStyle");
+    expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
         headerStyle: undefined,
-        headerRight: expect.any(Function),
         title: "Profile",
       },
     });
     expect(profileOptions).not.toHaveProperty("headerLargeStyle");
+    expect(profileOptions).not.toHaveProperty("headerRight");
+    expect(stackScreenMock.mock.calls.slice(4).map((call) => call[0]?.name)).toEqual([
+      "account",
+      "work",
+      "security",
+    ]);
+  });
+
+  it("shows the Schedule tab for regular users with schedule view access", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { id: "org-123" },
+        effectiveRole: "user",
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: false,
+          canApproveShiftRequests: false,
+          canManageEmployees: false,
+        },
+      },
+      refetch: vi.fn(),
+    });
+
+    const { getByText } = render(<TabsLayout />);
+
+    expect(getByText("Schedule")).toBeInTheDocument();
+  });
+
+  it("shows the Schedule tab for schedule editors even without approval permission", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { id: "org-123" },
+        effectiveRole: "user",
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canApproveShiftRequests: false,
+          canManageEmployees: false,
+        },
+      },
+      error: null,
+      isFetching: false,
+      refetch: vi.fn(),
+    });
+
+    const { getByText } = render(<TabsLayout />);
+
+    expect(getByText("Schedule")).toBeInTheDocument();
+  });
+
+  it("shows the workspace lock instead of app tabs when bootstrap reports the workspace is unavailable", () => {
+    const refetch = vi.fn();
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { id: "org-123" },
+        effectiveRole: "super_admin",
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canApproveShiftRequests: true,
+          canManageEmployees: true,
+        },
+      },
+      error: new Error(
+        "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      ),
+      isFetching: false,
+      refetch,
+    });
+
+    render(<TabsLayout />);
+
+    expect(screen.getByText("Workspace unavailable")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Schedule")).not.toBeInTheDocument();
+    expect(usePushRegistration).toHaveBeenLastCalledWith("token-123", null);
+
+    fireEvent.click(screen.getByText("Try again"));
+    expect(refetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByText("Sign out"));
+    expect(handleExpiredMobileSession).toHaveBeenCalledTimes(1);
   });
 });

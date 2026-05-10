@@ -23,6 +23,7 @@ import {
 import type { NamedItem, FocusArea, JobDefinition, ShiftCategory, Department, AbsenceType, IndicatorType } from "@/types";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface ArchivedGroup {
   label: string;
@@ -93,7 +94,7 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
       toast.success(`Restored "${itemName}"`);
       await load();
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to restore");
+      toast.error(formatClientErrorMessage(err, "We couldn't restore that item."));
     } finally {
       setRestoring(null);
     }

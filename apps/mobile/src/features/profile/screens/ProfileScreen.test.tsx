@@ -1,7 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  createQueryStateCardModule,
   createReactNativeModule,
   createScreenModule,
 } from "../../../test/native";
@@ -18,37 +17,41 @@ vi.mock("../../../shared/components/Screen", async () =>
   createScreenModule(await import("react")),
 );
 
-vi.mock("../../../shared/components/QueryStateCard", async () =>
-  createQueryStateCardModule(await import("react")),
-);
-
+const routerPush = vi.fn();
+const useQuery = vi.fn();
 const useAccessToken = vi.fn();
-const useBootstrap = vi.fn();
 const getSupabaseClient = vi.fn();
-const usePushRegistration = vi.fn();
 const registerPushToken = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const pushToast = vi.fn();
-const useNetworkStatus = vi.fn();
+
+vi.mock("expo-router", () => ({
+  router: {
+    push: routerPush,
+  },
+}));
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+
+  return {
+    ...actual,
+    useQuery,
+  };
+});
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
-}));
-
-vi.mock("../../auth/hooks/useBootstrap", () => ({
-  useBootstrap,
 }));
 
 vi.mock("../../../shared/lib/supabase", () => ({
   getSupabaseClient,
 }));
 
-vi.mock("../../notifications/hooks/usePushRegistration", () => ({
-  usePushRegistration,
-}));
-
 vi.mock("../../../shared/lib/api", () => ({
+  getBootstrap: vi.fn(),
+  getProfile: vi.fn(),
   registerPushToken,
 }));
 
@@ -63,7 +66,6 @@ vi.mock("../../../shared/lib/session", () => ({
 
 vi.mock("../../../shared/lib/query-client", () => ({
   queryClient: {
-    clear: vi.fn(),
     invalidateQueries: vi.fn(),
   },
 }));
@@ -74,9 +76,110 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   }),
 }));
 
-vi.mock("../../../shared/providers/NetworkStateProvider", () => ({
-  useNetworkStatus,
-}));
+const profileData = {
+  user: {
+    id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+    firstName: "Mina",
+    lastName: "Diaz",
+    email: "mina@dubgrid.com",
+    createdAt: "2024-01-01T00:00:00.000Z",
+    lastSignInAt: "2024-01-02T00:00:00.000Z",
+    mfaEnabled: false,
+  },
+  currentOrg: {
+    id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+    name: "DubGrid Health",
+    slug: "dubgrid-health",
+    timezone: "America/Los_Angeles",
+    shiftDisplayMode: "code",
+    labels: {
+      focusArea: "Focus Area",
+      certification: "Certification",
+      role: "Role",
+      department: "Department",
+    },
+    featureFlags: {},
+  },
+  currentMembership: {
+    id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+    name: "DubGrid Health",
+    slug: "dubgrid-health",
+    orgRole: "admin",
+    platformRole: "none",
+    isCurrent: true,
+  },
+  effectiveRole: "admin",
+  linkedEmployee: {
+    id: "d660d308-4e0d-4daf-84fd-6753405e6740",
+    firstName: "Mina",
+    lastName: "Diaz",
+    phone: "(415) 425-3334",
+    status: "active",
+    focusAreaIds: [2],
+  },
+  focusAreas: [
+    {
+      id: 2,
+      name: "ICU",
+    },
+  ],
+  pendingProfileChangeRequest: false,
+  pendingAccountDeletionRequest: false,
+};
+
+const bootstrapData = {
+  ...profileData,
+  memberships: [
+    {
+      id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+      name: "DubGrid Health",
+      slug: "dubgrid-health",
+      orgRole: "admin",
+      platformRole: "none",
+      isCurrent: true,
+    },
+    {
+      id: "95d4c7f2-6b2e-4818-b47b-7d8f99879174",
+      name: "Hidden Clinic",
+      slug: "hidden-clinic",
+      orgRole: "user",
+      platformRole: "none",
+      isCurrent: false,
+    },
+  ],
+  permissions: {
+    canViewSchedule: true,
+    canEditShifts: false,
+    canPublishSchedule: false,
+    canApplyRecurringSchedule: false,
+    canEditNotes: false,
+    canViewRecurringShifts: false,
+    canManageRecurringShifts: false,
+    canManageShiftSeries: false,
+    canViewStaff: true,
+    canViewEmployeeDetails: false,
+    canManageEmployees: false,
+    canViewFocusAreas: false,
+    canManageFocusAreas: false,
+    canViewScheduleDefinitions: false,
+    canManageScheduleDefinitions: false,
+    canViewIndicatorTypes: false,
+    canManageIndicatorTypes: false,
+    canViewOrgLabels: false,
+    canManageOrgLabels: false,
+    canViewCoverageRequirements: false,
+    canManageCoverageRequirements: false,
+    canApproveShiftRequests: true,
+    canViewDashboardAnalytics: false,
+  },
+  absenceTypes: [],
+  unreadNotificationCount: 0,
+};
+
+const singleOrgBootstrapData = {
+  ...bootstrapData,
+  memberships: [bootstrapData.memberships[0]],
+};
 
 let ProfileScreen: (typeof import("./ProfileScreen"))["default"];
 
@@ -86,287 +189,166 @@ beforeAll(async () => {
 
 describe("ProfileScreen", () => {
   beforeEach(() => {
+    useQuery.mockReset();
     useAccessToken.mockReset();
-    useBootstrap.mockReset();
     getSupabaseClient.mockReset();
-    usePushRegistration.mockReset();
     registerPushToken.mockReset();
     loadStoredPushDevice.mockReset();
     handleExpiredMobileSession.mockReset();
     pushToast.mockReset();
-    useNetworkStatus.mockReset();
+    routerPush.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
-    useNetworkStatus.mockReturnValue({
-      hasResolvedState: true,
-      isOnline: true,
-      isOffline: false,
-    });
-    getSupabaseClient.mockReturnValue({
-      auth: {},
-    } as never);
-    usePushRegistration.mockReturnValue({
-      permissionState: "granted",
-      isRegistering: false,
-      error: null,
-      isSupported: true,
-      enablePush: vi.fn(),
-      disablePush: vi.fn(),
-      refreshPushRegistration: vi.fn(),
-    });
     loadStoredPushDevice.mockResolvedValue(null);
-  });
-
-  it("shows the loading state while the bootstrap summary is pending", () => {
-    useBootstrap.mockReturnValue({
-      data: null,
-      error: null,
-      isFetching: false,
-      isLoading: true,
-      refetch: vi.fn(),
-    } as never);
-
-    render(<ProfileScreen />);
-
-    expect(screen.getByText("Loading profile")).toBeInTheDocument();
-  });
-
-  it("shows a retryable error state when bootstrap fails", () => {
-    const refetch = vi.fn();
-    useBootstrap.mockReturnValue({
-      data: null,
-      error: new Error("Invalid session"),
-      isFetching: false,
-      isLoading: false,
-      refetch,
-    } as never);
-
-    render(<ProfileScreen />);
-
-    expect(screen.getByText("Could not load profile")).toBeInTheDocument();
-    expect(screen.getByText("Force Sign Out")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Try Again"));
-    expect(refetch).toHaveBeenCalled();
-  });
-
-  it("allows force sign-out from the profile error state", async () => {
-    useBootstrap.mockReturnValue({
-      data: null,
-      error: new Error("Could not load profile"),
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
-    getSupabaseClient.mockReturnValue({
-      auth: {
-        signOut: vi.fn().mockResolvedValue({
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      const key = queryKey.join(":");
+      if (key.includes("profile")) {
+        return {
+          data: profileData,
           error: null,
-        }),
-      },
-    } as never);
-    handleExpiredMobileSession.mockResolvedValue(undefined);
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
 
-    render(<ProfileScreen />);
-
-    fireEvent.click(screen.getByText("Force Sign Out"));
-
-    await waitFor(() => {
-      expect(handleExpiredMobileSession).toHaveBeenCalledWith({
-        skipSignOut: true,
-      });
+      return {
+        data: bootstrapData,
+        error: null,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
     });
   });
 
-  it("shows the empty state when no bootstrap summary is available", () => {
-    useBootstrap.mockReturnValue({
-      data: null,
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
-
+  it("shows organization-scoped data on the profile hub", () => {
     render(<ProfileScreen />);
 
-    expect(screen.getByText("Profile unavailable")).toBeInTheDocument();
+    expect(screen.getAllByText("Mina Diaz").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("DubGrid Health").length).toBeGreaterThan(0);
+    expect(screen.getByText("(415) 425-3334")).toBeInTheDocument();
+    expect(screen.getByText("ICU")).toBeInTheDocument();
+    expect(screen.getByText("Staff status")).toBeInTheDocument();
+    expect(screen.queryByText("Hidden Clinic")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch organization" })).toBeInTheDocument();
+    expect(screen.queryByText("Current organization only")).not.toBeInTheDocument();
   });
 
-  it("surfaces sign-out errors without losing the profile summary", async () => {
-    useBootstrap.mockReturnValue({
-      data: {
-        user: {
-          firstName: "Mina",
-          lastName: "Diaz",
-          email: "mina@dubgrid.com",
-        },
-        currentOrg: {
-          name: "DubGrid Health",
-          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-          slug: "dubgrid-health",
-        },
-        effectiveRole: "admin",
-        memberships: [
-          {
-            id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-            name: "DubGrid Health",
-            slug: "dubgrid-health",
-            orgRole: "admin",
-            platformRole: "none",
-            isCurrent: true,
-          },
-        ],
-        unreadNotificationCount: 0,
-        absenceTypes: [],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
-    getSupabaseClient.mockReturnValue({
-      auth: {
-        signOut: vi.fn().mockResolvedValue({
-          error: {
-            message: "Remote sign-out failed",
-          },
-        }),
-      },
-    } as never);
+  it("hides organization switching when the user belongs to one organization", () => {
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      const key = queryKey.join(":");
+      if (key.includes("profile")) {
+        return {
+          data: profileData,
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: singleOrgBootstrapData,
+        error: null,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
 
     render(<ProfileScreen />);
-
-    fireEvent.click(screen.getByText("Sign Out"));
 
     expect(
-      await screen.findByText(
-        "We couldn't sign you out right now. Try again in a moment.",
-      ),
+      screen.queryByRole("button", { name: "Switch organization" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows pending profile change request review state", () => {
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      const key = queryKey.join(":");
+      if (key.includes("profile")) {
+        return {
+          data: {
+            ...profileData,
+            pendingProfileChangeRequest: true,
+          },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: bootstrapData,
+        error: null,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
+
+    render(<ProfileScreen />);
+
+    expect(
+      screen.getByText("A profile change request is pending admin review."),
     ).toBeInTheDocument();
-    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
   });
 
-  it("shows push registration errors while online", async () => {
-    useBootstrap.mockReturnValue({
-      data: {
-        user: {
-          firstName: "Mina",
-          lastName: "Diaz",
-          email: "mina@dubgrid.com",
-        },
-        currentOrg: {
-          name: "DubGrid Health",
-          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-          slug: "dubgrid-health",
-        },
-        effectiveRole: "admin",
-        memberships: [],
-        unreadNotificationCount: 0,
-        absenceTypes: [],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
-    usePushRegistration.mockReturnValue({
-      permissionState: "granted",
-      isRegistering: false,
-      error: new Error("Push registration failed"),
-      isSupported: true,
-      enablePush: vi.fn(),
-      disablePush: vi.fn(),
-      refreshPushRegistration: vi.fn(),
+  it("shows pending account deletion request review state", () => {
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      const key = queryKey.join(":");
+      if (key.includes("profile")) {
+        return {
+          data: {
+            ...profileData,
+            pendingAccountDeletionRequest: true,
+          },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: bootstrapData,
+        error: null,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
     });
 
     render(<ProfileScreen />);
 
-    await waitFor(() => {
-      expect(pushToast).toHaveBeenCalledWith({
-        tone: "error",
-        title: "Could not update notifications",
-        message: "We couldn't update mobile notifications right now.",
-      });
-    });
+    expect(
+      screen.getByText("An account deletion request is pending admin review."),
+    ).toBeInTheDocument();
   });
 
-  it("suppresses push registration toasts while offline", async () => {
-    useNetworkStatus.mockReturnValue({
-      hasResolvedState: true,
-      isOnline: false,
-      isOffline: true,
-    });
-    useBootstrap.mockReturnValue({
-      data: {
-        user: {
-          firstName: "Mina",
-          lastName: "Diaz",
-          email: "mina@dubgrid.com",
-        },
-        currentOrg: {
-          name: "DubGrid Health",
-          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-          slug: "dubgrid-health",
-        },
-        effectiveRole: "admin",
-        memberships: [],
-        unreadNotificationCount: 0,
-        absenceTypes: [],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
-    usePushRegistration.mockReturnValue({
-      permissionState: "granted",
-      isRegistering: false,
-      error: new Error("Push registration failed"),
-      isSupported: true,
-      enablePush: vi.fn(),
-      disablePush: vi.fn(),
-      refreshPushRegistration: vi.fn(),
-    });
-
+  it("opens detail screens from tappable rows", () => {
     render(<ProfileScreen />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
-    });
-    expect(pushToast).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Account details"));
+    fireEvent.click(screen.getByText("Work profile"));
+    fireEvent.click(screen.getByText("Security & sessions"));
+
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/account");
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/work");
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/security");
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/me");
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/requests");
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/notifications");
+  });
+
+  it("opens organization switching in a modal from the bottom button", () => {
+    render(<ProfileScreen />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Switch organization" }),
+    );
+
+    expect(screen.getByText("Hidden Clinic")).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalledWith(
+      "/(tabs)/profile/switch-organization",
+    );
   });
 
   it("resets the mobile session after a successful sign-out", async () => {
-    useBootstrap.mockReturnValue({
-      data: {
-        user: {
-          firstName: "Mina",
-          lastName: "Diaz",
-          email: "mina@dubgrid.com",
-        },
-        currentOrg: {
-          name: "DubGrid Health",
-          id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-          slug: "dubgrid-health",
-        },
-        effectiveRole: "admin",
-        memberships: [
-          {
-            id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-            name: "DubGrid Health",
-            slug: "dubgrid-health",
-            orgRole: "admin",
-            platformRole: "none",
-            isCurrent: true,
-          },
-        ],
-        unreadNotificationCount: 0,
-        absenceTypes: [],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never);
     getSupabaseClient.mockReturnValue({
       auth: {
         signOut: vi.fn().mockResolvedValue({
@@ -379,6 +361,11 @@ describe("ProfileScreen", () => {
     render(<ProfileScreen />);
 
     fireEvent.click(screen.getByText("Sign Out"));
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", {
+        name: "Sign Out",
+      }),
+    );
 
     await waitFor(() => {
       expect(handleExpiredMobileSession).toHaveBeenCalledWith({

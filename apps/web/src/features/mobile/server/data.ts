@@ -12,12 +12,17 @@ import {
   fetchLinkedEmployeeRowForUser,
   fetchMobileAbsenceTypeRows,
   fetchMobileAssignmentSeedRows,
+  fetchMobileCertificationRows as fetchMobileCertificationRowsData,
+  fetchMobileDepartmentRows as fetchMobileDepartmentRowsData,
   fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
   fetchMobileJobNameRows,
+  fetchMobileManagementMembershipRowsByUserIds,
   fetchMobileNotificationsPage as fetchMobileNotificationsPageData,
   fetchMobileOpenShiftContextRows as fetchMobileOpenShiftContextRowsData,
   fetchMobilePeopleRows as fetchMobilePeopleRowsData,
+  fetchMobilePendingInvitationRows,
   fetchMobilePublishHistoryRows,
+  fetchMobileRoleRows as fetchMobileRoleRowsData,
   fetchMobileShiftRequestRows as fetchMobileShiftRequestRowsData,
   fetchMobileUnreadNotificationCount as fetchMobileUnreadNotificationCountData,
   fetchProfileNameRowsByIds as fetchProfileNameRowsByIdsData,
@@ -46,19 +51,29 @@ import {
   resolveJobColorsForShift,
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
+import { isRegularStaffSystemJob } from "@/lib/system-jobs";
+import {
+  normalizeMobileScheduleRange,
+  type MobileScheduleQuery,
+} from "@dubgrid/contracts";
 import type {
   MobileAbsenceType,
+  MobileDepartment,
   MobileFocusArea,
+  MobileNamedItem,
   MobileNotification,
   MobileOpenShift,
+  MobilePerson,
   MobileScheduleEntry,
   MobileScheduleEntrySegment,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { hasShiftStartedAtTimeRanges } from "@dubgrid/schedule-core";
 import {
   buildAssignmentDefinitionIdsByFocusArea,
   computeCoverageGaps,
+  normalizeCoverageRuleConfig,
   timesOverlap,
   type TimeRange,
 } from "@/lib/schedule-logic";
@@ -90,6 +105,8 @@ type MobileAssignmentDetails = {
   color: string | null;
   borderColor: string | null;
   textColor: string | null;
+  showJobOnGrid: boolean;
+  isShiftOnly: boolean;
 };
 
 type MobileAbsenceDetails = {
@@ -112,15 +129,26 @@ type MobilePeopleRow = Pick<
   | "id"
   | "firstName"
   | "lastName"
+  | "employmentType"
   | "status"
   | "statusChangedAt"
   | "statusNote"
+  | "certificationId"
+  | "roleIds"
+  | "seniority"
   | "focusAreaIds"
+  | "departmentIds"
+  | "deptAdminIds"
   | "phone"
   | "email"
   | "contactNotes"
+  | "userId"
   | "version"
->;
+> & {
+  managementDepartmentIds: number[];
+  managementDeptAdminIds: number[];
+  pendingInvitation: MobilePerson["pendingInvitation"];
+};
 
 function compareJobsByQualificationSeniority(
   left: JobDefinition,
@@ -157,18 +185,7 @@ export function resolveMobileDateRange(input?: {
   startDate?: string;
   endDate?: string;
 }): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = input?.startDate
-    ? new Date(`${input.startDate}T00:00:00`)
-    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const end = input?.endDate
-    ? new Date(`${input.endDate}T00:00:00`)
-    : new Date(start.getTime() + 13 * 86_400_000);
-
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  };
+  return normalizeMobileScheduleRange(input as MobileScheduleQuery | undefined);
 }
 
 export async function fetchLinkedEmployeeForUser(
@@ -189,15 +206,14 @@ async function fetchAssignmentDetailsMap(
     orgId,
   );
   const focusAreas = assignmentSeed.focusAreaRows.map(rowToFocusArea);
-  const shiftCategories = assignmentSeed.shiftCategoryRows.map(
-    rowToShiftCategory,
-  );
+  const shiftCategories =
+    assignmentSeed.shiftCategoryRows.map(rowToShiftCategory);
   const jobs = assignmentSeed.jobRows.map(rowToJobDefinition);
   const orgRoles = assignmentSeed.organizationRoleRows.map(rowToNamedItem);
   const certifications = assignmentSeed.certificationRows.map(rowToNamedItem);
   const jobSortOrderById = new Map(
     jobs
-      .filter((job) => job.systemKey !== "regular_staff")
+      .filter((job) => !isRegularStaffSystemJob(job))
       .sort((left, right) =>
         compareJobsByQualificationSeniority(
           left,
@@ -238,6 +254,8 @@ async function fetchAssignmentDetailsMap(
       color: colors.color,
       borderColor: colors.border,
       textColor: colors.text,
+      showJobOnGrid: displayParts.showJobOnGrid,
+      isShiftOnly: displayParts.isShiftOnly,
       defaultStartTime: times.startTime,
       defaultEndTime: times.endTime,
       defaultDurationHours: shift ? null : (job.defaultDurationHours ?? null),
@@ -249,7 +267,7 @@ async function fetchAssignmentDetailsMap(
   }
 
   for (const job of jobs) {
-    if (job.systemKey === "regular_staff") continue;
+    if (isRegularStaffSystemJob(job)) continue;
     const mode = job.assignmentMode ?? "with_shift";
     if (mode !== "shiftless") {
       for (const shift of getJobPlacementShiftPool(
@@ -305,6 +323,9 @@ export async function fetchMobileAbsenceTypes(
     id: row.id,
     label: row.label,
     name: row.name ?? undefined,
+    color: row.color ?? null,
+    borderColor: row.border_color ?? null,
+    textColor: row.text_color ?? null,
   }));
 }
 
@@ -316,6 +337,44 @@ export async function fetchMobileFocusAreas(
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
+    departmentId: row.department_id,
+  }));
+}
+
+export async function fetchMobileRoles(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileNamedItem[]> {
+  const rows = await fetchMobileRoleRowsData(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    abbr: row.abbr,
+  }));
+}
+
+export async function fetchMobileCertifications(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileNamedItem[]> {
+  const rows = await fetchMobileCertificationRowsData(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    abbr: row.abbr,
+  }));
+}
+
+export async function fetchMobileDepartments(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileDepartment[]> {
+  const rows = await fetchMobileDepartmentRowsData(serviceClient, orgId);
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    abbr: row.abbr,
+    type: row.type === "management" ? "management" : "scheduled",
   }));
 }
 
@@ -330,8 +389,9 @@ async function fetchFocusAreaNameMap(
 async function fetchMobilePublishHistory(
   serviceClient: SupabaseClient,
   orgId: string,
+  input?: { startDate?: string; endDate?: string },
 ): Promise<MobilePublishHistoryEntry[]> {
-  const rows = await fetchMobilePublishHistoryRows(serviceClient, orgId);
+  const rows = await fetchMobilePublishHistoryRows(serviceClient, orgId, input);
   if (rows.length === 0) {
     return [];
   }
@@ -363,7 +423,8 @@ async function fetchMobilePublishHistory(
     startDate: row.start_date,
     endDate: row.end_date,
     publishedAt: row.published_at,
-    publishedByName: (row.published_by && publisherNameMap.get(row.published_by)) ?? null,
+    publishedByName:
+      (row.published_by && publisherNameMap.get(row.published_by)) ?? null,
   }));
 }
 
@@ -444,6 +505,18 @@ function pickPipeTime(
     : (parts[parts.length - 1] ?? null);
 }
 
+function pickBoundaryPipeTime(
+  value: string | null | undefined,
+  which: "start" | "end",
+  segmentCount: number,
+): string | null {
+  if (segmentCount <= 1) {
+    return pickPipeTime(value, "first");
+  }
+
+  return pickPipeTime(value, which === "start" ? "first" : "last");
+}
+
 function getFallbackTime(
   shiftIds: Array<number | null>,
   jobIds: number[],
@@ -485,6 +558,7 @@ function buildMobileScheduleEntrySegments(input: {
   rowFocusAreaId: number | null;
   shiftIds: Array<number | null>;
   jobIds: number[];
+  stateSegments?: ReadonlyArray<{ isMentored?: boolean | null }>;
   assignmentDetailsByPair: Map<string, MobileAssignmentDetails>;
   shiftName: string;
   startTime: string | null;
@@ -522,7 +596,10 @@ function buildMobileScheduleEntrySegments(input: {
         assignmentDetails?.name ??
         assignmentDetails?.label ??
         "?",
-      jobName: input.jobNameMap.get(jobId) ?? null,
+      jobName:
+        assignmentDetails?.isShiftOnly === true
+          ? null
+          : (input.jobNameMap.get(jobId) ?? null),
       jobSortOrder: assignmentDetails?.jobSortOrder ?? null,
       jobColor: assignmentDetails?.color ?? null,
       jobBorderColor: assignmentDetails?.borderColor ?? null,
@@ -532,10 +609,12 @@ function buildMobileScheduleEntrySegments(input: {
       defaultDurationHours: assignmentDetails?.defaultDurationHours ?? null,
       defaultDurationMinutes: assignmentDetails?.defaultDurationMinutes ?? null,
       breakMinutes: assignmentDetails?.breakMinutes ?? null,
+      focusAreaId: segmentFocusAreaId,
       startTime:
         customStartTimes[index] ?? assignmentDetails?.defaultStartTime ?? null,
       endTime:
         customEndTimes[index] ?? assignmentDetails?.defaultEndTime ?? null,
+      isMentored: input.stateSegments?.[index]?.isMentored ?? false,
       displayFocusAreaName:
         segmentFocusAreaId != null
           ? (input.focusAreaNameMap.get(segmentFocusAreaId) ?? null)
@@ -566,6 +645,7 @@ function buildMobileShiftRequestSegments(input: {
   focusAreaNameMap: Map<number, string>;
   jobIds: number[] | null | undefined;
   jobNameMap: Map<number, string>;
+  stateSegments?: ReadonlyArray<{ isMentored?: boolean | null }>;
   assignmentDetailsByPair: Map<string, MobileAssignmentDetails>;
   shiftIds: Array<number | null> | null | undefined;
 }): MobileScheduleEntrySegment[] {
@@ -591,7 +671,10 @@ function buildMobileShiftRequestSegments(input: {
         assignmentDetails?.name ??
         assignmentDetails?.label ??
         "?",
-      jobName: jobId != null ? (input.jobNameMap.get(jobId) ?? null) : null,
+      jobName:
+        assignmentDetails?.isShiftOnly === true || jobId == null
+          ? null
+          : (input.jobNameMap.get(jobId) ?? null),
       jobSortOrder: assignmentDetails?.jobSortOrder ?? null,
       jobColor: assignmentDetails?.color ?? null,
       jobBorderColor: assignmentDetails?.borderColor ?? null,
@@ -601,10 +684,12 @@ function buildMobileShiftRequestSegments(input: {
       defaultDurationHours: assignmentDetails?.defaultDurationHours ?? null,
       defaultDurationMinutes: assignmentDetails?.defaultDurationMinutes ?? null,
       breakMinutes: assignmentDetails?.breakMinutes ?? null,
+      focusAreaId,
       startTime:
         customStartTimes[index] ?? assignmentDetails?.defaultStartTime ?? null,
       endTime:
         customEndTimes[index] ?? assignmentDetails?.defaultEndTime ?? null,
+      isMentored: input.stateSegments?.[index]?.isMentored ?? false,
       displayFocusAreaName:
         focusAreaId != null
           ? (input.focusAreaNameMap.get(focusAreaId) ?? null)
@@ -638,8 +723,10 @@ function buildMobileShiftRequestSegments(input: {
       jobTextColor: null,
       shiftStartTime: null,
       shiftEndTime: null,
+      focusAreaId: input.focusAreaId,
       startTime: pickPipeTime(input.customStartTime, "first"),
       endTime: pickPipeTime(input.customEndTime, "last"),
+      isMentored: input.stateSegments?.[0]?.isMentored ?? false,
       displayFocusAreaName:
         input.focusAreaId != null
           ? (input.focusAreaNameMap.get(input.focusAreaId) ?? null)
@@ -648,7 +735,9 @@ function buildMobileShiftRequestSegments(input: {
   ];
 }
 
-function normalizeMobileTimeValue(value: string | null | undefined): string | null {
+function normalizeMobileTimeValue(
+  value: string | null | undefined,
+): string | null {
   return value ? value.slice(0, 5) : null;
 }
 
@@ -700,7 +789,10 @@ function getScheduleRowTimeRanges(input: {
     jobIds: input.row.state.segments.map((segment) => segment.jobId),
     jobNameMap: input.jobNameMap,
     assignmentDetailsByPair: input.assignmentDetailsByPair,
-    shiftIds: input.row.state.segments.map((segment) => segment.shiftId ?? null),
+    shiftIds: input.row.state.segments.map(
+      (segment) => segment.shiftId ?? null,
+    ),
+    stateSegments: input.row.state.segments,
   });
 
   return getMobileSegmentTimeRanges(segments);
@@ -747,7 +839,10 @@ export async function fetchMobileScheduleEntries(
     fetchAbsenceLabelMap(serviceClient, input.orgId),
     fetchFocusAreaNameMap(serviceClient, input.orgId),
     fetchJobNameMap(serviceClient, input.orgId),
-    fetchMobilePublishHistory(serviceClient, input.orgId),
+    fetchMobilePublishHistory(serviceClient, input.orgId, {
+      startDate: input.startDate,
+      endDate: input.endDate,
+    }),
   ]);
   const data = await fetchPublishedMobileScheduleRowsData(serviceClient, input);
 
@@ -794,12 +889,16 @@ export async function fetchMobileScheduleEntries(
     const startTime =
       absenceTypeId != null
         ? null
-        : (pickPipeTime(state.customStartTime, "first") ??
+        : (pickBoundaryPipeTime(
+            state.customStartTime,
+            "start",
+            jobIds.length,
+          ) ??
           getFallbackTime(shiftIds, jobIds, assignmentDetailsByPair, "start"));
     const endTime =
       absenceTypeId != null
         ? null
-        : (pickPipeTime(state.customEndTime, "last") ??
+        : (pickBoundaryPipeTime(state.customEndTime, "end", jobIds.length) ??
           getFallbackTime(shiftIds, jobIds, assignmentDetailsByPair, "end"));
 
     const rowFocusAreaId = (row.focus_area_id as number | null) ?? null;
@@ -825,6 +924,7 @@ export async function fetchMobileScheduleEntries(
       rowFocusAreaId,
       shiftIds,
       jobIds,
+      stateSegments: state.kind === "worked" ? state.segments : [],
       assignmentDetailsByPair,
       shiftName,
       startTime,
@@ -852,8 +952,10 @@ export async function fetchMobileScheduleEntries(
 
     entries.push({
       employeeId: row.employees.id,
-      employeeName: `${row.employees.first_name} ${row.employees.last_name}`.trim(),
+      employeeName:
+        `${row.employees.first_name} ${row.employees.last_name}`.trim(),
       employeeSeniority: row.employees.seniority ?? null,
+      employeeFocusAreaIds: row.employees.focus_area_ids ?? [],
       date: row.date as string,
       state,
       presentation,
@@ -871,6 +973,27 @@ function parseMobileIsoDate(value: string): Date {
 
 function formatMobileIsoDate(value: Date): string {
   return value.toISOString().slice(0, 10);
+}
+
+function buildOpenShiftVolunteerSegmentKey({
+  assignment,
+  date,
+  focusAreaId,
+}: {
+  assignment: Pick<AssignmentDefinition, "jobId" | "shiftId">;
+  date: string;
+  focusAreaId: number;
+}): string | null {
+  if (assignment.jobId == null) {
+    return null;
+  }
+
+  return [
+    date,
+    focusAreaId,
+    assignment.shiftId ?? "null",
+    assignment.jobId,
+  ].join(":");
 }
 
 function getMobileDatesBetween(startDate: string, endDate: string): Date[] {
@@ -917,6 +1040,9 @@ async function fetchMobileOpenShiftContext(
   const coverageRequirements = contextRows.coverageRequirementRows.map(
     rowToCoverageRequirement,
   );
+  const coverageRuleConfig = normalizeCoverageRuleConfig(
+    contextRows.organizationRow?.coverage_rule_config,
+  );
   const employees = contextRows.employeeRows
     .map((row) => rowToEmployee(row))
     .filter((employee) => employee.status === "active");
@@ -930,6 +1056,7 @@ async function fetchMobileOpenShiftContext(
   return {
     assignments,
     coverageRequirements,
+    coverageRuleConfig,
     employees,
     focusAreas,
     jobs,
@@ -942,9 +1069,11 @@ export async function fetchMobileOpenShifts(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
-    employee: Employee;
+    employee?: Employee;
     startDate?: string;
     endDate?: string;
+    showAll?: boolean;
+    timeZone?: string | null;
   },
 ): Promise<MobileOpenShift[]> {
   const range = resolveMobileDateRange({
@@ -957,12 +1086,21 @@ export async function fetchMobileOpenShifts(
     publishHistory,
     context,
     scheduleRows,
+    activeRequestRows,
   ] = await Promise.all([
     fetchAssignmentDetailsMap(serviceClient, input.orgId),
     fetchFocusAreaNameMap(serviceClient, input.orgId),
-    fetchMobilePublishHistory(serviceClient, input.orgId),
+    fetchMobilePublishHistory(serviceClient, input.orgId, {
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
     fetchMobileOpenShiftContext(serviceClient, input.orgId),
     fetchPublishedMobileScheduleRowsData(serviceClient, {
+      orgId: input.orgId,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+    fetchMobileShiftRequestRowsData(serviceClient, {
       orgId: input.orgId,
       startDate: range.startDate,
       endDate: range.endDate,
@@ -992,6 +1130,70 @@ export async function fetchMobileOpenShifts(
           ],
     ),
   );
+  const assignmentById = new Map(
+    context.assignments.map((assignment) => [assignment.id, assignment]),
+  );
+  const pendingVolunteerRequestIdsByAssignmentKey = new Map<
+    string,
+    Set<string>
+  >();
+  const ownPendingVolunteerAssignmentKeys = new Set<string>();
+  for (const row of activeRequestRows) {
+    if (
+      row.type !== "pickup" ||
+      row.status !== "pending_approval" ||
+      row.target_emp_id != null ||
+      row.parent_request_id != null
+    ) {
+      continue;
+    }
+
+    const state = row.requester_state as {
+      focusAreaId?: number | null;
+      kind?: string | null;
+      segments?: Array<{ shiftId?: number | null; jobId?: number | null }>;
+    };
+
+    if (state.kind !== "worked") {
+      continue;
+    }
+
+    for (const segment of state.segments ?? []) {
+      if (segment.jobId == null) {
+        continue;
+      }
+
+      const assignmentId = assignmentIdByPair.get(
+        buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId),
+      );
+      const assignment =
+        assignmentId == null
+          ? null
+          : (assignmentById.get(assignmentId) ?? null);
+      const segmentFocusAreaId =
+        state.focusAreaId ?? assignment?.focusAreaId ?? null;
+      const key =
+        assignment != null && segmentFocusAreaId != null
+          ? buildOpenShiftVolunteerSegmentKey({
+              assignment,
+              date: row.requester_shift_date,
+              focusAreaId: segmentFocusAreaId,
+            })
+          : null;
+
+      if (key != null) {
+        const requestIds =
+          pendingVolunteerRequestIdsByAssignmentKey.get(key) ??
+          new Set<string>();
+        requestIds.add(row.id);
+        pendingVolunteerRequestIdsByAssignmentKey.set(key, requestIds);
+
+        if (input.employee?.id === row.requester_emp_id) {
+          ownPendingVolunteerAssignmentKeys.add(key);
+        }
+      }
+    }
+  }
   const employeesByFocusArea = new Map<number, Employee[]>();
   for (const focusArea of context.focusAreas) {
     employeesByFocusArea.set(
@@ -1004,9 +1206,32 @@ export async function fetchMobileOpenShifts(
   const rowByEmployeeDate = new Map(
     scheduleRows.map((row) => [`${row.emp_id}_${row.date}`, row]),
   );
-  const assignmentById = new Map(
-    context.assignments.map((assignment) => [assignment.id, assignment]),
-  );
+  const mentoredCoverageCredit =
+    context.coverageRuleConfig.mentoredCoverageCreditPercent / 100;
+  const coverageCreditForKey = (
+    empId: string,
+    date: Date,
+    assignmentId: number,
+  ) => {
+    const row = rowByEmployeeDate.get(`${empId}_${formatMobileIsoDate(date)}`);
+    if (!row || row.state.kind !== "worked") {
+      return 0;
+    }
+
+    let credit = 0;
+    for (const segment of row.state.segments) {
+      const segmentAssignmentId = assignmentIdByPair.get(
+        buildShiftJobPairKey(segment.shiftId ?? null, segment.jobId),
+      );
+      if (segmentAssignmentId === assignmentId) {
+        credit = Math.max(
+          credit,
+          segment.isMentored ? mentoredCoverageCredit : 1,
+        );
+      }
+    }
+    return credit;
+  };
 
   const gaps = computeCoverageGaps(
     context.focusAreas,
@@ -1035,49 +1260,168 @@ export async function fetchMobileOpenShifts(
       context.focusAreas,
       context.assignments,
     ),
+    undefined,
+    coverageCreditForKey,
   );
   const jobNameMap = new Map(context.jobs.map((job) => [job.id, job.name]));
 
   return gaps.flatMap((gap) => {
+    const gapDate = formatMobileIsoDate(gap.date);
+    const pendingVolunteerRequestIds = new Set<string>();
+    const hasOwnPendingVolunteer = gap.eligibleAssignmentDefinitionIds.some(
+      (assignmentId) => {
+        const assignment = assignmentById.get(assignmentId);
+        const key =
+          assignment == null
+            ? null
+            : buildOpenShiftVolunteerSegmentKey({
+                assignment,
+                date: gapDate,
+                focusAreaId: gap.focusAreaId,
+              });
+        return key != null && ownPendingVolunteerAssignmentKeys.has(key);
+      },
+    );
+
+    if (hasOwnPendingVolunteer) {
+      return [];
+    }
+
+    for (const assignmentId of gap.eligibleAssignmentDefinitionIds) {
+      const assignment = assignmentById.get(assignmentId);
+      const key =
+        assignment == null
+          ? null
+          : buildOpenShiftVolunteerSegmentKey({
+              assignment,
+              date: gapDate,
+              focusAreaId: gap.focusAreaId,
+            });
+      const requestIds =
+        key == null ? null : pendingVolunteerRequestIdsByAssignmentKey.get(key);
+      if (!requestIds) {
+        continue;
+      }
+
+      for (const requestId of requestIds) {
+        pendingVolunteerRequestIds.add(requestId);
+      }
+    }
+
+    const remainingNeeded =
+      gap.status.required - gap.status.actual - pendingVolunteerRequestIds.size;
+
+    if (remainingNeeded <= 0) {
+      return [];
+    }
+
     const openAssignments = gap.eligibleAssignmentDefinitionIds
       .map((assignmentId) => assignmentById.get(assignmentId))
       .filter(
         (assignment): assignment is (typeof context.assignments)[number] =>
           Boolean(assignment),
       );
-    const qualifiedAssignments = openAssignments.filter((assignment) =>
-      isEmployeeQualifiedForAssignmentDefinition(input.employee, {
-        assignment,
-        shiftCategories: context.shiftCategories,
-        jobs: context.jobs,
-        orgRoles: context.orgRoles,
-      }),
-    );
-    const employeeScheduleRow = rowByEmployeeDate.get(
-      `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
-    );
-    const employeeTimeRanges = employeeScheduleRow
-      ? getScheduleRowTimeRanges({
-          row: employeeScheduleRow,
-          assignmentDetailsByPair,
-          focusAreaNameMap,
-          jobNameMap,
+    const getVolunteerState = (
+      assignment: AssignmentDefinition,
+    ): { canVolunteer: boolean; volunteerBlockReason: string | null } => {
+      if (!input.employee) {
+        return {
+          canVolunteer: false,
+          volunteerBlockReason: "You need a linked staff profile to volunteer.",
+        };
+      }
+
+      if (!input.employee.focusAreaIds.includes(gap.focusAreaId)) {
+        return {
+          canVolunteer: false,
+          volunteerBlockReason:
+            "You are not assigned to the focus area required for this shift.",
+        };
+      }
+
+      if (
+        !isEmployeeQualifiedForAssignmentDefinition(input.employee, {
+          assignment,
+          shiftCategories: context.shiftCategories,
+          jobs: context.jobs,
+          orgRoles: context.orgRoles,
         })
-      : [];
-    const conflictFreeAssignments = qualifiedAssignments.filter((assignment) => {
+      ) {
+        return {
+          canVolunteer: false,
+          volunteerBlockReason:
+            "You do not meet the eligibility requirements for this shift.",
+        };
+      }
+
+      const employeeScheduleRow = rowByEmployeeDate.get(
+        `${input.employee.id}_${formatMobileIsoDate(gap.date)}`,
+      );
+      const employeeTimeRanges = employeeScheduleRow
+        ? getScheduleRowTimeRanges({
+            row: employeeScheduleRow,
+            assignmentDetailsByPair,
+            focusAreaNameMap,
+            jobNameMap,
+          })
+        : [];
       const assignmentRanges = getAssignmentDefinitionTimeRanges(assignment);
 
-      if (employeeTimeRanges.length === 0 || assignmentRanges.length === 0) {
+      if (
+        employeeTimeRanges.length > 0 &&
+        assignmentRanges.length > 0 &&
+        timesOverlap(employeeTimeRanges, assignmentRanges)
+      ) {
+        return {
+          canVolunteer: false,
+          volunteerBlockReason: "You already have a shift during that time.",
+        };
+      }
+
+      return { canVolunteer: true, volunteerBlockReason: null };
+    };
+
+    const viewableAssignments = openAssignments.filter((assignment) => {
+      if (
+        hasShiftStartedAtTimeRanges({
+          shiftDate: gapDate,
+          timeRanges: [
+            {
+              start:
+                assignment.defaultStartTime ??
+                context.shiftCategories.find(
+                  (item) => item.id === assignment.categoryId,
+                )?.startTime ??
+                "",
+            },
+          ],
+          now: new Date(),
+          timeZone: input.timeZone ?? null,
+        })
+      ) {
+        return false;
+      }
+
+      if (input.showAll || !input.employee) {
         return true;
       }
 
-      return !timesOverlap(employeeTimeRanges, assignmentRanges);
+      return getVolunteerState(assignment).canVolunteer;
     });
+    const volunteerableAssignments = input.employee
+      ? viewableAssignments.filter(
+          (assignment) => getVolunteerState(assignment).canVolunteer,
+        )
+      : [];
     const assignment =
-      conflictFreeAssignments.find(
+      volunteerableAssignments.find(
         (item) => item.id === gap.preferredOpenAssignmentDefinitionId,
       ) ??
-      conflictFreeAssignments[0] ??
+      volunteerableAssignments[0] ??
+      viewableAssignments.find(
+        (item) => item.id === gap.preferredOpenAssignmentDefinitionId,
+      ) ??
+      viewableAssignments[0] ??
       null;
 
     if (!assignment || assignment.jobId == null) {
@@ -1086,6 +1430,7 @@ export async function fetchMobileOpenShifts(
 
     const shiftIds = [assignment.shiftId ?? null];
     const jobIds = [assignment.jobId];
+    const volunteerState = getVolunteerState(assignment);
     const segments = buildMobileShiftRequestSegments({
       customStartTime: null,
       customEndTime: null,
@@ -1094,17 +1439,18 @@ export async function fetchMobileOpenShifts(
       focusAreaNameMap,
       jobIds,
       jobNameMap,
+      stateSegments: [{ isMentored: false }],
       assignmentDetailsByPair,
       shiftIds,
     });
 
     return [
       {
-        id: `coverage_gap_${gap.focusAreaId}_${assignment.id}_${formatMobileIsoDate(gap.date)}`,
-        date: formatMobileIsoDate(gap.date),
+        id: `coverage_gap_${gap.focusAreaId}_${assignment.id}_${gapDate}`,
+        date: gapDate,
         focusAreaId: gap.focusAreaId,
         focusAreaName: gap.focusAreaName,
-        needed: Math.max(gap.status.required - gap.status.actual, 1),
+        needed: remainingNeeded,
         state: {
           kind: "worked" as const,
           segments: [
@@ -1112,9 +1458,11 @@ export async function fetchMobileOpenShifts(
               shiftId: assignment.shiftId ?? null,
               jobId: assignment.jobId,
               position: 0,
+              isMentored: false,
             },
           ],
           absenceTypeId: null,
+          focusAreaId: gap.focusAreaId,
           customStartTime: null,
           customEndTime: null,
           seriesId: null,
@@ -1133,6 +1481,8 @@ export async function fetchMobileOpenShifts(
           endTime: segments[0]?.endTime ?? null,
           segments,
         },
+        canVolunteer: volunteerState.canVolunteer,
+        volunteerBlockReason: volunteerState.volunteerBlockReason,
       },
     ];
   });
@@ -1160,7 +1510,9 @@ export async function fetchMobileShiftRequests(
     const requester = Array.isArray(row.requester)
       ? (row.requester[0] ?? null)
       : row.requester;
-    const target = Array.isArray(row.target) ? (row.target[0] ?? null) : row.target;
+    const target = Array.isArray(row.target)
+      ? (row.target[0] ?? null)
+      : row.target;
     const mapped: DbShiftRequest = {
       id: row.id,
       org_id: row.org_id,
@@ -1206,6 +1558,7 @@ export async function fetchMobileShiftRequests(
       shiftIds: baseRequest.requesterState.segments.map(
         (segment) => segment.shiftId,
       ),
+      stateSegments: baseRequest.requesterState.segments,
     });
     const targetSegments =
       baseRequest.targetState != null
@@ -1223,6 +1576,7 @@ export async function fetchMobileShiftRequests(
             shiftIds: baseRequest.targetState.segments.map(
               (segment) => segment.shiftId,
             ),
+            stateSegments: baseRequest.targetState.segments,
           })
         : null;
 
@@ -1303,18 +1657,67 @@ export async function fetchMobilePeople(
   orgId: string,
 ): Promise<MobilePeopleRow[]> {
   const rows = await fetchMobilePeopleRowsData(serviceClient, orgId);
+  const pendingInvitations = await fetchMobilePendingInvitationRows(
+    serviceClient,
+    orgId,
+    rows.map((row) => row.id),
+  );
+  const invitationByEmployeeId = new Map(
+    pendingInvitations
+      .filter((invitation) => invitation.employee_id)
+      .map((invitation) => [invitation.employee_id as string, invitation]),
+  );
+  const managementMemberships =
+    await fetchMobileManagementMembershipRowsByUserIds(
+      serviceClient,
+      orgId,
+      rows
+        .map((row) => row.user_id)
+        .filter((userId): userId is string => Boolean(userId)),
+    );
+  const managementMembershipByUserId = new Map(
+    managementMemberships.map((membership) => [membership.user_id, membership]),
+  );
+
   return rows.map((row) => ({
     id: row.id,
     firstName: row.first_name,
     lastName: row.last_name,
+    employmentType: row.employment_type ?? "full_time",
     status: (row.status as Employee["status"] | null) ?? "active",
     statusChangedAt: row.status_changed_at ?? null,
     statusNote: row.status_note ?? "",
+    certificationId: row.certification_id ?? null,
+    roleIds: row.role_ids ?? [],
+    seniority: row.seniority ?? 0,
     focusAreaIds: row.focus_area_ids ?? [],
+    departmentIds: row.department_ids ?? [],
+    deptAdminIds: row.dept_admin_ids ?? [],
     phone: row.phone ?? "",
     email: row.email ?? "",
     contactNotes: row.contact_notes ?? "",
+    userId: row.user_id ?? null,
     version: row.version ?? 0,
+    managementDepartmentIds:
+      (row.user_id
+        ? managementMembershipByUserId.get(row.user_id)?.department_ids
+        : null) ??
+      invitationByEmployeeId.get(row.id)?.department_ids ??
+      [],
+    managementDeptAdminIds:
+      (row.user_id
+        ? managementMembershipByUserId.get(row.user_id)?.dept_admin_ids
+        : null) ??
+      invitationByEmployeeId.get(row.id)?.dept_admin_ids ??
+      [],
+    pendingInvitation: invitationByEmployeeId.get(row.id)
+      ? {
+          id: invitationByEmployeeId.get(row.id)!.id,
+          email: invitationByEmployeeId.get(row.id)!.email,
+          expiresAt: invitationByEmployeeId.get(row.id)!.expires_at,
+          updatedAt: invitationByEmployeeId.get(row.id)!.updated_at ?? null,
+        }
+      : null,
   }));
 }
 

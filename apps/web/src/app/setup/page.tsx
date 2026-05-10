@@ -61,18 +61,18 @@ function SetupContent() {
       href: "/settings",
     },
     {
-      label: org?.focusAreaLabel || "Focus Areas",
+      label: `${org?.departmentLabel || "Departments"} & ${org?.focusAreaLabel || "Focus Areas"}`,
       description: setupStatus.missing.focusAreas
-        ? `No ${(org?.focusAreaLabel || "focus areas").toLowerCase()} yet`
-        : `${org?.focusAreaLabel || "Focus areas"} configured`,
+        ? `Add scheduled departments and assign ${(org?.focusAreaLabel || "focus areas").toLowerCase()} to them`
+        : `${org?.focusAreaLabel || "Focus areas"} are department-scoped`,
       done: !setupStatus.missing.focusAreas,
       href: "/settings",
     },
     {
       label: "Shifts & Jobs",
       description: setupStatus.missing.scheduleDefinitions
-        ? "No shifts or jobs yet"
-        : "Shifts and jobs configured",
+        ? "Add focus-area shifts and place jobs on departments, focus areas, and shifts"
+        : "Focus-area shifts and placed jobs configured",
       done: !setupStatus.missing.scheduleDefinitions,
       href: "/settings?section=schedule-shifts",
     },
@@ -82,7 +82,7 @@ function SetupContent() {
         ? `No ${(org?.certificationLabel || "certifications").toLowerCase()} yet`
         : `${org?.certificationLabel || "Certifications"} configured`,
       done: !setupStatus.missing.certifications,
-      href: "/settings/staff-config",
+      href: "/settings?section=staff-certifications",
     },
     {
       label: org?.roleLabel || "Roles",
@@ -90,7 +90,7 @@ function SetupContent() {
         ? `No ${(org?.roleLabel || "roles").toLowerCase()} yet`
         : `${org?.roleLabel || "Roles"} configured`,
       done: !setupStatus.missing.orgRoles,
-      href: "/settings/staff-config",
+      href: "/settings?section=staff-roles",
     },
     {
       label: "Employees",

@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type CSSProperties } from "react";
 import type { ViewMode } from "./DashboardView";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint } from "@/components/ui/hint";
@@ -61,6 +61,7 @@ interface DashboardHeaderProps {
   periodStart: Date;
   periodEnd: Date;
   viewMode: ViewMode;
+  showViewModeTabs?: boolean;
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -71,6 +72,7 @@ export default function DashboardHeader({
   periodStart,
   periodEnd,
   viewMode,
+  showViewModeTabs = true,
   onPrev,
   onNext,
   onToday,
@@ -169,40 +171,13 @@ export default function DashboardHeader({
           </button>
         </div>
 
-        {/* Row 2: View mode tabs */}
-        <div
-          className="dg-span-tabs dg-span-tabs--light"
-          style={{ alignSelf: "flex-start" }}
-        >
-          {VIEW_MODES.map((m, i) => {
-            const isActive = viewMode === m.value;
-            const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;
-            const showDivider = i > 0 && !isActive && !prevActive;
-            return (
-              <Fragment key={m.value}>
-                {i > 0 && (
-                  <div
-                    style={{
-                      width: 1,
-                      height: 16,
-                      background: showDivider
-                        ? "var(--color-border)"
-                        : "transparent",
-                      flexShrink: 0,
-                      alignSelf: "center",
-                    }}
-                  />
-                )}
-                <button
-                  onClick={() => onViewModeChange(m.value)}
-                  className={`dg-span-tab${isActive ? " active" : ""}`}
-                >
-                  {m.label}
-                </button>
-              </Fragment>
-            );
-          })}
-        </div>
+        {showViewModeTabs ? (
+          <ViewModeTabs
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            style={{ alignSelf: "flex-start" }}
+          />
+        ) : null}
       </div>
     );
   }
@@ -320,42 +295,61 @@ export default function DashboardHeader({
           {todayLabel}
         </button>
 
-        {/* View mode selector */}
-        <div
-          data-tour="dashboard-view-mode"
-          className="dg-span-tabs dg-span-tabs--light"
-        >
-          {VIEW_MODES.map((m, i) => {
-            const isActive = viewMode === m.value;
-            const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;
-            const showDivider = i > 0 && !isActive && !prevActive;
-            return (
-              <Fragment key={m.value}>
-                {i > 0 && (
-                  <div
-                    style={{
-                      width: 1,
-                      height: 16,
-                      background: showDivider
-                        ? "var(--color-border)"
-                        : "transparent",
-                      flexShrink: 0,
-                      alignSelf: "center",
-                    }}
-                  />
-                )}
-                <button
-                  onClick={() => onViewModeChange(m.value)}
-                  className={`dg-span-tab${isActive ? " active" : ""}`}
-                >
-                  {m.label}
-                </button>
-              </Fragment>
-            );
-          })}
-        </div>
+        {showViewModeTabs ? (
+          <ViewModeTabs
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+          />
+        ) : null}
       </div>
 
+    </div>
+  );
+}
+
+function ViewModeTabs({
+  viewMode,
+  onViewModeChange,
+  style,
+}: {
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      data-tour="dashboard-view-mode"
+      className="dg-span-tabs dg-span-tabs--light"
+      style={style}
+    >
+      {VIEW_MODES.map((m, i) => {
+        const isActive = viewMode === m.value;
+        const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;
+        const showDivider = i > 0 && !isActive && !prevActive;
+        return (
+          <Fragment key={m.value}>
+            {i > 0 && (
+              <div
+                style={{
+                  width: 1,
+                  height: 16,
+                  background: showDivider
+                    ? "var(--color-border)"
+                    : "transparent",
+                  flexShrink: 0,
+                  alignSelf: "center",
+                }}
+              />
+            )}
+            <button
+              onClick={() => onViewModeChange(m.value)}
+              className={`dg-span-tab${isActive ? " active" : ""}`}
+            >
+              {m.label}
+            </button>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

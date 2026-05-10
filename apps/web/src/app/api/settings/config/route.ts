@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { buildPermissionContext } from "@dubgrid/authz";
-import type { AdminPermissions } from "@dubgrid/domain";
 import type { User } from "@supabase/supabase-js";
 import type {
   AbsenceType,
@@ -15,8 +13,8 @@ import type {
   ScheduleCellState,
   ShiftCategory,
 } from "@/types";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
@@ -43,6 +41,12 @@ import {
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import { normalizePresetBg } from "@/lib/colors";
 import {
+  getCodeError,
+  getLineTextError,
+  normalizeCode,
+  normalizeLineText,
+} from "@/lib/form-validation";
+import {
   getJobEligibilityMode,
   getStoredJobDepartmentIds,
   getStoredJobFocusAreaIds,
@@ -53,6 +57,11 @@ import {
   shouldShowJobOnGrid,
 } from "@/lib/job-placement";
 import { CacheKey, cacheDel } from "@/lib/cache";
+import {
+  DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+  isDefaultShiftSystemJob,
+  isRegularStaffSystemJob,
+} from "@/lib/system-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +81,41 @@ type SettingsPermission =
   | "coverageManage"
   | "indicatorTypesRead"
   | "indicatorTypesManage";
+
+const POSTGREST_MUTATION_BATCH_SIZE = 50;
+
+type SettingsServiceClient = ReturnType<typeof getServiceClient>;
+type ArchivableSettingsTable =
+  | "certifications"
+  | "organization_roles"
+  | "departments";
+
+function chunkNumberIds(ids: number[]): number[][] {
+  const chunks: number[][] = [];
+  for (let i = 0; i < ids.length; i += POSTGREST_MUTATION_BATCH_SIZE) {
+    chunks.push(ids.slice(i, i + POSTGREST_MUTATION_BATCH_SIZE));
+  }
+  return chunks;
+}
+
+async function archiveSettingsRowsByIds(
+  serviceClient: SettingsServiceClient,
+  table: ArchivableSettingsTable,
+  orgId: string,
+  ids: number[],
+): Promise<void> {
+  if (ids.length === 0) return;
+
+  const archivedAt = new Date().toISOString();
+  for (const batch of chunkNumberIds(ids)) {
+    const { error } = await serviceClient
+      .from(table)
+      .update({ archived_at: archivedAt })
+      .eq("org_id", orgId)
+      .in("id", batch);
+    if (error) throw error;
+  }
+}
 
 const namedItemSchema = z.object({
   id: z.number().int(),
@@ -286,6 +330,424 @@ const postBodySchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+type NamedItemInput = z.infer<typeof namedItemSchema>;
+type DepartmentInput = z.infer<typeof departmentSchema>;
+type FocusAreaInput = z.infer<typeof focusAreaSchema>;
+type ShiftCategoryInput = z.infer<typeof shiftCategorySchema>;
+type JobInput = z.infer<typeof jobSchema>;
+type AbsenceTypeInput = z.infer<typeof absenceTypeSchema>;
+type IndicatorTypeInput = z.infer<typeof indicatorTypeSchema>;
+
+const SETTINGS_NAME_MAX = 80;
+const SETTINGS_ABBR_MAX = 20;
+const FOCUS_AREA_NAME_MAX = 80;
+const SHIFT_CATEGORY_NAME_MAX = 50;
+const SHIFT_CATEGORY_ABBR_MAX = 8;
+const JOB_NAME_MAX = 50;
+const JOB_ABBR_MAX = 6;
+const ABSENCE_LABEL_MAX = 6;
+const ABSENCE_NAME_MAX = 50;
+const INDICATOR_NAME_MAX = 50;
+
+function buildSettingsValidationResponse(args: {
+  error: string;
+  fieldErrors: Record<string, string | null>;
+}) {
+  return NextResponse.json(args, { status: 400 });
+}
+
+function findDuplicateValue(values: string[]): string | null {
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) {
+      return value;
+    }
+    seen.add(value);
+  }
+  return null;
+}
+
+function validateSettingsTextField(args: {
+  value: string;
+  label: string;
+  maxLength: number;
+  required?: boolean;
+}): string | null {
+  return getLineTextError(args.value, {
+    label: args.label,
+    maxLength: args.maxLength,
+    required: args.required,
+    disallowUrl: true,
+  });
+}
+
+function normalizeSettingsTextField(args: {
+  value: string;
+  label: string;
+  maxLength: number;
+  required?: boolean;
+}): string {
+  return normalizeLineText(args.value, {
+    label: args.label,
+    maxLength: args.maxLength,
+    required: args.required,
+    disallowUrl: true,
+  });
+}
+
+function validateNamedItems(
+  items: NamedItemInput[],
+  args: { itemLabel: string },
+): { items: NamedItemInput[] } | { response: NextResponse } {
+  const fieldErrors: Record<string, string | null> = {};
+  const draftItems = items.map((item, index) => {
+    const nameError = validateSettingsTextField({
+      value: item.name,
+      label: `${args.itemLabel} name`,
+      maxLength: SETTINGS_NAME_MAX,
+      required: true,
+    });
+    const abbrError =
+      item.abbr.trim().length > 0
+        ? getCodeError(item.abbr, {
+            label: `${args.itemLabel} abbreviation`,
+            maxLength: SETTINGS_ABBR_MAX,
+          })
+        : null;
+    fieldErrors[`items.${index}.name`] = nameError;
+    fieldErrors[`items.${index}.abbr`] = abbrError;
+
+    return item;
+  });
+
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: firstFieldError,
+        fieldErrors,
+      }),
+    };
+  }
+
+  const normalizedItems = draftItems.map((item) => ({
+    ...item,
+    name: normalizeSettingsTextField({
+      value: item.name,
+      label: `${args.itemLabel} name`,
+      maxLength: SETTINGS_NAME_MAX,
+      required: true,
+    }),
+    abbr:
+      item.abbr.trim().length > 0
+        ? normalizeCode(item.abbr, {
+            label: `${args.itemLabel} abbreviation`,
+            maxLength: SETTINGS_ABBR_MAX,
+          })
+        : "",
+  }));
+
+  const duplicateName = findDuplicateValue(
+    normalizedItems.map((item) => item.name.toLowerCase()),
+  );
+  if (duplicateName) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: `Duplicate ${args.itemLabel.toLowerCase()} name: "${duplicateName}"`,
+        fieldErrors,
+      }),
+    };
+  }
+
+  return { items: normalizedItems };
+}
+
+function validateDepartments(
+  items: DepartmentInput[],
+): { items: DepartmentInput[] } | { response: NextResponse } {
+  const fieldErrors: Record<string, string | null> = {};
+  const draftItems = items.map((item, index) => {
+    const nameError = validateSettingsTextField({
+      value: item.name,
+      label: "Department name",
+      maxLength: SETTINGS_NAME_MAX,
+      required: true,
+    });
+    const abbrError =
+      item.abbr.trim().length > 0
+        ? getCodeError(item.abbr, {
+            label: "Department abbreviation",
+            maxLength: SETTINGS_ABBR_MAX,
+          })
+        : null;
+    fieldErrors[`items.${index}.name`] = nameError;
+    fieldErrors[`items.${index}.abbr`] = abbrError;
+
+    return item;
+  });
+
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: firstFieldError,
+        fieldErrors,
+      }),
+    };
+  }
+
+  const normalizedItems = draftItems.map((item) => ({
+    ...item,
+    name: normalizeSettingsTextField({
+      value: item.name,
+      label: "Department name",
+      maxLength: SETTINGS_NAME_MAX,
+      required: true,
+    }),
+    abbr:
+      item.abbr.trim().length > 0
+        ? normalizeCode(item.abbr, {
+            label: "Department abbreviation",
+            maxLength: SETTINGS_ABBR_MAX,
+          })
+        : "",
+  }));
+
+  for (const type of ["scheduled", "management"] as const) {
+    const duplicateName = findDuplicateValue(
+      normalizedItems
+        .filter((item) => item.type === type)
+        .map((item) => item.name.toLowerCase()),
+    );
+    if (duplicateName) {
+      return {
+        response: buildSettingsValidationResponse({
+          error: `Duplicate department name: "${duplicateName}"`,
+          fieldErrors,
+        }),
+      };
+    }
+  }
+
+  return { items: normalizedItems };
+}
+
+function validateFocusArea(
+  focusArea: FocusAreaInput,
+): { focusArea: FocusAreaInput } | { response: NextResponse } {
+  const nameError = validateSettingsTextField({
+    value: focusArea.name,
+    label: "Focus area name",
+    maxLength: FOCUS_AREA_NAME_MAX,
+    required: true,
+  });
+  if (nameError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: nameError,
+        fieldErrors: {
+          "focusArea.name": nameError,
+        },
+      }),
+    };
+  }
+
+  return {
+    focusArea: {
+      ...focusArea,
+      name: normalizeSettingsTextField({
+        value: focusArea.name,
+        label: "Focus area name",
+        maxLength: FOCUS_AREA_NAME_MAX,
+        required: true,
+      }),
+    },
+  };
+}
+
+function validateShiftCategory(
+  shiftCategory: ShiftCategoryInput,
+): { shiftCategory: ShiftCategoryInput } | { response: NextResponse } {
+  const nameError = validateSettingsTextField({
+    value: shiftCategory.name,
+    label: "Shift name",
+    maxLength: SHIFT_CATEGORY_NAME_MAX,
+    required: true,
+  });
+  const abbrError =
+    shiftCategory.abbr?.trim()
+      ? getCodeError(shiftCategory.abbr, {
+          label: "Shift code",
+          maxLength: SHIFT_CATEGORY_ABBR_MAX,
+          uppercase: true,
+        })
+      : null;
+  const fieldErrors = {
+    "shiftCategory.name": nameError,
+    "shiftCategory.abbr": abbrError,
+  };
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: firstFieldError,
+        fieldErrors,
+      }),
+    };
+  }
+
+  return {
+    shiftCategory: {
+      ...shiftCategory,
+      name: normalizeSettingsTextField({
+        value: shiftCategory.name,
+        label: "Shift name",
+        maxLength: SHIFT_CATEGORY_NAME_MAX,
+        required: true,
+      }),
+      abbr: shiftCategory.abbr?.trim()
+        ? normalizeCode(shiftCategory.abbr, {
+            label: "Shift code",
+            maxLength: SHIFT_CATEGORY_ABBR_MAX,
+            uppercase: true,
+          })
+        : null,
+    },
+  };
+}
+
+function validateJob(
+  job: JobInput,
+): { job: JobInput } | { response: NextResponse } {
+  const nameError = validateSettingsTextField({
+    value: job.name,
+    label: "Job name",
+    maxLength: JOB_NAME_MAX,
+    required: true,
+  });
+  const abbrError = getCodeError(job.abbr, {
+    label: "Job abbreviation",
+    maxLength: JOB_ABBR_MAX,
+    required: true,
+    uppercase: true,
+  });
+  const fieldErrors = {
+    "job.name": nameError,
+    "job.abbr": abbrError,
+  };
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: firstFieldError,
+        fieldErrors,
+      }),
+    };
+  }
+
+  return {
+    job: {
+      ...job,
+      name: normalizeSettingsTextField({
+        value: job.name,
+        label: "Job name",
+        maxLength: JOB_NAME_MAX,
+        required: true,
+      }),
+      abbr: normalizeCode(job.abbr, {
+        label: "Job abbreviation",
+        maxLength: JOB_ABBR_MAX,
+        required: true,
+        uppercase: true,
+      }),
+    },
+  };
+}
+
+function validateAbsenceType(
+  absenceType: AbsenceTypeInput,
+): { absenceType: AbsenceTypeInput } | { response: NextResponse } {
+  const labelError =
+    absenceType.label.trim().length > 0
+      ? getCodeError(absenceType.label, {
+          label: "Absence code",
+          maxLength: ABSENCE_LABEL_MAX,
+          uppercase: true,
+        })
+      : null;
+  const nameError = validateSettingsTextField({
+    value: absenceType.name,
+    label: "Absence name",
+    maxLength: ABSENCE_NAME_MAX,
+    required: true,
+  });
+  const fieldErrors = {
+    "absenceType.label": labelError,
+    "absenceType.name": nameError,
+  };
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: firstFieldError,
+        fieldErrors,
+      }),
+    };
+  }
+
+  return {
+    absenceType: {
+      ...absenceType,
+      label: absenceType.label.trim().length > 0
+        ? normalizeCode(absenceType.label, {
+            label: "Absence code",
+            maxLength: ABSENCE_LABEL_MAX,
+            uppercase: true,
+          })
+        : "",
+      name: normalizeSettingsTextField({
+        value: absenceType.name,
+        label: "Absence name",
+        maxLength: ABSENCE_NAME_MAX,
+        required: true,
+      }),
+    },
+  };
+}
+
+function validateIndicatorType(
+  indicatorType: IndicatorTypeInput,
+): { indicatorType: IndicatorTypeInput } | { response: NextResponse } {
+  const nameError = validateSettingsTextField({
+    value: indicatorType.name,
+    label: "Indicator name",
+    maxLength: INDICATOR_NAME_MAX,
+    required: true,
+  });
+  if (nameError) {
+    return {
+      response: buildSettingsValidationResponse({
+        error: nameError,
+        fieldErrors: {
+          "indicatorType.name": nameError,
+        },
+      }),
+    };
+  }
+
+  return {
+    indicatorType: {
+      ...indicatorType,
+      name: normalizeSettingsTextField({
+        value: indicatorType.name,
+        label: "Indicator name",
+        maxLength: INDICATOR_NAME_MAX,
+        required: true,
+      }),
+    },
+  };
+}
+
 function buildSummary(parts: string[]): DependencyInfo {
   const active = parts.filter(Boolean);
   if (active.length === 0) {
@@ -338,71 +800,40 @@ async function authorize(
   orgId: string,
   permission: SettingsPermission,
 ) {
-  const auth = await requireAuthenticatedUser(req);
+  const auth = await requireOrgPermissions(
+    req,
+    orgId,
+    (permissions) => {
+      switch (permission) {
+        case "orgLabelsRead":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewOrgLabels || permissions.canManageOrgLabels;
+        case "orgLabelsManage":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgLabels;
+        case "departmentsRead":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewFocusAreas || permissions.canManageFocusAreas || permissions.canViewOrgLabels || permissions.canManageOrgLabels;
+        case "departmentsManage":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageFocusAreas || permissions.canManageOrgLabels;
+        case "scheduleDefinitionsRead":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewScheduleDefinitions || permissions.canManageScheduleDefinitions;
+        case "scheduleDefinitionsManage":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageScheduleDefinitions;
+        case "coverageRead":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewCoverageRequirements || permissions.canManageCoverageRequirements;
+        case "coverageManage":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageCoverageRequirements;
+        case "indicatorTypesRead":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewIndicatorTypes || permissions.canManageIndicatorTypes;
+        case "indicatorTypesManage":
+          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageIndicatorTypes;
+      }
+    },
+    { allowDuringSetup: true },
+  );
   if ("response" in auth) {
     return { response: auth.response } as const;
   }
 
-  const serviceClient = getServiceClient();
-  const [{ data: membership }, { data: profile }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role, admin_permissions")
-      .eq("user_id", auth.user.id)
-      .eq("org_id", orgId)
-      .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", auth.user.id)
-      .maybeSingle(),
-  ]);
-
-  const role =
-    profile?.platform_role === "gridmaster"
-      ? "gridmaster"
-      : (membership?.org_role ?? "user");
-  const permissions = buildPermissionContext(
-    role,
-    orgId,
-    (membership?.admin_permissions as AdminPermissions | null) ?? null,
-  );
-
-  const allowed = (() => {
-    switch (permission) {
-      case "orgLabelsRead":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewOrgLabels || permissions.canManageOrgLabels;
-      case "orgLabelsManage":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgLabels;
-      case "departmentsRead":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewFocusAreas || permissions.canManageFocusAreas || permissions.canViewOrgLabels || permissions.canManageOrgLabels;
-      case "departmentsManage":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageFocusAreas || permissions.canManageOrgLabels;
-      case "scheduleDefinitionsRead":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewScheduleDefinitions || permissions.canManageScheduleDefinitions;
-      case "scheduleDefinitionsManage":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageScheduleDefinitions;
-      case "coverageRead":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewCoverageRequirements || permissions.canManageCoverageRequirements;
-      case "coverageManage":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageCoverageRequirements;
-      case "indicatorTypesRead":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewIndicatorTypes || permissions.canManageIndicatorTypes;
-      case "indicatorTypesManage":
-        return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageIndicatorTypes;
-    }
-  })();
-
-  if (!allowed) {
-    return {
-      response: NextResponse.json(
-        { error: "Insufficient permissions" },
-        { status: 403 },
-      ),
-    } as const;
-  }
-
-  return { actor: auth.user, serviceClient } as const;
+  return { actor: auth.actor, serviceClient: auth.serviceClient } as const;
 }
 
 async function fetchCertificationsForOrg(
@@ -510,6 +941,7 @@ async function fetchJobDefinitionsForOrg(
   includeArchived = false,
 ): Promise<JobDefinition[]> {
   const serviceClient = getServiceClient();
+  await ensureDefaultShiftJobForOrg(orgId);
   let query = serviceClient
     .from("jobs")
     .select(JOB_COLS)
@@ -523,6 +955,58 @@ async function fetchJobDefinitionsForOrg(
   return (data ?? []).map((row) =>
     rowToJobDefinition(row as Parameters<typeof rowToJobDefinition>[0]),
   );
+}
+
+async function ensureDefaultShiftJobForOrg(orgId: string): Promise<void> {
+  const serviceClient = getServiceClient();
+  const { data: existing, error: existingError } = await serviceClient
+    .from("jobs")
+    .select("id, archived_at")
+    .eq("org_id", orgId)
+    .eq("system_key", DEFAULT_SHIFT_JOB_SYSTEM_KEY)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+
+  if (existing) {
+    if (existing.archived_at != null) {
+      const { error } = await serviceClient
+        .from("jobs")
+        .update({ archived_at: null })
+        .eq("org_id", orgId)
+        .eq("id", existing.id);
+      if (error) throw error;
+    }
+    return;
+  }
+
+  const { error } = await serviceClient
+    .from("jobs")
+    .insert({
+      org_id: orgId,
+      name: "Default shift job",
+      abbr: "SHIFT",
+      show_on_grid: false,
+      assignment_mode: "with_shift",
+      eligibility_mode: "and",
+      focus_area_ids: [],
+      department_ids: [],
+      applicable_shift_ids: [],
+      eligible_role_ids: [],
+      required_certification_ids: [],
+      color: "#E2E8F0",
+      border_color: "transparent",
+      text_color: "#1E293B",
+      shift_time_overrides: {},
+      shift_color_overrides: {},
+      default_start_time: null,
+      default_end_time: null,
+      default_duration_hours: null,
+      default_duration_minutes: null,
+      sort_order: -1000,
+      system_key: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+    });
+  if (error && error.code !== "23505") throw error;
 }
 
 async function fetchCoverageRequirementsForOrg(
@@ -541,7 +1025,12 @@ async function fetchCoverageRequirementsForOrg(
 
   const visibleJobIds = new Set(
     jobs
-      .filter((job) => !job.archivedAt && shouldShowJobOnGrid(job))
+      .filter(
+        (job) =>
+          !job.archivedAt &&
+          !isRegularStaffSystemJob(job) &&
+          (shouldShowJobOnGrid(job) || isDefaultShiftSystemJob(job)),
+      )
       .map((job) => job.id),
   );
 
@@ -1043,23 +1532,36 @@ export async function POST(req: NextRequest) {
   try {
     switch (data.action) {
       case "saveCertifications": {
-        const existingIds = new Set(data.existing.map((item) => item.id));
-        const newIds = new Set(data.items.filter((item) => item.id).map((item) => item.id));
-        const toDelete = data.existing.filter((item) => !newIds.has(item.id));
-
-        if (toDelete.length > 0) {
-          const { error } = await serviceClient
-            .from("certifications")
-            .update({ archived_at: new Date().toISOString() })
-            .eq("org_id", data.orgId)
-            .in("id", toDelete.map((item) => item.id));
-          if (error) throw error;
+        const validatedItems = validateNamedItems(data.items, {
+          itemLabel: "Certification",
+        });
+        if ("response" in validatedItems) {
+          return validatedItems.response;
+        }
+        const validatedExisting = validateNamedItems(data.existing, {
+          itemLabel: "Certification",
+        });
+        if ("response" in validatedExisting) {
+          return validatedExisting.response;
         }
 
-        const toUpdate = data.items
+        const existingIds = new Set(validatedExisting.items.map((item) => item.id));
+        const newIds = new Set(validatedItems.items.filter((item) => item.id).map((item) => item.id));
+        const toDelete = validatedExisting.items.filter((item) => !newIds.has(item.id));
+
+        if (toDelete.length > 0) {
+          await archiveSettingsRowsByIds(
+            serviceClient,
+            "certifications",
+            data.orgId,
+            toDelete.map((item) => item.id),
+          );
+        }
+
+        const toUpdate = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
           .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-        const toInsert = data.items
+        const toInsert = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
           .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
 
@@ -1146,23 +1648,36 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "saveOrganizationRoles": {
-        const existingIds = new Set(data.existing.map((item) => item.id));
-        const newIds = new Set(data.items.filter((item) => item.id).map((item) => item.id));
-        const toDelete = data.existing.filter((item) => !newIds.has(item.id));
-
-        if (toDelete.length > 0) {
-          const { error } = await serviceClient
-            .from("organization_roles")
-            .update({ archived_at: new Date().toISOString() })
-            .eq("org_id", data.orgId)
-            .in("id", toDelete.map((item) => item.id));
-          if (error) throw error;
+        const validatedItems = validateNamedItems(data.items, {
+          itemLabel: "Role",
+        });
+        if ("response" in validatedItems) {
+          return validatedItems.response;
+        }
+        const validatedExisting = validateNamedItems(data.existing, {
+          itemLabel: "Role",
+        });
+        if ("response" in validatedExisting) {
+          return validatedExisting.response;
         }
 
-        const toUpdate = data.items
+        const existingIds = new Set(validatedExisting.items.map((item) => item.id));
+        const newIds = new Set(validatedItems.items.filter((item) => item.id).map((item) => item.id));
+        const toDelete = validatedExisting.items.filter((item) => !newIds.has(item.id));
+
+        if (toDelete.length > 0) {
+          await archiveSettingsRowsByIds(
+            serviceClient,
+            "organization_roles",
+            data.orgId,
+            toDelete.map((item) => item.id),
+          );
+        }
+
+        const toUpdate = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
           .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-        const toInsert = data.items
+        const toInsert = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
           .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
 
@@ -1254,23 +1769,32 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "saveDepartments": {
-        const existingIds = new Set(data.existing.map((item) => item.id));
-        const newIds = new Set(data.items.filter((item) => item.id).map((item) => item.id));
-        const toDelete = data.existing.filter((item) => !newIds.has(item.id));
-
-        if (toDelete.length > 0) {
-          const { error } = await serviceClient
-            .from("departments")
-            .update({ archived_at: new Date().toISOString() })
-            .eq("org_id", data.orgId)
-            .in("id", toDelete.map((item) => item.id));
-          if (error) throw error;
+        const validatedItems = validateDepartments(data.items);
+        if ("response" in validatedItems) {
+          return validatedItems.response;
+        }
+        const validatedExisting = validateDepartments(data.existing);
+        if ("response" in validatedExisting) {
+          return validatedExisting.response;
         }
 
-        const toUpdate = data.items
+        const existingIds = new Set(validatedExisting.items.map((item) => item.id));
+        const newIds = new Set(validatedItems.items.filter((item) => item.id).map((item) => item.id));
+        const toDelete = validatedExisting.items.filter((item) => !newIds.has(item.id));
+
+        if (toDelete.length > 0) {
+          await archiveSettingsRowsByIds(
+            serviceClient,
+            "departments",
+            data.orgId,
+            toDelete.map((item) => item.id),
+          );
+        }
+
+        const toUpdate = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
           .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-        const toInsert = data.items
+        const toInsert = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
           .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
 
@@ -1360,20 +1884,24 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "upsertFocusArea": {
+        const validatedFocusArea = validateFocusArea(data.focusArea);
+        if ("response" in validatedFocusArea) {
+          return validatedFocusArea.response;
+        }
         const row = {
-          org_id: data.focusArea.orgId,
-          department_id: data.focusArea.departmentId ?? null,
-          name: data.focusArea.name,
-          color: normalizePresetBg(data.focusArea.color ?? undefined),
-          sort_order: data.focusArea.sortOrder,
+          org_id: validatedFocusArea.focusArea.orgId,
+          department_id: validatedFocusArea.focusArea.departmentId ?? null,
+          name: validatedFocusArea.focusArea.name,
+          color: normalizePresetBg(validatedFocusArea.focusArea.color ?? undefined),
+          sort_order: validatedFocusArea.focusArea.sortOrder,
         };
 
         let savedRow;
-        if (data.focusArea.id) {
+        if (validatedFocusArea.focusArea.id) {
           const { data: updated, error } = await serviceClient
             .from("focus_areas")
             .update(row)
-            .eq("id", data.focusArea.id)
+            .eq("id", validatedFocusArea.focusArea.id)
             .select()
             .single();
           if (error) throw error;
@@ -1388,14 +1916,14 @@ export async function POST(req: NextRequest) {
           savedRow = inserted;
         }
 
-        await cacheDel(CacheKey.focusAreas(data.focusArea.orgId));
+        await cacheDel(CacheKey.focusAreas(validatedFocusArea.focusArea.orgId));
         await writeAudit({
           actor,
           action: "focus_area.upserted",
           resourceType: "focus_area",
           resourceId: String(savedRow.id),
-          details: { name: data.focusArea.name },
-          orgId: data.focusArea.orgId,
+          details: { name: validatedFocusArea.focusArea.name },
+          orgId: validatedFocusArea.focusArea.orgId,
         });
         return NextResponse.json({
           item: rowToFocusArea(savedRow as Parameters<typeof rowToFocusArea>[0]),
@@ -1459,24 +1987,28 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "upsertShiftCategory": {
+        const validatedShiftCategory = validateShiftCategory(data.shiftCategory);
+        if ("response" in validatedShiftCategory) {
+          return validatedShiftCategory.response;
+        }
         const row = {
-          org_id: data.shiftCategory.orgId,
-          name: data.shiftCategory.name,
-          abbr: data.shiftCategory.abbr ?? null,
-          start_time: data.shiftCategory.startTime ?? null,
-          end_time: data.shiftCategory.endTime ?? null,
-          color: normalizePresetBg(data.shiftCategory.color),
-          sort_order: data.shiftCategory.sortOrder,
-          focus_area_id: data.shiftCategory.focusAreaId ?? null,
-          break_minutes: data.shiftCategory.breakMinutes ?? null,
+          org_id: validatedShiftCategory.shiftCategory.orgId,
+          name: validatedShiftCategory.shiftCategory.name,
+          abbr: validatedShiftCategory.shiftCategory.abbr ?? null,
+          start_time: validatedShiftCategory.shiftCategory.startTime ?? null,
+          end_time: validatedShiftCategory.shiftCategory.endTime ?? null,
+          color: normalizePresetBg(validatedShiftCategory.shiftCategory.color),
+          sort_order: validatedShiftCategory.shiftCategory.sortOrder,
+          focus_area_id: validatedShiftCategory.shiftCategory.focusAreaId ?? null,
+          break_minutes: validatedShiftCategory.shiftCategory.breakMinutes ?? null,
         };
 
         let savedRow;
-        if (data.shiftCategory.id) {
+        if (validatedShiftCategory.shiftCategory.id) {
           const { data: updated, error } = await serviceClient
             .from("shift_categories")
             .update(row)
-            .eq("id", data.shiftCategory.id)
+            .eq("id", validatedShiftCategory.shiftCategory.id)
             .select()
             .single();
           if (error) throw error;
@@ -1491,20 +2023,20 @@ export async function POST(req: NextRequest) {
           savedRow = inserted;
         }
 
-        await cacheDel(CacheKey.shiftCategories(data.shiftCategory.orgId));
+        await cacheDel(CacheKey.shiftCategories(validatedShiftCategory.shiftCategory.orgId));
         await cacheDel(
-          CacheKey.assignments(data.shiftCategory.orgId),
-          CacheKey.assignments(data.shiftCategory.orgId, true),
-          CacheKey.jobs(data.shiftCategory.orgId),
-          CacheKey.jobs(data.shiftCategory.orgId, true),
+          CacheKey.assignments(validatedShiftCategory.shiftCategory.orgId),
+          CacheKey.assignments(validatedShiftCategory.shiftCategory.orgId, true),
+          CacheKey.jobs(validatedShiftCategory.shiftCategory.orgId),
+          CacheKey.jobs(validatedShiftCategory.shiftCategory.orgId, true),
         );
         await writeAudit({
           actor,
           action: "shift_category.upserted",
           resourceType: "shift_category",
           resourceId: String(savedRow.id),
-          details: { name: data.shiftCategory.name },
-          orgId: data.shiftCategory.orgId,
+          details: { name: validatedShiftCategory.shiftCategory.name },
+          orgId: validatedShiftCategory.shiftCategory.orgId,
         });
         return NextResponse.json({
           item: rowToShiftCategory(savedRow as Parameters<typeof rowToShiftCategory>[0]),
@@ -1557,15 +2089,19 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "upsertJobDefinition": {
-        const focusAreaIds = getStoredJobFocusAreaIds(data.job);
-        const departmentIds = getStoredJobDepartmentIds(data.job);
-        const normalizedTiming = normalizeShiftlessJobTiming(data.job);
-        const isShiftlessJob = (data.job.assignmentMode ?? "with_shift") === "shiftless";
+        const validatedJob = validateJob(data.job);
+        if ("response" in validatedJob) {
+          return validatedJob.response;
+        }
+        const focusAreaIds = getStoredJobFocusAreaIds(validatedJob.job);
+        const departmentIds = getStoredJobDepartmentIds(validatedJob.job);
+        const normalizedTiming = normalizeShiftlessJobTiming(validatedJob.job);
+        const isShiftlessJob = (validatedJob.job.assignmentMode ?? "with_shift") === "shiftless";
         const storedStyle = isShiftlessJob
           ? {
-              color: data.job.color,
-              border_color: data.job.border,
-              text_color: data.job.text,
+              color: validatedJob.job.color,
+              border_color: validatedJob.job.border,
+              text_color: validatedJob.job.text,
             }
           : {
               color: "#E2E8F0",
@@ -1574,41 +2110,41 @@ export async function POST(req: NextRequest) {
             };
 
         const row = {
-          org_id: data.job.orgId,
-          name: data.job.name,
-          abbr: data.job.abbr,
-          show_on_grid: data.job.showOnGrid,
-          assignment_mode: data.job.assignmentMode ?? "with_shift",
-          eligibility_mode: getJobEligibilityMode(data.job),
+          org_id: validatedJob.job.orgId,
+          name: validatedJob.job.name,
+          abbr: validatedJob.job.abbr,
+          show_on_grid: validatedJob.job.showOnGrid,
+          assignment_mode: validatedJob.job.assignmentMode ?? "with_shift",
+          eligibility_mode: getJobEligibilityMode(validatedJob.job),
           focus_area_ids: focusAreaIds,
           department_ids: departmentIds,
-          applicable_shift_ids: normalizePlacementIds(data.job.applicableShiftIds),
-          eligible_role_ids: data.job.eligibleRoleIds ?? [],
-          required_certification_ids: data.job.requiredCertificationIds ?? [],
+          applicable_shift_ids: normalizePlacementIds(validatedJob.job.applicableShiftIds),
+          eligible_role_ids: validatedJob.job.eligibleRoleIds ?? [],
+          required_certification_ids: validatedJob.job.requiredCertificationIds ?? [],
           color: storedStyle.color,
           border_color: storedStyle.border_color,
           text_color: storedStyle.text_color,
           shift_time_overrides: normalizeShiftTimeOverrides(
-            data.job.shiftTimeOverrides as
+            validatedJob.job.shiftTimeOverrides as
               | Record<string, JobShiftTimeOverride | undefined>
               | undefined,
           ),
-          shift_color_overrides: normalizeShiftColorOverrides(data.job.shiftColorOverrides),
+          shift_color_overrides: normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides),
           default_start_time: normalizedTiming.defaultStartTime,
           default_end_time: normalizedTiming.defaultEndTime,
           default_duration_hours: normalizedTiming.defaultDurationHours,
           default_duration_minutes: normalizedTiming.defaultDurationMinutes,
-          sort_order: data.job.sortOrder,
-          system_key: data.job.systemKey ?? null,
+          sort_order: validatedJob.job.sortOrder,
+          system_key: validatedJob.job.systemKey ?? null,
         };
 
         let savedRow;
-        if (data.job.id) {
+        if (validatedJob.job.id) {
           const { data: updated, error } = await serviceClient
             .from("jobs")
             .update(row)
-            .eq("org_id", data.job.orgId)
-            .eq("id", data.job.id)
+            .eq("org_id", validatedJob.job.orgId)
+            .eq("id", validatedJob.job.id)
             .select(JOB_COLS)
             .single();
           if (error) throw error;
@@ -1624,18 +2160,18 @@ export async function POST(req: NextRequest) {
         }
 
         await cacheDel(
-          CacheKey.assignments(data.job.orgId),
-          CacheKey.assignments(data.job.orgId, true),
-          CacheKey.jobs(data.job.orgId),
-          CacheKey.jobs(data.job.orgId, true),
+          CacheKey.assignments(validatedJob.job.orgId),
+          CacheKey.assignments(validatedJob.job.orgId, true),
+          CacheKey.jobs(validatedJob.job.orgId),
+          CacheKey.jobs(validatedJob.job.orgId, true),
         );
         await writeAudit({
           actor,
           action: "job.upserted",
           resourceType: "job",
           resourceId: String(savedRow.id),
-          details: { name: data.job.name },
-          orgId: data.job.orgId,
+          details: { name: validatedJob.job.name },
+          orgId: validatedJob.job.orgId,
         });
         return NextResponse.json({
           item: rowToJobDefinition(savedRow as Parameters<typeof rowToJobDefinition>[0]),
@@ -1731,22 +2267,26 @@ export async function POST(req: NextRequest) {
         });
       }
       case "upsertAbsenceType": {
+        const validatedAbsenceType = validateAbsenceType(data.absenceType);
+        if ("response" in validatedAbsenceType) {
+          return validatedAbsenceType.response;
+        }
         const row = {
-          org_id: data.absenceType.orgId,
-          label: data.absenceType.label,
-          name: data.absenceType.name,
-          color: data.absenceType.color,
-          border_color: data.absenceType.border,
-          text_color: data.absenceType.text,
-          sort_order: data.absenceType.sortOrder,
+          org_id: validatedAbsenceType.absenceType.orgId,
+          label: validatedAbsenceType.absenceType.label,
+          name: validatedAbsenceType.absenceType.name,
+          color: validatedAbsenceType.absenceType.color,
+          border_color: validatedAbsenceType.absenceType.border,
+          text_color: validatedAbsenceType.absenceType.text,
+          sort_order: validatedAbsenceType.absenceType.sortOrder,
         };
 
         let savedRow;
-        if (data.absenceType.id) {
+        if (validatedAbsenceType.absenceType.id) {
           const { data: updated, error } = await serviceClient
             .from("absence_types")
             .update(row)
-            .eq("id", data.absenceType.id)
+            .eq("id", validatedAbsenceType.absenceType.id)
             .select()
             .single();
           if (error) throw error;
@@ -1762,8 +2302,8 @@ export async function POST(req: NextRequest) {
         }
 
         await cacheDel(
-          CacheKey.absenceTypes(data.absenceType.orgId),
-          CacheKey.absenceTypes(data.absenceType.orgId, true),
+          CacheKey.absenceTypes(validatedAbsenceType.absenceType.orgId),
+          CacheKey.absenceTypes(validatedAbsenceType.absenceType.orgId, true),
         );
         await writeAudit({
           actor,
@@ -1771,10 +2311,10 @@ export async function POST(req: NextRequest) {
           resourceType: "absence_type",
           resourceId: String(savedRow.id),
           details: {
-            label: data.absenceType.label,
-            name: data.absenceType.name,
+            label: validatedAbsenceType.absenceType.label,
+            name: validatedAbsenceType.absenceType.name,
           },
-          orgId: data.absenceType.orgId,
+          orgId: validatedAbsenceType.absenceType.orgId,
         });
         return NextResponse.json({
           item: rowToAbsenceType(savedRow as Parameters<typeof rowToAbsenceType>[0]),
@@ -1821,19 +2361,23 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
       case "upsertIndicatorType": {
+        const validatedIndicatorType = validateIndicatorType(data.indicatorType);
+        if ("response" in validatedIndicatorType) {
+          return validatedIndicatorType.response;
+        }
         const row = {
-          org_id: data.indicatorType.orgId,
-          name: data.indicatorType.name,
-          color: data.indicatorType.color,
-          sort_order: data.indicatorType.sortOrder,
+          org_id: validatedIndicatorType.indicatorType.orgId,
+          name: validatedIndicatorType.indicatorType.name,
+          color: validatedIndicatorType.indicatorType.color,
+          sort_order: validatedIndicatorType.indicatorType.sortOrder,
         };
 
         let savedRow;
-        if (data.indicatorType.id) {
+        if (validatedIndicatorType.indicatorType.id) {
           const { data: updated, error } = await serviceClient
             .from("indicator_types")
             .update(row)
-            .eq("id", data.indicatorType.id)
+            .eq("id", validatedIndicatorType.indicatorType.id)
             .select()
             .single();
           if (error) throw error;
@@ -1848,14 +2392,14 @@ export async function POST(req: NextRequest) {
           savedRow = inserted;
         }
 
-        await cacheDel(CacheKey.indicatorTypes(data.indicatorType.orgId));
+        await cacheDel(CacheKey.indicatorTypes(validatedIndicatorType.indicatorType.orgId));
         await writeAudit({
           actor,
           action: "indicator_type.upserted",
           resourceType: "indicator_type",
           resourceId: String(savedRow.id),
-          details: { name: data.indicatorType.name },
-          orgId: data.indicatorType.orgId,
+          details: { name: validatedIndicatorType.indicatorType.name },
+          orgId: validatedIndicatorType.indicatorType.orgId,
         });
         return NextResponse.json({
           item: rowToIndicatorType(savedRow as Parameters<typeof rowToIndicatorType>[0]),

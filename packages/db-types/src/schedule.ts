@@ -7,6 +7,7 @@ export interface DbScheduleCellSegment {
   position: number;
   shift_id: number | null;
   job_id: number;
+  is_mentored?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

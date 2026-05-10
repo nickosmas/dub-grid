@@ -1,51 +1,87 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
-import type { FullAuditLogEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
+import Modal from "@/components/Modal";
+import {
+  describeAction,
+  formatDetails,
+  formatRelativeTime,
+  getAuditActorLabel,
+  getAuditActorSecondaryLabel,
+  getAuditTargetLabel,
+  summarizeDetails,
+} from "@/lib/activity-log-utils";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { MaybeHint } from "@/components/ui/hint";
+import { queryKeys } from "@/lib/query-keys";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+import type { FullAuditLogEntry } from "@/types";
 
 const ACTION_LABELS: Record<string, string> = {
-  "org.created": "Org Created",
-  "org.updated": "Org Updated",
-  "org.archived": "Org Archived",
-  "org.restored": "Org Restored",
-  "org.suspended": "Org Suspended",
-  "org.unsuspended": "Org Unsuspended",
-  "org.deleted": "Org Deleted",
-  "role.changed": "Role Changed",
-  "permissions.updated": "Perms Updated",
-  "user.removed_from_org": "User Removed",
-  "user.deactivated": "User Deactivated",
-  "user.reactivated": "User Reactivated",
-  "user.force_logout": "Force Logout",
-  "user.password_reset_sent": "Password Reset",
-  "impersonation.started": "Impersonation Start",
-  "impersonation.ended": "Impersonation End",
-  "invitation.sent": "Invitation Sent",
-  "invitation.accepted": "Invitation Accepted",
-  "invitation.revoked": "Invitation Revoked",
-  "invitation.resent": "Invitation Resent",
-  "employee.created": "Employee Created",
-  "employee.updated": "Employee Updated",
-  "employee.benched": "Employee Benched",
-  "employee.activated": "Employee Activated",
-  "employee.archived": "Employee Terminated",
-  "shift.created": "Shift Created",
-  "shift.updated": "Shift Updated",
-  "shift.deleted": "Shift Deleted",
-  "schedule.published": "Schedule Published",
-  "schedule.drafts_discarded": "Drafts Discarded",
-  "billing.trial_extended": "Trial Extended",
-  "billing.subscription_canceled": "Subscription Canceled",
-  "billing.synced": "Billing Synced",
+  "org.created": "Organization created",
+  "org.updated": "Organization updated",
+  "org.archived": "Organization archived",
+  "org.restored": "Organization restored",
+  "org.suspended": "Organization suspended",
+  "org.unsuspended": "Organization unsuspended",
+  "org.deleted": "Organization deleted",
+  "role.changed": "Role changed",
+  "role.assigned": "Role assigned",
+  "permissions.updated": "Permissions updated",
+  "gridmaster_account.promoted": "Gridmaster promoted",
+  "gridmaster_account.demoted": "Gridmaster demoted",
+  "gridmaster_account.deactivated": "Gridmaster deactivated",
+  "gridmaster_account.reactivated": "Gridmaster reactivated",
+  "user.removed_from_org": "User removed",
+  "user.deactivated": "User deactivated",
+  "user.reactivated": "User reactivated",
+  "user.force_logout": "Force logout",
+  "user.password_reset_sent": "Password reset",
+  "impersonation.started": "Impersonation started",
+  "impersonation.ended": "Impersonation ended",
+  "invitation.sent": "Invitation sent",
+  "invitation.accepted": "Invitation accepted",
+  "invitation.revoked": "Invitation revoked",
+  "invitation.resent": "Invitation resent",
+  "employee.created": "Employee created",
+  "employee.updated": "Employee updated",
+  "employee.benched": "Employee benched",
+  "employee.activated": "Employee activated",
+  "employee.archived": "Employee terminated",
+  "shift.created": "Shift created",
+  "shift.updated": "Shift updated",
+  "shift.deleted": "Shift deleted",
+  "schedule.published": "Schedule published",
+  "schedule.drafts_discarded": "Drafts discarded",
+  "billing.trial_extended": "Trial extended",
+  "billing.subscription_canceled": "Subscription canceled",
+  "billing.synced": "Billing synced",
+  "billing.status_overridden": "Billing status override",
+  "feature_flags.updated": "Runtime controls updated",
 };
 
 function getActionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/\./g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return ACTION_LABELS[action] ?? action.replace(/[._-]/g, " ").replace(/\s+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  data_export: "Data export",
+  employee: "Employee",
+  impersonation_session: "Impersonation session",
+  invitation: "Invitation",
+  organization: "Organization",
+  organization_membership: "Organization access",
+  schedule: "Schedule",
+  shift: "Shift",
+  user: "User account",
+};
+
+function getResourceTypeLabel(resourceType: string): string {
+  return RESOURCE_TYPE_LABELS[resourceType] ?? resourceType.replace(/[._-]/g, " ").replace(/\s+/g, " ").trim().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function ActionBadge({ action }: { action: string }) {
@@ -86,33 +122,58 @@ function ActionBadge({ action }: { action: string }) {
   );
 }
 
+function IdentityStack({
+  primary,
+  secondary,
+}: {
+  primary: string;
+  secondary?: string | null;
+}) {
+  const showSecondary = secondary && secondary !== primary;
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+        {primary}
+      </div>
+      {showSecondary && (
+        <div style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>
+          {secondary}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DetailsSummary({ details, action }: { details: Record<string, unknown>; action: string }) {
   if (!details || Object.keys(details).length === 0) return <span style={{ color: "var(--color-text-faint)" }}>—</span>;
 
-  const parts: string[] = [];
-  if (action === "role.changed" && details.from_role && details.to_role) {
-    parts.push(`${details.from_role} → ${details.to_role}`);
-  } else if (action === "org.suspended" && details.reason) {
-    parts.push(`Reason: ${details.reason}`);
-  } else if (details.name) {
-    parts.push(String(details.name));
-  } else if (details.email) {
-    parts.push(String(details.email));
-  } else if (details.justification) {
-    parts.push(String(details.justification));
-  }
-
-  if (parts.length === 0) {
-    const keys = Object.keys(details).slice(0, 2);
-    for (const k of keys) parts.push(`${k}: ${String(details[k])}`);
-  }
+  const entry = {
+    id: 0,
+    orgId: null,
+    orgName: null,
+    actorId: null,
+    actorEmail: null,
+    actorName: null,
+    action,
+    resourceType: "",
+    resourceId: null,
+    targetLabel: null,
+    targetEmail: null,
+    details,
+    createdAt: new Date().toISOString(),
+  };
+  const summary = summarizeDetails(entry);
+  const detailItems = formatDetails(entry);
+  const hintContent = detailItems.length > 0
+    ? detailItems.map((item) => `${item.label}: ${item.value}`).join("\n")
+    : "No extra details";
 
   return (
-    <MaybeHint content={JSON.stringify(details, null, 2)} side="bottom">
+    <MaybeHint content={hintContent} side="bottom">
       <span
         style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
       >
-        {parts.join("; ")}
+        {summary}
       </span>
     </MaybeHint>
   );
@@ -123,6 +184,7 @@ const ACTION_CATEGORIES = [
   { value: "all", label: "All Actions" },
   { value: "org.", label: "Organization" },
   { value: "role.", label: "Roles & Permissions" },
+  { value: "gridmaster_account.", label: "Gridmaster Accounts" },
   { value: "user.", label: "User Management" },
   { value: "impersonation.", label: "Impersonation" },
   { value: "invitation.", label: "Invitations" },
@@ -130,40 +192,53 @@ const ACTION_CATEGORIES = [
   { value: "shift.", label: "Shifts" },
   { value: "schedule.", label: "Schedule" },
   { value: "billing.", label: "Billing" },
+  { value: "feature_flags.", label: "Runtime Controls" },
 ];
 
 export default function AuditLogView({
   orgId,
   title,
+  initialActionFilter = "all",
 }: {
   orgId?: string;
   title?: string;
+  initialActionFilter?: string;
 }) {
-  const [entries, setEntries] = useState<FullAuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(0);
-  const [actionFilter, setActionFilter] = useState("all");
+  const [actionFilter, setActionFilter] = useState(initialActionFilter);
+  const [resourceType, setResourceType] = useState("");
+  const [target, setTarget] = useState("");
+  const [highRiskOnly, setHighRiskOnly] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<FullAuditLogEntry | null>(null);
   const PAGE_SIZE = 50;
+  const filterKey = JSON.stringify({
+    actionFilter,
+    resourceType,
+    target,
+    highRiskOnly,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    fetchGridmasterFullAuditLog({
-      orgId,
-      limit: PAGE_SIZE,
-      offset: page * PAGE_SIZE,
-    })
-      .then((data) => { if (!cancelled) setEntries(data); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [orgId, page]);
-
-  const filteredEntries = useMemo(() => {
-    if (actionFilter === "all") return entries;
-    return entries.filter((e) => e.action.startsWith(actionFilter));
-  }, [entries, actionFilter]);
+  const auditQuery = useQuery({
+    queryKey: queryKeys.gridmaster.orgAudit(orgId ?? null, page, PAGE_SIZE, filterKey),
+    queryFn: () =>
+      fetchGridmasterFullAuditLog({
+        orgId,
+        actionPrefix: actionFilter === "all" ? undefined : actionFilter,
+        resourceType: resourceType || undefined,
+        target: target.trim() || undefined,
+        highRiskOnly,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE,
+      }),
+    staleTime: 30_000,
+  });
+  const entries = auditQuery.data ?? [];
+  const error = auditQuery.error
+    ? formatClientErrorMessage(
+        auditQuery.error,
+        "We couldn't load the audit log right now.",
+      )
+    : null;
 
   const actionOptions = useMemo(() => ACTION_CATEGORIES, []);
 
@@ -181,6 +256,30 @@ export default function AuditLogView({
             style={{ width: "auto", minWidth: 160 }}
             fontSize={12}
           />
+          <input
+            className="dg-input"
+            value={resourceType}
+            onChange={(event) => { setResourceType(event.target.value); setPage(0); }}
+            placeholder="Resource"
+            aria-label="Resource type"
+            style={{ width: 130, fontSize: "var(--dg-fs-caption)" }}
+          />
+          <input
+            className="dg-input"
+            value={target}
+            onChange={(event) => { setTarget(event.target.value); setPage(0); }}
+            placeholder="Target / details"
+            aria-label="Target search"
+            style={{ width: 170, fontSize: "var(--dg-fs-caption)" }}
+          />
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontWeight: 700 }}>
+            <input
+              type="checkbox"
+              checked={highRiskOnly}
+              onChange={(event) => { setHighRiskOnly(event.target.checked); setPage(0); }}
+            />
+            High risk
+          </label>
         </div>
       </div>
 
@@ -190,7 +289,7 @@ export default function AuditLogView({
         </div>
       )}
 
-      {loading ? (
+      {auditQuery.isLoading ? (
         <div style={sectionStyle}>
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} style={{ display: "flex", gap: 16, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
@@ -205,7 +304,7 @@ export default function AuditLogView({
         </div>
       ) : (
         <>
-          {filteredEntries.length > 0 ? (
+          {entries.length > 0 ? (
             <div style={sectionStyle}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -214,37 +313,79 @@ export default function AuditLogView({
                       <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Timestamp</th>
                       <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Action</th>
                       <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Actor</th>
-                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Resource</th>
+                      <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Target</th>
                       <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Details</th>
                       {!orgId && <th style={{ ...thStyle, background: "var(--color-bg-secondary)" }}>Org</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEntries.map((e, idx) => {
+                    {entries.map((e, idx) => {
                       const date = new Date(e.createdAt);
+                      const actorLabel = getAuditActorLabel(e);
+                      const targetLabel = getAuditTargetLabel(e);
+                      const actionDescription = describeAction(e);
                       return (
-                        <tr key={e.id} style={{ background: idx % 2 === 1 ? "var(--color-row-alt)" : undefined }}>
+                        <tr
+                          key={e.id}
+                          tabIndex={0}
+                          aria-label={`${getActionLabel(e.action)} audit details`}
+                          onClick={() => setSelectedEntry(e)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelectedEntry(e);
+                            }
+                          }}
+                          style={{
+                            background: idx % 2 === 1 ? "var(--color-row-alt)" : undefined,
+                            cursor: "pointer",
+                          }}
+                        >
                           <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-                            {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            {" "}
-                            {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            <MaybeHint
+                              content={date.toLocaleString("en-US", {
+                                weekday: "long",
+                                month: "long",
+                                day: "numeric",
+                                year: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                                timeZoneName: "short",
+                              })}
+                              side="bottom"
+                            >
+                              <span>{formatRelativeTime(e.createdAt)}</span>
+                            </MaybeHint>
                           </td>
                           <td style={tdStyle}>
-                            <ActionBadge action={e.action} />
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                              <ActionBadge action={e.action} />
+                              <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {actionDescription}
+                              </span>
+                            </div>
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace" }}>
-                            {e.actorEmail ?? (e.actorId ? e.actorId.slice(0, 8) + "…" : "System")}
+                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)" }}>
+                            <IdentityStack
+                              primary={actorLabel}
+                              secondary={getAuditActorSecondaryLabel(e)}
+                            />
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace" }}>
-                            {e.resourceType}
-                            {e.resourceId ? ` #${e.resourceId.slice(0, 8)}` : ""}
+                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)" }}>
+                            <IdentityStack
+                              primary={targetLabel}
+                              secondary={e.targetLabel ? e.targetEmail : null}
+                            />
+                            <div style={{ color: "var(--color-text-faint)", fontSize: "var(--dg-fs-caption)", marginTop: 2 }}>
+                              {getResourceTypeLabel(e.resourceType)}
+                            </div>
                           </td>
                           <td style={tdStyle}>
                             <DetailsSummary details={e.details} action={e.action} />
                           </td>
                           {!orgId && (
                             <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                              {e.orgId ? e.orgId.slice(0, 8) + "…" : "—"}
+                              {e.orgName ?? (e.orgId ? "Unknown organization" : "Platform-wide")}
                             </td>
                           )}
                         </tr>
@@ -260,7 +401,7 @@ export default function AuditLogView({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               }
               title="No audit log entries"
-              description={actionFilter !== "all" ? "Try changing the action filter to see more entries." : undefined}
+              description={actionFilter !== "all" || resourceType || target || highRiskOnly ? "Try changing the filters to see more entries." : undefined}
             />
           )}
 
@@ -274,7 +415,7 @@ export default function AuditLogView({
               Previous
             </button>
             <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace" }}>
-              {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + filteredEntries.length}
+              {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + entries.length}
             </span>
             <button
               className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -286,6 +427,142 @@ export default function AuditLogView({
           </div>
         </>
       )}
+      {selectedEntry ? (
+        <AuditEntryDetailsDialog
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+        />
+      ) : null}
     </>
   );
+}
+
+function AuditEntryDetailsDialog({
+  entry,
+  onClose,
+}: {
+  entry: FullAuditLogEntry;
+  onClose: () => void;
+}) {
+  const detailItems = formatDetails(entry);
+  const actorLabel = getAuditActorLabel(entry);
+  const targetLabel = getAuditTargetLabel(entry);
+  const actorSecondary = getAuditActorSecondaryLabel(entry);
+  const targetSecondary = entry.targetLabel ? entry.targetEmail : null;
+
+  return (
+    <Modal
+      title="Audit log details"
+      onClose={onClose}
+      style={{ maxWidth: 600, width: "min(600px, calc(100vw - 32px))" }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <ActionBadge action={entry.action} />
+          <div
+            style={{
+              color: "var(--color-text-primary)",
+              fontSize: "var(--dg-fs-card-title)",
+              fontWeight: 800,
+            }}
+          >
+            {describeAction(entry)}
+          </div>
+        </div>
+
+        <AuditDetailRows
+          rows={[
+            ["Timestamp", formatTimestamp(entry.createdAt)],
+            ["Actor", actorSecondary ? `${actorLabel} (${actorSecondary})` : actorLabel],
+            ["Target", targetSecondary ? `${targetLabel} (${targetSecondary})` : targetLabel],
+            [
+              "Record type",
+              getResourceTypeLabel(entry.resourceType),
+            ],
+            ["Organization", entry.orgName ?? (entry.orgId ? "Unknown organization" : "Platform-wide")],
+            ["Action", getActionLabel(entry.action)],
+          ]}
+        />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div
+            style={{
+              color: "var(--color-text-muted)",
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 800,
+              textTransform: "uppercase",
+            }}
+          >
+            Event details
+          </div>
+          {detailItems.length > 0 ? (
+            <AuditDetailRows rows={detailItems.map((item) => [item.label, item.value])} />
+          ) : (
+            <div
+              style={{
+                color: "var(--color-text-muted)",
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+              }}
+            >
+              No additional details were recorded.
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AuditDetailRows({ rows }: { rows: Array<[string, string]> }) {
+  return (
+    <dl
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(104px, max-content) minmax(0, 1fr)",
+        gap: "8px 14px",
+        margin: 0,
+      }}
+    >
+      {rows.map(([label, value]) => (
+        <AuditDetailRow key={`${label}:${value}`} label={label} value={value} />
+      ))}
+    </dl>
+  );
+}
+
+function AuditDetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt
+        style={{
+          color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 800,
+        }}
+      >
+        {label}
+      </dt>
+      <dd
+        style={{
+          color: "var(--color-text-primary)",
+          fontSize: "var(--dg-fs-label)",
+          fontWeight: 650,
+          margin: 0,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {value}
+      </dd>
+    </>
+  );
+}
+
+function formatTimestamp(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }

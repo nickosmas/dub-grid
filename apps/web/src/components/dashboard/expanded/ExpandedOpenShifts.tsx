@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import Modal from "@/components/Modal";
@@ -60,6 +61,10 @@ export default function ExpandedOpenShifts({
   const focusAreaNames = useMemo(
     () => [...new Set(openShifts.map((s) => s.focusAreaName))].sort(),
     [openShifts],
+  );
+  const filteredSlotCount = filtered.reduce(
+    (total, shift) => total + shift.needed,
+    0,
   );
 
   return (
@@ -133,7 +138,7 @@ export default function ExpandedOpenShifts({
                   marginLeft: "auto",
                 }}
               >
-                {filtered.length} shift{filtered.length !== 1 ? "s" : ""}
+                {filteredSlotCount} open slot{filteredSlotCount === 1 ? "" : "s"}
               </span>
             </div>
 
@@ -164,72 +169,82 @@ export default function ExpandedOpenShifts({
                     .filter(Boolean)
                     .join(" · ");
                   return (
-                    <div key={shift.id} style={itemStyle}>
-                      <div style={{ textAlign: "center", minWidth: 40 }}>
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: "var(--color-text-subtle)",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {shift.dayOfWeek}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 18,
-                            fontWeight: 700,
-                            color: "var(--color-text-primary)",
-                            lineHeight: 1,
-                          }}
-                        >
-                          {shift.dayOfMonth}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          width: 1,
-                          height: 40,
-                          background: "var(--color-border)",
-                        }}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "var(--color-text-primary)",
-                          }}
-                        >
-                          {shift.assignmentLabel}
-                        </div>
-                        {metaText ? (
+                    <Link
+                      key={shift.id}
+                      href="/schedule"
+                      style={{
+                        display: "block",
+                        textDecoration: "none",
+                        color: "inherit",
+                      }}
+                    >
+                      <div style={itemStyle}>
+                        <div style={{ textAlign: "center", minWidth: 40 }}>
                           <div
                             style={{
-                              fontSize: 11,
+                              fontSize: 10,
                               color: "var(--color-text-subtle)",
-                              marginTop: 2,
+                              fontWeight: 500,
                             }}
                           >
-                            {metaText}
+                            {shift.dayOfWeek}
                           </div>
-                        ) : null}
+                          <div
+                            style={{
+                              fontSize: 18,
+                              fontWeight: 700,
+                              color: "var(--color-text-primary)",
+                              lineHeight: 1,
+                            }}
+                          >
+                            {shift.dayOfMonth}
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            width: 1,
+                            height: 40,
+                            background: "var(--color-border)",
+                          }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: "var(--color-text-primary)",
+                            }}
+                          >
+                            {shift.assignmentLabel}
+                          </div>
+                          {metaText ? (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: "var(--color-text-subtle)",
+                                marginTop: 2,
+                              }}
+                            >
+                              {metaText}
+                            </div>
+                          ) : null}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            padding: "3px 10px",
+                            borderRadius: 5,
+                            background: badge.bg,
+                            color: badge.color,
+                            border: `1px solid ${badge.border}`,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {badge.label}
+                        </span>
                       </div>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: "3px 10px",
-                          borderRadius: 5,
-                          background: badge.bg,
-                          color: badge.color,
-                          border: `1px solid ${badge.border}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {badge.label}
-                      </span>
-                    </div>
+                    </Link>
                   );
                 })
               )}

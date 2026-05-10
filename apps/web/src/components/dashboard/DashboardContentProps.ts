@@ -44,6 +44,7 @@ export interface DashboardContentProps {
   periodDates: Date[];
   periodStart: Date;
   periodEnd: Date;
+  periodLabel: string;
   prevPeriodLabel: string;
 
   // Shift data
@@ -61,6 +62,7 @@ export interface DashboardContentProps {
   activityItems: ActivityItem[];
   trendData: TrendDataPoint[];
   publishedWindowState: PublishedWindowState;
+  overtimeThreshold: number;
 
   // Shift requests
   shiftRequests: ShiftRequestsData;

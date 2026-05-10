@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { mobileColors, mobileText } from "../theme/tokens";
 
 export function EmptyStateCard({
   iconName = "sparkles-outline",
@@ -36,22 +36,10 @@ export function EmptyStateCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    paddingHorizontal: 20,
-    paddingVertical: 22,
+    paddingHorizontal: 4,
+    paddingVertical: 18,
     gap: 14,
     alignItems: "center",
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 2,
   },
   iconFrame: {
     width: 52,
@@ -68,15 +56,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
+    ...mobileText.sectionTitle,
     color: mobileColors.textPrimary,
-    fontSize: 19,
-    fontWeight: "800",
     textAlign: "center",
   },
   body: {
+    ...mobileText.body,
     color: mobileColors.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
     textAlign: "center",
   },
   actionRow: {

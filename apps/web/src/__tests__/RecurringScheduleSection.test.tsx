@@ -35,6 +35,7 @@ const employees: Employee[] = [
     id: "emp-1",
     firstName: "Alice",
     lastName: "Smith",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",

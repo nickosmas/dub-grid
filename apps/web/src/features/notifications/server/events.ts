@@ -1,5 +1,6 @@
 import { getServiceClient } from "@/lib/supabase-service";
 import { fetchPublishedShiftRows } from "@/lib/published-shifts";
+import logger from "@/lib/logger";
 import { sendNotification } from "./sender";
 import type { NotificationType } from "@/types";
 
@@ -9,6 +10,13 @@ export type NotificationEvent =
       orgId: string;
       requestId: string;
       requestType: "pickup" | "swap" | "calloff";
+    }
+  | {
+      action: "shift_request_responded";
+      orgId: string;
+      requestId: string;
+      requestType: "pickup" | "swap" | "calloff";
+      accepted: boolean;
     }
   | {
       action: "shift_request_resolved";
@@ -42,13 +50,15 @@ async function getAdminsWithPermission(
     .from("organization_memberships")
     .select("user_id")
     .eq("org_id", orgId)
-    .eq("org_role", "super_admin");
+    .eq("org_role", "super_admin")
+    .is("archived_at", null);
 
   const { data: admins } = await db
     .from("organization_memberships")
     .select("user_id, admin_permissions")
     .eq("org_id", orgId)
-    .eq("org_role", "admin");
+    .eq("org_role", "admin")
+    .is("archived_at", null);
 
   const ids = new Set<string>();
   for (const row of superAdmins ?? []) {
@@ -92,96 +102,226 @@ async function getAffectedEmployeeUserIds(
 
 async function getRequestInfo(
   requestId: string,
-): Promise<{ userId: string | null; requesterName: string }> {
+): Promise<{
+  requesterUserId: string | null;
+  requesterName: string;
+  targetUserId: string | null;
+  targetName: string;
+  requestType: "pickup" | "swap" | "calloff" | null;
+  status: string | null;
+}> {
   const db = getServiceClient();
   const { data } = await db
     .from("shift_requests")
     .select(
-      "requester:employees!shift_requests_requester_emp_id_fkey(user_id, first_name, last_name)",
+      `status,
+       type,
+       requester:employees!shift_requests_requester_emp_id_fkey(user_id, first_name, last_name),
+       target:employees!shift_requests_target_emp_id_fkey(user_id, first_name, last_name)`,
     )
     .eq("id", requestId)
     .single();
 
-  const requesterRows = data?.requester as
-    | { user_id: string | null; first_name: string; last_name: string }[]
-    | null;
-  const requester = requesterRows?.[0] ?? null;
+  const requester = normalizeEmployeeRelation(data?.requester);
+  const target = normalizeEmployeeRelation(data?.target);
 
   return {
-    userId: requester?.user_id ?? null,
+    requesterUserId: requester?.user_id ?? null,
     requesterName: requester
       ? `${requester.first_name} ${requester.last_name}`
       : "An employee",
+    targetUserId: target?.user_id ?? null,
+    targetName: target ? `${target.first_name} ${target.last_name}` : "An employee",
+    requestType:
+      data?.type === "pickup" || data?.type === "swap" || data?.type === "calloff"
+        ? data.type
+        : null,
+    status: (data?.status as string | null | undefined) ?? null,
   };
+}
+
+function normalizeEmployeeRelation(
+  value: unknown,
+): { user_id: string | null; first_name: string; last_name: string } | null {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    return normalizeEmployeeRelation(value[0]);
+  }
+  if (typeof value !== "object") return null;
+
+  const row = value as {
+    user_id?: unknown;
+    first_name?: unknown;
+    last_name?: unknown;
+  };
+  if (typeof row.first_name !== "string" || typeof row.last_name !== "string") {
+    return null;
+  }
+
+  return {
+    user_id: typeof row.user_id === "string" ? row.user_id : null,
+    first_name: row.first_name,
+    last_name: row.last_name,
+  };
+}
+
+function getShiftRequestTypeLabel(type: "pickup" | "swap" | "calloff"): string {
+  if (type === "calloff") return "calloff";
+  if (type === "swap") return "swap";
+  return "pickup";
+}
+
+function capitalize(value: string): string {
+  return value.length > 0 ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : value;
+}
+
+async function notifyShiftRequestApprovers(input: {
+  actorUserId: string;
+  orgId: string;
+  requestId: string;
+  requestType: "pickup" | "swap" | "calloff";
+  title: string;
+  message: string;
+}) {
+  const adminIds = await getAdminsWithPermission(
+    input.orgId,
+    "canApproveShiftRequests",
+  );
+
+  await Promise.all(
+    adminIds
+      .filter((id) => id !== input.actorUserId)
+      .map((adminId) =>
+        sendNotification(
+          adminId,
+          input.orgId,
+          "shift_request_new" as NotificationType,
+          input.title,
+          input.message,
+          {
+            requestId: input.requestId,
+            requestType: input.requestType,
+            action: "approve_request",
+            tab: "approval",
+          },
+        ),
+      ),
+  );
 }
 
 export async function dispatchNotificationEvent(
   actorUserId: string,
   event: NotificationEvent,
 ): Promise<void> {
+  try {
+    await dispatchNotificationEventInternal(actorUserId, event);
+  } catch (error) {
+    logger.error(
+      { error, action: event.action, orgId: event.orgId },
+      "Failed to dispatch notification event",
+    );
+  }
+}
+
+async function dispatchNotificationEventInternal(
+  actorUserId: string,
+  event: NotificationEvent,
+): Promise<void> {
   switch (event.action) {
     case "shift_request_created": {
-      const { requesterName } = await getRequestInfo(event.requestId);
-      const adminIds = await getAdminsWithPermission(
-        event.orgId,
-        "canApproveShiftRequests",
-      );
-      const typeLabel =
-        event.requestType === "calloff"
-          ? "calloff"
-          : event.requestType === "swap"
-            ? "swap"
-            : "pickup";
+      const requestInfo = await getRequestInfo(event.requestId);
+      const requestType = requestInfo.requestType ?? event.requestType;
+      const typeLabel = getShiftRequestTypeLabel(requestType);
 
-      await Promise.all(
-        adminIds
-          .filter((id) => id !== actorUserId)
-          .map((adminId) =>
-            sendNotification(
-              adminId,
-              event.orgId,
-              "shift_request_new" as NotificationType,
-              `New ${typeLabel} request`,
-              `${requesterName} submitted a ${typeLabel} request that needs your approval.`,
-              {
-                requestId: event.requestId,
-                requestType: event.requestType,
-              },
-            ),
-          ),
-      );
+      if (
+        requestInfo.status === "open" &&
+        requestInfo.targetUserId &&
+        requestInfo.targetUserId !== actorUserId
+      ) {
+        await sendNotification(
+          requestInfo.targetUserId,
+          event.orgId,
+          "shift_request_new" as NotificationType,
+          `${capitalize(typeLabel)} response needed`,
+          `${requestInfo.requesterName} sent you a ${typeLabel} request.`,
+          {
+            requestId: event.requestId,
+            requestType,
+            action: "respond_to_request",
+            tab: "mine",
+          },
+        );
+        return;
+      }
+
+      if (requestInfo.status === "pending_approval") {
+        await notifyShiftRequestApprovers({
+          actorUserId,
+          orgId: event.orgId,
+          requestId: event.requestId,
+          requestType,
+          title: `New ${typeLabel} request`,
+          message: `${requestInfo.requesterName} submitted a ${typeLabel} request that needs your approval.`,
+        });
+      }
       return;
     }
 
     case "shift_request_claimed": {
-      const { requesterName: claimerName } = await getRequestInfo(event.requestId);
-      const adminIds = await getAdminsWithPermission(
-        event.orgId,
-        "canApproveShiftRequests",
-      );
-      await Promise.all(
-        adminIds
-          .filter((id) => id !== actorUserId)
-          .map((adminId) =>
-            sendNotification(
-              adminId,
-              event.orgId,
-              "shift_request_new" as NotificationType,
-              "Shift pickup claimed",
-              `${claimerName} claimed a pickup request that needs your approval.`,
-              {
-                requestId: event.requestId,
-                requestType: "pickup",
-              },
-            ),
-          ),
-      );
+      const { requesterName, targetName } = await getRequestInfo(event.requestId);
+      await notifyShiftRequestApprovers({
+        actorUserId,
+        orgId: event.orgId,
+        requestId: event.requestId,
+        requestType: "pickup",
+        title: "Pickup request awaiting approval",
+        message: `${targetName} offered to pick up ${requesterName}'s shift.`,
+      });
+      return;
+    }
+
+    case "shift_request_responded": {
+      const requestInfo = await getRequestInfo(event.requestId);
+      const requestType = requestInfo.requestType ?? event.requestType;
+      const typeLabel = getShiftRequestTypeLabel(requestType);
+
+      if (event.accepted) {
+        await notifyShiftRequestApprovers({
+          actorUserId,
+          orgId: event.orgId,
+          requestId: event.requestId,
+          requestType,
+          title: `${capitalize(typeLabel)} request awaiting approval`,
+          message: `${requestInfo.targetName} accepted ${requestInfo.requesterName}'s ${typeLabel} request.`,
+        });
+        return;
+      }
+
+      if (requestInfo.requesterUserId && requestInfo.requesterUserId !== actorUserId) {
+        await sendNotification(
+          requestInfo.requesterUserId,
+          event.orgId,
+          "shift_request_rejected" as NotificationType,
+          "Request declined",
+          `${requestInfo.targetName} declined your ${typeLabel} request.`,
+          {
+            requestId: event.requestId,
+            requestType,
+            approved: false,
+            action: "view_request",
+            tab: "mine",
+          },
+        );
+      }
       return;
     }
 
     case "shift_request_resolved": {
-      const { userId } = await getRequestInfo(event.requestId);
-      if (userId && userId !== actorUserId) {
+      const requestInfo = await getRequestInfo(event.requestId);
+      const requestType = requestInfo.requestType ?? event.requestType;
+      const typeLabel = getShiftRequestTypeLabel(requestType);
+      const { requesterUserId } = requestInfo;
+      if (requesterUserId && requesterUserId !== actorUserId) {
         const status = event.approved ? "approved" : "rejected";
         const type: NotificationType = event.approved
           ? "shift_request_approved"
@@ -189,15 +329,17 @@ export async function dispatchNotificationEvent(
         const noteText = event.adminNote ? ` Note: ${event.adminNote}` : "";
 
         await sendNotification(
-          userId,
+          requesterUserId,
           event.orgId,
           type,
           `Request ${status}`,
-          `Your ${event.requestType} request has been ${status}.${noteText}`,
+          `Your ${typeLabel} request has been ${status}.${noteText}`,
           {
             requestId: event.requestId,
-            requestType: event.requestType,
+            requestType,
             approved: event.approved,
+            action: "view_request",
+            tab: "mine",
           },
         );
       }

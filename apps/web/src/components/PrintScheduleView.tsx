@@ -6,7 +6,6 @@ import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs, getEmplo
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import {
   borderColor,
   DESIGNATION_COLORS,
@@ -20,6 +19,93 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+const BRAND_MUTED = "#4A607F";
+const BRAND_SEPARATOR = "#94A3B8";
+
+function PrintBrandLockup({
+  orgName,
+  logoSize,
+  wordmarkWidth,
+  wordmarkHeight,
+  separatorHeight,
+  orgFontSize,
+}: {
+  orgName?: string;
+  logoSize: number;
+  wordmarkWidth: number;
+  wordmarkHeight: number;
+  separatorHeight: number;
+  orgFontSize: number;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", lineHeight: 1 }}>
+      <img
+        src="/logo.png"
+        alt=""
+        aria-hidden="true"
+        style={{
+          display: "block",
+          width: logoSize,
+          height: logoSize,
+          objectFit: "contain",
+        }}
+      />
+      <img
+        src="/wordmark-white.png"
+        alt="dubgrid"
+        style={{
+          display: "block",
+          width: wordmarkWidth,
+          height: wordmarkHeight,
+          objectFit: "contain",
+          marginLeft: 8,
+          filter: "brightness(0) saturate(100%)",
+        }}
+      />
+      {orgName && (
+        <>
+          <span
+            aria-hidden="true"
+            style={{
+              display: "block",
+              width: 0.8,
+              height: separatorHeight,
+              background: BRAND_SEPARATOR,
+              marginLeft: 5,
+              marginRight: 5,
+              flex: "0 0 auto",
+            }}
+          />
+          <span
+            style={{
+              color: BRAND_MUTED,
+              fontSize: orgFontSize,
+              fontWeight: 600,
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {orgName}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function waitForImages(targetWindow: Window): Promise<void> {
+  const images = Array.from(targetWindow.document.images);
+  return Promise.all(
+    images.map((image) => {
+      if (image.complete) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        image.addEventListener("load", () => resolve(), { once: true });
+        image.addEventListener("error", () => resolve(), { once: true });
+      });
+    }),
+  ).then(() => undefined);
+}
 
 function getFocusAreaInitials(name: string): string {
   return name
@@ -831,11 +917,11 @@ export default function PrintScheduleView({
 </head><body>${contentEl.outerHTML}</body></html>`);
 
     printWindow.document.close();
-    setTimeout(() => {
+    void waitForImages(printWindow).then(() => {
       printWindow.focus();
       printWindow.print();
       printWindow.addEventListener("afterprint", () => printWindow.close());
-    }, 250);
+    });
   }
 
   const legendItems = assignments.filter((s) => !EXCLUDED_LEGEND.has(s.label));
@@ -873,19 +959,15 @@ export default function PrintScheduleView({
           ← Back
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, lineHeight: 1 }}>
-            <DubGridLogo size={32} color="#0F1724" />
-            <DubGridWordmark fontSize={20} color="#0F1724" />
-          </div>
-          {orgName && (
-            <>
-              <span style={{ color:"#94A3B8", fontSize: "var(--dg-fs-heading)", fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
-              <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "#0F1724", lineHeight: 1 }}>
-                {orgName}
-              </span>
-            </>
-          )}
-          <span style={{ color:"#94A3B8", fontSize: "var(--dg-fs-heading)", fontWeight: 300, userSelect: "none", alignSelf: "center", marginBottom: 2 }}>|</span>
+          <PrintBrandLockup
+            orgName={orgName}
+            logoSize={32}
+            wordmarkWidth={96}
+            wordmarkHeight={34}
+            separatorHeight={18}
+            orgFontSize={13}
+          />
+          <span style={{ width: 0.8, height: 18, background: BRAND_SEPARATOR, display: "block" }} />
           <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color:"#334766", lineHeight: 1 }}>
             {dateRangeLabel}
           </span>
@@ -967,27 +1049,15 @@ export default function PrintScheduleView({
           >
             <div>
               {/* Logo + Wordmark + Org Name in one line */}
-              <div style={{ display: "flex", alignItems: "center", gap: "0.6em", marginBottom: "0.7em" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5em", lineHeight: 1 }}>
-                  <DubGridLogo size={24} color="#0F1724" />
-                  <DubGridWordmark fontSize={16} color="#0F1724" />
-                </div>
-                
-                {orgName && (
-                  <>
-                    <span style={{ color: "#94A3B8", fontSize: "1.4em", fontWeight: 300, userSelect: "none", alignSelf: "center", marginTop: "-0.1em" }}>|</span>
-                    <span
-                      style={{
-                        fontSize: "1.4em",
-                        fontWeight: 800,
-                        color: "#0F1724",
-                        lineHeight: 1,
-                      }}
-                    >
-                      {orgName}
-                    </span>
-                  </>
-                )}
+              <div style={{ marginBottom: "0.7em" }}>
+                <PrintBrandLockup
+                  orgName={orgName}
+                  logoSize={24}
+                  wordmarkWidth={72}
+                  wordmarkHeight={25.5}
+                  separatorHeight={16}
+                  orgFontSize={11}
+                />
               </div>
 
               <div

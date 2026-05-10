@@ -72,6 +72,8 @@ export function OverviewTab({
   const certificationName = employee.certificationId
     ? certifications.find((item) => item.id === employee.certificationId)?.name
     : null;
+  const employmentLabel =
+    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const assignedFocusAreaNames = employee.focusAreaIds
     .map((id) => focusAreas.find((item) => item.id === id)?.name)
     .filter(Boolean) as string[];
@@ -79,6 +81,7 @@ export function OverviewTab({
     .map((id) => orgRoles.find((role) => role.id === id)?.name)
     .filter(Boolean) as string[];
   const hasDetails =
+    !!employmentLabel ||
     assignedFocusAreaNames.length > 0 ||
     !!certificationName ||
     roleNames.length > 0 ||
@@ -172,12 +175,18 @@ export function OverviewTab({
                   Details
                 </div>
                 <div className="dg-card-subtitle">
-                  {`${focusAreaLabel}, certification, roles, and internal notes.`}
+                  {`Employment, ${focusAreaLabel.toLowerCase()}, certification, roles, and internal notes.`}
                 </div>
               </div>
             </div>
             <div className="dg-card-body">
               <dl className="flex flex-col gap-3">
+                <div>
+                  <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
+                    Employment
+                  </dt>
+                  <dd className="text-[13px] text-[var(--color-text-primary)]">{employmentLabel}</dd>
+                </div>
                 {assignedFocusAreaNames.length > 0 && (
                   <div>
                     <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">

@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { DashboardContentProps } from "./DashboardContentProps";
+import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
 import ActivityFeed from "./ActivityFeed";
 import CoverageBySectionCard from "./CoverageBySectionCard";
 import OpenShiftsCard from "./OpenShiftsCard";
@@ -17,9 +18,61 @@ export default function AdminDashboard(props: DashboardContentProps) {
     currentHours,
     activeEmployees,
     focusAreas,
+    shiftRequests,
+    currentEmpId,
+    draftNewCount,
+    draftModifiedCount,
+    draftDeletedCount,
+    periodLabel,
+    overtimeThreshold,
     isMobile,
     onExpandPanel,
   } = props;
+  const draftTotal = draftNewCount + draftModifiedCount + draftDeletedCount;
+  const actionItems = useMemo(
+    () =>
+      buildActionItems({
+        isAdmin: true,
+        pendingApproval: permissions.canApproveShiftRequests
+          ? shiftRequests.pendingApproval
+          : [],
+        swapProposals: [],
+        openPickups: [],
+        openShifts,
+        draftTotal,
+        currentEmpId,
+        onResolve: permissions.canApproveShiftRequests
+          ? shiftRequests.resolve
+          : undefined,
+      }),
+    [
+      currentEmpId,
+      draftTotal,
+      openShifts,
+      permissions.canApproveShiftRequests,
+      shiftRequests.pendingApproval,
+      shiftRequests.resolve,
+    ],
+  );
+  const actionableCoverageSections = useMemo(
+    () =>
+      sectionCoverage
+        .map((section, index) => ({ section, index }))
+        .sort((a, b) => {
+          const aOpenSlots = a.section.requiredTotal - a.section.filledTotal;
+          const bOpenSlots = b.section.requiredTotal - b.section.filledTotal;
+          if (aOpenSlots !== bOpenSlots) {
+            return bOpenSlots - aOpenSlots;
+          }
+          if (a.section.pct !== b.section.pct) {
+            return a.section.pct - b.section.pct;
+          }
+          return a.index - b.index;
+        })
+        .slice(0, 4)
+        .map(({ section }) => section),
+    [sectionCoverage],
+  );
   const overtimeHours = useMemo(
     () => currentHours.filter((entry) => entry.isOvertime),
     [currentHours],
@@ -27,6 +80,8 @@ export default function AdminDashboard(props: DashboardContentProps) {
 
   return (
     <>
+      <ActionQueueCard items={actionItems} maxVisible={5} grouped />
+
       <div
         style={{
           display: "grid",
@@ -36,11 +91,12 @@ export default function AdminDashboard(props: DashboardContentProps) {
       >
         {permissions.canViewSchedule && (
           <CoverageBySectionCard
-            sections={sectionCoverage.slice(0, 4)}
+            sections={actionableCoverageSections}
             focusAreaLabel={org.focusAreaLabel || "section"}
             isMobile={isMobile}
             hasRequirements={coverageRequirements.length > 0}
             publishedWindowState={publishedWindowState}
+            periodLabel={periodLabel}
             onExpand={() => onExpandPanel("coverage")}
           />
         )}
@@ -48,6 +104,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
           openShifts={openShifts}
           publishedWindowState={publishedWindowState}
           maxVisible={5}
+          periodLabel={periodLabel}
           onExpand={() => onExpandPanel("openShifts")}
         />
       </div>
@@ -70,8 +127,9 @@ export default function AdminDashboard(props: DashboardContentProps) {
           focusAreas={focusAreas}
           maxVisible={5}
           heading="Overtime watch"
-          subtitle="Staff trending over 40h this period"
+          subtitle={`Staff over ${overtimeThreshold}h ${periodLabel}`}
           emptyMessage="No overtime alerts this period"
+          otThreshold={overtimeThreshold}
           onExpand={() => onExpandPanel("staffHours")}
         />
       </div>

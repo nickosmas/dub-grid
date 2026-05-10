@@ -2,19 +2,56 @@
 
 import { useRef, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
-import { useOrganizationData, usePermissions } from "@/hooks";
+import { fetchOrganizationBilling } from "@/features/billing/client";
+import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
+import { queryKeys } from "@/lib/query-keys";
 
-const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/settings"];
+const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/reports", "/settings"];
 
 function isAppRoute(pathname: string): boolean {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
 }
 
 function AppHeader() {
-  const { org } = useOrganizationData();
+  const perms = usePermissions();
+  const { data: billing, isLoading: billingLoading } = useQuery({
+    queryKey: queryKeys.org.billing(perms.orgId!),
+    queryFn: () => fetchOrganizationBilling(perms.orgId!),
+    enabled:
+      Boolean(perms.orgId) &&
+      perms.isSuperAdmin &&
+      !perms.isGridmaster &&
+      !perms.isImpersonating,
+    staleTime: 30_000,
+  });
+  const shouldLoadOrgHeader =
+    !perms.isSuperAdmin ||
+    perms.isGridmaster ||
+    perms.isImpersonating ||
+    (!billingLoading && billing?.billingAccess.isLocked !== true);
+  const { org, setupStatus, loading: orgLoading } = useOrganizationData({
+    includeAssignmentDefinitionCompatibility: false,
+    enabled: shouldLoadOrgHeader,
+  });
+  const { employees, loading: empLoading } = useEmployees(
+    shouldLoadOrgHeader ? (perms.orgId ?? org?.id ?? null) : null,
+  );
+  const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
+  const hideForSetupLock =
+    !perms.isGridmaster &&
+    !perms.isImpersonating &&
+    (perms.isLoading || orgLoading || empLoading || !isOrgSetupComplete);
+  const hideForBillingLock =
+    !perms.isGridmaster &&
+    !perms.isImpersonating &&
+    (billingLoading || billing?.billingAccess.isLocked === true);
+
+  if (hideForSetupLock || hideForBillingLock) return null;
+
   return (
     <div
       style={{

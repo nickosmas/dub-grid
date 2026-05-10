@@ -17,6 +17,10 @@ import type {
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 import { DAY_LABELS } from "@/lib/constants";
+import {
+  formatShiftRequestStatusLabel,
+  formatShiftRequestTypeLabel,
+} from "@/lib/client-facing";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -460,7 +464,7 @@ export function ScheduleTab({
                 <TableBody>
                   {shiftRequests.map((request) => (
                     <TableRow key={request.id}>
-                      <TableCell className="text-[13px] font-medium capitalize">{request.type}</TableCell>
+                      <TableCell className="text-[13px] font-medium">{formatShiftRequestTypeLabel(request.type)}</TableCell>
                       <TableCell className="text-[13px]">{request.requesterShiftDate}</TableCell>
                       <TableCell className="text-[13px] font-semibold">{request.requesterShiftLabel}</TableCell>
                       <TableCell>
@@ -475,7 +479,7 @@ export function ScheduleTab({
                                   : "var(--color-warning)",
                           }}
                         >
-                          {request.status.replace("_", " ")}
+                          {formatShiftRequestStatusLabel(request.status)}
                         </span>
                       </TableCell>
                       <TableCell className="text-[13px] text-[var(--color-text-muted)]">

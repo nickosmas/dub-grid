@@ -11,6 +11,7 @@ export type ShiftDiffState = {
   assignmentIds?: number[] | null;
   absenceTypeId?: number | null;
   timeRanges?: ShiftDiffTimeRange[] | null;
+  isMentoredFlags?: boolean[] | null;
 };
 
 export type ShiftDiffBadgeDescriptor = {
@@ -63,6 +64,13 @@ function normalizeTimeRanges(
       end: normalizeTimeValue(range?.end),
     };
   });
+}
+
+function normalizeBooleanFlags(
+  flags: boolean[] | null | undefined,
+  count: number,
+): boolean[] {
+  return Array.from({ length: count }, (_, index) => flags?.[index] ?? false);
 }
 
 function hasTimeRange(range: ShiftDiffTimeRange | undefined): boolean {
@@ -226,6 +234,14 @@ export function buildShiftDiffDescriptors(
     input.after.timeRanges,
     afterAssignmentDefinitionIds.length,
   );
+  const beforeIsMentoredFlags = normalizeBooleanFlags(
+    input.before.isMentoredFlags,
+    beforeAssignmentDefinitionIds.length,
+  );
+  const afterIsMentoredFlags = normalizeBooleanFlags(
+    input.after.isMentoredFlags,
+    afterAssignmentDefinitionIds.length,
+  );
   const hasBeforeContent =
     beforeAbsenceTypeId != null || beforeAssignmentDefinitionIds.length > 0;
   const hasAfterContent =
@@ -287,9 +303,11 @@ export function buildShiftDiffDescriptors(
         label: afterLabel,
         includeLabel: usesMultiplePills,
       });
+      const isMentoredChanged =
+        beforeIsMentoredFlags[pillIndex] !== afterIsMentoredFlags[pillIndex];
 
       return {
-        borderKind: timeBadge ? 'modified' : null,
+        borderKind: timeBadge || isMentoredChanged ? 'modified' : null,
         badge: timeBadge,
       };
     },

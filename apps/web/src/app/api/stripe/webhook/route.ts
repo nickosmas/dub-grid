@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStripe } from "@/lib/stripe";
+import {
+  getStripe,
+  upsertStripeSubscriptionToDb,
+  writeStripeCustomerBillingActivityLog,
+  writeStripePaymentFailedAuditLog,
+  writeStripePaymentSucceededAuditLog,
+} from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -7,49 +13,23 @@ import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
 
-async function upsertSubscription(sub: Stripe.Subscription) {
+function stripeObjectId(value: string | { id: string } | null | undefined) {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
+async function upsertSubscription(
+  sub: Stripe.Subscription,
+  event: Stripe.Event,
+) {
   const supabase = getServiceClient();
-  const orgId = sub.metadata?.org_id;
-  if (!orgId) {
-    logger.warn({ subscriptionId: sub.id }, "Subscription missing org_id metadata");
-    return;
-  }
-
-  // Update subscriptions table
-  const { error: subError } = await supabase
-    .from("subscriptions")
-    .upsert(
-      {
-        org_id: orgId,
-        stripe_subscription_id: sub.id,
-        stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.toString(),
-        status: sub.status,
-        price_id: sub.items.data[0]?.price?.id ?? null,
-        quantity: sub.items.data[0]?.quantity ?? 1,
-        current_period_start: sub.items.data[0]?.current_period_start
-          ? new Date(sub.items.data[0].current_period_start * 1000).toISOString()
-          : null,
-        current_period_end: sub.items.data[0]?.current_period_end
-          ? new Date(sub.items.data[0].current_period_end * 1000).toISOString()
-          : null,
-        cancel_at: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
-        canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
-        trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "org_id" },
-    );
-  if (subError) logger.error({ error: subError }, "Failed to upsert subscription");
-
-  // Sync status to organizations table
-  const { error: orgError } = await supabase
-    .from("organizations")
-    .update({
-      subscription_status: sub.status,
-      subscription_seats: sub.items.data[0]?.quantity ?? null,
-    })
-    .eq("id", orgId);
-  if (orgError) logger.error({ error: orgError }, "Failed to update org subscription status");
+  await upsertStripeSubscriptionToDb(supabase, sub, {
+    audit: {
+      source: "stripe_webhook",
+      stripeEventId: event.id,
+      stripeEventType: event.type,
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -86,15 +66,62 @@ export async function POST(req: NextRequest) {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription;
-        await upsertSubscription(sub);
+        await upsertSubscription(sub, event);
         break;
       }
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
+        await writeStripePaymentFailedAuditLog(getServiceClient(), invoice, {
+          stripeEventId: event.id,
+          stripeEventType: event.type,
+        });
         logger.warn(
           { customerId: invoice.customer, invoiceId: invoice.id },
           "Invoice payment failed",
         );
+        break;
+      }
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await writeStripePaymentSucceededAuditLog(getServiceClient(), invoice, {
+          stripeEventId: event.id,
+          stripeEventType: event.type,
+        });
+        break;
+      }
+      case "customer.updated": {
+        const customer = event.data.object as Stripe.Customer;
+        await writeStripeCustomerBillingActivityLog(getServiceClient(), {
+          customerId: customer.id,
+          action: "billing.billing_details_updated",
+          resourceId: customer.id,
+          stripeEventId: event.id,
+          stripeEventType: event.type,
+        });
+        break;
+      }
+      case "payment_method.attached":
+      case "payment_method.detached":
+      case "payment_method.updated": {
+        const paymentMethod = event.data.object as Stripe.PaymentMethod;
+        const previous = event.data.previous_attributes as
+          | Partial<Stripe.PaymentMethod>
+          | undefined;
+        const customerId =
+          stripeObjectId(paymentMethod.customer) ??
+          stripeObjectId(previous?.customer);
+        if (customerId) {
+          await writeStripeCustomerBillingActivityLog(getServiceClient(), {
+            customerId,
+            action: "billing.payment_method_updated",
+            resourceId: paymentMethod.id,
+            details: {
+              payment_method_type: paymentMethod.type,
+            },
+            stripeEventId: event.id,
+            stripeEventType: event.type,
+          });
+        }
         break;
       }
       default:

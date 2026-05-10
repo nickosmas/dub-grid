@@ -1,10 +1,10 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
-import { Employee, FocusArea, NamedItem, ScheduleCellSegmentInput } from "@/types";
+import { Department, Employee, FocusArea, NamedItem, ScheduleCellSegmentInput } from "@/types";
 import { upsertRecurringShift } from "@/features/schedule/client";
 
 const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
@@ -197,6 +197,46 @@ const focusAreas: FocusArea[] = [
     sortOrder: 1,
     departmentId: null,
   },
+  {
+    id: 2,
+    orgId: "org-1",
+    name: "South",
+    sortOrder: 2,
+    departmentId: null,
+  },
+];
+
+const departments: Department[] = [
+  {
+    id: 10,
+    orgId: "org-1",
+    name: "Residential",
+    abbr: "RES",
+    type: "scheduled",
+    sortOrder: 1,
+    archivedAt: null,
+  },
+  {
+    id: 20,
+    orgId: "org-1",
+    name: "Clinical",
+    abbr: "CLN",
+    type: "scheduled",
+    sortOrder: 2,
+    archivedAt: null,
+  },
+];
+const managementDepartments: Department[] = [
+  ...departments,
+  {
+    id: 30,
+    orgId: "org-1",
+    name: "Operations",
+    abbr: "OPS",
+    type: "management",
+    sortOrder: 3,
+    archivedAt: null,
+  },
 ];
 
 const employees: Employee[] = [
@@ -204,6 +244,7 @@ const employees: Employee[] = [
     id: "emp-1",
     firstName: "Alice",
     lastName: "Smith",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -223,6 +264,7 @@ const employees: Employee[] = [
     id: "emp-2",
     firstName: "Bob",
     lastName: "Jones",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -237,6 +279,55 @@ const employees: Employee[] = [
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+  },
+];
+
+const filterEmployees: Employee[] = [
+  {
+    ...employees[0],
+    id: "emp-filter-1",
+    firstName: "Alice",
+    lastName: "Alpha",
+    employmentType: "full_time",
+    certificationId: 4,
+    roleIds: [4],
+    focusAreaIds: [1],
+    email: "alice@example.com",
+    phone: "555-0101",
+    userId: "user-alice",
+    departmentIds: [10],
+    deptAdminIds: [10],
+  },
+  {
+    ...employees[1],
+    id: "emp-filter-2",
+    firstName: "Bob",
+    lastName: "Beta",
+    employmentType: "part_time",
+    certificationId: 3,
+    roleIds: [2],
+    focusAreaIds: [2],
+    email: "",
+    phone: "555-0202",
+    userId: null,
+    departmentIds: [20],
+    deptAdminIds: [],
+  },
+  {
+    ...employees[0],
+    id: "emp-filter-3",
+    firstName: "Casey",
+    lastName: "Clark",
+    employmentType: "full_time",
+    certificationId: 3,
+    roleIds: [2],
+    focusAreaIds: [1],
+    email: "casey@example.com",
+    phone: "",
+    userId: null,
+    departmentIds: [10],
+    deptAdminIds: [],
+    seniority: 3,
   },
 ];
 
@@ -255,6 +346,7 @@ const defaultProps = {
   onAdd: vi.fn(),
   canViewEmployeeDetails: true,
   canManageEmployees: true,
+  departments,
 };
 
 function renderWithProviders(ui: React.ReactElement) {
@@ -267,6 +359,7 @@ beforeEach(() => {
   mockSearchParams = new URLSearchParams();
   mockCurrentUser = null;
   mockShiftPickerRender.mockReset();
+  document.body.style.overflow = "";
 });
 
 describe("StaffView", () => {
@@ -288,6 +381,42 @@ describe("StaffView", () => {
       // The # column header is clickable for seniority sort; the Name column header is clickable for name sort
       expect(screen.getByText("#")).toBeInTheDocument();
       expect(screen.getByText("Name")).toBeInTheDocument();
+    });
+
+    it("grays out empty roster export and reorder while leaving import available", async () => {
+      renderWithProviders(
+        <StaffView {...defaultProps} employees={[]} orgId="org-1" />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
+      });
+      expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Reorder" })).toBeDisabled();
+    });
+
+    it("hides admin-only People controls from regular users", async () => {
+      mockSearchParams = new URLSearchParams("section=recurring-schedule");
+
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          orgId="org-1"
+          canManageEmployees={false}
+          canViewEmployeeDetails={false}
+          canViewRecurringShifts
+          canManageRecurringShifts={false}
+          departments={managementDepartments}
+        />,
+      );
+
+      expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Export" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Import" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /On Schedule/i })).not.toBeInTheDocument();
+      expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
+      expect(screen.queryByRole("gridcell")).not.toBeInTheDocument();
     });
   });
 
@@ -324,6 +453,43 @@ describe("StaffView", () => {
   });
 
   describe("Employee count", () => {
+    it("shows only on-schedule and employment-type summary cards", () => {
+      renderWithProviders(
+        <StaffView
+          {...defaultProps}
+          employees={[
+            employees[0],
+            {
+              ...employees[1],
+              employmentType: "part_time",
+            },
+          ]}
+          benchedEmployees={[
+            {
+              ...employees[0],
+              id: "emp-benched",
+              employmentType: "part_time",
+              status: "benched",
+            },
+          ]}
+          terminatedEmployees={[
+            {
+              ...employees[1],
+              id: "emp-terminated",
+              status: "terminated",
+            },
+          ]}
+        />,
+      );
+
+      expect(within(screen.getByLabelText("On schedule staff count")).getByText("2")).toBeInTheDocument();
+      expect(within(screen.getByLabelText("Full-time staff count")).getByText("1")).toBeInTheDocument();
+      expect(within(screen.getByLabelText("Part-time staff count")).getByText("1")).toBeInTheDocument();
+      expect(screen.queryByLabelText("Management staff count")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Benched staff count")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Terminated staff count")).not.toBeInTheDocument();
+    });
+
     it("renders both employees in the list", () => {
       renderWithProviders(<StaffView {...defaultProps} />);
       expect(screen.getByText("Alice Smith")).toBeInTheDocument();
@@ -347,6 +513,106 @@ describe("StaffView", () => {
 
       expect(screen.getByRole("link", { name: "Alice Smith" })).toHaveAttribute("href", "/profile");
       expect(screen.getByRole("link", { name: "Bob Jones" })).toHaveAttribute("href", "/people/emp-2");
+    });
+  });
+
+  describe("Detailed filters", () => {
+    it("locks page scroll while the filter window is open", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      expect(document.body.style.overflow).toBe("");
+
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+      expect(document.body.style.overflow).toBe("hidden");
+
+      await user.click(screen.getByRole("button", { name: "Done" }));
+      await waitFor(() => {
+        expect(document.body.style.overflow).toBe("");
+      });
+    });
+
+    it("filters scheduled staff by employment type and shows a clearable pill", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+      await user.click(screen.getByRole("button", { name: "Part-time" }));
+
+      expect(screen.getByRole("link", { name: "Bob Beta" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Alice Alpha" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Casey Clark" })).not.toBeInTheDocument();
+      expect(screen.getByText("Employment: Part-time")).toBeInTheDocument();
+    });
+
+    it("filters scheduled staff by department and department admin status", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+      await user.click(screen.getByRole("button", { name: "Residential" }));
+      await user.click(screen.getByLabelText("Department admins only"));
+
+      expect(screen.getByRole("link", { name: "Alice Alpha" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Bob Beta" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Casey Clark" })).not.toBeInTheDocument();
+      expect(screen.getByText("Scheduled Departments: Residential")).toBeInTheDocument();
+      expect(screen.getByText("Department admin: Residential")).toBeInTheDocument();
+    });
+
+    it("combines certification, role, and employment filters", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+      await user.click(screen.getByRole("button", { name: "Full-time" }));
+      await user.click(screen.getByRole("button", { name: "CSN II" }));
+      await user.click(screen.getByRole("button", { name: "DVCSN" }));
+
+      expect(screen.getByRole("link", { name: "Casey Clark" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Alice Alpha" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Bob Beta" })).not.toBeInTheDocument();
+      expect(screen.getByText("Certifications: CSN II")).toBeInTheDocument();
+      expect(screen.getByText("Roles: DVCSN")).toBeInTheDocument();
+    });
+
+    it("filters by linked account and contact detail presence alongside search", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      await user.type(screen.getByPlaceholderText("Search by name, email, or phone..."), "Alice");
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+      await user.click(screen.getByRole("button", { name: "Linked account" }));
+      await user.click(screen.getByRole("button", { name: "Has email" }));
+      await user.click(screen.getByRole("button", { name: "Has phone" }));
+
+      expect(screen.getByRole("link", { name: "Alice Alpha" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Bob Beta" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Casey Clark" })).not.toBeInTheDocument();
+      expect(screen.getByText("Account: Linked account")).toBeInTheDocument();
+      expect(screen.getByText("Email: Has email")).toBeInTheDocument();
+      expect(screen.getByText("Phone: Has phone")).toBeInTheDocument();
+    });
+
+    it("filters by unlinked and missing contact details, then clears all filters", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<StaffView {...defaultProps} employees={filterEmployees} />);
+
+      await user.click(screen.getByRole("button", { name: /Filter/i }));
+      await user.click(screen.getByRole("button", { name: /Unlinked account/ }));
+      await user.click(screen.getByRole("button", { name: "Missing email" }));
+
+      expect(screen.getByRole("link", { name: "Bob Beta" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Alice Alpha" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Casey Clark" })).not.toBeInTheDocument();
+
+      await user.click(screen.getAllByRole("button", { name: /Clear all/i })[0]);
+
+      expect(screen.getByRole("link", { name: "Alice Alpha" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Bob Beta" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Casey Clark" })).toBeInTheDocument();
+      expect(screen.queryByText("Account: Unlinked account")).not.toBeInTheDocument();
+      expect(screen.queryByText("Email: Missing email")).not.toBeInTheDocument();
     });
   });
 
@@ -413,6 +679,12 @@ describe("StaffView", () => {
       await user.click(screen.getAllByRole("gridcell")[0]);
       await user.click(screen.getByRole("button", { name: "pick-D" }));
       await user.click(screen.getByRole("button", { name: "Save Changes" }));
+      const confirmDialog = await screen.findByRole("dialog", {
+        name: "Save Recurring Schedule Changes?",
+      });
+      await user.click(
+        within(confirmDialog).getByRole("button", { name: "Save Changes" }),
+      );
 
       expect(mockedUpsertRecurringShift).toHaveBeenCalledTimes(1);
       expect(mockedUpsertRecurringShift).toHaveBeenCalledWith(
@@ -545,6 +817,7 @@ describe("Property-based tests", () => {
       fc.record({
         firstName: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
         lastName: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
+        employmentType: fc.constant("full_time" as const),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),

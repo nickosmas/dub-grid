@@ -8,6 +8,10 @@ import {
   fetchOrganizationEmployeeCount,
   updateOrganizationSettings,
 } from "@/features/organization/client";
+import {
+  fetchGridmasterBilling,
+  updateGridmasterSubscription,
+} from "@/features/gridmaster/client";
 import type { Organization } from "@/types";
 
 vi.mock("@/features/organization/client", () => ({
@@ -45,7 +49,11 @@ vi.mock("@/features/settings/client", () => ({
 }));
 
 vi.mock("@/features/gridmaster/client", () => ({
+  fetchGridmasterBilling: vi.fn(),
+  fetchGridmasterFullAuditLog: vi.fn().mockResolvedValue([]),
   fetchGridmasterInvitations: vi.fn().mockResolvedValue({ invitations: [] }),
+  syncGridmasterBilling: vi.fn(),
+  updateGridmasterSubscription: vi.fn(),
   archiveGridmasterOrganization: vi.fn(),
   restoreGridmasterOrganization: vi.fn(),
   suspendGridmasterOrganization: vi.fn(),
@@ -96,8 +104,7 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
     dataRetentionDays: 365,
     updatedAt: "2026-04-15T18:00:00.000000+00:00",
     featureOverrides: {
-      beta_shift_requests: false,
-      beta_coverage_panel: false,
+      disable_realtime: false,
     },
     ...overrides,
   };
@@ -119,9 +126,36 @@ describe("gridmaster dirty save controls", () => {
     vi.mocked(fetchOrganizationEmployeeCount).mockResolvedValue({
       employeeCount: 42,
     });
+    vi.mocked(fetchGridmasterBilling).mockResolvedValue({
+      generatedAt: "2026-05-02T00:00:00.000Z",
+      organizations: [
+        {
+          orgId: "org-1",
+          orgName: "Acme Health",
+          orgSlug: "acme-health",
+          status: "active",
+          stripeCustomerId: "cus_123",
+          stripeSubscriptionId: "sub_123",
+          trialEndsAt: null,
+          currentPeriodEnd: "2026-06-01T00:00:00.000Z",
+          cancelAt: null,
+          canceledAt: null,
+          seats: 7,
+          appUsers: 9,
+          employeeCount: 8,
+          seatDelta: -2,
+          updatedAt: "2026-05-01T00:00:00.000Z",
+        },
+      ],
+      trialEndingSoon: [],
+      riskOrganizations: [],
+      missingStripeCustomer: [],
+      seatMismatches: [],
+    });
+    vi.mocked(updateGridmasterSubscription).mockResolvedValue({ success: true });
   });
 
-  it("only shows feature flag Discard when there are unsaved flag edits", async () => {
+  it("only shows runtime control Discard when there are unsaved realtime edits", async () => {
     const user = userEvent.setup();
 
     render(<FeatureFlagsEditor organization={makeOrganization()} />);
@@ -129,8 +163,11 @@ describe("gridmaster dirty save controls", () => {
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/shift requests \(beta\)/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/maintenance mode/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /\+ add flag/i })).not.toBeInTheDocument();
 
-    await user.click(screen.getByLabelText(/shift requests \(beta\)/i));
+    await user.click(screen.getByLabelText(/pause live updates/i));
     const discardButton = screen.getByRole("button", { name: /^discard$/i });
     expect(saveButton).toBeEnabled();
     expect(discardButton).toBeEnabled();
@@ -140,20 +177,26 @@ describe("gridmaster dirty save controls", () => {
     expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
-  it("disables feature flag Save again immediately after a successful save", async () => {
+  it("disables runtime control Save again immediately after a successful save", async () => {
     const user = userEvent.setup();
 
     render(<FeatureFlagsEditor organization={makeOrganization()} />);
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
 
-    await user.click(screen.getByLabelText(/shift requests \(beta\)/i));
+    await user.click(screen.getByLabelText(/pause live updates/i));
     expect(saveButton).toBeEnabled();
 
     await user.click(saveButton);
+    await user.click(screen.getByRole("button", { name: /save changes/i }));
 
     await waitFor(() => {
       expect(saveButton).toBeDisabled();
+    });
+    expect(updateOrganizationSettings).toHaveBeenCalledWith({
+      orgId: "org-1",
+      expectedUpdatedAt: "2026-04-15T18:00:00.000000+00:00",
+      featureOverrides: { disable_realtime: true },
     });
   });
 
@@ -207,5 +250,32 @@ describe("gridmaster dirty save controls", () => {
     expect(screen.getByText(/review organization changes/i)).toBeInTheDocument();
     expect(screen.getByText("Organization Name")).toBeInTheDocument();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
+  });
+
+  it("gives each organization a billing tab with seat actions", async () => {
+    const user = userEvent.setup();
+
+    renderWithQueryClient(
+      <OrganizationDetail
+        organization={makeOrganization()}
+        stats={{ orgId: "org-1", userCount: 8, employeeCount: 42 }}
+        initialTab="billing"
+      />,
+    );
+
+    expect(await screen.findByText("Stripe seats")).toBeInTheDocument();
+    expect(screen.getByText("App users")).toBeInTheDocument();
+    expect(screen.getByText("Seat delta")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "True up seats" }));
+    await user.click(screen.getByRole("button", { name: "True Up Seats" }));
+
+    await waitFor(() => {
+      expect(updateGridmasterSubscription).toHaveBeenCalled();
+    });
+    expect(vi.mocked(updateGridmasterSubscription).mock.calls[0]?.[0]).toEqual({
+      orgId: "org-1",
+      action: "sync_seats",
+    });
   });
 });

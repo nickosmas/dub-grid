@@ -7,12 +7,15 @@ import {
   type PermissionContext,
 } from "@dubgrid/authz";
 import type {
+  BillingAccessResult,
   AdminPermissions,
   Organization,
   PlatformRole,
 } from "@dubgrid/domain";
+import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import {
   createClient,
+  type Factor,
   type SupabaseClient,
   type User,
 } from "@supabase/supabase-js";
@@ -20,11 +23,13 @@ import {
   findMobileWorkspaceBySlug,
   type MobileWorkspaceLookup,
 } from "./workspace";
+import { isMobileWorkspaceSetupComplete } from "./setup";
 
 type WorkspaceMembership = {
   org_id: string;
   org_name: string;
   org_slug: string | null;
+  org_role?: string | null;
   is_active: boolean;
 };
 
@@ -36,10 +41,12 @@ type SignedInSession = {
 };
 
 type MobileAuthClaims = {
+  aal?: string;
   org_id?: string;
   org_role?: string;
   org_slug?: string;
   platform_role?: string;
+  session_id?: string;
 };
 
 type MobileAuthMembershipRow = {
@@ -102,6 +109,29 @@ function getMobileUserName(user: User): {
   };
 }
 
+function getLockedWorkspaceMessage(
+  orgRole: string,
+  billingAccess: BillingAccessResult,
+): string {
+  if (billingAccess.reason === "suspended") {
+    return "Workspace unavailable. Contact your organization administrator.";
+  }
+
+  if (orgRole === "super_admin") {
+    return "Workspace unavailable. Sign in on the web to manage billing.";
+  }
+
+  return "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.";
+}
+
+function getIncompleteSetupMessage(orgRole: string): string {
+  if (orgRole === "super_admin" || orgRole === "admin") {
+    return "Workspace unavailable. Sign in on the web to finish workspace setup.";
+  }
+
+  return "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.";
+}
+
 async function requireMobileWorkspace(
   serviceClient: SupabaseClient,
   slug: string,
@@ -134,6 +164,7 @@ async function signInMobileUser(
 ): Promise<{
   session: SignedInSession;
   user: User;
+  mfaFactor: Factor<"totp", "verified"> | null;
 }> {
   const { data: authData, error: authError } =
     await serviceClient.auth.signInWithPassword({
@@ -160,17 +191,12 @@ async function signInMobileUser(
 
   const verifiedTotpFactors = (authData.user.factors ?? []).filter(
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
-  );
-  if (verifiedTotpFactors.length > 0) {
-    throw new MobileApiRequestError(
-      409,
-      "Two-factor authentication is not yet supported in mobile. Please use the web app to sign in.",
-    );
-  }
+  ) as Factor<"totp", "verified">[];
 
   return {
     session: authData.session as SignedInSession,
     user: authData.user,
+    mfaFactor: verifiedTotpFactors[0] ?? null,
   };
 }
 
@@ -270,7 +296,10 @@ export function extractMobileBearerToken(
 
 export async function resolveMobileAuthContext<
   TOrganizationRow,
-  TOrganization extends Pick<Organization, "id"> = Organization,
+  TOrganization extends Pick<
+    Organization,
+    "id" | "suspendedAt" | "subscriptionStatus" | "trialEndsAt"
+  > = Organization,
 >(input: {
   accessToken: string;
   serviceClient: SupabaseClient;
@@ -301,6 +330,16 @@ export async function resolveMobileAuthContext<
 
   const user = userData.user;
   const claims = claimsData.claims as MobileAuthClaims;
+  const hasVerifiedTotpFactor = (user.factors ?? []).some(
+    (factor) => factor.factor_type === "totp" && factor.status === "verified",
+  );
+  if (hasVerifiedTotpFactor && claims.aal !== "aal2") {
+    throw new MobileApiRequestError(
+      401,
+      "Two-factor authentication required",
+    );
+  }
+
   if (claims.platform_role === "gridmaster") {
     throw new MobileApiRequestError(
       403,
@@ -347,12 +386,36 @@ export async function resolveMobileAuthContext<
     (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
   const adminPermissions = currentMembership.admin_permissions ?? null;
   const orgRole = currentMembership.org_role ?? "user";
+  const currentOrg = input.mapOrganization(currentOrgRow);
+  const billingAccess = evaluateOrganizationBillingAccess({
+    suspendedAt: currentOrg.suspendedAt,
+    subscriptionStatus: currentOrg.subscriptionStatus,
+    trialEndsAt: currentOrg.trialEndsAt,
+  });
+
+  if (billingAccess.isLocked) {
+    throw new MobileApiRequestError(
+      403,
+      getLockedWorkspaceMessage(orgRole, billingAccess),
+    );
+  }
+
+  const setupComplete = await isMobileWorkspaceSetupComplete(
+    input.serviceClient,
+    currentOrgId,
+  );
+  if (!setupComplete) {
+    throw new MobileApiRequestError(
+      403,
+      getIncompleteSetupMessage(orgRole),
+    );
+  }
 
   return {
     accessToken: input.accessToken,
     user,
     claims,
-    currentOrg: input.mapOrganization(currentOrgRow),
+    currentOrg,
     permissions: buildPermissionContext(orgRole, currentOrgId, adminPermissions),
     membership: {
       orgRole,
@@ -379,7 +442,10 @@ export async function loginMobileUser(
     serviceClient,
     input.workspaceSlug,
   );
-  const { session, user } = await signInMobileUser(serviceClient, input);
+  const { session, user, mfaFactor } = await signInMobileUser(
+    serviceClient,
+    input,
+  );
   await assertMobileProfileSupported(serviceClient, user.id);
 
   const { error: setSessionError } = await sessionClient.auth.setSession({
@@ -403,6 +469,22 @@ export async function loginMobileUser(
     throw new MobileApiRequestError(
       403,
       "Your account is not associated with that workspace.",
+    );
+  }
+
+  const loginBillingAccess = evaluateOrganizationBillingAccess({
+    suspendedAt: workspace.suspendedAt,
+    subscriptionStatus: workspace.subscriptionStatus,
+    trialEndsAt: workspace.trialEndsAt,
+  });
+
+  if (loginBillingAccess.isLocked) {
+    throw new MobileApiRequestError(
+      403,
+      getLockedWorkspaceMessage(
+        targetMembership.org_role ?? "user",
+        loginBillingAccess,
+      ),
     );
   }
 
@@ -431,5 +513,12 @@ export async function loginMobileUser(
       firstName,
       lastName,
     },
+    mfaRequired: mfaFactor !== null,
+    mfa: mfaFactor
+      ? {
+          factorId: mfaFactor.id,
+          friendlyName: mfaFactor.friendly_name ?? null,
+        }
+      : null,
   };
 }

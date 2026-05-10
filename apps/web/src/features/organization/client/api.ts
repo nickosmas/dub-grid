@@ -13,6 +13,7 @@ import type {
   Organization,
   ShiftCategory,
 } from "@/types";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export interface OrganizationBootstrap {
   org: Organization | null;
@@ -51,9 +52,7 @@ async function requestOrganizationJson<T>(
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "Organization request failed.",
+      formatClientErrorMessage(body?.error, "Organization request failed."),
     );
   }
 

@@ -4,12 +4,12 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
-import { ExplainerSection, PreviewFrame } from "@/components/ui/explainer-section";
 
 const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
   amber: { bg: "var(--color-warning-border)", text: "var(--color-warning-text)" },
   red: { bg: "var(--color-danger-border)", text: "var(--color-danger-text)" },
+  none: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)" },
 };
 
 const PCT_COLORS = {
@@ -48,21 +48,6 @@ export default function ExpandedCoverage({
   const totalFilled = sections.reduce((s, sec) => s + sec.filledTotal, 0);
   const totalRequired = sections.reduce((s, sec) => s + sec.requiredTotal, 0);
   const overallPct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
-  const sampleSectionName = filtered[0]?.focusAreaName ?? focusAreas[0]?.name ?? focusAreaLabel.replace(/s$/i, "") ?? "Section";
-  const explainerPoints = [
-    {
-      title: "Coverage rolls up by category total",
-      description: "Each day is scored by comparing required headcount to the number of unique staff scheduled in that category.",
-    },
-    {
-      title: "Green means enough staff were scheduled",
-      description: "If scheduled staff meets or exceeds the category total required, coverage is counted as met.",
-    },
-    {
-      title: "Shortages still keep the mix visible",
-      description: "When a category is short, the detailed coverage views explain which shift lines still need attention.",
-    },
-  ];
 
   return (
     <Modal title={`Coverage by ${focusAreaLabel.toLowerCase()}`} onClose={onClose} style={modalStyle}>
@@ -87,65 +72,6 @@ export default function ExpandedCoverage({
             Showing published dates only.
           </div>
         )}
-        <ExplainerSection
-          title="How coverage is scored"
-          points={explainerPoints}
-          compact
-          defaultOpen={false}
-          storageKey="dg-explainer-expanded-coverage"
-          preview={(
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <PreviewFrame
-                title="Green"
-                subtitle={sampleSectionName}
-                compact
-              >
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-sm)",
-                    background: "rgba(16, 185, 129, 0.08)",
-                    border: "1px solid var(--color-success-border)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
-                  }}
-                >
-                  <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>4 required</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-success-text)" }}>5 scheduled</span>
-                </div>
-              </PreviewFrame>
-
-              <PreviewFrame
-                title="Red"
-                subtitle={sampleSectionName}
-                compact
-              >
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "var(--dg-radius-sm)",
-                    background: "rgba(220, 38, 38, 0.06)",
-                    border: "1px solid var(--color-danger-border)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--color-text-secondary)" }}>4 required</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-danger-dark)" }}>3 scheduled</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--color-danger-dark)", lineHeight: 1.4 }}>
-                    Detailed views explain which shift lines are still light.
-                  </div>
-                </div>
-              </PreviewFrame>
-            </div>
-          )}
-        />
-
         {/* Summary + filter row */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", padding: 16, borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
           <div style={summaryBadgeStyle}>
@@ -244,6 +170,14 @@ export default function ExpandedCoverage({
                         </div>
                         {sec.daily.map((day) => {
                           const colors = STATUS_COLORS[day.status];
+                          const hasRequirement = day.requiredCount > 0;
+                          const cellLabel = hasRequirement
+                            ? `${day.filledCount}/${day.requiredCount}`
+                            : "\u2014";
+                          const ariaLabel = hasRequirement
+                            ? `${sec.focusAreaName} ${day.dayLabel}: ${day.filledCount} of ${day.requiredCount} required slots filled`
+                            : `${sec.focusAreaName} ${day.dayLabel}: no coverage requirement`;
+
                           return (
                             <div
                               key={`${sec.focusAreaId}-${day.dateKey}`}
@@ -258,9 +192,9 @@ export default function ExpandedCoverage({
                                 background: colors.bg,
                                 color: colors.text,
                               }}
-                              aria-label={`${sec.focusAreaName} ${day.dayLabel}: ${day.staffCount} staff`}
+                              aria-label={ariaLabel}
                             >
-                              {day.staffCount}
+                              {cellLabel}
                             </div>
                           );
                         })}

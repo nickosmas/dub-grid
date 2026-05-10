@@ -3,6 +3,7 @@ import type { AssignableOrganizationRole } from "@/types";
 export interface FocusAreaRow {
   id: string;
   name: string;
+  departmentId: string | null;
 }
 
 export interface NamedItemRow {
@@ -23,6 +24,7 @@ export interface ShiftCatRow {
   name: string;
   startTime: string;
   endTime: string;
+  focusAreaId: string | null;
 }
 
 export interface JobRow {
@@ -30,6 +32,9 @@ export interface JobRow {
   label: string;
   name: string;
   color: string;
+  departmentIds: string[];
+  focusAreaIds: string[];
+  shiftCategoryIds: string[];
 }
 
 export interface EmployeeRow {

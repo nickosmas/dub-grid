@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthenticatedSession } from "@/lib/api-auth";
-import { getServiceClient } from "@/lib/supabase-service";
 import { z } from "zod";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
@@ -59,31 +59,20 @@ export async function POST(req: NextRequest) {
     }
 
     const { orgId, rows } = parsed.data;
-    const serviceClient = getServiceClient();
 
-    // Permission check — parallelize independent queries
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
-    ]);
-
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    const isSuperAdmin = membership?.org_role === "super_admin";
-    const canManage = membership?.org_role === "admin" &&
-      (membership.admin_permissions as Record<string, boolean> | null)?.canManageEmployees;
-
-    if (!isGridmaster && !isSuperAdmin && !canManage) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    const orgAuth = await requireOrgPermissions(
+      req,
+      orgId,
+      (permissions) =>
+        permissions.isGridmaster ||
+        permissions.isSuperAdmin ||
+        permissions.canManageEmployees,
+      { allowDuringSetup: true },
+    );
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
+    const serviceClient = orgAuth.serviceClient;
 
     // Fetch org's focus areas, certifications, and roles for name matching
     const [{ data: focusAreas }, { data: certs }, { data: orgRoles }] = await Promise.all([

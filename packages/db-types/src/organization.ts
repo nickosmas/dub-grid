@@ -24,6 +24,7 @@ export interface DbOrganization {
   suspended_at: string | null;
   suspended_reason: string | null;
   enforce_conflict_prevention: boolean;
+  coverage_rule_config?: Record<string, unknown> | null;
   stripe_customer_id: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;

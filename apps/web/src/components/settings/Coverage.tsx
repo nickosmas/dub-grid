@@ -13,6 +13,7 @@ import type {
 import { saveCoverageRequirements } from "@/features/settings/client";
 import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
 import { getJobPlacementShiftPool, resolveJobColorsForShift, resolveJobTimesForShift } from "@/lib/job-placement";
+import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
@@ -115,7 +116,15 @@ function getCoverageSectionTitle(option: AssignableShiftOption): string {
 }
 
 function getCoverageRowTitle(option: AssignableShiftOption): string {
+  if (option.isShiftOnly) {
+    return option.shiftName ?? option.groupLabel;
+  }
+
   return option.jobName;
+}
+
+function isCoverageTargetOption(option: AssignableShiftOption): boolean {
+  return !option.isShiftless && (option.showJobOnGrid || option.isShiftOnly);
 }
 
 function buildCoverageOptions(args: {
@@ -129,7 +138,7 @@ function buildCoverageOptions(args: {
   const { focusAreas, shiftCategories, jobs, orgRoles, certifications, shiftDisplayMode } = args;
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
-  const activeJobs = jobs.filter((job) => !job.archivedAt && job.systemKey !== "regular_staff");
+  const activeJobs = jobs.filter((job) => !job.archivedAt && !isRegularStaffSystemJob(job));
   const focusAreaNameById = new Map(activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]));
   const options: AssignableShiftOption[] = [];
 
@@ -159,6 +168,7 @@ function buildCoverageOptions(args: {
           jobAbbr: job.abbr,
           showJobOnGrid: displayParts.showJobOnGrid,
           isShiftless: displayParts.isShiftless,
+          isShiftOnly: displayParts.isShiftOnly,
           primaryLabel: displayParts.primaryLabel,
           secondaryLabel: displayParts.secondaryLabel,
           groupLabel: shift.name,
@@ -196,6 +206,7 @@ function buildCoverageOptions(args: {
         jobAbbr: job.abbr,
         showJobOnGrid: displayParts.showJobOnGrid,
         isShiftless: displayParts.isShiftless,
+        isShiftOnly: displayParts.isShiftOnly,
         primaryLabel: displayParts.primaryLabel,
         secondaryLabel: displayParts.secondaryLabel,
         groupLabel: "General",
@@ -484,7 +495,7 @@ export default function CoverageRequirementsSettings({
     [certifications, focusAreas, jobs, orgRoles, shiftCategories, shiftDisplayMode],
   );
   const coverageOptions = useMemo(
-    () => assignableOptions.filter((option) => option.showJobOnGrid && !option.isShiftless),
+    () => assignableOptions.filter(isCoverageTargetOption),
     [assignableOptions],
   );
 
@@ -503,10 +514,10 @@ export default function CoverageRequirementsSettings({
     return (
       <EmptyState
         compact
-        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No scheduled jobs yet"}
+        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
         description={activeFocusAreas.length === 0
           ? "Create focus areas first to configure coverage."
-          : "Create scheduled jobs first so coverage can target the jobs you actually want to track."}
+          : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."}
       />
     );
   }
@@ -579,8 +590,8 @@ export default function CoverageRequirementsSettings({
             {localOptions.length === 0 ? (
               <EmptyState
                 compact
-                title="No scheduled jobs yet"
-                description="Create scheduled jobs that apply to this focus area before adding coverage."
+                title="No coverage targets yet"
+                description="Create shifts or scheduled jobs that apply to this focus area before adding coverage."
                 style={{ margin: "12px 16px" }}
               />
             ) : (

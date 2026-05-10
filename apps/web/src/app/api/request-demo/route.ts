@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getRequiredStaffEmailError,
+  getStaffNameError,
+  normalizeOptionalUsPhone,
+} from "@dubgrid/contracts";
 import { z } from "zod";
 import { demoLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
+import {
+  getLineTextError,
+  getMultilineTextError,
+  getOptionalUsPhoneFieldError,
+  normalizeLineText,
+  normalizeMultilineText,
+} from "@/lib/form-validation";
 
 const bodySchema = z.object({
   contactName: z.string().trim().min(1, "Name is required").max(100),
@@ -89,6 +101,52 @@ export async function POST(req: NextRequest) {
 
   const { contactName, email, phone, orgName, orgSize, industry, message } =
     parsed.data;
+  const fieldErrors = {
+    contactName: getStaffNameError(contactName, "Contact name"),
+    email: getRequiredStaffEmailError(email),
+    phone: getOptionalUsPhoneFieldError(phone),
+    orgName: getLineTextError(orgName, {
+      label: "Organization name",
+      maxLength: 200,
+      required: true,
+    }),
+    industry: getLineTextError(industry, {
+      label: "Industry / facility type",
+      maxLength: 200,
+    }),
+    message: getMultilineTextError(message, {
+      label: "Additional notes",
+      maxLength: 2000,
+    }),
+  } as const;
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return NextResponse.json(
+      { success: false, error: firstFieldError, fieldErrors },
+      { status: 400 },
+    );
+  }
+
+  const normalizedContactName = normalizeLineText(contactName, {
+    label: "Contact name",
+    maxLength: 80,
+    required: true,
+  });
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedPhone = normalizeOptionalUsPhone(phone);
+  const normalizedOrgName = normalizeLineText(orgName, {
+    label: "Organization name",
+    maxLength: 200,
+    required: true,
+  });
+  const normalizedIndustry = normalizeLineText(industry, {
+    label: "Industry / facility type",
+    maxLength: 200,
+  });
+  const normalizedMessage = normalizeMultilineText(message, {
+    label: "Additional notes",
+    maxLength: 2000,
+  });
 
   // ── Build email ───────────────────────────────────────────────────────
   const apiKey = process.env.RESEND_API_KEY;
@@ -118,27 +176,27 @@ export async function POST(req: NextRequest) {
         New Demo Request
       </h2>
       <p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
-        <strong>${escapeHtml(contactName)}</strong> from <strong>${escapeHtml(orgName)}</strong> has requested a demo.
+        <strong>${escapeHtml(normalizedContactName)}</strong> from <strong>${escapeHtml(normalizedOrgName)}</strong> has requested a demo.
       </p>
       <table style="width:100%;border-collapse:collapse;border:1px solid #D0DBD4;border-radius:8px;">
-        ${fieldRow("Name", contactName)}
-        ${fieldRow("Email", email)}
-        ${fieldRow("Phone", phone)}
-        ${fieldRow("Organization", orgName)}
+        ${fieldRow("Name", normalizedContactName)}
+        ${fieldRow("Email", normalizedEmail)}
+        ${fieldRow("Phone", normalizedPhone)}
+        ${fieldRow("Organization", normalizedOrgName)}
         ${fieldRow("Employees", orgSize)}
-        ${fieldRow("Industry", industry)}
+        ${fieldRow("Industry", normalizedIndustry)}
       </table>
       ${
-        message
+        normalizedMessage
           ? `<div style="margin-top:24px;">
               <p style="color:#94A3B8;font-size:13px;margin:0 0 8px;font-weight:600;">Additional Notes</p>
-              <p style="color:#3E433B;font-size:15px;line-height:1.6;margin:0;white-space:pre-wrap;">${escapeHtml(message)}</p>
+              <p style="color:#3E433B;font-size:15px;line-height:1.6;margin:0;white-space:pre-wrap;">${escapeHtml(normalizedMessage)}</p>
             </div>`
           : ""
       }
       <div style="border-top:1px solid #D0DBD4;padding-top:20px;margin-top:24px;">
         <p style="color:#94A3B8;font-size:13px;margin:0;">
-          Reply directly to this email to respond to ${escapeHtml(contactName)}.
+          Reply directly to this email to respond to ${escapeHtml(normalizedContactName)}.
         </p>
       </div>`);
 
@@ -147,8 +205,10 @@ export async function POST(req: NextRequest) {
       apiKey,
       from: fromEmail,
       to: recipientEmail,
-      replyTo: sanitizeHeaderValue(email),
-      subject: sanitizeHeaderValue(`DubGrid Demo Request: ${orgName}`),
+      replyTo: sanitizeHeaderValue(normalizedEmail),
+      subject: sanitizeHeaderValue(
+        `DubGrid Demo Request: ${normalizedOrgName}`,
+      ),
       html,
     });
     return NextResponse.json({ success: true });

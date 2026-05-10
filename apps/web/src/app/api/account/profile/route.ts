@@ -1,43 +1,68 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  canManageProfileChangeRequests,
+  updateSelfProfileDetails,
+} from "@/features/account/server";
+import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { extractJwtClaims } from "@/features/permissions/shared";
+import { getServiceClient } from "@/lib/supabase-service";
+import {
+  buildStaffValidationErrorResponse,
+  getStaffFieldErrorsFromZod,
+} from "@/lib/staff-validation";
+import { staffNameSchema } from "@dubgrid/contracts";
 import { z } from "zod";
-import { updateSelfProfileDetails } from "@/features/account/server";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
 
-const profileUpdateSchema = z.object({
-  firstName: z.string().trim().nullable(),
-  lastName: z.string().trim().nullable(),
+const accountProfileUpdateSchema = z.object({
+  firstName: staffNameSchema,
+  lastName: staffNameSchema,
   orgId: z.string().uuid().nullable(),
 });
 
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {
       return auth.response;
     }
-
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-    }
-
-    const parsed = profileUpdateSchema.safeParse(body);
+    const parsed = accountProfileUpdateSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return buildStaffValidationErrorResponse(
+        getStaffFieldErrorsFromZod(parsed.error),
+      );
     }
 
-    const firstName = parsed.data.firstName?.trim() || null;
-    const lastName = parsed.data.lastName?.trim() || null;
+    const serviceClient = getServiceClient();
+    const { effectiveRole, orgId: claimOrgId } = extractJwtClaims(
+      auth.session.access_token,
+    );
+    const targetOrgId = parsed.data.orgId ?? claimOrgId ?? null;
+    const canEditDirectly =
+      effectiveRole === "gridmaster" ||
+      (targetOrgId
+        ? await canManageProfileChangeRequests({
+            serviceClient,
+            actorId: auth.user.id,
+            orgId: targetOrgId,
+          })
+        : false);
+
+    if (canEditDirectly) {
+      const result = await updateSelfProfileDetails({
+        userId: auth.user.id,
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        orgId: targetOrgId,
+      });
+      return NextResponse.json(result);
+    }
 
     return NextResponse.json(
-      await updateSelfProfileDetails({
-        userId: auth.user.id,
-        firstName,
-        lastName,
-        orgId: parsed.data.orgId,
-      }),
+      {
+        error:
+          "Profile details are changed by admins. Submit a profile change request instead.",
+      },
+      { status: 403 },
     );
   } catch (error) {
     console.error("account profile PATCH failed", error);

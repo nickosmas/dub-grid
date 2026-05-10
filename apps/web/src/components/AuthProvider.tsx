@@ -22,29 +22,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Track session via API route so the server can capture the client IP address.
- * Uses a stable per-browser session ID (stored in localStorage) so token refreshes
- * update the existing row instead of creating duplicates.
+ * The server keys the row by the Supabase auth session_id claim so web and
+ * mobile sessions share the same registry.
  */
-async function trackSession(userId: string) {
-  // Generate a stable session ID per browser — persists across refreshes/tabs
-  const storageKey = `dg_session_id:${userId}`;
-  let sessionId = localStorage.getItem(storageKey);
-  if (!sessionId) {
-    sessionId = crypto.randomUUID();
-    localStorage.setItem(storageKey, sessionId);
-  }
-
-  // Hash the session ID for storage (the UNIQUE column is refresh_token_hash, repurposed as session fingerprint)
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(sessionId));
-  const hashHex = Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, "0")).join("");
-
+async function trackSession() {
   const deviceLabel = parseUserAgent(navigator.userAgent);
 
   await fetch("/api/auth/track-session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshTokenHash: hashHex, deviceLabel }),
+    body: JSON.stringify({ platform: "web", deviceLabel }),
   });
 }
 
@@ -110,7 +97,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
         // Track existing session on page load (session restored from cookies)
         if (session?.refresh_token && verifiedUser) {
-          trackSession(verifiedUser.id).catch(() => {});
+          trackSession().catch(() => {});
         }
       } catch (error) {
         // Timeout or stale auth state — clear persisted browser auth so the app
@@ -153,7 +140,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           session.refresh_token &&
           verifiedUser
         ) {
-          trackSession(verifiedUser.id).catch(() => {});
+          trackSession().catch(() => {});
         }
       })();
     });

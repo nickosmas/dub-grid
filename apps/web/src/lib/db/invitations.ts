@@ -1,5 +1,6 @@
 import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit } from "./shared";
 import { parseNameMismatchResponse } from "@/lib/account-linking";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { rowToInvitation } from "./mappers";
 import type { DbInvitation } from "./types";
 import {
@@ -139,7 +140,7 @@ async function postLinkRequest(
   const mismatchError = parseNameMismatchResponse(payload);
   if (mismatchError) throw mismatchError;
   if (!response.ok) {
-    throw new Error(payload?.error || "Failed to link employee to user");
+    throw new Error(formatClientErrorMessage(payload?.error, "Failed to link employee to user"));
   }
   return { status: payload?.status ?? "linked" };
 }

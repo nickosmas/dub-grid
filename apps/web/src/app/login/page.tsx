@@ -340,7 +340,7 @@ function GridmasterLogin() {
 
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(result.error || "Too many login attempts. Please try again later.");
+          toast.error(extractErrorMessage(result.error, "Too many login attempts. Please try again later."));
           setLoading(false);
           return;
         }
@@ -349,7 +349,7 @@ function GridmasterLogin() {
           setLoading(false);
           return;
         }
-        toast.error(result.error || "Unable to sign in. Please try again.");
+        toast.error(extractErrorMessage(result.error, "Unable to sign in. Please try again."));
         setLoading(false);
         return;
       }
@@ -380,7 +380,7 @@ function GridmasterLogin() {
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network error — please check your connection.");
+        toast.error("Network issue. Please check your connection.");
       } else {
         toast.error("Unable to sign in. Please try again.");
       }
@@ -593,7 +593,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(result.error || "Too many login attempts. Please try again later.");
+          toast.error(extractErrorMessage(result.error, "Too many login attempts. Please try again later."));
           setLoading(false);
           return;
         }
@@ -602,7 +602,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           setLoading(false);
           return;
         }
-        toast.error(result.error || "Unable to sign in. Please try again.");
+        toast.error(extractErrorMessage(result.error, "Unable to sign in. Please try again."));
         setLoading(false);
         return;
       }
@@ -673,7 +673,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
-        toast.error("Network error — please check your connection and try again.");
+        toast.error("Network issue. Please check your connection and try again.");
       } else {
         toast.error("Unable to sign in. Please try again.");
       }

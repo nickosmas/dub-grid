@@ -210,6 +210,7 @@ describe("createShiftSeries", () => {
       p_state_kind: "worked",
       p_shift_ids: [12, null],
       p_job_ids: [88, 99],
+      p_is_mentored_flags: [false, false],
       p_absence_type_id: null,
       p_custom_start_time: null,
       p_custom_end_time: null,
@@ -243,6 +244,10 @@ describe("createShiftSeries", () => {
       p_day_of_week: 2,
       p_state: {
         ...input,
+        segments: input.segments.map((segment) => ({
+          ...segment,
+          isMentored: false,
+        })),
         fromRecurring: true,
       },
       p_effective_from: "2026-04-14",
@@ -324,6 +329,7 @@ describe("createShiftSeries", () => {
       p_state_kind: "absence",
       p_shift_ids: [],
       p_job_ids: [],
+      p_is_mentored_flags: [],
       p_absence_type_id: 7,
       p_custom_start_time: null,
       p_custom_end_time: null,

@@ -17,7 +17,7 @@ function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
     firstName: "Jordan",
     lastName: "Lee",
     email: "jordan@example.com",
-    phone: "555-0100",
+    phone: "(415) 425-3334",
     employeeStatus: null,
     orgRole: "admin",
     hasAppAccess: true,
@@ -91,7 +91,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordyn",
         lastName: "Lee",
-        phone: "555-0100",
+        phone: "(415) 425-3334",
         managementDepartmentIds: [10],
       });
       expect(saveButton).toBeDisabled();
@@ -144,7 +144,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordyn",
         lastName: "Lane",
-        phone: "555-0100",
+        phone: "(415) 425-3334",
         managementDepartmentIds: [10],
       });
     });
@@ -163,10 +163,20 @@ describe("ManagementStaffPanel", () => {
         managementDepartmentIds: [10],
         isManagementUser: true,
       },
-      [{ id: 10, orgId: "org-1", name: "Leadership", abbr: "LEAD", sortOrder: 0 }],
+      [
+        {
+          id: 10,
+          orgId: "org-1",
+          name: "Leadership",
+          abbr: "LEAD",
+          sortOrder: 0,
+        },
+      ],
     );
 
-    await user.click(screen.getByRole("button", { name: /remove from management/i }));
+    await user.click(
+      screen.getByRole("button", { name: /remove from management/i }),
+    );
     expect(screen.getByText(/keep them on the schedule/i)).toBeInTheDocument();
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -177,7 +187,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordan",
         lastName: "Lee",
-        phone: "555-0100",
+        phone: "(415) 425-3334",
         managementDepartmentIds: [],
       });
     });
@@ -190,12 +200,24 @@ describe("ManagementStaffPanel", () => {
         managementDepartmentIds: [10],
         isManagementUser: true,
       },
-      [{ id: 10, orgId: "org-1", name: "Leadership", abbr: "LEAD", sortOrder: 0 }],
+      [
+        {
+          id: 10,
+          orgId: "org-1",
+          name: "Leadership",
+          abbr: "LEAD",
+          sortOrder: 0,
+        },
+      ],
     );
 
     await user.click(screen.getByRole("button", { name: "Leadership" }));
 
-    expect(screen.getByText(/must stay assigned to at least one management department/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /must stay assigned to at least one management department/i,
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
   });
 
@@ -214,7 +236,9 @@ describe("ManagementStaffPanel", () => {
 
     await user.click(footerCloseButton);
 
-    expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: /unsaved changes/i }),
+    ).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: /discard changes/i }));

@@ -22,6 +22,7 @@ import type {
 import type {
   AdminPermissions,
   AssignableOrganizationRole,
+  CoverageRuleConfig,
   Organization,
   OrganizationRole,
   PlatformRole,
@@ -46,7 +47,12 @@ import type {
   DbOrganizationMembership,
   DbShiftRequest,
 } from "@dubgrid/db-types";
-import { trimTime, resolveCodeLabels, iterateDateRange, MAX_SERIES_OCCURRENCES } from "./shared";
+import {
+  trimTime,
+  resolveCodeLabels,
+  iterateDateRange,
+  MAX_SERIES_OCCURRENCES,
+} from "./shared";
 import {
   deriveAssignmentDefinitionIdsFromAssignments,
   joinShiftJobSegmentLabels,
@@ -61,6 +67,27 @@ const EMPTY_SCHEDULED_JOB_STYLE = {
   border: "",
   text: "",
 } as const;
+
+const DEFAULT_COVERAGE_RULE_CONFIG: CoverageRuleConfig = {
+  mentoredCoverageCreditPercent: 100,
+};
+
+function normalizeCoverageRuleConfig(value: unknown): CoverageRuleConfig {
+  if (!value || typeof value !== "object") {
+    return DEFAULT_COVERAGE_RULE_CONFIG;
+  }
+
+  const rawPercent = (value as Record<string, unknown>)
+    .mentoredCoverageCreditPercent;
+  const percent =
+    typeof rawPercent === "number" && Number.isFinite(rawPercent)
+      ? Math.min(100, Math.max(0, Math.round(rawPercent)))
+      : DEFAULT_COVERAGE_RULE_CONFIG.mentoredCoverageCreditPercent;
+
+  return {
+    mentoredCoverageCreditPercent: percent,
+  };
+}
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
 
@@ -102,14 +129,15 @@ export function rowToOrganization(row: DbOrganization): Organization {
     id: row.id,
     name: row.name,
     slug: row.slug ?? null,
-    address: composeOrganizationAddress({
-      addressLine1,
-      addressLine2,
-      addressCity,
-      addressState,
-      addressPostalCode,
-      addressCountry,
-    }) || row.address,
+    address:
+      composeOrganizationAddress({
+        addressLine1,
+        addressLine2,
+        addressCity,
+        addressState,
+        addressPostalCode,
+        addressCountry,
+      }) || row.address,
     addressLine1,
     addressLine2,
     addressCity,
@@ -118,17 +146,18 @@ export function rowToOrganization(row: DbOrganization): Organization {
     addressCountry,
     phone: row.phone,
     employeeCount: row.employee_count,
-    focusAreaLabel: row.focus_area_label ?? 'Focus Areas',
-    certificationLabel: row.certification_label ?? 'Certifications',
-    roleLabel: row.role_label ?? 'Roles',
-    departmentLabel: row.department_label ?? 'Scheduled Departments',
-    shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? 'code',
+    focusAreaLabel: row.focus_area_label ?? "Focus Areas",
+    certificationLabel: row.certification_label ?? "Certifications",
+    roleLabel: row.role_label ?? "Roles",
+    departmentLabel: row.department_label ?? "Scheduled Departments",
+    shiftDisplayMode: (row.shift_display_mode as ShiftDisplayMode) ?? "code",
     timezone: row.timezone ?? null,
     payPeriodStartDate: row.pay_period_start_date ?? null,
     archivedAt: row.archived_at ?? null,
     suspendedAt: row.suspended_at ?? null,
     suspendedReason: row.suspended_reason ?? null,
     enforceConflictPrevention: row.enforce_conflict_prevention ?? false,
+    coverageRuleConfig: normalizeCoverageRuleConfig(row.coverage_rule_config),
     stripeCustomerId: row.stripe_customer_id ?? null,
     subscriptionStatus: row.subscription_status ?? null,
     trialEndsAt: row.trial_ends_at ?? null,
@@ -149,7 +178,8 @@ export function rowToOrganizationUser(
     lastName: (row.last_name as string | null) ?? null,
     orgRole: (row.org_role as OrganizationRole) ?? "user",
     platformRole: (row.platform_role as PlatformRole) ?? "none",
-    adminPermissions: (row.admin_permissions as AdminPermissions | null) ?? null,
+    adminPermissions:
+      (row.admin_permissions as AdminPermissions | null) ?? null,
     createdAt: row.created_at as string,
     lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
     updatedAt: (row.updated_at as string | null) ?? null,
@@ -250,8 +280,12 @@ export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
       ]),
   );
   const shiftColorOverrides = Object.fromEntries(
-    Object.entries(row.shift_color_overrides ?? {})
-      .filter(([shiftId, value]) => shiftId.trim().length > 0 && typeof value === "string" && value.trim().length > 0),
+    Object.entries(row.shift_color_overrides ?? {}).filter(
+      ([shiftId, value]) =>
+        shiftId.trim().length > 0 &&
+        typeof value === "string" &&
+        value.trim().length > 0,
+    ),
   );
   const style =
     assignmentMode === "shiftless"
@@ -290,7 +324,9 @@ export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
   };
 }
 
-export function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRequirement {
+export function rowToCoverageRequirement(
+  row: DbCoverageRequirement,
+): CoverageRequirement {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -302,7 +338,9 @@ export function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRe
   };
 }
 
-export function rowToAssignmentDefinition(row: DbAssignmentDefinition): AssignmentDefinition {
+export function rowToAssignmentDefinition(
+  row: DbAssignmentDefinition,
+): AssignmentDefinition {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -347,9 +385,10 @@ export function rowToEmployee(row: DbEmployee): Employee {
     id: row.id,
     firstName: row.first_name,
     lastName: row.last_name,
-    status: row.status ?? 'active',
+    employmentType: row.employment_type ?? "full_time",
+    status: row.status ?? "active",
     statusChangedAt: row.status_changed_at ?? null,
-    statusNote: row.status_note ?? '',
+    statusNote: row.status_note ?? "",
     certificationId: row.certification_id ?? null,
     roleIds: row.role_ids ?? [],
     seniority: row.seniority,
@@ -365,11 +404,24 @@ export function rowToEmployee(row: DbEmployee): Employee {
   };
 }
 
-export function employeeToRow(emp: Omit<Employee, "id">, orgId: string): Omit<DbEmployee, "id" | "status" | "status_changed_at" | "status_note" | "archived_at" | "user_id" | "version"> {
+export function employeeToRow(
+  emp: Omit<Employee, "id">,
+  orgId: string,
+): Omit<
+  DbEmployee,
+  | "id"
+  | "status"
+  | "status_changed_at"
+  | "status_note"
+  | "archived_at"
+  | "user_id"
+  | "version"
+> {
   return {
     org_id: orgId,
     first_name: emp.firstName,
     last_name: emp.lastName,
+    employment_type: emp.employmentType ?? "full_time",
     certification_id: emp.certificationId,
     role_ids: emp.roleIds ?? [],
     seniority: emp.seniority,
@@ -400,12 +452,16 @@ function normalizeScheduleCellState(
   overrides?: Partial<Pick<ScheduleCellInput, "seriesId" | "fromRecurring">>,
 ): ScheduleCellInput {
   const seriesId = overrides?.seriesId ?? state.seriesId ?? null;
-  const fromRecurring = overrides?.fromRecurring ?? state.fromRecurring ?? false;
+  const fromRecurring =
+    overrides?.fromRecurring ?? state.fromRecurring ?? false;
 
   if (state.kind === "deleted") {
     return {
       kind: "deleted",
       segments: [],
+      ...(state.focusAreaId !== undefined
+        ? { focusAreaId: state.focusAreaId ?? null }
+        : {}),
       absenceTypeId: null,
       customStartTime: null,
       customEndTime: null,
@@ -418,6 +474,9 @@ function normalizeScheduleCellState(
     return {
       kind: "absence",
       segments: [],
+      ...(state.focusAreaId !== undefined
+        ? { focusAreaId: state.focusAreaId ?? null }
+        : {}),
       absenceTypeId: state.absenceTypeId ?? null,
       customStartTime: null,
       customEndTime: null,
@@ -434,7 +493,11 @@ function normalizeScheduleCellState(
         shiftId: segment.shiftId,
         jobId: segment.jobId,
         position: index,
+        isMentored: segment.isMentored ?? false,
       })),
+    ...(state.focusAreaId !== undefined
+      ? { focusAreaId: state.focusAreaId ?? null }
+      : {}),
     absenceTypeId: null,
     customStartTime: state.customStartTime ?? null,
     customEndTime: state.customEndTime ?? null,
@@ -486,6 +549,7 @@ function buildFallbackSegments(
       focusAreaId: null,
       showJobOnGrid: true,
       isShiftless: segment.shiftId == null,
+      isMentored: segment.isMentored ?? false,
       startTime: null,
       endTime: null,
     }));
@@ -502,10 +566,11 @@ function resolveSegmentsAndAssignmentDefinitions(
   segments: ShiftJobSegment[];
 } {
   const { shiftIds, jobIds } = getScheduleAssignments(state);
-  const derivedAssignmentDefinitionIds = deriveAssignmentDefinitionIdsFromAssignments(
-    { shiftIds, jobIds },
-    assignmentIdByPair ?? new Map(),
-  );
+  const derivedAssignmentDefinitionIds =
+    deriveAssignmentDefinitionIdsFromAssignments(
+      { shiftIds, jobIds },
+      assignmentIdByPair ?? new Map(),
+    );
   const segments =
     state.kind === "worked"
       ? segmentCompatibility
@@ -516,7 +581,10 @@ function resolveSegmentsAndAssignmentDefinitions(
               assignmentIds: derivedAssignmentDefinitionIds,
             },
             segmentCompatibility,
-          )
+          ).map((segment, index) => ({
+            ...segment,
+            isMentored: state.segments[index]?.isMentored ?? false,
+          }))
         : buildFallbackSegments(state, derivedAssignmentDefinitionIds)
       : [];
 
@@ -587,6 +655,7 @@ function buildResolvedPresentation(
           : ""),
       shiftName: segment.shiftName,
       jobName: segment.jobName,
+      isMentored: segment.isMentored ?? false,
       startTime: segment.startTime ?? null,
       endTime: segment.endTime ?? null,
       displayFocusAreaName: null,
@@ -604,10 +673,7 @@ export function rowToRecurringShift(
   assignmentIdByPair?: Map<string, number>,
 ): RecurringShift {
   const input = normalizeScheduleCellState(row.state, { fromRecurring: true });
-  const {
-    assignmentIds,
-    segments,
-  } = resolveSegmentsAndAssignmentDefinitions(
+  const { assignmentIds, segments } = resolveSegmentsAndAssignmentDefinitions(
     input,
     segmentCompatibility,
     assignmentIdByPair,
@@ -627,7 +693,8 @@ export function rowToRecurringShift(
     state: input,
     presentation,
     input,
-    absenceTypeId: input.kind === "absence" ? (input.absenceTypeId ?? null) : null,
+    absenceTypeId:
+      input.kind === "absence" ? (input.absenceTypeId ?? null) : null,
     shiftLabel: presentation.label,
     effectiveFrom: row.effective_from,
     effectiveUntil: row.effective_until,
@@ -663,17 +730,22 @@ export function rowToShiftRequest(
           assignmentIdByPair,
         )
       : null;
-  const resolvedRequesterAssignmentDefinitionIds = requesterResolved.assignmentIds;
+  const resolvedRequesterAssignmentDefinitionIds =
+    requesterResolved.assignmentIds;
   const resolvedTargetAssignmentDefinitionIds =
     targetState != null ? (targetResolved?.assignmentIds ?? []) : [];
   const requesterSegments = requesterResolved.segments;
   const targetSegments = targetResolved?.segments ?? null;
   const requesterFocusAreaId =
+    requesterState.focusAreaId ??
     requesterSegments.find((segment) => segment.focusAreaId != null)
-      ?.focusAreaId ?? null;
+      ?.focusAreaId ??
+    null;
   const targetFocusAreaId =
+    targetState?.focusAreaId ??
     targetSegments?.find((segment) => segment.focusAreaId != null)
-      ?.focusAreaId ?? null;
+      ?.focusAreaId ??
+    null;
   const requesterPresentation = buildResolvedPresentation(requesterState, {
     codeMap: assignmentLabelMap,
     segments: requesterSegments,
@@ -694,9 +766,10 @@ export function rowToShiftRequest(
     type: row.type,
     status: row.status,
     requesterEmpId: row.requester_emp_id,
-    requesterName: [row.requester_first_name, row.requester_last_name]
-      .filter(Boolean)
-      .join(" ") || "Unknown",
+    requesterName:
+      [row.requester_first_name, row.requester_last_name]
+        .filter(Boolean)
+        .join(" ") || "Unknown",
     requesterShiftDate: row.requester_shift_date,
     requesterState,
     requesterPresentation,
@@ -710,9 +783,7 @@ export function rowToShiftRequest(
     requesterCustomEndTime: requesterState.customEndTime ?? null,
     targetEmpId: row.target_emp_id,
     targetName: row.target_first_name
-      ? [row.target_first_name, row.target_last_name]
-          .filter(Boolean)
-          .join(" ")
+      ? [row.target_first_name, row.target_last_name].filter(Boolean).join(" ")
       : null,
     targetShiftDate: row.target_shift_date,
     targetState,
@@ -720,9 +791,15 @@ export function rowToShiftRequest(
     targetShiftIds: targetResolved?.shiftIds ?? null,
     targetJobIds: targetResolved?.jobIds ?? null,
     targetSegments,
-    targetAssignmentDefinitionIds: targetState ? resolvedTargetAssignmentDefinitionIds : null,
+    targetAssignmentDefinitionIds: targetState
+      ? resolvedTargetAssignmentDefinitionIds
+      : null,
     targetShiftLabel: targetState
-      ? targetPresentation?.label ?? resolveCodeLabels(resolvedTargetAssignmentDefinitionIds, assignmentLabelMap)
+      ? (targetPresentation?.label ??
+        resolveCodeLabels(
+          resolvedTargetAssignmentDefinitionIds,
+          assignmentLabelMap,
+        ))
       : null,
     targetFocusAreaId,
     targetCustomStartTime: targetState?.customStartTime ?? null,
@@ -748,29 +825,35 @@ export function generateSeriesDates(
   maxOccurrences: number | null,
 ): string[] {
   const dates: string[] = [];
-  const start = new Date(startDate + 'T00:00:00');
+  const start = new Date(startDate + "T00:00:00");
   const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
 
   // Compute an upper-bound end date for iteration if none specified
   const maxEnd = endDate
-    ? new Date(endDate + 'T00:00:00')
+    ? new Date(endDate + "T00:00:00")
     : new Date(start.getFullYear(), start.getMonth() + 7, start.getDate()); // ~7 months
-  const startDayOfWeek = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())).getUTCDay();
+  const startDayOfWeek = new Date(
+    Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()),
+  ).getUTCDay();
 
   // DST-safe iteration using UTC arithmetic
-  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
+  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(
+    start,
+    maxEnd,
+  )) {
     if (dates.length >= cap) break;
 
     let include = false;
-    const dayMatch = (daysOfWeek === null || daysOfWeek.length === 0)
-      ? dayOfWeek === startDayOfWeek
-      : daysOfWeek.includes(dayOfWeek);
+    const dayMatch =
+      daysOfWeek === null || daysOfWeek.length === 0
+        ? dayOfWeek === startDayOfWeek
+        : daysOfWeek.includes(dayOfWeek);
 
-    if (frequency === 'daily') {
+    if (frequency === "daily") {
       include = true;
-    } else if (frequency === 'weekly') {
+    } else if (frequency === "weekly") {
       include = dayMatch;
-    } else if (frequency === 'biweekly') {
+    } else if (frequency === "biweekly") {
       // dayIndex is a reliable day counter (immune to DST)
       const weekNum = Math.floor(dayIndex / 7);
       include = weekNum % 2 === 0 && dayMatch;

@@ -7,13 +7,15 @@ const checkRateLimit = vi.fn();
 const loggerError = vi.fn();
 const captureException = vi.fn();
 const membershipMaybeSingle = vi.fn();
-const profileSingle = vi.fn();
+const profileMaybeSingle = vi.fn();
+const organizationBillingMaybeSingle = vi.fn();
 const organizationSingle = vi.fn();
 const organizationUpdateMaybeSingle = vi.fn();
 const auditInsert = vi.fn();
 const organizationUpdate = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
+  createRequestSupabaseClient: vi.fn(() => ({})),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
 
@@ -44,7 +46,9 @@ vi.mock("@/lib/supabase-service", () => ({
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               eq: vi.fn(() => ({
-                maybeSingle: membershipMaybeSingle,
+                is: vi.fn(() => ({
+                  maybeSingle: membershipMaybeSingle,
+                })),
               })),
             })),
           })),
@@ -55,7 +59,8 @@ vi.mock("@/lib/supabase-service", () => ({
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              single: profileSingle,
+              maybeSingle: profileMaybeSingle,
+              single: profileMaybeSingle,
             })),
           })),
         };
@@ -63,8 +68,11 @@ vi.mock("@/lib/supabase-service", () => ({
 
       if (table === "organizations") {
         return {
-          select: vi.fn(() => ({
+          select: vi.fn((columns: string) => ({
             eq: vi.fn(() => ({
+              maybeSingle: columns.includes("subscription_status")
+                ? organizationBillingMaybeSingle
+                : organizationSingle,
               single: organizationSingle,
             })),
           })),
@@ -165,8 +173,16 @@ describe("PUT /api/organizations/settings", () => {
       data: { org_role: "super_admin", admin_permissions: null },
       error: null,
     });
-    profileSingle.mockResolvedValue({
+    profileMaybeSingle.mockResolvedValue({
       data: { platform_role: "none" },
+      error: null,
+    });
+    organizationBillingMaybeSingle.mockResolvedValue({
+      data: {
+        suspended_at: null,
+        subscription_status: "active",
+        trial_ends_at: null,
+      },
       error: null,
     });
     organizationUpdate.mockImplementation(() => makeUpdateBuilder());
@@ -297,5 +313,71 @@ describe("PUT /api/organizations/settings", () => {
     );
     expect(captureException).not.toHaveBeenCalled();
     expect(loggerError).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid organization phone numbers with field errors", async () => {
+    const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
+
+    const response = await PUT(
+      makeRequest({
+        orgId: currentRow.id,
+        expectedUpdatedAt: currentRow.updated_at,
+        phone: "123",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        error: "Enter a 10-digit US phone number",
+        fieldErrors: expect.objectContaining({
+          phone: "Enter a 10-digit US phone number",
+        }),
+      }),
+    );
+    expect(organizationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("records a dedicated runtime controls audit event when feature overrides change", async () => {
+    const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00", {
+      feature_overrides: {},
+    });
+    const updatedRow = makeOrganizationRow("2026-04-15T18:10:00.000000+00:00", {
+      feature_overrides: { disable_realtime: true },
+    });
+
+    organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+    organizationUpdateMaybeSingle.mockResolvedValueOnce({
+      data: updatedRow,
+      error: null,
+    });
+
+    const response = await PUT(
+      makeRequest({
+        orgId: currentRow.id,
+        expectedUpdatedAt: currentRow.updated_at,
+        featureOverrides: { disable_realtime: true },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "org.updated",
+        details: expect.objectContaining({
+          changedFields: expect.arrayContaining(["featureOverrides"]),
+        }),
+      }),
+    );
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "feature_flags.updated",
+        resource_type: "organization",
+        details: {
+          from: {},
+          to: { disable_realtime: true },
+        },
+      }),
+    );
   });
 });

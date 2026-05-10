@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { usePermissions, useLogout, useMediaQuery, MOBILE } from "@/hooks";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useGridmasterRealtimeInvalidation,
+  usePermissions,
+  useLogout,
+  useMediaQuery,
+  MOBILE,
+} from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
 import { DubGridLogo } from "@/components/Logo";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+import { getAvatarInitials } from "@/lib/utils";
 import {
   SidebarProvider,
   Sidebar,
@@ -23,18 +32,29 @@ import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 
 import AllUsersView from "@/components/gridmaster/AllUsersView";
+import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
+import GridmasterBillingView from "@/components/gridmaster/GridmasterBillingView";
+import GridmasterComplianceView from "@/components/gridmaster/GridmasterComplianceView";
+import GridmasterSecurityView from "@/components/gridmaster/GridmasterSecurityView";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
 import {
   fetchGridmasterDashboardData,
+  type GridmasterDashboardData,
   type TenantStats,
 } from "@/features/gridmaster/client";
+import { queryKeys } from "@/lib/query-keys";
 import type { Organization } from "@/types";
+import type { OrganizationDetailTab } from "@/components/gridmaster/OrganizationDetail";
 
 type GridmasterView =
   | "dashboard"
   | "all-users"
+  | "gridmaster-accounts"
+  | "billing"
+  | "compliance"
+  | "security"
   | "audit-log"
   | "organization"
   | "impersonation"
@@ -125,8 +145,8 @@ function OrgSearchCombobox({
   }, []);
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div ref={ref} style={{ position: "relative", minWidth: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
         {selectedOrg && (
           <span
             style={{
@@ -138,9 +158,7 @@ function OrgSearchCombobox({
               padding: "3px 10px",
               color: "var(--color-text-primary)",
               whiteSpace: "nowrap",
-              maxWidth: 160,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              flexShrink: 0,
             }}
           >
             {selectedOrg.name}
@@ -256,6 +274,7 @@ export default function GridmasterPortal() {
   const isMobile = useMediaQuery(MOBILE);
   const [signingOut, setSigningOut] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Fetch user name for header identity
   useEffect(() => {
@@ -280,24 +299,23 @@ export default function GridmasterPortal() {
   }, [authUser]);
 
   const displayName = userName || "Gridmaster";
-  const initials = userName
-    ? userName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()
-    : "GM";
+  const initials = getAvatarInitials(userName, "GM");
 
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
     await signOutLocal("/login");
   }, [signOutLocal]);
 
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [stats, setStats] = useState<Map<string, TenantStats>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedOrgInitialTab, setSelectedOrgInitialTab] = useState<OrganizationDetailTab | undefined>();
   const [view, setView] = useState<GridmasterView>("dashboard");
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
   const [impersonateOrgId, setImpersonateOrgId] = useState<string | undefined>();
+
+  useGridmasterRealtimeInvalidation({
+    enabled: !permLoading && isGridmaster,
+    queryClient,
+  });
 
   // User menu dropdown state
   const [menuOpen, setMenuOpen] = useState(false);
@@ -312,24 +330,24 @@ export default function GridmasterPortal() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  const loadData = useCallback(async () => {
-    try {
-      const data = await fetchGridmasterDashboardData();
-      setOrganizations(data.organizations);
-      const map = new Map<string, TenantStats>();
-      for (const s of data.stats) map.set(s.orgId, s);
-      setStats(map);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
-    } finally {
-      setLoading(false);
+  const dashboardQuery = useQuery({
+    queryKey: queryKeys.gridmaster.dashboard(),
+    queryFn: fetchGridmasterDashboardData,
+    enabled: !permLoading && isGridmaster,
+    staleTime: 30_000,
+  });
+  const organizations = dashboardQuery.data?.organizations ?? [];
+  const stats = useMemo(() => {
+    const map = new Map<string, TenantStats>();
+    for (const stat of dashboardQuery.data?.stats ?? []) {
+      map.set(stat.orgId, stat);
     }
-  }, []);
-
-  useEffect(() => {
-    if (permLoading || !isGridmaster) return;
-    loadData();
-  }, [permLoading, isGridmaster, loadData]);
+    return map;
+  }, [dashboardQuery.data?.stats]);
+  const error =
+    dashboardQuery.error
+      ? formatClientErrorMessage(dashboardQuery.error, "Failed to load gridmaster dashboard")
+      : null;
 
   // ── Nav item config (must be before early returns to satisfy Rules of Hooks) ──
 
@@ -338,31 +356,43 @@ export default function GridmasterPortal() {
       id: "navigation",
       label: "Navigation",
       items: [
-        { key: "dashboard" as GridmasterView, label: "Dashboard", icon: DashboardIcon, onClick: () => { setView("dashboard"); setSelectedId(null); } },
-        { key: "all-users" as GridmasterView, label: "All Users", icon: UsersIcon, onClick: () => { setView("all-users"); setSelectedId(null); } },
-        { key: "audit-log" as GridmasterView, label: "Audit Log", icon: AuditIcon, onClick: () => { setView("audit-log"); setSelectedId(null); } },
+        { key: "dashboard" as GridmasterView, label: "Dashboard", icon: DashboardIcon, onClick: () => { setView("dashboard"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "all-users" as GridmasterView, label: "All Users", icon: UsersIcon, onClick: () => { setView("all-users"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "billing" as GridmasterView, label: "Billing", icon: AuditIcon, onClick: () => { setView("billing"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "compliance" as GridmasterView, label: "Compliance", icon: AuditIcon, onClick: () => { setView("compliance"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "audit-log" as GridmasterView, label: "Audit Log", icon: AuditIcon, onClick: () => { setView("audit-log"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
     },
     {
       id: "actions",
       label: "Actions",
       items: [
-        { key: "create-organization" as GridmasterView, label: "New Organization", icon: PlusIcon, onClick: () => { setView("create-organization"); setSelectedId(null); } },
+        { key: "create-organization" as GridmasterView, label: "New Organization", icon: PlusIcon, onClick: () => { setView("create-organization"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "security" as GridmasterView, label: "Security", icon: UsersIcon, onClick: () => { setView("security"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "gridmaster-accounts" as GridmasterView, label: "Gridmaster Accounts", icon: UsersIcon, onClick: () => { setView("gridmaster-accounts"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
     },
     {
       id: "tools",
       label: "Tools",
       items: [
-        { key: "impersonation" as GridmasterView, label: "Impersonation", icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
-        { key: "impersonation-history" as GridmasterView, label: "History", icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); } },
+        { key: "impersonation" as GridmasterView, label: "Impersonation", icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setSelectedOrgInitialTab(undefined); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
+        { key: "impersonation-history" as GridmasterView, label: "History", icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
     },
   ], []);
+  const primaryNavGroups = useMemo(
+    () => navGroups.filter((group) => group.id === "navigation" || group.id === "tools"),
+    [navGroups],
+  );
+  const bottomActionGroups = useMemo(
+    () => navGroups.filter((group) => group.id === "actions"),
+    [navGroups],
+  );
 
   // ── Loading / denied states ──────────────────────────────────────────────
 
-  if (permLoading || signingOut || (isGridmaster && loading)) {
+  if (permLoading || signingOut || (isGridmaster && dashboardQuery.isLoading)) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center" }}>
         <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>Loading…</span>
@@ -376,7 +406,7 @@ export default function GridmasterPortal() {
         <div style={{ textAlign: "center", maxWidth: 520 }}>
           <h1 style={{ marginBottom: 8, fontSize: "var(--dg-fs-section-title)", color: "var(--color-danger)" }}>Access denied</h1>
           <p style={{ margin: 0, color: "var(--color-text-muted)" }}>
-            The gridmaster command center is restricted to gridmaster accounts.
+            The gridmaster portal is restricted to gridmaster accounts.
           </p>
         </div>
       </div>
@@ -385,13 +415,16 @@ export default function GridmasterPortal() {
 
   // ── Derived ──────────────────────────────────────────────────────────────
 
-  const totalUsers = Array.from(stats.values()).reduce((n, s) => n + s.userCount, 0);
+  const totalUsers =
+    dashboardQuery.data?.platformUserCount ??
+    Array.from(stats.values()).reduce((n, s) => n + s.userCount, 0);
   const totalEmployees = Array.from(stats.values()).reduce((n, s) => n + s.employeeCount, 0);
 
   const selectedOrg = selectedId ? organizations.find((c) => c.id === selectedId) ?? null : null;
 
-  function selectOrg(id: string) {
+  function selectOrg(id: string, initialTab?: OrganizationDetailTab) {
     setSelectedId(id);
+    setSelectedOrgInitialTab(initialTab);
     setView("organization");
   }
 
@@ -402,12 +435,37 @@ export default function GridmasterPortal() {
   }
 
   function handleOrgCreated(org: Organization) {
-    setOrganizations((prev) => [...prev, org].sort((a, b) => a.name.localeCompare(b.name)));
+    queryClient.setQueryData<GridmasterDashboardData>(
+      queryKeys.gridmaster.dashboard(),
+      (current) => ({
+        organizations: [
+          ...(current?.organizations ?? []),
+          org,
+        ].sort((a, b) => a.name.localeCompare(b.name)),
+        platformUserCount: current?.platformUserCount ?? 0,
+        stats: current?.stats ?? [],
+      }),
+    );
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.dashboard() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.orgAudit(null, 0, 50) });
     selectOrg(org.id);
   }
 
   function handleOrgUpdated(updated: Organization) {
-    setOrganizations((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    queryClient.setQueryData<GridmasterDashboardData>(
+      queryKeys.gridmaster.dashboard(),
+      (current) => ({
+        organizations: (current?.organizations ?? []).map((organization) =>
+          organization.id === updated.id ? updated : organization,
+        ),
+        platformUserCount: current?.platformUserCount ?? 0,
+        stats: current?.stats ?? [],
+      }),
+    );
+    queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.dashboard() });
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.gridmaster.orgAudit(updated.id, 0, 50),
+    });
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -418,6 +476,9 @@ export default function GridmasterPortal() {
       <header
         style={{
           height: 56,
+          position: "sticky",
+          top: 0,
+          zIndex: 300,
           background: "var(--color-surface)",
           borderBottom: "1px solid var(--color-border)",
           display: "flex",
@@ -432,24 +493,8 @@ export default function GridmasterPortal() {
           <span style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" }}>
             Gridmaster
           </span>
-          {!isMobile && (
-            <span
-              style={{
-                fontSize: "var(--dg-fs-badge)",
-                fontWeight: 600,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--color-text-inverse)",
-                background: "var(--color-text-primary)",
-                padding: "2px 8px",
-                borderRadius: 4,
-              }}
-            >
-              Command Center
-            </span>
-          )}
         </div>
-        <div style={{ flex: 1, display: "flex", justifyContent: isMobile ? "flex-end" : "center", marginLeft: isMobile ? 8 : 0 }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: isMobile ? "flex-end" : "center", marginLeft: isMobile ? 8 : 0 }}>
           <OrgSearchCombobox
             organizations={organizations}
             stats={stats}
@@ -551,6 +596,10 @@ export default function GridmasterPortal() {
           {([
             { key: "dashboard", label: "Dashboard" },
             { key: "all-users", label: "Users" },
+            { key: "billing", label: "Billing" },
+            { key: "compliance", label: "Compliance" },
+            { key: "security", label: "Security" },
+            { key: "gridmaster-accounts", label: "GM Accounts" },
             { key: "audit-log", label: "Audit" },
             { key: "create-organization", label: "New Org" },
             { key: "impersonation", label: "Impersonate" },
@@ -559,7 +608,7 @@ export default function GridmasterPortal() {
             <button
               key={item.key}
               className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
-              onClick={() => { setView(item.key); setSelectedId(null); if (item.key === "impersonation") { setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } }}
+              onClick={() => { setView(item.key); setSelectedId(null); setSelectedOrgInitialTab(undefined); if (item.key === "impersonation") { setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } }}
             >
               {item.label}
             </button>
@@ -573,7 +622,7 @@ export default function GridmasterPortal() {
         {!isMobile && (
           <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
             <SidebarContent className="pt-2 overscroll-contain">
-              {navGroups.map((group) => (
+              {primaryNavGroups.map((group) => (
                 <SidebarGroup key={group.id}>
                   <SidebarGroupLabel className={SIDEBAR_GROUP_LABEL_CLASS}>
                     {group.label}
@@ -601,6 +650,35 @@ export default function GridmasterPortal() {
               ))}
             </SidebarContent>
             <SidebarFooter>
+              <div className="-mx-2 border-t border-[var(--color-border)]" />
+              {bottomActionGroups.map((group) => (
+                <SidebarGroup key={group.id} className="p-0">
+                  {group.id !== "actions" && (
+                    <SidebarGroupLabel className={SIDEBAR_GROUP_LABEL_CLASS}>
+                      {group.label}
+                    </SidebarGroupLabel>
+                  )}
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={item.key}>
+                          <SidebarMenuButton
+                            isActive={view === item.key}
+                            tooltip={item.label}
+                            onClick={item.onClick}
+                            className={SIDEBAR_MENU_BTN_CLASS}
+                          >
+                            <span className={view === item.key ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                              {item.icon}
+                            </span>
+                            <span className="font-semibold">{item.label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              ))}
               <SidebarMenu>
                 <SidebarMenuItem>
                   <GridmasterSidebarCollapseButton />
@@ -647,6 +725,28 @@ export default function GridmasterPortal() {
             />
           )}
 
+          {view === "billing" && (
+            <GridmasterBillingView onSelectOrg={selectOrg} />
+          )}
+
+          {view === "compliance" && (
+            <GridmasterComplianceView onSelectOrg={selectOrg} />
+          )}
+
+          {view === "security" && (
+            <GridmasterSecurityView
+              organizations={organizations}
+              currentUserId={authUser?.id}
+            />
+          )}
+
+          {view === "gridmaster-accounts" && (
+            <GridmasterAccountsView
+              organizations={organizations}
+              currentUserId={authUser?.id}
+            />
+          )}
+
           {view === "audit-log" && (
             <AuditLogView />
           )}
@@ -686,6 +786,7 @@ export default function GridmasterPortal() {
               <OrganizationDetail
                 organization={selectedOrg}
                 stats={stats.get(selectedOrg.id)}
+                initialTab={selectedOrgInitialTab}
                 onOrgUpdated={handleOrgUpdated}
                 onImpersonate={handleImpersonate}
               />

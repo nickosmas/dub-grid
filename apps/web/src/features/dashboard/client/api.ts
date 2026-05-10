@@ -1,6 +1,7 @@
 "use client";
 
 import type { DashboardAnalyticsResponse } from "../shared/analytics";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 async function requestJson<T>(input: string): Promise<T> {
   const response = await fetch(input);
@@ -11,9 +12,7 @@ async function requestJson<T>(input: string): Promise<T> {
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "Dashboard request failed.",
+      formatClientErrorMessage(body?.error, "Dashboard request failed."),
     );
   }
 

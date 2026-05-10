@@ -1,6 +1,15 @@
+import { useEffect, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
-import { StyleSheet, View } from "react-native";
-import { mobileColors, mobileRadii, mobileSpacing } from "../theme/tokens";
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  StyleSheet,
+  View,
+} from "react-native";
+import { mobileColors, mobileSpacing } from "../theme/tokens";
+
+const PULSE_DURATION_MS = 900;
 
 export function SkeletonBlock({
   height,
@@ -13,12 +22,74 @@ export function SkeletonBlock({
   radius?: number;
   style?: StyleProp<ViewStyle>;
 }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  const [isReduceMotionEnabled, setIsReduceMotionEnabled] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (isMounted) {
+        setIsReduceMotionEnabled(enabled);
+      }
+    });
+
+    const subscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setIsReduceMotionEnabled,
+    );
+
+    return () => {
+      isMounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isReduceMotionEnabled) {
+      pulse.setValue(1);
+      return undefined;
+    }
+
+    pulse.setValue(0);
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          duration: PULSE_DURATION_MS,
+          easing: Easing.out(Easing.cubic),
+          toValue: 1,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          duration: PULSE_DURATION_MS,
+          easing: Easing.out(Easing.cubic),
+          toValue: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [isReduceMotionEnabled, pulse]);
+
+  const opacity = isReduceMotionEnabled
+    ? 0.72
+    : pulse.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.5, 0.92],
+      });
+
   return (
-    <View
+    <Animated.View
       style={[
         styles.block,
         {
           height,
+          opacity,
           width,
           borderRadius: radius,
         },
@@ -102,20 +173,14 @@ export function DetailSkeleton({ sections = 2 }: { sections?: number }) {
 
 const styles = StyleSheet.create({
   block: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.borderSubtle,
   },
   section: {
     gap: mobileSpacing.sectionGap,
   },
   heroCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 20,
-    gap: 14,
+    paddingVertical: 4,
+    gap: 12,
   },
   heroRow: {
     flexDirection: "row",
@@ -131,12 +196,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   listCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: mobileColors.borderSubtle,
-    padding: 18,
-    gap: 12,
+    paddingVertical: 14,
+    gap: 10,
   },
   listRow: {
     flexDirection: "row",
@@ -145,12 +208,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   detailCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 20,
-    gap: 14,
+    paddingVertical: 4,
+    gap: 12,
   },
   detailHeader: {
     flexDirection: "row",
@@ -169,11 +228,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   detailListCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderColor: mobileColors.borderSubtle,
-    padding: 18,
-    gap: 12,
+    paddingVertical: 14,
+    gap: 10,
   },
 });

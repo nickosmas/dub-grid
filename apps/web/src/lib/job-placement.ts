@@ -6,6 +6,7 @@ import type {
   ShiftCategory,
 } from "@/types";
 import { borderColor, getPresetByBg, normalizePresetBg } from "@/lib/colors";
+import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 
 type JobPlacementScope = Pick<
   JobDefinition,
@@ -83,7 +84,7 @@ export function shouldShowJobOnGrid(
     return false;
   }
 
-  if (job.systemKey === "regular_staff") {
+  if (isRegularStaffSystemJob(job)) {
     return false;
   }
 

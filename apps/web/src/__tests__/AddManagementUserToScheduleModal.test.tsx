@@ -22,7 +22,9 @@ vi.mock("sonner", () => ({
 }));
 
 const createEmployeeFromOrgUserMock = vi.mocked(createEmployeeFromOrgUser);
-const reconcileEmployeeFromOrgUserMock = vi.mocked(reconcileEmployeeFromOrgUser);
+const reconcileEmployeeFromOrgUserMock = vi.mocked(
+  reconcileEmployeeFromOrgUser,
+);
 
 const focusAreas: FocusArea[] = [
   {
@@ -58,7 +60,7 @@ function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
     firstName: "Jordan",
     lastName: "Lee",
     email: "jordan@example.com",
-    phone: "555-0100",
+    phone: "(415) 425-3334",
     employeeStatus: null,
     orgRole: "user",
     hasAppAccess: true,
@@ -85,6 +87,7 @@ describe("AddManagementUserToScheduleModal", () => {
       id: "emp-99",
       firstName: "Jordan",
       lastName: "Lee",
+      employmentType: "full_time",
       status: "active",
       statusChangedAt: null,
       statusNote: "",
@@ -92,7 +95,7 @@ describe("AddManagementUserToScheduleModal", () => {
       roleIds: [],
       seniority: 1,
       focusAreaIds: [1],
-      phone: "555-0100",
+      phone: "(415) 425-3334",
       email: "jordan@example.com",
       contactNotes: "",
       userId: "user-1",
@@ -104,6 +107,7 @@ describe("AddManagementUserToScheduleModal", () => {
       id: "emp-100",
       firstName: "Jordan",
       lastName: "Lee",
+      employmentType: "full_time",
       status: "active",
       statusChangedAt: null,
       statusNote: "",
@@ -111,7 +115,7 @@ describe("AddManagementUserToScheduleModal", () => {
       roleIds: [],
       seniority: 1,
       focusAreaIds: [1],
-      phone: "555-0100",
+      phone: "(415) 425-3334",
       email: "jordan@example.com",
       contactNotes: "",
       userId: "user-1",
@@ -134,7 +138,9 @@ describe("AddManagementUserToScheduleModal", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /add to schedule/i }),
+    ).toBeDisabled();
     expect(createEmployeeFromOrgUserMock).not.toHaveBeenCalled();
   });
 
@@ -158,7 +164,7 @@ describe("AddManagementUserToScheduleModal", () => {
     const firstNameInput = screen.getByDisplayValue("Jordan");
     const lastNameInput = screen.getByDisplayValue("Lee");
     const emailInput = screen.getByDisplayValue("jordan@example.com");
-    const phoneInput = screen.getByDisplayValue("555-0100");
+    const phoneInput = screen.getByDisplayValue("(415) 425-3334");
 
     await user.clear(firstNameInput);
     await user.type(firstNameInput, "  Jordyn  ");
@@ -167,7 +173,7 @@ describe("AddManagementUserToScheduleModal", () => {
     await user.clear(emailInput);
     await user.type(emailInput, "  jordyn@example.com  ");
     await user.clear(phoneInput);
-    await user.type(phoneInput, " 555-0199 ");
+    await user.type(phoneInput, "415-555-0199");
 
     await user.click(screen.getByRole("button", { name: "North" }));
     await user.click(screen.getByRole("button", { name: "SUPV" }));
@@ -186,13 +192,15 @@ describe("AddManagementUserToScheduleModal", () => {
         firstName: "Jordyn",
         lastName: "Lane",
         email: "jordyn@example.com",
-        phone: "555-0199",
+        phone: "(415) 555-0199",
         certificationId: null,
         focusAreaIds: [1],
         roleIds: [7],
         contactNotes: "Internal note",
       });
-      expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ id: "emp-99" }));
+      expect(onAdded).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "emp-99" }),
+      );
       expect(onClose).toHaveBeenCalledOnce();
     });
   });
@@ -239,17 +247,54 @@ describe("AddManagementUserToScheduleModal", () => {
     expect(screen.getByText("Jordyn Lane")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Use Account Name and Add to Schedule" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "Use Account Name and Add to Schedule",
+      }),
+    );
 
     await waitFor(() => {
-      expect(reconcileEmployeeFromOrgUserMock).toHaveBeenCalledWith(expect.objectContaining({
-        orgId: "org-1",
-        userId: "user-1",
-        firstName: "Jordyn",
-        lastName: "Lane",
-      }));
-      expect(onAdded).toHaveBeenCalledWith(expect.objectContaining({ id: "emp-100" }));
+      expect(reconcileEmployeeFromOrgUserMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: "org-1",
+          userId: "user-1",
+          firstName: "Jordyn",
+          lastName: "Lane",
+        }),
+      );
+      expect(onAdded).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "emp-100" }),
+      );
       expect(onClose).toHaveBeenCalledOnce();
     });
+  });
+
+  it("blocks adding the management user when the phone number is invalid", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AddManagementUserToScheduleModal
+        orgId="org-1"
+        person={makePerson()}
+        focusAreas={focusAreas}
+        certifications={certifications}
+        roles={roles}
+        onClose={vi.fn()}
+        onAdded={vi.fn()}
+      />,
+    );
+
+    const phoneInput = screen.getByDisplayValue("(415) 425-3334");
+    await user.clear(phoneInput);
+    await user.type(phoneInput, "123");
+    await user.tab();
+    await user.click(screen.getByRole("button", { name: "North" }));
+
+    expect(
+      screen.getByText("Enter a 10-digit US phone number"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /add to schedule/i }),
+    ).toBeDisabled();
   });
 });

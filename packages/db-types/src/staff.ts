@@ -1,10 +1,11 @@
-import type { EmployeeStatus } from "@dubgrid/domain";
+import type { EmployeeEmploymentType, EmployeeStatus } from "@dubgrid/domain";
 
 export interface DbEmployee {
   id: string;
   org_id: string;
   first_name: string;
   last_name: string;
+  employment_type: EmployeeEmploymentType;
   status: EmployeeStatus;
   status_changed_at: string | null;
   status_note: string;

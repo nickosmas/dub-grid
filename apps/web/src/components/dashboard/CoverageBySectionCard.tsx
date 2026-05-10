@@ -8,6 +8,7 @@ const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
   amber: { bg: "var(--color-warning-border)", text: "var(--color-warning-text)" },
   red: { bg: "var(--color-danger-border)", text: "var(--color-danger-text)" },
+  none: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)" },
 };
 
 const PCT_COLORS = {
@@ -22,6 +23,7 @@ interface CoverageBySectionCardProps {
   isMobile: boolean;
   hasRequirements: boolean;
   publishedWindowState?: PublishedWindowState;
+  periodLabel?: string;
   onExpand?: () => void;
 }
 
@@ -31,6 +33,7 @@ export default function CoverageBySectionCard({
   isMobile,
   hasRequirements,
   publishedWindowState = "published",
+  periodLabel = "this week",
   onExpand,
 }: CoverageBySectionCardProps) {
   const isUnpublished = hasRequirements && publishedWindowState === "unpublished";
@@ -41,7 +44,7 @@ export default function CoverageBySectionCard({
       ? "Not published yet"
       : isPartial
         ? "Published dates only · required vs scheduled"
-        : "This week · required vs scheduled";
+        : `${periodLabel} · required vs scheduled`;
 
   if (sections.length === 0) {
     return (
@@ -196,6 +199,14 @@ export default function CoverageBySectionCard({
                   </div>
                   {sec.daily.map((day) => {
                     const colors = STATUS_COLORS[day.status];
+                    const hasRequirement = day.requiredCount > 0;
+                    const cellLabel = hasRequirement
+                      ? `${day.filledCount}/${day.requiredCount}`
+                      : "\u2014";
+                    const ariaLabel = hasRequirement
+                      ? `${sec.focusAreaName} ${day.dayLabel}: ${day.filledCount} of ${day.requiredCount} required slots filled`
+                      : `${sec.focusAreaName} ${day.dayLabel}: no coverage requirement`;
+
                     return (
                       <div
                         key={`${sec.focusAreaId}-${day.dateKey}`}
@@ -211,9 +222,9 @@ export default function CoverageBySectionCard({
                         color: colors.text,
                         cursor: "default",
                       }}
-                        aria-label={`${sec.focusAreaName} ${day.dayLabel}: ${day.staffCount} staff`}
+                        aria-label={ariaLabel}
                       >
-                        {day.staffCount}
+                        {cellLabel}
                       </div>
                     );
                   })}

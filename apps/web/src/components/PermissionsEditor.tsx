@@ -9,6 +9,7 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import ChangeReviewModal, { type ReviewChange } from "@/components/review/ChangeReviewModal";
 import type { AdminPermissions } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 // ── View / Edit implication pairs ───────────────────────────────────────────
 export const VIEW_EDIT_PAIRS: { view: keyof AdminPermissions; edit: keyof AdminPermissions }[] = [
@@ -393,7 +394,7 @@ export default function PermissionsEditor({
       setReviewConfig(null);
       onClose();
     } catch (err: unknown) {
-      toast.error((err instanceof Error ? err.message : null) ?? "Failed to update permissions");
+      toast.error(formatClientErrorMessage(err, "We couldn't update those permissions."));
     } finally {
       setSaving(false);
     }

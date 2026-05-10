@@ -19,6 +19,8 @@ export function StaffDetailHeader({
   onToggleEditDetails,
 }: StaffDetailHeaderProps) {
   const displayName = getEmployeeDisplayName(employee);
+  const employmentLabel =
+    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
 
   const statusConfig = {
     active: {
@@ -85,9 +87,10 @@ export function StaffDetailHeader({
             ) : null}
           </div>
 
-          <div className="grid gap-3 text-[13px] md:grid-cols-3">
+          <div className="grid gap-3 text-[13px] sm:grid-cols-2 lg:grid-cols-4">
             <BioField label="Email" value={employee.email || "—"} />
             <BioField label="Phone" value={employee.phone || "—"} />
+            <BioField label="Employment" value={employmentLabel} />
             <BioField label="Seniority" value={`#${employee.seniority}`} />
           </div>
         </div>

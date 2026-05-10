@@ -4,6 +4,16 @@ import type { DbScheduleCell } from "@/lib/db/types";
 import { getServiceClient } from "@/lib/supabase-service";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 
+const POSTGREST_MUTATION_BATCH_SIZE = 50;
+
+function chunkIds(ids: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += POSTGREST_MUTATION_BATCH_SIZE) {
+    chunks.push(ids.slice(i, i + POSTGREST_MUTATION_BATCH_SIZE));
+  }
+  return chunks;
+}
+
 export async function fetchScheduleDraftBreakdown(input: {
   orgId: string;
   startDate?: string;
@@ -15,7 +25,7 @@ export async function fetchScheduleDraftBreakdown(input: {
   let scheduleCellQuery = serviceClient
     .from("schedule_cells")
     .select(
-      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
     )
     .eq("org_id", input.orgId);
 
@@ -132,19 +142,23 @@ export async function discardScheduleDraftsDirect(input: {
   }
 
   if (draftSnapshotIdsToDelete.length > 0) {
-    const { error: deleteDraftsError } = await serviceClient
-      .from("schedule_cell_snapshots")
-      .delete()
-      .in("id", draftSnapshotIdsToDelete);
-    if (deleteDraftsError) throw deleteDraftsError;
+    for (const batch of chunkIds(draftSnapshotIdsToDelete)) {
+      const { error: deleteDraftsError } = await serviceClient
+        .from("schedule_cell_snapshots")
+        .delete()
+        .in("id", batch);
+      if (deleteDraftsError) throw deleteDraftsError;
+    }
   }
 
   if (cellIdsToDelete.length > 0) {
-    const { error: deleteCellsError } = await serviceClient
-      .from("schedule_cells")
-      .delete()
-      .in("id", cellIdsToDelete);
-    if (deleteCellsError) throw deleteCellsError;
+    for (const batch of chunkIds(cellIdsToDelete)) {
+      const { error: deleteCellsError } = await serviceClient
+        .from("schedule_cells")
+        .delete()
+        .in("id", batch);
+      if (deleteCellsError) throw deleteCellsError;
+    }
   }
 
   for (const cell of cellsToTouch) {

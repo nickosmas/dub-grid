@@ -79,6 +79,7 @@ export async function updateOrganization(org: Organization): Promise<void> {
       timezone: org.timezone || null,
       pay_period_start_date: org.payPeriodStartDate || null,
       enforce_conflict_prevention: org.enforceConflictPrevention ?? false,
+      coverage_rule_config: org.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
       data_retention_days: org.dataRetentionDays ?? 365,
       feature_overrides: org.featureOverrides ?? {},
     })

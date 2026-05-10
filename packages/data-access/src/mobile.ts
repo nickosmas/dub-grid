@@ -6,8 +6,10 @@ import type {
 import type {
   DbAbsenceType,
   DbCoverageRequirement,
+  DbDepartment,
   DbEmployee,
   DbFocusArea,
+  DbInvitation,
   DbJobDefinition,
   DbNamedItem,
   DbOrganization,
@@ -29,9 +31,13 @@ const NAMED_ITEM_COLS =
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
+  "id, org_id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
 const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
+const DEPARTMENT_COLS =
+  "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
+const INVITATION_COLS =
+  "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";
 
 const POSTGREST_UNSAFE = /[(),."\\]/;
 
@@ -41,6 +47,26 @@ function assertSafeFilterValue(value: string, label: string): void {
   }
 }
 
+function buildShiftRequestDateClauses(
+  column: "requester_shift_date" | "target_shift_date",
+  input: { startDate?: string; endDate?: string },
+): string[] {
+  const clauses: string[] = [];
+  if (input.startDate) {
+    assertSafeFilterValue(input.startDate, "startDate");
+    clauses.push(`${column}.gte.${input.startDate}`);
+  }
+  if (input.endDate) {
+    assertSafeFilterValue(input.endDate, "endDate");
+    clauses.push(`${column}.lte.${input.endDate}`);
+  }
+  return clauses;
+}
+
+function andFilter(clauses: string[]): string {
+  return clauses.length === 1 ? clauses[0] : `and(${clauses.join(",")})`;
+}
+
 export interface MobileAbsenceTypeRow
   extends Pick<
     DbAbsenceType,
@@ -48,7 +74,13 @@ export interface MobileAbsenceTypeRow
   > {}
 
 export interface MobileFocusAreaRow
-  extends Pick<DbFocusArea, "id" | "name"> {}
+  extends Pick<DbFocusArea, "id" | "name" | "department_id"> {}
+
+export interface MobileNamedItemRow
+  extends Pick<DbNamedItem, "id" | "name" | "abbr"> {}
+
+export interface MobileDepartmentRow
+  extends Pick<DbDepartment, "id" | "name" | "abbr" | "type"> {}
 
 export interface MobileJobNameRow
   extends Pick<DbJobDefinition, "id" | "name"> {}
@@ -84,6 +116,12 @@ export interface MobileOrganizationMembershipRow
   };
 }
 
+export interface MobileManagementMembershipRow
+  extends Pick<
+    DbOrganizationMembership,
+    "user_id" | "department_ids" | "dept_admin_ids"
+  > {}
+
 export interface MobileEmbeddedEmployeeRow {
   id: string;
   first_name: string;
@@ -116,6 +154,7 @@ export interface MobileAssignmentSeedRows {
 
 export interface MobileOpenShiftContextRows
   extends MobileAssignmentSeedRows {
+  organizationRow: Pick<DbOrganization, "coverage_rule_config"> | null;
   coverageRequirementRows: DbCoverageRequirement[];
   employeeRows: DbEmployee[];
 }
@@ -153,15 +192,38 @@ export interface MobilePeopleQueryRow {
   id: string;
   first_name: string;
   last_name: string;
+  employment_type: DbEmployee["employment_type"] | null;
   status: string | null;
   status_changed_at: string | null;
   status_note: string | null;
+  certification_id: number | null;
+  role_ids: number[] | null;
+  seniority: number | null;
   focus_area_ids: number[] | null;
+  department_ids: number[] | null;
+  dept_admin_ids: number[] | null;
   phone: string | null;
   email: string | null;
   contact_notes: string | null;
+  user_id: string | null;
   version: number | null;
 }
+
+export interface MobileInvitationRow
+  extends Pick<
+    DbInvitation,
+    | "id"
+    | "org_id"
+    | "email"
+    | "token"
+    | "expires_at"
+    | "accepted_at"
+    | "revoked_at"
+    | "updated_at"
+    | "employee_id"
+    | "department_ids"
+    | "dept_admin_ids"
+  > {}
 
 export interface MobilePushTokenRow {
   expo_push_token: string;
@@ -278,6 +340,7 @@ function normalizePublishedScheduleRow(
               shiftId: segment.shift_id ?? null,
               jobId: segment.job_id,
               position: segment.position,
+              isMentored: segment.is_mentored ?? false,
             })),
             absenceTypeId: null,
             customStartTime: publishedSnapshot.custom_start_time ?? null,
@@ -361,6 +424,38 @@ export async function fetchMobileOrganizationMembershipRows(
   });
 }
 
+export async function fetchMobileManagementMembershipRowsByUserIds(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userIds: string[],
+): Promise<MobileManagementMembershipRow[]> {
+  const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+  if (uniqueUserIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await serviceClient
+    .from("organization_memberships")
+    .select("user_id, department_ids, dept_admin_ids")
+    .eq("org_id", orgId)
+    .in("user_id", uniqueUserIds)
+    .is("archived_at", null);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as Array<{
+    user_id: string;
+    department_ids: number[] | null;
+    dept_admin_ids: number[] | null;
+  }>).map((row) => ({
+    user_id: row.user_id,
+    department_ids: row.department_ids ?? [],
+    dept_admin_ids: row.dept_admin_ids ?? [],
+  }));
+}
+
 export async function fetchMobileOrganizationRowById(
   serviceClient: SupabaseClient,
   orgId: string,
@@ -368,7 +463,7 @@ export async function fetchMobileOrganizationRowById(
   const { data, error } = await serviceClient
     .from("organizations")
     .select(
-      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, stripe_customer_id, subscription_status, trial_ends_at, subscription_seats, data_retention_days, feature_overrides, updated_at",
+      "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, subscription_status, trial_ends_at, data_retention_days, feature_overrides, updated_at",
     )
     .eq("id", orgId)
     .maybeSingle();
@@ -476,7 +571,7 @@ export async function fetchMobileFocusAreaRows(
 ): Promise<MobileFocusAreaRow[]> {
   const { data, error } = await serviceClient
     .from("focus_areas")
-    .select("id, name")
+    .select("id, name, department_id")
     .eq("org_id", orgId)
     .is("archived_at", null)
     .order("sort_order", { ascending: true });
@@ -484,6 +579,54 @@ export async function fetchMobileFocusAreaRows(
   if (error) throw error;
 
   return (data ?? []) as MobileFocusAreaRow[];
+}
+
+export async function fetchMobileRoleRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileNamedItemRow[]> {
+  const { data, error } = await serviceClient
+    .from("organization_roles")
+    .select("id, name, abbr")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order");
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileNamedItemRow[];
+}
+
+export async function fetchMobileCertificationRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileNamedItemRow[]> {
+  const { data, error } = await serviceClient
+    .from("certifications")
+    .select("id, name, abbr")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order");
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileNamedItemRow[];
+}
+
+export async function fetchMobileDepartmentRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileDepartmentRow[]> {
+  const { data, error } = await serviceClient
+    .from("departments")
+    .select("id, name, abbr, type")
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .order("sort_order");
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileDepartmentRow[];
 }
 
 export async function fetchMobileJobNameRows(
@@ -504,13 +647,25 @@ export async function fetchMobileJobNameRows(
 export async function fetchMobilePublishHistoryRows(
   serviceClient: SupabaseClient,
   orgId: string,
+  input?: {
+    startDate?: string;
+    endDate?: string;
+  },
 ): Promise<MobilePublishHistoryRow[]> {
-  const { data, error } = await serviceClient
+  let query = serviceClient
     .from("publish_history")
     .select("published_by, start_date, end_date, published_at")
     .eq("org_id", orgId)
-    .order("published_at", { ascending: false })
-    .limit(100);
+    .order("published_at", { ascending: false });
+
+  if (input?.startDate) {
+    query = query.gte("end_date", input.startDate);
+  }
+  if (input?.endDate) {
+    query = query.lte("start_date", input.endDate);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -575,7 +730,8 @@ export async function fetchPublishedMobileScheduleRows(
             org_id,
             position,
             shift_id,
-            job_id
+            job_id,
+            is_mentored
           )
         ),
         employees!inner(id, first_name, last_name, org_id, seniority, focus_area_ids)
@@ -602,9 +758,14 @@ export async function fetchMobileOpenShiftContextRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileOpenShiftContextRows> {
-  const [assignmentSeedRows, coverageResult, employeeResult] =
+  const [assignmentSeedRows, organizationResult, coverageResult, employeeResult] =
     await Promise.all([
       fetchMobileAssignmentSeedRows(serviceClient, orgId),
+      serviceClient
+        .from("organizations")
+        .select("coverage_rule_config")
+        .eq("id", orgId)
+        .maybeSingle(),
       serviceClient
         .from("coverage_requirements")
         .select(COVERAGE_REQ_COLS)
@@ -617,11 +778,17 @@ export async function fetchMobileOpenShiftContextRows(
         .eq("status", "active"),
     ]);
 
+  if (organizationResult.error) throw organizationResult.error;
   if (coverageResult.error) throw coverageResult.error;
   if (employeeResult.error) throw employeeResult.error;
 
   return {
     ...assignmentSeedRows,
+    organizationRow:
+      (organizationResult.data as Pick<
+        DbOrganization,
+        "coverage_rule_config"
+      > | null) ?? null,
     coverageRequirementRows:
       (coverageResult.data ?? []) as DbCoverageRequirement[],
     employeeRows: (employeeResult.data ?? []) as DbEmployee[],
@@ -648,47 +815,44 @@ export async function fetchMobileShiftRequestRows(
     .eq("org_id", input.orgId)
     .order("created_at", { ascending: false });
 
+  const hasDateFilter = Boolean(input.startDate || input.endDate);
   if (input.employeeId) {
     assertSafeFilterValue(input.employeeId, "employeeId");
     const filters = [
-      `requester_emp_id.eq.${input.employeeId}`,
-      `target_emp_id.eq.${input.employeeId}`,
+      andFilter([
+        `requester_emp_id.eq.${input.employeeId}`,
+        ...buildShiftRequestDateClauses("requester_shift_date", input),
+      ]),
+      andFilter([
+        `target_emp_id.eq.${input.employeeId}`,
+        ...buildShiftRequestDateClauses("target_shift_date", input),
+      ]),
     ];
 
     if (input.includeOpenPickupRequests) {
-      filters.push("and(status.eq.open,type.eq.pickup)");
+      filters.push(
+        andFilter([
+          "status.eq.open",
+          "type.eq.pickup",
+          ...buildShiftRequestDateClauses("requester_shift_date", input),
+        ]),
+      );
     }
 
     query = query.or(filters.join(","));
+  } else if (hasDateFilter) {
+    query = query.or(
+      [
+        andFilter(buildShiftRequestDateClauses("requester_shift_date", input)),
+        andFilter(buildShiftRequestDateClauses("target_shift_date", input)),
+      ].join(","),
+    );
   }
 
   const { data, error } = await query;
   if (error) throw error;
 
-  const rows = (data ?? []) as MobileShiftRequestQueryRow[];
-
-  return rows.filter((row) => {
-    if (!input.startDate && !input.endDate) {
-      return true;
-    }
-
-    const requesterDate = String(row.requester_shift_date ?? "");
-    const targetDate =
-      row.target_shift_date == null ? null : String(row.target_shift_date);
-    const dateValues = [requesterDate, targetDate].filter(
-      (value): value is string => value != null && value.length > 0,
-    );
-
-    return dateValues.some((dateValue) => {
-      if (input.startDate && dateValue < input.startDate) {
-        return false;
-      }
-      if (input.endDate && dateValue > input.endDate) {
-        return false;
-      }
-      return true;
-    });
-  });
+  return (data ?? []) as MobileShiftRequestQueryRow[];
 }
 
 export async function fetchMobilePeopleRows(
@@ -698,7 +862,7 @@ export async function fetchMobilePeopleRows(
   const { data, error } = await serviceClient
     .from("employees")
     .select(
-      "id, first_name, last_name, status, status_changed_at, status_note, focus_area_ids, phone, email, contact_notes, version",
+      "id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
     )
     .eq("org_id", orgId)
     .order("first_name", { ascending: true });
@@ -706,6 +870,30 @@ export async function fetchMobilePeopleRows(
   if (error) throw error;
 
   return (data ?? []) as MobilePeopleQueryRow[];
+}
+
+export async function fetchMobilePendingInvitationRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employeeIds: string[],
+): Promise<MobileInvitationRow[]> {
+  if (employeeIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .select(INVITATION_COLS)
+    .eq("org_id", orgId)
+    .in("employee_id", employeeIds)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .gte("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileInvitationRow[];
 }
 
 export async function fetchMobileEmployeeRowById(
@@ -764,6 +952,162 @@ export async function updateMobileEmployeeStatusRow(
   }
 
   return (data as DbEmployee | null | undefined) ?? null;
+}
+
+export async function updateMobileEmployeeDetailsRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    expectedVersion: number;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    contactNotes: string;
+    certificationId: number | null;
+    focusAreaIds: number[];
+    roleIds: number[];
+    departmentIds: number[];
+    employmentType?: DbEmployee["employment_type"];
+  },
+): Promise<DbEmployee | null> {
+  const { data, error } = await serviceClient
+    .from("employees")
+    .update({
+      first_name: input.firstName,
+      last_name: input.lastName,
+      phone: input.phone,
+      email: input.email,
+      contact_notes: input.contactNotes,
+      certification_id: input.certificationId,
+      focus_area_ids: input.focusAreaIds,
+      role_ids: input.roleIds,
+      department_ids: input.departmentIds,
+      ...(input.employmentType ? { employment_type: input.employmentType } : {}),
+      version: input.expectedVersion + 1,
+    })
+    .eq("id", input.employeeId)
+    .eq("org_id", input.orgId)
+    .eq("version", input.expectedVersion)
+    .select(EMPLOYEE_COLS)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as DbEmployee | null | undefined) ?? null;
+}
+
+export async function fetchMobilePendingInvitationRowByEmployeeId(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employeeId: string,
+): Promise<MobileInvitationRow | null> {
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .select(INVITATION_COLS)
+    .eq("org_id", orgId)
+    .eq("employee_id", employeeId)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .gte("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return (data as MobileInvitationRow | null | undefined) ?? null;
+}
+
+export async function createMobileEmployeeInvitationRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    employeeId: string;
+    invitedBy: string;
+    email: string;
+    roleToAssign: "user" | "admin";
+  },
+): Promise<MobileInvitationRow> {
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .insert({
+      org_id: input.orgId,
+      employee_id: input.employeeId,
+      invited_by: input.invitedBy,
+      email: input.email.toLowerCase(),
+      role_to_assign: input.roleToAssign,
+    })
+    .select(INVITATION_COLS)
+    .single();
+
+  if (error) throw error;
+
+  return data as MobileInvitationRow;
+}
+
+export async function refreshMobileEmployeeInvitationRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string | null;
+  },
+): Promise<MobileInvitationRow | null> {
+  let query = serviceClient
+    .from("invitations")
+    .update({
+      token: crypto.randomUUID(),
+      expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+      revoked_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .is("accepted_at", null);
+
+  query = input.expectedUpdatedAt
+    ? query.eq("updated_at", input.expectedUpdatedAt)
+    : query.is("updated_at", null);
+
+  const { data, error } = await query.select(INVITATION_COLS).maybeSingle();
+
+  if (error) throw error;
+
+  return (data as MobileInvitationRow | null | undefined) ?? null;
+}
+
+export async function revokeMobileEmployeeInvitationRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string | null;
+  },
+): Promise<MobileInvitationRow | null> {
+  let query = serviceClient
+    .from("invitations")
+    .update({
+      revoked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .is("accepted_at", null)
+    .is("revoked_at", null);
+
+  query = input.expectedUpdatedAt
+    ? query.eq("updated_at", input.expectedUpdatedAt)
+    : query.is("updated_at", null);
+
+  const { data, error } = await query.select(INVITATION_COLS).maybeSingle();
+
+  if (error) throw error;
+
+  return (data as MobileInvitationRow | null | undefined) ?? null;
 }
 
 export async function insertMobileAuditLogEntry(

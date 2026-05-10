@@ -21,11 +21,19 @@ import type {
   ShiftCategory,
   AssignmentDefinition,
   ShiftDisplayMode,
+  ShiftJobSegment,
 } from "@/types";
 
 export interface ScheduleGridAccessors {
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  segmentsForKey?: (empId: string, date: Date) => ScheduleCellInput["segments"];
+  publishedSegmentsForKey?: (
+    empId: string,
+    date: Date,
+  ) => Array<
+    Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">
+  >;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   activeIndicatorIdsForKey?: (
     empId: string,
@@ -123,6 +131,9 @@ export interface ScheduleGridInteractionState {
   activeCellId: GridCellId | null;
   contextMenuCellId: GridCellId | null;
   hasClipboard: boolean;
+  bulkDeleteMode?: boolean;
+  bulkSelectedCellKeys?: Set<string>;
+  bulkSelectableCellKeys?: Set<string>;
 }
 
 export interface ScheduleGridActivateArgs {
@@ -155,6 +166,7 @@ export interface ScheduleGridHandlers {
   onCopyCell?: (cellId: GridCellId) => void;
   onPasteCell?: (cellId: GridCellId) => void;
   onClearCell?: (cellId: GridCellId) => void;
+  onToggleBulkDeleteCell?: (cellId: GridCellId) => void;
   onClaimOpenShift?: (openShift: GridOpenShift) => void;
 }
 

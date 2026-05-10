@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { MobileRealtimeProvider } from "../src/features/auth/providers/MobileRealtimeProvider";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
@@ -31,25 +32,27 @@ export default function RootLayout() {
               <ToastProvider>
                 <QueryClientProvider client={queryClient}>
                   <AuthSessionProvider>
-                    <Stack screenOptions={commonStackOptions}>
-                      <Stack.Screen name="index" options={{ headerShown: false }} />
-                      <Stack.Screen
-                        name="(auth)/login"
-                        options={{ headerShown: false }}
-                      />
-                      <Stack.Screen
-                        name="(tabs)"
-                        options={{ headerShown: false }}
-                      />
-                      <Stack.Screen
-                        name="alerts"
-                        options={createDetailStackOptions("Alerts")}
-                      />
-                      <Stack.Screen
-                        name="shift/[employeeId]/[date]"
-                        options={createDetailStackOptions("Shift Detail")}
-                      />
-                    </Stack>
+                    <MobileRealtimeProvider>
+                      <Stack screenOptions={commonStackOptions}>
+                        <Stack.Screen name="index" options={{ headerShown: false }} />
+                        <Stack.Screen
+                          name="(auth)/login"
+                          options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                          name="(tabs)"
+                          options={{ headerShown: false }}
+                        />
+                        <Stack.Screen
+                          name="alerts"
+                          options={createDetailStackOptions("Alerts")}
+                        />
+                        <Stack.Screen
+                          name="shift/[employeeId]/[date]"
+                          options={createDetailStackOptions("Shift Detail")}
+                        />
+                      </Stack>
+                    </MobileRealtimeProvider>
                   </AuthSessionProvider>
                 </QueryClientProvider>
               </ToastProvider>

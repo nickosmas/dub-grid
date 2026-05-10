@@ -7,6 +7,7 @@ import type { DbRecurringShift, DbScheduleNote, RecurringDraft, DbScheduleCell }
 import { rowToRecurringShift, generateSeriesDates } from "./mappers";
 import { upsertShift, deleteShift } from "./shifts";
 import type { DraftBreakdown } from "@/lib/draft-utils";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import {
   joinShiftJobSegmentLabels,
   resolveShiftJobSegments,
@@ -62,7 +63,7 @@ function getScheduleDraftSummaryErrorMessage(
     return "Schedule review is temporarily unavailable. Please try again.";
   }
 
-  return body?.error || "Failed to load schedule draft summary";
+  return formatClientErrorMessage(body?.error, "Failed to load schedule draft summary");
 }
 
 type CreateShiftSeriesOptions = {
@@ -109,6 +110,7 @@ function normalizeScheduleCellInput(
         shiftId: segment.shiftId,
         jobId: segment.jobId,
         position: index,
+        isMentored: segment.isMentored ?? false,
       })),
     absenceTypeId: null,
     customStartTime: input.customStartTime ?? null,
@@ -241,7 +243,7 @@ export async function publishSchedule(
   }
 
   if (!response.ok || !body?.summary) {
-    throw new Error(body?.error || "Failed to publish schedule");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
   }
 
   return body.summary;
@@ -387,7 +389,7 @@ export async function discardScheduleDrafts(
   }
 
   if (!response.ok || !body?.summary) {
-    throw new Error(body?.error || "Failed to discard schedule drafts");
+    throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
   }
 
   return body.summary;
@@ -599,7 +601,7 @@ export async function applyRecurringSchedules(
     supabase
       .from("schedule_cells")
       .select(
-        "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, created_at, updated_at))",
+        "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
       )
       .eq("org_id", orgId)
       .gte("date", startKey)
@@ -731,6 +733,7 @@ export async function applyRecurringSchedules(
                     position: segment.position,
                     shift_id: segment.shiftId,
                     job_id: segment.jobId,
+                    is_mentored: segment.isMentored ?? false,
                   }))
                 : [],
           },

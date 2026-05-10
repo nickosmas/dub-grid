@@ -11,6 +11,7 @@ const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const pushToast = vi.fn();
+const routerPush = vi.fn();
 
 vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
@@ -20,12 +21,24 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
-vi.mock("@tanstack/react-query", () => ({
-  onlineManager: {
-    isOnline: () => true,
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+
+  return {
+    ...actual,
+    onlineManager: {
+      ...actual.onlineManager,
+      isOnline: () => true,
+    },
+    useMutation,
+    useQuery,
+  };
+});
+
+vi.mock("expo-router", () => ({
+  router: {
+    push: routerPush,
   },
-  useMutation,
-  useQuery,
 }));
 
 vi.mock("../../../shared/components/Screen", async () =>
@@ -63,6 +76,7 @@ describe("PeopleScreen", () => {
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     pushToast.mockReset();
+    routerPush.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
@@ -71,6 +85,24 @@ describe("PeopleScreen", () => {
           {
             id: 2,
             name: "Skilled Nursing",
+          },
+          {
+            id: 5,
+            name: "Memory Care",
+          },
+        ],
+        departments: [
+          {
+            id: 10,
+            name: "Clinical Leadership",
+            abbr: "CL",
+            type: "management",
+          },
+          {
+            id: 11,
+            name: "Operations",
+            abbr: "OPS",
+            type: "management",
           },
         ],
         permissions: {
@@ -133,8 +165,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("No teammates yet")).toBeInTheDocument();
   });
 
-  it("shows person details and lets managers bench teammates", () => {
-    const mutate = vi.fn();
+  it("shows plain person rows and opens details by tapping a user", () => {
     useQuery.mockReturnValue({
       data: {
         people: [
@@ -145,9 +176,14 @@ describe("PeopleScreen", () => {
             phone: "555-0100",
             email: "mina@dubgrid.com",
             status: "active",
+            certificationId: null,
             focusAreaIds: [2],
             roleIds: [3],
             departmentIds: [4],
+            deptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
             contactNotes: "Weekend availability",
             statusChangedAt: "2026-04-24T12:00:00.000Z",
             statusNote: "",
@@ -160,26 +196,344 @@ describe("PeopleScreen", () => {
       isLoading: false,
       refetch: vi.fn(),
     });
-    useMutation.mockReturnValue({
+
+    render(<PeopleScreen />);
+
+    expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Mina Diaz"));
+
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/people/[id]",
+      params: { id: "emp-1" },
+    });
+  });
+
+  it("sorts the directory by seniority by default", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Zoe",
+            lastName: "Adams",
+            phone: "555-0100",
+            email: "zoe@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0101",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 3,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
       error: null,
-      isPending: false,
-      mutate,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
     });
 
     render(<PeopleScreen />);
 
+    const zoeRow = screen.getByText("Zoe Adams");
+    const minaRow = screen.getByText("Mina Diaz");
     expect(
-      screen.getByText(/Focus areas:\s*Skilled Nursing/),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Details"));
+      zoeRow.compareDocumentPosition(minaRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
 
-    expect(screen.getByText("Weekend availability")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Bench"));
-
-    expect(mutate).toHaveBeenCalledWith({
-      personId: "emp-1",
-      action: "bench",
-      expectedVersion: 7,
+  it("can switch the directory sort to alphabetical", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Zoe",
+            lastName: "Adams",
+            phone: "555-0100",
+            email: "zoe@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0101",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 3,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
     });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("Alphabetical"));
+
+    const minaRow = screen.getByText("Mina Diaz");
+    const zoeRow = screen.getByText("Zoe Adams");
+    expect(
+      minaRow.compareDocumentPosition(zoeRow) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("hides inactive staff and status pills from regular users", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        permissions: {
+          canManageEmployees: false,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0100",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "Owen",
+            lastName: "Lee",
+            phone: "555-0101",
+            email: "owen@dubgrid.com",
+            status: "benched",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 2,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+    expect(screen.queryByText("Owen Lee")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Active 1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Inactive/)).not.toBeInTheDocument();
+    expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+  });
+
+  it("filters the directory by focus area from the filter button", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0100",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "June",
+            lastName: "Patel",
+            phone: "555-0101",
+            email: "june@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [5],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            seniority: 2,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    const memoryCareOptions = screen.getAllByText("Memory Care");
+    fireEvent.click(memoryCareOptions[0]);
+
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+  });
+
+  it("filters the directory by true management department from the refine modal", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0100",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [4],
+            deptAdminIds: [],
+            managementDepartmentIds: [],
+            managementDeptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "June",
+            lastName: "Patel",
+            phone: "555-0101",
+            email: "june@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            seniority: 2,
+            userId: "user-2",
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("Clinical Leadership"));
+
+    expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 });

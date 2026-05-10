@@ -3,7 +3,16 @@
 import { useMemo } from "react";
 import type { Employee, AuditLogEntry, Invitation } from "@/types";
 import { formatRelativeTime, getEmployeeDisplayName } from "@/lib/utils";
+import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ROLE_BADGE_COLORS } from "@/lib/styles";
 import { UserCheck, UserPlus, UserX, Mail, Clock, History } from "lucide-react";
 
@@ -17,6 +26,7 @@ interface TimelineEvent {
   id: string;
   date: Date;
   type: "role_change" | "invitation_sent" | "invitation_accepted" | "invitation_revoked" | "invitation_expired";
+  category: string;
   description: string;
   meta?: string;
   fromRole?: string;
@@ -36,6 +46,7 @@ export function ActivityTab({
         id: `role-${entry.id}`,
         date: new Date(entry.createdAt),
         type: "role_change",
+        category: "Role",
         description: "Role changed",
         meta: entry.changedByEmail ?? "System",
         fromRole: entry.fromRole,
@@ -48,8 +59,9 @@ export function ActivityTab({
         id: `inv-sent-${invitation.id}`,
         date: new Date(invitation.createdAt),
         type: "invitation_sent",
+        category: "Invitation",
         description: `Invitation sent to ${invitation.email}`,
-        meta: `as ${invitation.roleToAssign} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`,
+        meta: `as ${formatOrganizationRoleLabel(invitation.roleToAssign)} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`,
       });
 
       if (invitation.acceptedAt) {
@@ -57,6 +69,7 @@ export function ActivityTab({
           id: `inv-accepted-${invitation.id}`,
           date: new Date(invitation.acceptedAt),
           type: "invitation_accepted",
+          category: "Invitation",
           description: `Invitation accepted by ${invitation.email}`,
         });
       } else if (invitation.revokedAt) {
@@ -64,6 +77,7 @@ export function ActivityTab({
           id: `inv-revoked-${invitation.id}`,
           date: new Date(invitation.revokedAt),
           type: "invitation_revoked",
+          category: "Invitation",
           description: "Invitation revoked",
           meta: invitation.email,
         });
@@ -72,6 +86,7 @@ export function ActivityTab({
           id: `inv-expired-${invitation.id}`,
           date: new Date(invitation.expiresAt),
           type: "invitation_expired",
+          category: "Invitation",
           description: "Invitation expired",
           meta: invitation.email,
         });
@@ -97,51 +112,109 @@ export function ActivityTab({
           </div>
         </div>
       </div>
-      <div className="dg-card-body">
+      <div className={timeline.length === 0 ? "dg-card-body" : "p-0"}>
         {timeline.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <History className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
             <p className="text-[13px] text-[var(--color-text-muted)]">No activity recorded</p>
           </div>
         ) : (
-          <div className="relative pl-6">
-            <div className="absolute bottom-2 left-[7px] top-2 w-px bg-[var(--color-border-light)]" />
-
-            <div className="flex flex-col gap-5">
-              {timeline.map((event) => (
-                <div key={event.id} className="relative flex gap-3">
-                  <div className="absolute -left-6 top-1 flex h-[15px] w-[15px] items-center justify-center">
-                    <div className="h-[9px] w-[9px] shrink-0 rounded-full border-2 border-[var(--color-text-faint)] bg-[var(--color-surface)]" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <EventIcon type={event.type} />
-                      <span className="text-[13px] text-[var(--color-text-primary)]">{event.description}</span>
-                      {event.fromRole && event.toRole && (
-                        <span className="inline-flex items-center gap-1.5">
-                          <RoleBadge role={event.fromRole} />
-                          <span className="text-[11px] text-[var(--color-text-muted)]">→</span>
-                          <RoleBadge role={event.toRole} />
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>When</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Activity</TableHead>
+                  <TableHead>Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {timeline.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell>
+                      <div className="flex min-w-[120px] flex-col gap-0.5">
+                        <span className="font-medium text-[var(--color-text-primary)]">
+                          {formatRelativeTime(event.date.toISOString())}
                         </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] text-[var(--color-text-muted)]">
-                        {event.date.toLocaleDateString()} · {formatRelativeTime(event.date.toISOString())}
-                      </span>
-                      {event.meta && (
-                        <span className="text-[11px] text-[var(--color-text-faint)]">· {event.meta}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                        <span className="text-[12px] text-[var(--color-text-muted)]">
+                          {event.date.toLocaleDateString()}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <EventBadge event={event} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex min-w-[220px] items-center gap-2">
+                        <EventIcon type={event.type} />
+                        <span className="font-medium text-[var(--color-text-primary)]">
+                          {event.description}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex min-w-[240px] flex-wrap items-center gap-1.5 text-[13px] text-[var(--color-text-muted)]">
+                        {event.fromRole && event.toRole ? (
+                          <>
+                            <RoleBadge role={event.fromRole} />
+                            <span className="text-[11px] text-[var(--color-text-muted)]">→</span>
+                            <RoleBadge role={event.toRole} />
+                          </>
+                        ) : null}
+                        {event.meta ? (
+                          <span className="text-[12px] text-[var(--color-text-muted)]">
+                            {event.meta}
+                          </span>
+                        ) : null}
+                        {!event.fromRole && !event.toRole && !event.meta ? (
+                          <span className="text-[12px] text-[var(--color-text-faint)]">—</span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+function EventBadge({ event }: { event: TimelineEvent }) {
+  const tone =
+    event.type === "invitation_revoked" || event.type === "invitation_expired"
+      ? {
+          bg: "var(--color-danger-bg)",
+          color: "var(--color-danger)",
+          border: "var(--color-danger-bg)",
+        }
+      : event.type === "role_change"
+        ? {
+            bg: "var(--color-warning-bg)",
+            color: "var(--color-warning)",
+            border: "var(--color-warning-bg)",
+          }
+        : {
+            bg: "var(--color-success-bg)",
+            color: "var(--color-success)",
+            border: "var(--color-success-bg)",
+          };
+
+  return (
+    <Badge
+      variant="outline"
+      className="h-5 px-2 py-0 text-[11px] font-semibold"
+      style={{
+        backgroundColor: tone.bg,
+        borderColor: tone.border,
+        color: tone.color,
+      }}
+    >
+      {event.category}
+    </Badge>
   );
 }
 
@@ -174,7 +247,7 @@ function RoleBadge({ role }: { role: string }) {
         borderColor: colors.border,
       }}
     >
-      {role.replace("_", " ")}
+      {formatOrganizationRoleLabel(role)}
     </Badge>
   );
 }

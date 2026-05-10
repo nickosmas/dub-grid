@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import {
+  optionalUsPhoneSchema,
+  requiredStaffEmailSchema,
+  staffNameSchema,
+  staffNotesSchema,
+} from "@dubgrid/contracts";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -10,21 +16,31 @@ import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
-import { canManageEmployees, fetchProfileName, nameMismatchResponse } from "@/app/api/employees/shared";
+import {
+  canManageEmployees,
+  fetchProfileName,
+  nameMismatchResponse,
+} from "@/app/api/employees/shared";
+import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import {
+  buildStaffValidationErrorResponse,
+  getStaffFieldErrorsFromZod,
+  validateStaffOrgReferences,
+} from "@/lib/staff-validation";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
   userId: z.string().uuid(),
-  firstName: z.string().trim().min(1),
-  lastName: z.string().trim().min(1),
-  email: z.string().trim().email(),
-  phone: z.string().trim().optional().default(""),
+  firstName: staffNameSchema,
+  lastName: staffNameSchema,
+  email: requiredStaffEmailSchema,
+  phone: optionalUsPhoneSchema.optional().default(""),
   certificationId: z.number().int().nullable(),
   focusAreaIds: z.array(z.number().int()).min(1),
   roleIds: z.array(z.number().int()).default([]),
-  contactNotes: z.string().trim().optional().default(""),
+  contactNotes: staffNotesSchema.optional().default(""),
 });
 
 export async function POST(req: NextRequest) {
@@ -35,14 +51,23 @@ export async function POST(req: NextRequest) {
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
-  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  const { limited, reset, misconfigured } = await checkRateLimit(
+    apiLimiter,
+    user.id,
+  );
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json(
+      { error: "Service temporarily unavailable" },
+      { status: 503 },
+    );
   }
   if (limited) {
     return NextResponse.json(
       { error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) },
+      },
     );
   }
 
@@ -50,12 +75,17 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return buildStaffValidationErrorResponse(
+      getStaffFieldErrorsFromZod(parsed.error),
+    );
   }
 
   const {
@@ -74,12 +104,38 @@ export async function POST(req: NextRequest) {
   const serviceClient = getServiceClient();
 
   try {
-    const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
+    const hasPermission = await canManageEmployees(
+      serviceClient,
+      user.id,
+      orgId,
+    );
     if (!hasPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Insufficient permissions" },
+        { status: 403 },
+      );
     }
 
-    const [{ data: membership }, { data: existingLinkedEmployees }, { data: seniorityRow }, profileName] = await Promise.all([
+    const referenceErrors = await validateStaffOrgReferences(
+      serviceClient,
+      orgId,
+      {
+        certificationId,
+        focusAreaIds,
+        requireFocusArea: true,
+        roleIds,
+      },
+    );
+    if (Object.keys(referenceErrors).length > 0) {
+      return buildStaffValidationErrorResponse(referenceErrors);
+    }
+
+    const [
+      { data: membership },
+      { data: existingLinkedEmployees },
+      { data: seniorityRow },
+      profileName,
+    ] = await Promise.all([
       serviceClient
         .from("organization_memberships")
         .select("user_id")
@@ -105,10 +161,19 @@ export async function POST(req: NextRequest) {
     ]);
 
     if (!membership) {
-      return NextResponse.json({ error: "User is not an active member of this organization" }, { status: 404 });
+      return NextResponse.json(
+        { error: "User is not an active member of this organization" },
+        { status: 404 },
+      );
     }
     if ((existingLinkedEmployees?.length ?? 0) > 0) {
-      return NextResponse.json({ error: "User is already linked to a schedule employee in this organization" }, { status: 409 });
+      return NextResponse.json(
+        {
+          error:
+            "User is already linked to a schedule employee in this organization",
+        },
+        { status: 409 },
+      );
     }
     if (!hasCompleteName(profileName)) {
       return nameMismatchResponse(
@@ -124,7 +189,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const nextSeniority = (seniorityRow?.seniority as number | null ?? 0) + 1;
+    const nextSeniority = ((seniorityRow?.seniority as number | null) ?? 0) + 1;
     const { data: row, error } = await serviceClient
       .from("employees")
       .insert({
@@ -144,7 +209,9 @@ export async function POST(req: NextRequest) {
         created_by: user.id,
         updated_by: user.id,
       })
-      .select("id, org_id, first_name, last_name, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version")
+      .select(
+        "id, org_id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version",
+      )
       .single();
 
     if (error || !row) {
@@ -179,8 +246,21 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ employee: rowToEmployee(row as DbEmployee) });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "employees/from-user/reconcile", orgId, userId } });
-    logger.error({ error: err, orgId, userId }, "Failed to reconcile org user name and create employee");
-    return NextResponse.json({ error: "Failed to add management user to the schedule" }, { status: 500 });
+    const contactConflict = getEmployeeContactConflict(err);
+    if (contactConflict) {
+      return NextResponse.json(contactConflict, { status: 409 });
+    }
+
+    Sentry.captureException(err, {
+      extra: { context: "employees/from-user/reconcile", orgId, userId },
+    });
+    logger.error(
+      { error: err, orgId, userId },
+      "Failed to reconcile org user name and create employee",
+    );
+    return NextResponse.json(
+      { error: "Failed to add management user to the schedule" },
+      { status: 500 },
+    );
   }
 }

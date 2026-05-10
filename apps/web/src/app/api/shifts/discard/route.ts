@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServiceClient } from "@/lib/supabase-service";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -61,36 +61,21 @@ export async function POST(req: NextRequest) {
   const { orgId, scope, expectedSummary } = parsed.data;
 
   try {
-    const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
-    ]);
-
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    const isSuperAdmin = membership?.org_role === "super_admin";
-    const isAdmin = membership?.org_role === "admin";
-    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-
-    const canDiscardOwnDrafts =
-      isGridmaster
-      || isSuperAdmin
-      || (isAdmin && (adminPerms?.canEditShifts === true || adminPerms?.canPublishSchedule === true));
-
-    const canDiscardAllDrafts = isGridmaster || isSuperAdmin;
-
-    if ((scope === "mine" && !canDiscardOwnDrafts) || (scope === "all" && !canDiscardAllDrafts)) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    const orgAuth = await requireOrgPermissions(
+      req,
+      orgId,
+      (permissions) =>
+        scope === "all"
+          ? permissions.isGridmaster || permissions.isSuperAdmin
+          : permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canEditShifts ||
+            permissions.canPublishSchedule,
+    );
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
+    const serviceClient = orgAuth.serviceClient;
 
     const latestSummary = await fetchScheduleDraftBreakdown({
       orgId,

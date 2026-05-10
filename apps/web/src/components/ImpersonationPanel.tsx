@@ -6,6 +6,7 @@ import {
   startGridmasterImpersonation,
 } from "@/features/gridmaster/client";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { formatClientErrorMessage, formatDateTimeLabel } from "@/lib/client-facing";
 
 export default function ImpersonationPanel() {
   const [targetUserId, setTargetUserId] = useState("");
@@ -29,7 +30,7 @@ export default function ImpersonationPanel() {
       setExpiresAt(result.expiresAt);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to start impersonation",
+        formatClientErrorMessage(err, "We couldn't start that support session."),
       );
     } finally {
       setLoading(false);
@@ -47,7 +48,7 @@ export default function ImpersonationPanel() {
       setTargetUserId("");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to end impersonation",
+        formatClientErrorMessage(err, "We couldn't end that support session."),
       );
     } finally {
       setLoading(false);
@@ -57,7 +58,7 @@ export default function ImpersonationPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-        Start a support impersonation session by target user id. Sessions are
+        Start a support session for a selected user. Sessions are
         capped at 30 minutes.
       </p>
 
@@ -72,7 +73,7 @@ export default function ImpersonationPanel() {
         <input
           value={targetUserId}
           onChange={(e) => setTargetUserId(e.target.value)}
-          placeholder="target user uuid"
+          placeholder="User ID"
           className="dg-input"
           style={{ flex: "1 1 280px" }}
         />
@@ -101,9 +102,9 @@ export default function ImpersonationPanel() {
 
       {sessionId && (
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-          Active session: <code>{sessionId}</code>
+          Active support session
           {expiresAt
-            ? ` · expires ${new Date(expiresAt).toLocaleString()}`
+            ? ` until ${formatDateTimeLabel(expiresAt)}`
             : ""}
         </div>
       )}

@@ -16,6 +16,8 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     currentHours,
     activeEmployees,
     focusAreas,
+    periodLabel,
+    overtimeThreshold,
     isMobile,
     onExpandPanel,
   } = props;
@@ -39,11 +41,13 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           isMobile={isMobile}
           hasRequirements={coverageRequirements.length > 0}
           publishedWindowState={publishedWindowState}
+          periodLabel={periodLabel}
           onExpand={() => onExpandPanel("coverage")}
         />
         <OpenShiftsCard
           openShifts={openShifts}
           publishedWindowState={publishedWindowState}
+          periodLabel={periodLabel}
           onExpand={() => onExpandPanel("openShifts")}
         />
       </div>
@@ -66,8 +70,9 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           focusAreas={focusAreas}
           maxVisible={5}
           heading="Overtime watch"
-          subtitle="Staff trending over 40h this period"
+          subtitle={`Staff over ${overtimeThreshold}h ${periodLabel}`}
           emptyMessage="No overtime alerts this period"
+          otThreshold={overtimeThreshold}
           onExpand={() => onExpandPanel("staffHours")}
         />
       </div>

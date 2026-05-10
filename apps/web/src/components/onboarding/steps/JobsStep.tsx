@@ -31,7 +31,7 @@ export default function JobsStep({
   return (
     <StepLayout
       title="Jobs"
-      description="Define responsibilities like Supervisor, Mentor, Nurse, and Office. Jobs control eligibility and how specialty work appears alongside your shifts."
+      description="Define responsibilities like Supervisor, Mentor, Nurse, and Office, then place each scheduled job on the departments, focus areas, and shifts where it should appear."
       onNext={onNext}
       onBack={onBack}
       nextDisabled={!hasVisibleJobs}

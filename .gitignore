@@ -23,11 +23,13 @@ node_modules/
 
 # production
 /build
+apps/mobile/dist/
 packages/*/dist/
 
 # misc
 .DS_Store
 .expo/
+supabase/.temp/
 .snaplet/
 *.pem
 .venv/

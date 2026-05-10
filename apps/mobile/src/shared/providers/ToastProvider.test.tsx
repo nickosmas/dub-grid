@@ -101,7 +101,7 @@ describe("ToastProvider", () => {
     });
   });
 
-  it("queues toasts, auto-dismisses, and allows manual close", () => {
+  it("queues toasts, auto-dismisses, and allows swipe dismiss", () => {
     render(
       <ToastProvider>
         <ToastHarness />
@@ -120,7 +120,14 @@ describe("ToastProvider", () => {
 
     expect(screen.getByText("Second toast")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Dismiss notification"));
+    const toast = screen.getByTestId("toast-notification");
+    fireEvent.touchStart(toast, {
+      changedTouches: [{ pageY: 120 }],
+      touches: [{ pageY: 120 }],
+    });
+    fireEvent.touchEnd(toast, {
+      changedTouches: [{ pageY: 72 }],
+    });
 
     expect(screen.queryByText("Second toast")).not.toBeInTheDocument();
   });
@@ -144,7 +151,14 @@ describe("ToastProvider", () => {
 
     expect(screen.getByText("Network connection issue")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Dismiss notification"));
+    const toast = screen.getByTestId("toast-notification");
+    fireEvent.touchStart(toast, {
+      changedTouches: [{ pageY: 120 }],
+      touches: [{ pageY: 120 }],
+    });
+    fireEvent.touchEnd(toast, {
+      changedTouches: [{ pageY: 72 }],
+    });
 
     expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();
   });

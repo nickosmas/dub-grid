@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
+import { getAvatarInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
@@ -120,13 +122,23 @@ export default function ExpandedStaffHours({
               if (!emp) return null;
               const faId = emp.focusAreaIds[0];
               const fa = faId != null ? faMap.get(faId) : undefined;
-              const initials = `${emp.firstName.charAt(0)}${emp.lastName.charAt(0)}`;
+              const initials = getAvatarInitials(
+                `${emp.firstName} ${emp.lastName}`,
+              );
               const prev = prevMap.get(h.empId);
               const delta = prev ? h.totalHours - prev.totalHours : 0;
 
               return (
-                <div
+                <Link
                   key={h.empId}
+                  href={`/people/${emp.id}`}
+                  style={{
+                    display: "block",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                <div
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -201,6 +213,7 @@ export default function ExpandedStaffHours({
                     </div>
                   </div>
                 </div>
+                </Link>
               );
             })
           )}

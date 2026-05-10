@@ -11,6 +11,7 @@ import {
   normalizeMobileWorkspaceSlug,
 } from "@dubgrid/mobile-api-core";
 import { checkRateLimit, loginLimiter } from "@/lib/rate-limit";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return json(
-      { error: "Invalid request body" },
+      { error: "We couldn't read that sign-in request. Try again." },
       { status: 400 },
     );
   }
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
       return json(
-        { error: error.message },
+        { error: formatClientErrorMessage(error, "We could not finish signing you in right now.") },
         { status: error.status },
       );
     }

@@ -1,3 +1,7 @@
+import {
+  normalizeMobileScheduleRange,
+  type MobileScheduleQuery,
+} from "@dubgrid/contracts";
 import type {
   MobileBootstrapResponse,
   MobileCreateShiftRequestBody,
@@ -7,6 +11,7 @@ import type {
   MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
 import {
+  hasShiftRequestStarted,
   timesOverlap,
   type TimeRange,
 } from "@dubgrid/schedule-core";
@@ -19,8 +24,11 @@ type MobileShiftRequestEmployee = NonNullable<
 export type MobileShiftRequestsContext = {
   currentOrg: {
     id: string;
+    timezone?: string | null;
   };
   permissions: {
+    canEditShifts: boolean;
+    canManageEmployees: boolean;
     canApproveShiftRequests: boolean;
   };
   serviceClient: SupabaseClient;
@@ -51,9 +59,11 @@ type FetchMobileOpenShifts<TEmployee extends MobileShiftRequestEmployee> = (
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
-    employee: TEmployee;
+    employee?: TEmployee;
     startDate?: string;
     endDate?: string;
+    showAll?: boolean;
+    timeZone?: string | null;
   },
 ) => Promise<MobileOpenShift[]>;
 
@@ -81,6 +91,13 @@ type ShiftRequestNotificationEvent =
       requestType: "pickup";
     }
   | {
+      action: "shift_request_responded";
+      orgId: string;
+      requestId: string;
+      requestType: "pickup" | "swap" | "calloff";
+      accepted: boolean;
+    }
+  | {
       action: "shift_request_resolved";
       orgId: string;
       requestId: string;
@@ -103,18 +120,10 @@ function resolveMobileShiftRequestRange(
   startDate?: string,
   endDate?: string,
 ): { startDate: string; endDate: string } {
-  const today = new Date();
-  const start = startDate
-    ? new Date(`${startDate}T00:00:00`)
-    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const end = endDate
-    ? new Date(`${endDate}T00:00:00`)
-    : new Date(start.getTime() + 13 * 86_400_000);
-
-  return {
-    startDate: start.toISOString().slice(0, 10),
-    endDate: end.toISOString().slice(0, 10),
-  };
+  return normalizeMobileScheduleRange({
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+  } as MobileScheduleQuery);
 }
 
 function toTimeRange(
@@ -214,8 +223,10 @@ function filterAvailableOpenPickupRequests(input: {
   linkedEmployeeId: string;
   requests: MobileShiftRequest[];
   scheduleEntries: MobileScheduleEntry[];
+  timeZone?: string | null;
 }): MobileShiftRequest[] {
   const scheduleRangesByDate = buildScheduleRangesByDate(input.scheduleEntries);
+  const now = new Date();
 
   return input.requests.filter((request) => {
     if (
@@ -224,6 +235,17 @@ function filterAvailableOpenPickupRequests(input: {
       request.requesterEmpId === input.linkedEmployeeId
     ) {
       return true;
+    }
+
+    if (
+      request.targetEmpId != null &&
+      request.targetEmpId !== input.linkedEmployeeId
+    ) {
+      return false;
+    }
+
+    if (hasShiftRequestStarted(request, now, input.timeZone)) {
+      return false;
     }
 
     return !timesOverlap(
@@ -251,13 +273,16 @@ export async function loadMobileShiftRequestsPayload<
     auth.user.id,
   );
 
-  if (!auth.permissions.canApproveShiftRequests && !linkedEmployee) {
+  const canViewAllRequests =
+    auth.permissions.canApproveShiftRequests ||
+    auth.permissions.canEditShifts ||
+    auth.permissions.canManageEmployees;
+
+  if (!canViewAllRequests && !linkedEmployee) {
     return { requests: [], openShifts: [] };
   }
 
-  const employeeId = auth.permissions.canApproveShiftRequests
-    ? undefined
-    : linkedEmployee?.id;
+  const employeeId = canViewAllRequests ? undefined : linkedEmployee?.id;
   const requestRange = resolveMobileShiftRequestRange(
     input.startDate,
     input.endDate,
@@ -267,14 +292,16 @@ export async function loadMobileShiftRequestsPayload<
     deps.fetchMobileShiftRequests(auth.serviceClient, {
       orgId: auth.currentOrg.id,
       employeeId,
-      includeOpenPickupRequests: !auth.permissions.canApproveShiftRequests,
+      includeOpenPickupRequests: !canViewAllRequests,
       ...(input.startDate ? { startDate: input.startDate } : {}),
       ...(input.endDate ? { endDate: input.endDate } : {}),
     }),
-    linkedEmployee
+    linkedEmployee || canViewAllRequests
       ? deps.fetchMobileOpenShifts(auth.serviceClient, {
           orgId: auth.currentOrg.id,
-          employee: linkedEmployee,
+          ...(linkedEmployee ? { employee: linkedEmployee } : {}),
+          showAll: canViewAllRequests,
+          timeZone: auth.currentOrg.timezone ?? null,
           ...(input.startDate ? { startDate: input.startDate } : {}),
           ...(input.endDate ? { endDate: input.endDate } : {}),
         })
@@ -290,11 +317,12 @@ export async function loadMobileShiftRequestsPayload<
   ]);
 
   return {
-    requests: employeeId
+    requests: employeeId && !canViewAllRequests
       ? filterAvailableOpenPickupRequests({
           linkedEmployeeId: employeeId,
           requests,
           scheduleEntries: availabilityEntries,
+          timeZone: auth.currentOrg.timezone ?? null,
         })
       : requests,
     openShifts,
@@ -318,6 +346,8 @@ export async function createMobileShiftRequest(
       p_target_emp_id: data.targetEmpId ?? null,
       p_target_shift_date: data.targetShiftDate ?? null,
       p_absence_type_id: data.absenceTypeId ?? null,
+      p_requester_segment_index: data.requesterSegmentIndex ?? null,
+      p_target_segment_index: data.targetSegmentIndex ?? null,
     },
   );
 
@@ -373,6 +403,22 @@ export async function updateMobileShiftRequest(
       if (error) {
         throw error;
       }
+
+      const { data: requestRow } = await auth.serviceClient
+        .from("shift_requests")
+        .select("type")
+        .eq("id", requestId)
+        .single();
+
+      await deps.dispatchNotificationEvent(auth.user.id, {
+        action: "shift_request_responded",
+        orgId: auth.currentOrg.id,
+        requestId,
+        requestType:
+          (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ??
+          "swap",
+        accepted: data.accept,
+      });
       return;
     }
 
@@ -400,7 +446,7 @@ export async function updateMobileShiftRequest(
           (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ??
           "pickup",
         approved: data.approved,
-        adminNote: data.note,
+        ...(data.note !== undefined ? { adminNote: data.note } : {}),
       });
       return;
     }
@@ -431,6 +477,9 @@ export async function updateMobileShiftRequest(
           p_shift_date: data.shiftDate,
           p_shift_ids: data.state.segments.map((segment) => segment.shiftId),
           p_job_ids: data.state.segments.map((segment) => segment.jobId),
+          p_is_mentored_flags: data.state.segments.map(
+            (segment) => segment.isMentored ?? false,
+          ),
           p_focus_area_id: data.focusAreaId,
           p_custom_start_time: data.state.customStartTime ?? null,
           p_custom_end_time: data.state.customEndTime ?? null,

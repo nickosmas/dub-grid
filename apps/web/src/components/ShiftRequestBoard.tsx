@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import { ExplainerSection, WorkflowStrip } from "@/components/ui/explainer-section";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { EmptyState } from "@/components/EmptyState";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,18 +16,27 @@ interface ShiftRequestBoardProps {
   myRequests: ShiftRequest[];
   pendingApproval: ShiftRequest[];
   approvalQueue?: ShiftRequest[];
+  canViewAllRequests?: boolean;
   loading: boolean;
   currentEmpId: string | null;
   canApprove: boolean;
-  onClaim: (requestId: string) => void;
-  onRespond: (requestId: string, accept: boolean) => void;
-  onResolve: (requestId: string, approved: boolean, note?: string) => void;
-  onCancel: (requestId: string) => void;
+  onClaim: (requestId: string) => void | Promise<unknown>;
+  onRespond: (requestId: string, accept: boolean) => void | Promise<unknown>;
+  onResolve: (requestId: string, approved: boolean, note?: string) => void | Promise<unknown>;
+  onCancel: (requestId: string) => void | Promise<unknown>;
   onClose: () => void;
   absenceTypeMap?: Map<number, AbsenceType>;
 }
 
 type Tab = "available" | "mine" | "approval";
+type PendingConfirmation = {
+  confirmLabel: string;
+  key: string;
+  message: ReactNode;
+  onConfirm: () => void | Promise<unknown>;
+  title: string;
+  variant?: "danger" | "warning" | "info";
+};
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +73,7 @@ export default function ShiftRequestBoard({
   myRequests,
   pendingApproval,
   approvalQueue,
+  canViewAllRequests = false,
   loading,
   currentEmpId,
   canApprove,
@@ -77,6 +88,8 @@ export default function ShiftRequestBoard({
   const [activeTab, setActiveTab] = useState<Tab>("available");
   const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
   const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [runningConfirmationKey, setRunningConfirmationKey] = useState<string | null>(null);
   const managerQueue = [...(approvalQueue ?? pendingApproval)].sort((left, right) => {
     const statusPriority = (status: ShiftRequestStatus) =>
       status === "pending_approval" ? 0 : status === "open" ? 1 : 2;
@@ -87,11 +100,29 @@ export default function ShiftRequestBoard({
 
     return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
   });
+  const hasRunningAction = runningConfirmationKey != null;
+
+  async function confirmPendingAction() {
+    if (!pendingConfirmation || runningConfirmationKey) return;
+
+    setRunningConfirmationKey(pendingConfirmation.key);
+    try {
+      await pendingConfirmation.onConfirm();
+      setPendingConfirmation(null);
+    } finally {
+      setRunningConfirmationKey(null);
+    }
+  }
 
   const tabs: { key: Tab; label: string; count: number; visible: boolean }[] = [
     { key: "available", label: "Available Shifts", count: openPickups.length, visible: true },
     { key: "mine", label: "My Requests", count: myRequests.length, visible: true },
-    { key: "approval", label: "Approval Queue", count: managerQueue.length, visible: canApprove },
+    {
+      key: "approval",
+      label: canApprove ? "Approval Queue" : "All Requests",
+      count: managerQueue.length,
+      visible: canApprove || canViewAllRequests,
+    },
   ];
 
   function getTabData(): ShiftRequest[] {
@@ -106,7 +137,10 @@ export default function ShiftRequestBoard({
     switch (activeTab) {
       case "available": return "No available shifts";
       case "mine": return "No requests yet";
-      case "approval": return "No active requests";
+      case "approval":
+        return canApprove
+          ? "No active requests"
+          : "No organization requests";
     }
   }
 
@@ -298,14 +332,36 @@ export default function ShiftRequestBoard({
 
   function renderActions(req: ShiftRequest, isOwnRequest: boolean, isTarget: boolean) {
     const actions: React.ReactNode[] = [];
+    const requestLabel = `${req.requesterShiftLabel} shift on ${formatShiftDate(req.requesterShiftDate)}`;
 
     // Claim button: open pickup that isn't mine
-    if (req.type === "pickup" && req.status === "open" && !isOwnRequest && currentEmpId) {
+    if (
+      req.type === "pickup" &&
+      req.status === "open" &&
+      req.targetEmpId == null &&
+      !isOwnRequest &&
+      currentEmpId
+    ) {
       actions.push(
         <button
           key="claim"
           className="dg-btn dg-btn-primary"
-          onClick={() => onClaim(req.id)}
+          disabled={hasRunningAction}
+          onClick={() =>
+            setPendingConfirmation({
+              confirmLabel: "Claim",
+              key: `claim:${req.id}`,
+              message: (
+                <>
+                  Claim <strong>{req.requesterShiftLabel}</strong> on{" "}
+                  <strong>{formatShiftDate(req.requesterShiftDate)}</strong>? This will be sent for manager approval.
+                </>
+              ),
+              onConfirm: () => onClaim(req.id),
+              title: "Claim this shift?",
+              variant: "info",
+            })
+          }
           style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Claim
@@ -313,13 +369,31 @@ export default function ShiftRequestBoard({
       );
     }
 
-    // Target of a swap with open status: Accept / Decline
-    if (isTarget && req.type === "swap" && req.status === "open") {
+    // Target of a swap or targeted pickup with open status: Accept / Decline
+    if (
+      isTarget &&
+      (req.type === "swap" || req.type === "pickup") &&
+      req.status === "open"
+    ) {
       actions.push(
         <button
           key="accept"
           className="dg-btn dg-btn-primary"
-          onClick={() => onRespond(req.id, true)}
+          disabled={hasRunningAction}
+          onClick={() =>
+            setPendingConfirmation({
+              confirmLabel: "Accept",
+              key: `accept:${req.id}`,
+              message: (
+                <>
+                  Accept {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
+                </>
+              ),
+              onConfirm: () => onRespond(req.id, true),
+              title: "Accept request?",
+              variant: "info",
+            })
+          }
           style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Accept
@@ -327,7 +401,21 @@ export default function ShiftRequestBoard({
         <button
           key="decline"
           className="dg-btn dg-btn-ghost"
-          onClick={() => onRespond(req.id, false)}
+          disabled={hasRunningAction}
+          onClick={() =>
+            setPendingConfirmation({
+              confirmLabel: "Decline",
+              key: `decline:${req.id}`,
+              message: (
+                <>
+                  Decline {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
+                </>
+              ),
+              onConfirm: () => onRespond(req.id, false),
+              title: "Decline request?",
+              variant: "danger",
+            })
+          }
           style={{
             fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
@@ -368,13 +456,29 @@ export default function ShiftRequestBoard({
             <div style={{ display: "flex", gap: 6 }}>
               <button
                 className="dg-btn dg-btn-danger-filled"
+                disabled={hasRunningAction}
                 onClick={() => {
-                  onResolve(req.id, false, rejectNotes[req.id] || undefined);
-                  setShowRejectInput((prev) => ({ ...prev, [req.id]: false }));
-                  setRejectNotes((prev) => {
-                    const next = { ...prev };
-                    delete next[req.id];
-                    return next;
+                  const note = rejectNotes[req.id] || undefined;
+
+                  setPendingConfirmation({
+                    confirmLabel: "Reject",
+                    key: `reject:${req.id}`,
+                    message: (
+                      <>
+                        Reject {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>? The original schedule will stay in place.
+                      </>
+                    ),
+                    onConfirm: async () => {
+                      await onResolve(req.id, false, note);
+                      setShowRejectInput((prev) => ({ ...prev, [req.id]: false }));
+                      setRejectNotes((prev) => {
+                        const next = { ...prev };
+                        delete next[req.id];
+                        return next;
+                      });
+                    },
+                    title: "Reject request?",
+                    variant: "danger",
                   });
                 }}
                 style={{
@@ -406,7 +510,21 @@ export default function ShiftRequestBoard({
           <button
             key="approve"
             className="dg-btn dg-btn-primary"
-            onClick={() => onResolve(req.id, true)}
+            disabled={hasRunningAction}
+            onClick={() =>
+              setPendingConfirmation({
+                confirmLabel: "Approve",
+                key: `approve:${req.id}`,
+                message: (
+                  <>
+                    Approve {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>? This will finalize the staffing change.
+                  </>
+                ),
+                onConfirm: () => onResolve(req.id, true),
+                title: "Approve request?",
+                variant: "info",
+              })
+            }
             style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
           >
             Approve
@@ -436,7 +554,21 @@ export default function ShiftRequestBoard({
         <button
           key="cancel"
           className="dg-btn dg-btn-ghost"
-          onClick={() => onCancel(req.id)}
+          disabled={hasRunningAction}
+          onClick={() =>
+            setPendingConfirmation({
+              confirmLabel: "Cancel request",
+              key: `cancel:${req.id}`,
+              message: (
+                <>
+                  Cancel your request for <strong>{requestLabel}</strong>? It will no longer be available for review.
+                </>
+              ),
+              onConfirm: () => onCancel(req.id),
+              title: "Cancel request?",
+              variant: "danger",
+            })
+          }
           style={{
             fontSize: "var(--dg-fs-caption)",
             padding: "7px 14px",
@@ -461,83 +593,26 @@ export default function ShiftRequestBoard({
   // ── Render ───────────────────────────────────────────────────────────────
 
   const tabData = getTabData();
-  const requestExplainer = (() => {
-    if (activeTab === "available") {
-      return {
-        points: [
-          {
-            title: "Available shifts are open requests you can respond to",
-            description: "This tab shows pickups and swaps that are currently open to you.",
-          },
-          {
-            title: "Calloffs follow the same board but are flagged clearly",
-            description: "Calloff-related requests stay visible here so approvals and follow-up can happen in the same workflow.",
-          },
-        ],
-        preview: (
-          <WorkflowStrip
-            compact
-            steps={[
-              { label: "Request posted", description: "Pickup, swap, or calloff enters the board", tone: "default" },
-              { label: "Volunteer", description: "A qualified teammate responds", tone: "info" },
-              { label: "Approval", description: "Managers approve when required", tone: "success" },
-            ]}
-          />
-        ),
-      };
-    }
-
-    if (activeTab === "mine") {
-      return {
-        points: [
-          {
-            title: "This tab tracks your own requests",
-            description: "Use it to see whether your request is still open, waiting on approval, approved, rejected, or cancelled.",
-          },
-          {
-            title: "Statuses tell you where the request is in the flow",
-            description: "Open means it is still available, pending means someone responded and it is waiting on review, and approved means the change is going through.",
-          },
-        ],
-        preview: (
-          <WorkflowStrip
-            compact
-            steps={[
-              { label: "Open", description: "Waiting for a response", tone: "default" },
-              { label: "Pending", description: "Response received, waiting on review", tone: "warning" },
-              { label: "Approved or rejected", description: "Final outcome", tone: "success" },
-            ]}
-          />
-        ),
-      };
-    }
-
-    return {
-      points: [
-        {
-          title: "Approval Queue shows active request progress",
-          description: "Open requests are still waiting on a teammate response. Pending requests are ready for manager approval or rejection.",
-        },
-        {
-          title: "Approve or reject once the request reaches pending",
-          description: "Approving finalizes the staffing change. Rejecting keeps the original schedule in place and lets you add a note when needed.",
-        },
-      ],
-      preview: (
-        <WorkflowStrip
-          compact
-          steps={[
-            { label: "Review request", description: "Confirm the details and the staffing impact", tone: "default" },
-            { label: "Approve or reject", description: "Add a note when helpful", tone: "info" },
-            { label: "Staff notified", description: "The board updates to the final status", tone: "success" },
-          ]}
-        />
-      ),
-    };
-  })();
 
   return (
     <>
+      {pendingConfirmation && (
+        <ConfirmDialog
+          confirmLabel={pendingConfirmation.confirmLabel}
+          isLoading={runningConfirmationKey === pendingConfirmation.key}
+          message={pendingConfirmation.message}
+          title={pendingConfirmation.title}
+          variant={pendingConfirmation.variant}
+          onCancel={() => {
+            if (!runningConfirmationKey) {
+              setPendingConfirmation(null);
+            }
+          }}
+          onConfirm={() => {
+            void confirmPendingAction();
+          }}
+        />
+      )}
       {/* Backdrop */}
       <div className="dg-panel-overlay" onClick={onClose} />
 
@@ -695,16 +770,6 @@ export default function ShiftRequestBoard({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
-          <div style={{ marginBottom: 12 }}>
-            <ExplainerSection
-              title="How requests flow"
-              points={requestExplainer.points}
-              preview={requestExplainer.preview}
-              compact
-              defaultOpen={false}
-              storageKey="dg-explainer-shift-requests"
-            />
-          </div>
           {loading ? (
             <div
               style={{

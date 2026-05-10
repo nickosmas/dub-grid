@@ -4,6 +4,9 @@ export type MobileWorkspaceLookup = {
   id: string;
   name: string;
   slug: string;
+  suspendedAt: string | null;
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
 };
 
 export function normalizeMobileWorkspaceSlug(
@@ -29,7 +32,7 @@ export async function findMobileWorkspaceBySlug(
 ): Promise<MobileWorkspaceLookup | null> {
   const { data, error } = await serviceClient
     .from("organizations")
-    .select("id, name, slug")
+    .select("id, name, slug, suspended_at, subscription_status, trial_ends_at")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -45,5 +48,9 @@ export async function findMobileWorkspaceBySlug(
     id: data.id as string,
     name: data.name as string,
     slug: data.slug,
+    suspendedAt: (data.suspended_at as string | null | undefined) ?? null,
+    subscriptionStatus:
+      (data.subscription_status as string | null | undefined) ?? null,
+    trialEndsAt: (data.trial_ends_at as string | null | undefined) ?? null,
   };
 }

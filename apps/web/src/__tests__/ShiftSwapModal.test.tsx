@@ -9,6 +9,7 @@ const employees: Employee[] = [
     id: "emp-1",
     firstName: "Alice",
     lastName: "Smith",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -28,6 +29,7 @@ const employees: Employee[] = [
     id: "emp-2",
     firstName: "Bob",
     lastName: "Jones",
+    employmentType: "full_time",
     status: "active",
     statusChangedAt: null,
     statusNote: "",
@@ -54,11 +56,12 @@ describe("ShiftSwapModal", () => {
       <ShiftSwapModal
         requesterEmpId="emp-1"
         requesterName="Alice Smith"
-        shiftDate="2026-04-16"
+        shiftDate="2026-05-04"
         shiftLabel="Day"
         employees={employees}
         shiftForKey={(empId) => (empId === "emp-2" ? "Night" : "Day")}
         isRequestableShift={(empId) => empId === "emp-2"}
+        isShiftStarted={() => false}
         getShiftTimeRanges={() => []}
         onSubmit={vi.fn()}
         onClose={onClose}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Link from "next/link";
 import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
 import DashboardEmptyState from "./DashboardEmptyState";
@@ -139,8 +140,12 @@ export default function ActivityFeed({
           ) : (
             <>
               {visible.map((item, i) => (
-                <div
+                <Link
                   key={item.id}
+                  href={item.href}
+                  style={{ display: "block", textDecoration: "none", color: "inherit" }}
+                >
+                  <div
                   style={{
                     display: "flex",
                     gap: 12,
@@ -175,6 +180,7 @@ export default function ActivityFeed({
                     </div>
                   </div>
                 </div>
+                </Link>
               ))}
               {remainingCount > 0 && (
                 <div

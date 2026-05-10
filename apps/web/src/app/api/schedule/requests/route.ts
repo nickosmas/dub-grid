@@ -5,6 +5,7 @@ import type { DbShiftRequest } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
+import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
 import { assertSafeFilterValue } from "@/lib/db/shared";
 import type {
@@ -40,8 +41,10 @@ const requestSchema = z.discriminatedUnion("action", [
     type: shiftRequestTypeSchema,
     requesterEmpId: z.string().uuid(),
     requesterShiftDate: z.string().date(),
+    requesterSegmentIndex: z.number().int().nonnegative().optional(),
     targetEmpId: z.string().uuid().optional(),
     targetShiftDate: z.string().date().optional(),
+    targetSegmentIndex: z.number().int().nonnegative().optional(),
     absenceTypeId: z.number().int().optional(),
   }),
   z.object({
@@ -78,7 +81,60 @@ const requestSchema = z.discriminatedUnion("action", [
     requestId: z.string().uuid(),
     empId: z.string().uuid(),
   }),
-]);
+]).superRefine((value, ctx) => {
+  if (value.action !== "createShiftRequest") {
+    return;
+  }
+
+  const isTargetedPickup =
+    value.type === "pickup" && value.targetEmpId && value.targetShiftDate;
+  const hasTargetedPickupField =
+    value.type === "pickup" &&
+    (value.targetEmpId != null ||
+      value.targetShiftDate != null ||
+      value.absenceTypeId != null);
+
+  if (
+    value.absenceTypeId != null &&
+    value.type !== "calloff" &&
+    value.type !== "pickup"
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "Only calloff and targeted pickup requests can include an absence type",
+      path: ["absenceTypeId"],
+    });
+  }
+
+  if (hasTargetedPickupField && !isTargetedPickup) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message:
+        "Targeted pickup requests require a target employee, target shift date, and absence type",
+      path: ["targetEmpId"],
+    });
+  }
+
+  if (isTargetedPickup && value.absenceTypeId == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Targeted pickup requests require an absence type",
+      path: ["absenceTypeId"],
+    });
+  }
+
+  if (
+    isTargetedPickup &&
+    value.targetShiftDate !== value.requesterShiftDate
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Targeted pickup requests must target the requester shift date",
+      path: ["targetShiftDate"],
+    });
+  }
+});
 
 async function fetchActorEmployeeId(
   serviceClient: SupabaseClient,
@@ -263,7 +319,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { data: requestId, error } = await auth.serviceClient.rpc(
+        const { data: requestId, error } = await auth.userClient.rpc(
           "create_shift_request",
           {
             p_org_id: data.orgId,
@@ -273,11 +329,20 @@ export async function POST(req: NextRequest) {
             p_target_emp_id: data.targetEmpId ?? null,
             p_target_shift_date: data.targetShiftDate ?? null,
             p_absence_type_id: data.absenceTypeId ?? null,
+            p_requester_segment_index: data.requesterSegmentIndex ?? null,
+            p_target_segment_index: data.targetSegmentIndex ?? null,
           },
         );
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_created",
+          orgId: data.orgId,
+          requestId: requestId as string,
+          requestType: data.type,
+        });
 
         return NextResponse.json({ requestId: requestId as string });
       }
@@ -292,13 +357,20 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { error } = await auth.serviceClient.rpc("claim_shift_request", {
+        const { error } = await auth.userClient.rpc("claim_shift_request", {
           p_request_id: data.requestId,
           p_claimer_emp_id: data.claimerEmpId,
         });
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_claimed",
+          orgId: data.orgId,
+          requestId: data.requestId,
+          requestType: "pickup",
+        });
 
         return NextResponse.json({ success: true });
       }
@@ -316,7 +388,7 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { data: requestId, error } = await auth.serviceClient.rpc(
+        const { data: requestId, error } = await auth.userClient.rpc(
           "volunteer_for_open_shift",
           {
             p_org_id: data.orgId,
@@ -324,6 +396,9 @@ export async function POST(req: NextRequest) {
             p_shift_date: data.shiftDate,
             p_shift_ids: data.input.segments.map((segment) => segment.shiftId),
             p_job_ids: data.input.segments.map((segment) => segment.jobId),
+            p_is_mentored_flags: data.input.segments.map(
+              (segment) => segment.isMentored ?? false,
+            ),
             p_focus_area_id: data.focusAreaId,
             p_custom_start_time: data.input.customStartTime ?? null,
             p_custom_end_time: data.input.customEndTime ?? null,
@@ -332,6 +407,13 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_created",
+          orgId: data.orgId,
+          requestId: requestId as string,
+          requestType: "pickup",
+        });
 
         return NextResponse.json({ requestId: requestId as string });
       }
@@ -342,7 +424,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { error } = await auth.serviceClient.rpc(
+        const { error } = await auth.userClient.rpc(
           "respond_to_shift_request",
           {
             p_request_id: data.requestId,
@@ -353,6 +435,14 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_responded",
+          orgId: data.orgId,
+          requestId: data.requestId,
+          requestType: "swap",
+          accepted: data.accept,
+        });
 
         return NextResponse.json({ success: true });
       }
@@ -370,7 +460,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { error } = await auth.serviceClient.rpc("resolve_shift_request", {
+        const { error } = await auth.userClient.rpc("resolve_shift_request", {
           p_request_id: data.requestId,
           p_approved: data.approved,
           p_note: data.note ?? null,
@@ -378,6 +468,15 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        await dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_request_resolved",
+          orgId: data.orgId,
+          requestId: data.requestId,
+          requestType: "pickup",
+          approved: data.approved,
+          ...(data.note !== undefined ? { adminNote: data.note } : {}),
+        });
 
         return NextResponse.json({ success: true });
       }
@@ -388,7 +487,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { error } = await auth.serviceClient.rpc("cancel_shift_request", {
+        const { error } = await auth.userClient.rpc("cancel_shift_request", {
           p_request_id: data.requestId,
           p_emp_id: data.empId,
         });

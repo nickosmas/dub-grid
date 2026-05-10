@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, Fragment } from "react";
+import { Import as ImportIcon, Trash2, Upload } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
@@ -56,8 +57,17 @@ interface ToolbarProps {
   hideTwoWeek?: boolean;
   /** Open the publish history panel. */
   onPublishHistory?: () => void;
-  /** When false, hides filters/search/tools (no data to operate on). */
+  /** Start or stop bulk delete mode for visible schedule entries. */
+  onBulkDeleteToggle?: () => void;
+  isBulkDeleteMode?: boolean;
+  /** When false, hides filters/search/tools (no org data to operate on). */
   hasData?: boolean;
+  /** When false, disables schedule-grid actions that need visible rows. */
+  hasVisibleGridRows?: boolean;
+  /** When false, disables actions that need visible schedule entries. */
+  hasVisibleScheduleEntries?: boolean;
+  /** When false, disables the bulk-delete entry point while still allowing exit. */
+  hasRemovableVisibleEntries?: boolean;
 }
 
 /* ── Toggle Switch ── */
@@ -108,6 +118,11 @@ function ToolsMenu({
   requestsBadgeCount,
   onRequestsToggle,
   onPublishHistory,
+  onBulkDeleteToggle,
+  isBulkDeleteMode,
+  scheduleEntryActionsDisabled,
+  scheduleTargetActionsDisabled,
+  bulkDeleteDisabled,
 }: {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -124,6 +139,11 @@ function ToolsMenu({
   requestsBadgeCount?: number;
   onRequestsToggle?: () => void;
   onPublishHistory?: () => void;
+  onBulkDeleteToggle?: () => void;
+  isBulkDeleteMode?: boolean;
+  scheduleEntryActionsDisabled?: boolean;
+  scheduleTargetActionsDisabled?: boolean;
+  bulkDeleteDisabled?: boolean;
 }) {
   return (
     <Menu
@@ -152,6 +172,7 @@ function ToolsMenu({
         <Hint content={hint("Show who last edited each shift")} side="left">
           <MenuItem
             closeOnClick={false}
+            disabled={scheduleEntryActionsDisabled}
             onClick={onAuditToggle}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -189,6 +210,7 @@ function ToolsMenu({
       {/* Print */}
       {onPrintOpen && (
         <MenuItem
+          disabled={scheduleEntryActionsDisabled}
           onClick={() => { onPrintOpen(); }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -203,13 +225,10 @@ function ToolsMenu({
       {/* Export CSV */}
       {onExportCSV && (
         <MenuItem
+          disabled={scheduleEntryActionsDisabled}
           onClick={() => { onExportCSV(); }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
+          <Upload size={14} />
           Export CSV
         </MenuItem>
       )}
@@ -229,12 +248,28 @@ function ToolsMenu({
         </Hint>
       )}
 
+      {onBulkDeleteToggle && (
+        <>
+          <div className="dg-menu-divider" />
+          <Hint content={hint("Select schedule entries to remove in bulk")} side="left">
+            <MenuItem
+              className={isBulkDeleteMode ? undefined : "dg-menu-item--danger"}
+              disabled={bulkDeleteDisabled}
+              onClick={() => { onBulkDeleteToggle(); }}
+            >
+              <Trash2 size={14} />
+              {isBulkDeleteMode ? "Exit Bulk Delete" : "Bulk Delete Entries"}
+            </MenuItem>
+          </Hint>
+        </>
+      )}
+
       {/* Auto Fill */}
       {canApplyRecurringSchedule && onApplyRecurring && (
         <Hint content={hint("Apply all recurring shift templates to the schedule")} side="left">
           <MenuItem
             data-tour="toolbar-autofill"
-            disabled={isApplyingRecurring}
+            disabled={scheduleTargetActionsDisabled || isApplyingRecurring}
             onClick={() => { onApplyRecurring(); }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -254,13 +289,10 @@ function ToolsMenu({
         <Hint content={hint("Copy shifts from the previous period into this one")} side="left">
           <MenuItem
             data-tour="toolbar-import"
-            disabled={isImportingPrevious}
+            disabled={scheduleTargetActionsDisabled || isImportingPrevious}
             onClick={() => { onImportPrevious(); }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
+            <ImportIcon size={14} />
             {isImportingPrevious ? "Importing..." : "Import Previous Schedule"}
           </MenuItem>
         </Hint>
@@ -299,10 +331,21 @@ export default function Toolbar({
   onCoverageToggle,
   hideTwoWeek,
   onPublishHistory,
+  onBulkDeleteToggle,
+  isBulkDeleteMode,
   hasData = true,
+  hasVisibleGridRows,
+  hasVisibleScheduleEntries,
+  hasRemovableVisibleEntries,
 }: ToolbarProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  const hasGridRows = hasVisibleGridRows ?? hasData;
+  const hasScheduleEntries = hasGridRows && (hasVisibleScheduleEntries ?? hasGridRows);
+  const hasBulkDeleteEntries = hasRemovableVisibleEntries ?? hasScheduleEntries;
+  const scheduleEntryActionsDisabled = !hasScheduleEntries;
+  const scheduleTargetActionsDisabled = !hasGridRows;
+  const bulkDeleteDisabled = !isBulkDeleteMode && !hasBulkDeleteEntries;
 
   const spanOptions = (hideTwoWeek || isMobile)
     ? SPAN_OPTIONS.filter((o) => o.value !== "2")
@@ -504,6 +547,11 @@ export default function Toolbar({
               requestsBadgeCount={requestsBadgeCount}
               onRequestsToggle={onRequestsToggle}
               onPublishHistory={onPublishHistory}
+              onBulkDeleteToggle={onBulkDeleteToggle}
+              isBulkDeleteMode={isBulkDeleteMode}
+              scheduleEntryActionsDisabled={scheduleEntryActionsDisabled}
+              scheduleTargetActionsDisabled={scheduleTargetActionsDisabled}
+              bulkDeleteDisabled={bulkDeleteDisabled}
             />
           )}
         </div>
@@ -771,6 +819,11 @@ export default function Toolbar({
             requestsBadgeCount={requestsBadgeCount}
             onRequestsToggle={onRequestsToggle}
             onPublishHistory={onPublishHistory}
+            onBulkDeleteToggle={onBulkDeleteToggle}
+            isBulkDeleteMode={isBulkDeleteMode}
+            scheduleEntryActionsDisabled={scheduleEntryActionsDisabled}
+            scheduleTargetActionsDisabled={scheduleTargetActionsDisabled}
+            bulkDeleteDisabled={bulkDeleteDisabled}
           />
         )}
       </div>}

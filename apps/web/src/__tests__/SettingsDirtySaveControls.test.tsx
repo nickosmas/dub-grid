@@ -28,6 +28,7 @@ import {
   makeShiftCategory,
   makeAssignmentDefinition,
 } from "./factories";
+import { DEFAULT_SHIFT_JOB_SYSTEM_KEY } from "@/lib/system-jobs";
 import type {
   AbsenceType,
   Department,
@@ -193,6 +194,25 @@ describe("settings dirty save controls", () => {
       );
     });
     expect(onSave).toHaveBeenCalledWith(updatedOrganization);
+  });
+
+  it("organization settings block review when the phone number is invalid", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OrganizationGeneral organization={baseOrganization} onSave={vi.fn()} />,
+    );
+
+    const phoneInput = screen.getByLabelText("Phone");
+    await user.clear(phoneInput);
+    await user.type(phoneInput, "123");
+
+    expect(
+      screen.getByText("Enter a 10-digit US phone number"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /review & save/i }),
+    ).toBeDisabled();
   });
 
   it("organization labels only show Discard while the labels are dirty", async () => {
@@ -767,7 +787,7 @@ describe("settings dirty save controls", () => {
     });
   });
 
-  it("coverage only shows scheduled visible jobs", () => {
+  it("coverage shows visible scheduled jobs and shift-only demand targets", () => {
     const focusArea = makeFocusArea({
       id: 1,
       orgId: "org-1",
@@ -795,6 +815,25 @@ describe("settings dirty save controls", () => {
         sortOrder: 0,
         assignmentMode: "with_shift",
         systemKey: "regular_staff",
+        archivedAt: null,
+      },
+      {
+        id: 203,
+        orgId: "org-1",
+        name: "Default shift job",
+        abbr: "SHIFT",
+        showOnGrid: false,
+        focusAreaId: 1,
+        focusAreaIds: [1],
+        applicableShiftIds: [10],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#e2e8f0",
+        border: "#94a3b8",
+        text: "#334155",
+        sortOrder: -1000,
+        assignmentMode: "with_shift",
+        systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
         archivedAt: null,
       },
       {
@@ -881,9 +920,10 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    expect(screen.queryAllByText("Day Shift").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Day Shift").length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText(/^D$/)).not.toBeInTheDocument();
     expect(screen.queryByText("Regular Staff")).not.toBeInTheDocument();
+    expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
     expect(screen.queryAllByText("Supervisor").length).toBeGreaterThan(0);
     expect(
       screen.queryByText("General shiftless jobs"),
@@ -892,6 +932,89 @@ describe("settings dirty save controls", () => {
     expect(
       screen.queryByText(/^Day Shift · Supervisor$/),
     ).not.toBeInTheDocument();
+  });
+
+  it("coverage saves shift-only demand against the default shift job", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({
+      id: 1,
+      orgId: "org-1",
+      name: "North Wing",
+    });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+    });
+    const defaultShiftJob: JobDefinition = {
+      id: 203,
+      orgId: "org-1",
+      name: "Default shift job",
+      abbr: "SHIFT",
+      showOnGrid: false,
+      focusAreaId: 1,
+      focusAreaIds: [1],
+      applicableShiftIds: [10],
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+      color: "#e2e8f0",
+      border: "#94a3b8",
+      text: "#334155",
+      sortOrder: -1000,
+      assignmentMode: "with_shift",
+      systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+      archivedAt: null,
+    };
+    const savedRequirement = makeCoverageRequirement({
+      id: 50,
+      orgId: "org-1",
+      focusAreaId: 1,
+      jobId: 203,
+      preferredShiftId: 10,
+      minStaff: 4,
+      dayOfWeek: null,
+    });
+
+    vi.mocked(saveCoverageRequirements).mockResolvedValue([savedRequirement]);
+
+    render(
+      <CoverageRequirementsSettings
+        orgId="org-1"
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        jobs={[defaultShiftJob]}
+        coverageRequirements={[]}
+        onCoverageRequirementsChange={vi.fn()}
+        canEdit
+      />,
+    );
+
+    expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
+
+    const coverageToggle = screen
+      .getAllByRole("button")
+      .find((button) => button.getAttribute("aria-expanded") === "false");
+
+    expect(coverageToggle).toBeDefined();
+    await user.click(coverageToggle!);
+
+    const staffInput = await screen.findByRole("spinbutton");
+    await user.clear(staffInput);
+    await user.type(staffInput, "4");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(saveCoverageRequirements).toHaveBeenCalledWith(
+        "org-1",
+        1,
+        203,
+        10,
+        [{ dayOfWeek: null, minStaff: 4 }],
+      );
+    });
   });
 
   it("coverage hides row previews and sorts jobs by qualification seniority within each shift", () => {
@@ -1408,6 +1531,95 @@ describe("settings dirty save controls", () => {
         expect.objectContaining({
           id: 10,
           color: "#BFDBFE",
+        }),
+      );
+    });
+  });
+
+  it("shift category editors let admins customize the code abbreviation", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+      color: "#E2E8F0",
+    });
+
+    vi.mocked(upsertShiftCategory).mockResolvedValue({
+      ...shiftCategory,
+      abbr: "DAY",
+    });
+
+    render(
+      <ShiftCategoriesSettings
+        shiftCategories={[shiftCategory]}
+        focusAreas={[focusArea]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+
+    const codeInput = screen.getByDisplayValue("D");
+    await user.clear(codeInput);
+    await user.type(codeInput, "day");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(upsertShiftCategory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 10,
+          abbr: "DAY",
+        }),
+      );
+    });
+  });
+
+  it("shift category editors auto-fill a code from the shift name before saving", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+
+    vi.mocked(upsertShiftCategory).mockResolvedValue({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      startTime: null,
+      endTime: null,
+      color: "#E2E8F0",
+      sortOrder: 0,
+      focusAreaId: 1,
+      breakMinutes: null,
+      archivedAt: null,
+    });
+
+    render(
+      <ShiftCategoriesSettings
+        shiftCategories={[]}
+        focusAreas={[focusArea]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /\+ add shift/i }));
+    await user.type(screen.getByPlaceholderText("e.g. Day Shift"), "Day Shift");
+
+    expect(screen.getByDisplayValue("D")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(upsertShiftCategory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Day Shift",
+          abbr: "D",
         }),
       );
     });
@@ -2347,6 +2559,117 @@ describe("settings dirty save controls", () => {
     expect(within(namePreview!).queryByText(/^SUP$/)).not.toBeInTheDocument();
   });
 
+  it("default shift job previews only show the shift label for each display mode", async () => {
+    const user = userEvent.setup();
+    const department = makeDepartment({
+      id: 1,
+      orgId: "org-1",
+      name: "Nursing",
+      type: "scheduled",
+    });
+    const focusArea = makeFocusArea({
+      id: 1,
+      orgId: "org-1",
+      name: "North",
+      departmentId: 1,
+    });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+      sortOrder: 0,
+      startTime: "07:00",
+      endTime: "15:00",
+    });
+    const defaultShiftJob: JobDefinition = {
+      id: 22,
+      orgId: "org-1",
+      name: "Default shift job",
+      abbr: "SHIFT",
+      showOnGrid: false,
+      assignmentMode: "with_shift",
+      focusAreaId: 1,
+      focusAreaIds: [1],
+      departmentIds: [1],
+      applicableShiftIds: [10],
+      eligibleRoleIds: [],
+      requiredCertificationIds: [],
+      color: "#E2E8F0",
+      border: "#CBD5E1",
+      text: "#475569",
+      shiftTimeOverrides: {},
+      shiftColorOverrides: {},
+      defaultStartTime: null,
+      defaultEndTime: null,
+      defaultDurationHours: null,
+      defaultDurationMinutes: null,
+      sortOrder: -1000,
+      systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+      archivedAt: null,
+    };
+
+    const { unmount } = render(
+      <JobsSettings
+        jobs={[defaultShiftJob]}
+        orgId="org-1"
+        orgRoles={[]}
+        certifications={[]}
+        departments={[department]}
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        roleLabel="Roles"
+        certificationLabel="Certifications"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        shiftDisplayMode="code"
+      />,
+    );
+
+    expect(screen.queryByText("Default Shift Job")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Default shift job"));
+
+    const codePreview = document.querySelector<HTMLElement>(
+      '[data-job-shift-preview="10"]',
+    );
+    expect(codePreview).not.toBeNull();
+    expect(within(codePreview!).getByText(/^D$/)).toBeInTheDocument();
+    expect(within(codePreview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
+    expect(within(codePreview!).queryByText(/^Default shift job$/)).not.toBeInTheDocument();
+
+    unmount();
+
+    render(
+      <JobsSettings
+        jobs={[defaultShiftJob]}
+        orgId="org-1"
+        orgRoles={[]}
+        certifications={[]}
+        departments={[department]}
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        roleLabel="Roles"
+        certificationLabel="Certifications"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        shiftDisplayMode="name"
+      />,
+    );
+
+    expect(screen.queryByText("Default Shift Job")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Default shift job"));
+
+    const namePreview = document.querySelector<HTMLElement>(
+      '[data-job-shift-preview="10"]',
+    );
+    expect(namePreview).not.toBeNull();
+    expect(within(namePreview!).getByText(/^Day Shift$/)).toBeInTheDocument();
+    expect(within(namePreview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
+    expect(within(namePreview!).queryByText(/^Default shift job$/)).not.toBeInTheDocument();
+    expect(within(namePreview!).queryByText(/^D$/)).not.toBeInTheDocument();
+  });
+
   it("scheduled jobs can override one shift while still applying to all matching shifts", async () => {
     const user = userEvent.setup();
     const department = makeDepartment({
@@ -2508,5 +2831,226 @@ describe("settings dirty save controls", () => {
     await user.clear(nameInput);
     await user.type(nameInput, "Vacation Leave");
     expect(saveButton).toBeEnabled();
+  });
+
+  it("custom labels block invalid text before save", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />,
+    );
+
+    const input = screen.getByDisplayValue("Focus Areas");
+    await user.clear(input);
+    await user.type(input, "https://units.example");
+
+    expect(screen.getByText("Focus area label cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(updateOrganizationSettings).not.toHaveBeenCalled();
+  });
+
+  it("string list settings block invalid names before save", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <StringListSettings
+        label="Roles"
+        items={[
+          { id: 1, orgId: "org-1", name: "Charge Nurse", abbr: "CN", sortOrder: 0 },
+        ]}
+        onSave={onSave}
+        placeholder="Role"
+        initialEditing
+      />,
+    );
+
+    const input = screen.getByDisplayValue("Charge Nurse");
+    await user.clear(input);
+    await user.type(input, "https://bad.example");
+
+    expect(screen.getByText("Name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("department settings block invalid department names before save", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <DepartmentsSettings
+        departments={[
+          {
+            id: 1,
+            orgId: "org-1",
+            name: "North",
+            abbr: "North",
+            type: "scheduled",
+            sortOrder: 0,
+            archivedAt: null,
+          },
+        ]}
+        focusAreas={[]}
+        orgId="org-1"
+        focusAreaLabel="Focus Areas"
+        departmentLabel="Departments"
+        canManageFocusAreas
+        canManageOrgLabels={false}
+        onDepartmentsChange={vi.fn()}
+        onFocusAreasChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    const input = screen.getByDisplayValue("North");
+    await user.clear(input);
+    await user.type(input, "www.bad.example");
+
+    expect(screen.getByText("Department name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(saveDepartments).not.toHaveBeenCalled();
+  });
+
+  it("indicator settings block invalid names before save", async () => {
+    const user = userEvent.setup();
+    const indicator: IndicatorType = {
+      id: 1,
+      orgId: "org-1",
+      name: "Readings",
+      color: "#ff0000",
+      sortOrder: 0,
+    };
+
+    render(
+      <Indicators
+        indicatorTypes={[indicator]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageIndicatorTypes
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    const input = screen.getByDisplayValue("Readings");
+    await user.clear(input);
+    await user.type(input, "https://bad.example");
+
+    expect(screen.getByText("Indicator name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(upsertIndicatorType).not.toHaveBeenCalled();
+  });
+
+  it("shift category settings block invalid names before save", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Days",
+      abbr: "D",
+      focusAreaId: 1,
+    });
+
+    render(
+      <ShiftCategoriesSettings
+        shiftCategories={[shiftCategory]}
+        focusAreas={[focusArea]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    const input = screen.getByDisplayValue("Days");
+    await user.clear(input);
+    await user.type(input, "https://bad.example");
+
+    expect(screen.getByText("Shift name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(upsertShiftCategory).not.toHaveBeenCalled();
+  });
+
+  it("job settings block invalid names before save", async () => {
+    const user = userEvent.setup();
+    const jobs: JobDefinition[] = [
+      {
+        id: 12,
+        orgId: "org-1",
+        name: "Office",
+        abbr: "OFC",
+        showOnGrid: true,
+        assignmentMode: "shiftless",
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E2E8F0",
+        border: "#CBD5E1",
+        text: "#1E293B",
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: 4,
+        defaultDurationMinutes: 0,
+        sortOrder: 0,
+        systemKey: null,
+        archivedAt: null,
+      },
+    ];
+
+    render(
+      <JobsSettings
+        jobs={jobs}
+        orgId="org-1"
+        orgRoles={[]}
+        certifications={[]}
+        roleLabel="Roles"
+        certificationLabel="Certifications"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+      />,
+    );
+
+    await user.click(screen.getByText("Office"));
+    const input = screen.getByDisplayValue("Office");
+    await user.clear(input);
+    await user.type(input, "https://bad.example");
+
+    expect(screen.getByText("Job name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+    expect(upsertJobDefinition).not.toHaveBeenCalled();
+  });
+
+  it("absence type settings block invalid names before save", async () => {
+    const user = userEvent.setup();
+    const absenceTypes: AbsenceType[] = [
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "VAC",
+        name: "Vacation",
+        color: "#E2E8F0",
+        border: "transparent",
+        text: "#1E293B",
+        sortOrder: 0,
+        archivedAt: null,
+      },
+    ];
+
+    render(
+      <AbsenceTypesSettings
+        absenceTypes={absenceTypes}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        shiftDisplayMode="code"
+      />,
+    );
+
+    await user.click(screen.getByText("Vacation"));
+    const input = screen.getByDisplayValue("Vacation");
+    await user.clear(input);
+    await user.type(input, "https://bad.example");
+
+    expect(screen.getByText("Absence name cannot contain a URL")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
   });
 });

@@ -7,6 +7,7 @@ import type {
   Employee,
   CoverageRequirement,
 } from "@/types";
+import type { CoverageRuleConfig } from "@dubgrid/domain";
 import {
   getDatesInRange,
   addDays,
@@ -43,6 +44,8 @@ interface ExpandedStatsProps {
   categoryById: Map<number, ShiftCategory>;
   showOT: boolean;
   hasRequirements: boolean;
+  overtimeThreshold?: number;
+  coverageRuleConfig?: Partial<CoverageRuleConfig> | null;
   onClose: () => void;
 }
 
@@ -58,6 +61,8 @@ export default function ExpandedStats({
   categoryById,
   showOT,
   hasRequirements,
+  overtimeThreshold = 40,
+  coverageRuleConfig,
   onClose,
 }: ExpandedStatsProps) {
   const periods = useMemo(() => {
@@ -77,12 +82,12 @@ export default function ExpandedStats({
 
       const coverage = computeCoveragePctAndSlots(
         focusAreas, assignments, coverageRequirements,
-        pDates, activeEmployees, periodShifts,
+        pDates, activeEmployees, periodShifts, coverageRuleConfig,
       );
 
       const hours = computeAllEmployeeHours(
         activeEmployees, dateKeys, periodShifts,
-        assignmentById, 40, categoryById,
+        assignmentById, overtimeThreshold, categoryById,
       );
       const otCount = computeOTAlerts(hours, activeEmployees, focusAreas).length;
 
@@ -97,7 +102,7 @@ export default function ExpandedStats({
     return rows;
   }, [
     allShifts, currentWeekStart, periodDays, activeEmployees, focusAreas, assignments,
-    assignmentById, coverageRequirements, categoryById,
+    assignmentById, coverageRequirements, categoryById, overtimeThreshold, coverageRuleConfig,
   ]);
 
   const columns = [

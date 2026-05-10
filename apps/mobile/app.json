@@ -5,7 +5,13 @@
     "scheme": "dubgridmobile",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store",
@@ -17,7 +23,12 @@
       "bundleIdentifier": "com.dubgrid.mobile"
     },
     "android": {
-      "package": "com.dubgrid.mobile"
+      "package": "com.dubgrid.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "experiments": {
       "autolinkingModuleResolution": true

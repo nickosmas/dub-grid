@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 function pickDomProps(input: Record<string, any>) {
@@ -14,6 +14,8 @@ function pickDomProps(input: Record<string, any>) {
       key === "contentInsetAdjustmentBehavior" ||
       key === "automaticallyAdjustContentInsets" ||
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
+      key === "keyboardDismissMode" ||
+      key === "scrollEventThrottle" ||
       key === "onLayout"
     ) {
       continue;
@@ -26,6 +28,17 @@ function pickDomProps(input: Record<string, any>) {
 
     if (key === "accessibilityRole") {
       output.role = value;
+      continue;
+    }
+
+    if (key === "accessibilityState") {
+      const state = value as { disabled?: boolean; selected?: boolean };
+      if (state.disabled !== undefined) {
+        output["aria-disabled"] = String(state.disabled);
+      }
+      if (state.selected !== undefined) {
+        output["aria-selected"] = String(state.selected);
+      }
       continue;
     }
 
@@ -102,13 +115,16 @@ vi.mock("react-native", async () => {
           props.automaticallyAdjustContentInsets ? "true" : "false",
         "data-automatically-adjusts-scroll-indicator-insets":
           props.automaticallyAdjustsScrollIndicatorInsets ? "true" : "false",
+        "data-keyboard-dismiss-mode": props.keyboardDismissMode,
         "data-testid": "screen-scroll-view",
       },
       children as React.ReactNode,
     );
   });
-
   return {
+    Platform: {
+      OS: "ios",
+    },
     RefreshControl: () => null,
     ScrollView,
     StyleSheet: {
@@ -148,7 +164,7 @@ beforeAll(async () => {
 });
 
 describe("Screen", () => {
-  it("makes the scroll view the root element when no custom sticky layer is needed", () => {
+  it("exposes the scroll view as the top-level element for native header scroll tracking", () => {
     const { container } = render(
       <Screen>
         <div>Content</div>
@@ -169,6 +185,9 @@ describe("Screen", () => {
         "data-automatically-adjusts-scroll-indicator-insets",
       ),
     ).toBe("true");
+    expect(scrollView.getAttribute("data-keyboard-dismiss-mode")).toBe(
+      "interactive",
+    );
   });
 
   it("applies bottom padding modes to the scroll content container", () => {
@@ -184,6 +203,33 @@ describe("Screen", () => {
     );
 
     expect(contentStyle.paddingBottom).toBe(86);
+  });
+
+  it("forwards scroll events to callers", () => {
+    const handleScroll = vi.fn();
+
+    render(
+      <Screen onScroll={handleScroll} scrollEventThrottle={16}>
+        <div>Content</div>
+      </Screen>,
+    );
+
+    fireEvent.scroll(screen.getByTestId("screen-scroll-view"));
+
+    expect(handleScroll).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a stable root shell when a custom overlay is requested", () => {
+    const { container } = render(
+      <Screen renderOverlay={() => null}>
+        <div>Content</div>
+      </Screen>,
+    );
+
+    const scrollView = screen.getByTestId("screen-scroll-view");
+
+    expect(container.firstElementChild).not.toBe(scrollView);
+    expect(container.firstElementChild?.contains(scrollView)).toBe(true);
   });
 
   it("renders overlays with the measured sticky header height", () => {

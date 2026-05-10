@@ -13,6 +13,13 @@ import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import {
+  getCodeError,
+  getLineTextError,
+  normalizeCode,
+  normalizeLineText,
+} from "@/lib/form-validation";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "./useSmoothReorder";
@@ -78,6 +85,7 @@ function FocusAreaRows({
   onFocusAreasChange,
   onFocusAreaChange,
   onFocusAreaDeleteClick,
+  focusAreaErrors,
 }: {
   deptId: number;
   focusAreas: FocusArea[];
@@ -86,6 +94,7 @@ function FocusAreaRows({
   onFocusAreasChange: React.Dispatch<React.SetStateAction<FocusArea[]>>;
   onFocusAreaChange: (faId: number, value: string) => void;
   onFocusAreaDeleteClick: (fa: FocusArea) => void;
+  focusAreaErrors: Record<number, string | null>;
 }) {
   const handleReorder = useCallback((sourceIdx: number, dropIdx: number) => {
     if (sourceIdx === dropIdx) return;
@@ -161,15 +170,35 @@ function FocusAreaRows({
               </svg>
             )}
             {isEditing ? (
-              <input
-                value={fa.name}
-                onChange={(e) => onFocusAreaChange(fa.id, e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-                draggable={false}
-                placeholder={`${focusAreaLabel.replace(/s$/i, "")} name`}
-                style={{ ...fieldStyle, flex: 1 }}
-              />
+              <div style={{ flex: 1 }}>
+                <input
+                  value={fa.name}
+                  onChange={(e) => onFocusAreaChange(fa.id, e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  draggable={false}
+                  placeholder={`${focusAreaLabel.replace(/s$/i, "")} name`}
+                  style={{
+                    ...fieldStyle,
+                    flex: 1,
+                    ...(focusAreaErrors[fa.id]
+                      ? { borderColor: "var(--color-danger)" }
+                      : {}),
+                  }}
+                />
+                {focusAreaErrors[fa.id] ? (
+                  <div
+                    role="alert"
+                    style={{
+                      marginTop: 4,
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-danger)",
+                    }}
+                  >
+                    {focusAreaErrors[fa.id]}
+                  </div>
+                ) : null}
+              </div>
             ) : (
               <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
                 {fa.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
@@ -274,6 +303,82 @@ function DepartmentSection({
     (list: Department[]) => list.filter(d => d.name.trim()),
     [],
   );
+  const departmentErrors = useMemo(
+    () =>
+      localDepts.map((department) => ({
+        name:
+          department.name.trim().length > 0
+            ? getLineTextError(department.name, {
+                label: "Department name",
+                maxLength: 80,
+                required: true,
+                disallowUrl: true,
+              })
+            : null,
+        abbr:
+          department.abbr.trim().length > 0
+            ? getCodeError(department.abbr, {
+                label: "Department abbreviation",
+                maxLength: 20,
+              })
+            : null,
+      })),
+    [localDepts],
+  );
+  const focusAreaErrors = useMemo(
+    () =>
+      Object.fromEntries(
+        localFAs.map((focusArea) => [
+          focusArea.id,
+          focusArea.name.trim().length > 0
+            ? getLineTextError(focusArea.name, {
+                label: "Focus area name",
+                maxLength: 80,
+                required: true,
+                disallowUrl: true,
+              })
+            : null,
+        ]),
+      ) as Record<number, string | null>,
+    [localFAs],
+  );
+  const duplicateDepartmentName = useMemo(() => {
+    const normalizedNames = localDepts
+      .map((department, index) =>
+        departmentErrors[index]?.name
+          ? ""
+          : department.name.trim().replace(/\s+/g, " ").toLowerCase(),
+      )
+      .filter(Boolean);
+    const duplicate = normalizedNames.find(
+      (name, index) => normalizedNames.indexOf(name) !== index,
+    );
+    return duplicate ? `Duplicate name: "${duplicate}"` : null;
+  }, [departmentErrors, localDepts]);
+  const duplicateFocusAreaName = useMemo(() => {
+    const duplicateByDepartment = new Map<number | null, string[]>();
+    for (const focusArea of localFAs) {
+      if (focusAreaErrors[focusArea.id]) continue;
+      const normalizedName = focusArea.name.trim().replace(/\s+/g, " ").toLowerCase();
+      if (!normalizedName) continue;
+      const key = focusArea.departmentId ?? null;
+      const names = duplicateByDepartment.get(key) ?? [];
+      names.push(normalizedName);
+      duplicateByDepartment.set(key, names);
+    }
+    for (const names of duplicateByDepartment.values()) {
+      const duplicate = names.find((name, index) => names.indexOf(name) !== index);
+      if (duplicate) {
+        return `Duplicate focus area name: "${duplicate}"`;
+      }
+    }
+    return null;
+  }, [focusAreaErrors, localFAs]);
+  const hasValidationErrors =
+    departmentErrors.some((department) => department.name || department.abbr) ||
+    Object.values(focusAreaErrors).some(Boolean) ||
+    Boolean(duplicateDepartmentName) ||
+    Boolean(duplicateFocusAreaName);
 
   const isDirty = useMemo(() => {
     const deptsDirty = JSON.stringify(nonEmpty(localDepts)) !== JSON.stringify(depts);
@@ -337,20 +442,39 @@ function DepartmentSection({
   };
 
   const handleSave = async () => {
-    const cleaned = nonEmpty(localDepts).map((d, i) => ({
-      ...d,
-      name: d.name.trim(),
-      abbr: d.abbr.trim() || d.name.trim(),
-      sortOrder: i,
-    }));
-
-    // Duplicate check
-    const names = cleaned.map(d => d.name.toLowerCase());
-    const dupes = names.filter((n, i) => n && names.indexOf(n) !== i);
-    if (dupes.length > 0) {
-      setError(`Duplicate name: "${dupes[0]}"`);
+    if (hasValidationErrors) {
+      setError(
+        departmentErrors.find((department) => department.name || department.abbr)?.name ??
+          departmentErrors.find((department) => department.name || department.abbr)?.abbr ??
+          Object.values(focusAreaErrors).find(Boolean) ??
+          duplicateDepartmentName ??
+          duplicateFocusAreaName ??
+          "Fix the invalid items and try again.",
+      );
       return;
     }
+
+    const cleaned = nonEmpty(localDepts).map((department, index) => ({
+      ...department,
+      name: normalizeLineText(department.name, {
+        label: "Department name",
+        maxLength: 80,
+        required: true,
+        disallowUrl: true,
+      }),
+      abbr:
+        normalizeCode(department.abbr, {
+          label: "Department abbreviation",
+          maxLength: 20,
+        }) ||
+        normalizeLineText(department.name, {
+          label: "Department name",
+          maxLength: 80,
+          required: true,
+          disallowUrl: true,
+        }),
+      sortOrder: index,
+    }));
 
     setSaving(true);
     setError(null);
@@ -381,7 +505,17 @@ function DepartmentSection({
 
         // Upsert new and modified FAs
         const savedFAsList: FocusArea[] = [];
-        const cleanedFAs = localFAs.filter(fa => fa.name.trim());
+        const cleanedFAs = localFAs
+          .filter((focusArea) => focusArea.name.trim())
+          .map((focusArea) => ({
+            ...focusArea,
+            name: normalizeLineText(focusArea.name, {
+              label: "Focus area name",
+              maxLength: 80,
+              required: true,
+              disallowUrl: true,
+            }),
+          }));
         for (let i = 0; i < cleanedFAs.length; i++) {
           const fa = cleanedFAs[i];
           const realDeptId = fa.departmentId && fa.departmentId < 0
@@ -423,10 +557,7 @@ function DepartmentSection({
       setLocalFAs([]);
       toast.success(`${title} saved`);
     } catch (err) {
-      const msg = err && typeof err === "object" && "message" in err
-        ? (err as { message: string }).message
-        : JSON.stringify(err);
-      setError(msg || "Unknown error");
+      setError(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
       Sentry.captureException(err);
     } finally {
       setSaving(false);
@@ -563,7 +694,7 @@ function DepartmentSection({
         </button>
       )}
       primaryAction={(
-        <button onClick={handleSave} disabled={saving || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+        <button onClick={handleSave} disabled={saving || !isDirty || hasValidationErrors} className="dg-btn dg-btn-primary dg-btn-sm">
           {getEditorSaveLabel(saving)}
         </button>
       )}
@@ -650,17 +781,37 @@ function DepartmentSection({
 
                   {/* Name */}
                   {isEditing ? (
-                    <input
-                      ref={(el) => { if (el) nameRefs.current.set(dept.id, el); else nameRefs.current.delete(dept.id); }}
-                      value={dept.name}
-                      onChange={(e) => handleItemChange(i, e.target.value)}
-                      onKeyDown={(e) => handleNameKeyDown(e, dept, i)}
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      draggable={false}
-                      placeholder="Department name"
-                      style={{ ...fieldStyle, flex: 1 }}
-                    />
+                    <div style={{ flex: 1 }}>
+                      <input
+                        ref={(el) => { if (el) nameRefs.current.set(dept.id, el); else nameRefs.current.delete(dept.id); }}
+                        value={dept.name}
+                        onChange={(e) => handleItemChange(i, e.target.value)}
+                        onKeyDown={(e) => handleNameKeyDown(e, dept, i)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        draggable={false}
+                        placeholder="Department name"
+                        style={{
+                          ...fieldStyle,
+                          flex: 1,
+                          ...(departmentErrors[i]?.name
+                            ? { borderColor: "var(--color-danger)" }
+                            : {}),
+                        }}
+                      />
+                      {departmentErrors[i]?.name ? (
+                        <div
+                          role="alert"
+                          style={{
+                            marginTop: 4,
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--color-danger)",
+                          }}
+                        >
+                          {departmentErrors[i]?.name}
+                        </div>
+                      ) : null}
+                    </div>
                   ) : (
                     <>
                       <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
@@ -716,6 +867,7 @@ function DepartmentSection({
                       onFocusAreasChange={setLocalFAs}
                       onFocusAreaChange={handleFAChange}
                       onFocusAreaDeleteClick={handleFADeleteClick}
+                      focusAreaErrors={focusAreaErrors}
                     />
 
                     {/* Add focus area button (edit mode) */}
@@ -762,9 +914,10 @@ function DepartmentSection({
       )}
 
       {/* Error banner */}
-      {error && (
+      {(duplicateDepartmentName || duplicateFocusAreaName || error) && (
         <div style={{ margin: "0 16px 12px", padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--dg-radius-md)", color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          <strong>Save Error:</strong> {error}
+          <strong>{duplicateDepartmentName || duplicateFocusAreaName ? "Validation Error:" : "Save Error:"}</strong>{" "}
+          {duplicateDepartmentName ?? duplicateFocusAreaName ?? error}
         </div>
       )}
 

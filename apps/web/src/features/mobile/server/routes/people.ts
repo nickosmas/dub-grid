@@ -14,29 +14,55 @@ type MobilePersonSource = Pick<
   | "id"
   | "firstName"
   | "lastName"
+  | "employmentType"
   | "phone"
   | "email"
   | "status"
   | "focusAreaIds"
+  | "certificationId"
+  | "roleIds"
+  | "seniority"
+  | "departmentIds"
+  | "deptAdminIds"
   | "contactNotes"
   | "statusChangedAt"
   | "statusNote"
+  | "userId"
   | "version"
->;
+> & {
+  managementDepartmentIds?: number[];
+  managementDeptAdminIds?: number[];
+  pendingInvitation?: {
+    id: string;
+    email: string;
+    expiresAt: string;
+    updatedAt: string | null;
+  } | null;
+};
 
 export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
   return {
     id: person.id,
     firstName: person.firstName,
     lastName: person.lastName,
+    employmentType: person.employmentType,
     phone: person.phone,
     email: person.email,
     status: person.status,
+    certificationId: person.certificationId,
+    roleIds: person.roleIds,
+    seniority: person.seniority,
     focusAreaIds: person.focusAreaIds,
+    departmentIds: person.departmentIds,
+    deptAdminIds: person.deptAdminIds,
+    managementDepartmentIds: person.managementDepartmentIds ?? [],
+    managementDeptAdminIds: person.managementDeptAdminIds ?? [],
     contactNotes: person.contactNotes,
     statusChangedAt: person.statusChangedAt,
     statusNote: person.statusNote,
+    userId: person.userId,
     version: person.version,
+    pendingInvitation: person.pendingInvitation ?? null,
   };
 }
 
@@ -53,7 +79,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(mobilePeopleResponseSchema.parse(payload));
   } catch (error) {
     if (error instanceof MobileApiAuthorizationError) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return NextResponse.json(
+        { error: "You don't have permission to view the staff directory." },
+        { status: 403 },
+      );
     }
 
     throw error;

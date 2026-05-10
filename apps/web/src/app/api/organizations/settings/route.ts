@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServiceClient } from "@/lib/supabase-service";
+import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { z } from "zod";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -14,6 +15,11 @@ import type { DbOrganization } from "@/lib/db/types";
 import { ORGANIZATION_COLS } from "@/lib/db/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import {
+  getLineTextError,
+  getOptionalUsPhoneFieldError,
+  normalizeLineText,
+} from "@/lib/form-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +46,9 @@ const bodySchema = z.object({
     .nullable()
     .optional(),
   enforceConflictPrevention: z.boolean().optional(),
+  coverageRuleConfig: z.object({
+    mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
+  }).optional(),
   dataRetentionDays: z.number().int().min(1).max(3650).optional(),
   featureOverrides: z.record(z.string(), z.boolean()).optional(),
 });
@@ -107,37 +116,127 @@ export async function PUT(req: NextRequest) {
   }
 
   const { orgId, expectedUpdatedAt, ...fields } = parsed.data;
+  const fieldErrors = {
+    ...(fields.name !== undefined
+      ? {
+          name: getLineTextError(fields.name, {
+            label: "Organization name",
+            maxLength: 200,
+            required: true,
+          }),
+        }
+      : {}),
+    ...(fields.phone !== undefined
+      ? { phone: getOptionalUsPhoneFieldError(fields.phone) }
+      : {}),
+    ...(fields.addressLine1 !== undefined
+      ? {
+          addressLine1: getLineTextError(fields.addressLine1, {
+            label: "Address line 1",
+            maxLength: 120,
+          }),
+        }
+      : {}),
+    ...(fields.addressLine2 !== undefined
+      ? {
+          addressLine2: getLineTextError(fields.addressLine2, {
+            label: "Address line 2",
+            maxLength: 120,
+          }),
+        }
+      : {}),
+    ...(fields.addressCity !== undefined
+      ? {
+          addressCity: getLineTextError(fields.addressCity, {
+            label: "City",
+            maxLength: 80,
+          }),
+        }
+      : {}),
+    ...(fields.addressState !== undefined
+      ? {
+          addressState: getLineTextError(fields.addressState, {
+            label: "State / province",
+            maxLength: 80,
+          }),
+        }
+      : {}),
+    ...(fields.addressPostalCode !== undefined
+      ? {
+          addressPostalCode: getLineTextError(fields.addressPostalCode, {
+            label: "Postal code",
+            maxLength: 20,
+          }),
+        }
+      : {}),
+    ...(fields.addressCountry !== undefined
+      ? {
+          addressCountry: getLineTextError(fields.addressCountry, {
+            label: "Country",
+            maxLength: 80,
+          }),
+        }
+      : {}),
+    ...(fields.focusAreaLabel !== undefined
+      ? {
+          focusAreaLabel: getLineTextError(fields.focusAreaLabel, {
+            label: "Focus area label",
+            maxLength: 50,
+            required: true,
+          }),
+        }
+      : {}),
+    ...(fields.certificationLabel !== undefined
+      ? {
+          certificationLabel: getLineTextError(fields.certificationLabel, {
+            label: "Certification label",
+            maxLength: 50,
+            required: true,
+          }),
+        }
+      : {}),
+    ...(fields.roleLabel !== undefined
+      ? {
+          roleLabel: getLineTextError(fields.roleLabel, {
+            label: "Role label",
+            maxLength: 50,
+            required: true,
+          }),
+        }
+      : {}),
+    ...(fields.departmentLabel !== undefined
+      ? {
+          departmentLabel: getLineTextError(fields.departmentLabel, {
+            label: "Department label",
+            maxLength: 50,
+            required: true,
+          }),
+        }
+      : {}),
+  } as const;
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return NextResponse.json(
+      { error: firstFieldError, fieldErrors },
+      { status: 400 },
+    );
+  }
 
   try {
     // ── Permission check ──────────────────────────────────────────────
-    const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }] = await Promise.all([
-      serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", user.id)
-        .eq("org_id", orgId)
-        .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
-    ]);
-
-    const isGridmaster = profile?.platform_role === "gridmaster";
-    const isSuperAdmin = membership?.org_role === "super_admin";
-    const isAdmin = membership?.org_role === "admin";
-    const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
-
-    const hasPermission =
-      isGridmaster ||
-      isSuperAdmin ||
-      (isAdmin && adminPerms?.canManageOrgSettings === true);
-
-    if (!hasPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    const orgAuth = await requireOrgPermissions(
+      req,
+      orgId,
+      (permissions) =>
+        permissions.isGridmaster ||
+        permissions.isSuperAdmin ||
+        permissions.canManageOrgSettings,
+      { allowDuringSetup: true },
+    );
+    if ("response" in orgAuth) {
+      return orgAuth.response;
     }
+    const serviceClient = orgAuth.serviceClient;
 
     const { data: existingRow, error: existingError } = await serviceClient
       .from("organizations")
@@ -162,22 +261,86 @@ export async function PUT(req: NextRequest) {
       addressCountry: fields.addressCountry ?? currentOrg.addressCountry ?? "",
     };
 
+    const normalizedAddress = {
+      addressLine1: normalizeLineText(nextAddress.addressLine1, {
+        label: "Address line 1",
+        maxLength: 120,
+      }),
+      addressLine2: normalizeLineText(nextAddress.addressLine2, {
+        label: "Address line 2",
+        maxLength: 120,
+      }),
+      addressCity: normalizeLineText(nextAddress.addressCity, {
+        label: "City",
+        maxLength: 80,
+      }),
+      addressState: normalizeLineText(nextAddress.addressState, {
+        label: "State / province",
+        maxLength: 80,
+      }),
+      addressPostalCode: normalizeLineText(nextAddress.addressPostalCode, {
+        label: "Postal code",
+        maxLength: 20,
+      }),
+      addressCountry: normalizeLineText(nextAddress.addressCountry, {
+        label: "Country",
+        maxLength: 80,
+      }),
+    };
+
     const nextOrg = {
       ...currentOrg,
-      name: fields.name ?? currentOrg.name,
-      phone: fields.phone ?? currentOrg.phone,
-      addressLine1: nextAddress.addressLine1,
-      addressLine2: nextAddress.addressLine2,
-      addressCity: nextAddress.addressCity,
-      addressState: nextAddress.addressState,
-      addressPostalCode: nextAddress.addressPostalCode,
-      addressCountry: nextAddress.addressCountry,
-      address: composeOrganizationAddress(nextAddress),
-      focusAreaLabel: fields.focusAreaLabel ?? currentOrg.focusAreaLabel,
+      name:
+        fields.name !== undefined
+          ? normalizeLineText(fields.name, {
+              label: "Organization name",
+              maxLength: 200,
+              required: true,
+            })
+          : currentOrg.name,
+      phone:
+        fields.phone !== undefined
+          ? normalizeOptionalUsPhone(fields.phone)
+          : currentOrg.phone,
+      addressLine1: normalizedAddress.addressLine1,
+      addressLine2: normalizedAddress.addressLine2,
+      addressCity: normalizedAddress.addressCity,
+      addressState: normalizedAddress.addressState,
+      addressPostalCode: normalizedAddress.addressPostalCode,
+      addressCountry: normalizedAddress.addressCountry,
+      address: composeOrganizationAddress(normalizedAddress),
+      focusAreaLabel:
+        fields.focusAreaLabel !== undefined
+          ? normalizeLineText(fields.focusAreaLabel, {
+              label: "Focus area label",
+              maxLength: 50,
+              required: true,
+            })
+          : currentOrg.focusAreaLabel,
       certificationLabel:
-        fields.certificationLabel ?? currentOrg.certificationLabel,
-      roleLabel: fields.roleLabel ?? currentOrg.roleLabel,
-      departmentLabel: fields.departmentLabel ?? currentOrg.departmentLabel,
+        fields.certificationLabel !== undefined
+          ? normalizeLineText(fields.certificationLabel, {
+              label: "Certification label",
+              maxLength: 50,
+              required: true,
+            })
+          : currentOrg.certificationLabel,
+      roleLabel:
+        fields.roleLabel !== undefined
+          ? normalizeLineText(fields.roleLabel, {
+              label: "Role label",
+              maxLength: 50,
+              required: true,
+            })
+          : currentOrg.roleLabel,
+      departmentLabel:
+        fields.departmentLabel !== undefined
+          ? normalizeLineText(fields.departmentLabel, {
+              label: "Department label",
+              maxLength: 50,
+              required: true,
+            })
+          : currentOrg.departmentLabel,
       shiftDisplayMode: fields.shiftDisplayMode ?? currentOrg.shiftDisplayMode,
       timezone:
         fields.timezone !== undefined
@@ -190,6 +353,8 @@ export async function PUT(req: NextRequest) {
       enforceConflictPrevention:
         fields.enforceConflictPrevention ??
         currentOrg.enforceConflictPrevention,
+      coverageRuleConfig:
+        fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
       dataRetentionDays:
         fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
       featureOverrides:
@@ -249,6 +414,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("enforceConflictPrevention")) {
       update.enforce_conflict_prevention = nextOrg.enforceConflictPrevention;
+    }
+    if (changeKeys.has("coverageRuleConfig")) {
+      update.coverage_rule_config = nextOrg.coverageRuleConfig;
     }
     if (changeKeys.has("dataRetentionDays")) {
       update.data_retention_days = nextOrg.dataRetentionDays;
@@ -311,6 +479,32 @@ export async function PUT(req: NextRequest) {
         { error: auditError, orgId, userId: user.id },
         "Organization settings audit log write failed",
       );
+    }
+
+    if (changeKeys.has("featureOverrides")) {
+      const { error: featureAuditError } = await serviceClient
+        .from("audit_log")
+        .insert({
+          org_id: orgId,
+          actor_id: user.id,
+          actor_email: user.email ?? null,
+          action: "feature_flags.updated",
+          resource_type: "organization",
+          resource_id: orgId,
+          details: {
+            from: currentOrg.featureOverrides,
+            to: nextOrg.featureOverrides,
+          },
+          ip_address: getRequestIp(req),
+          user_agent: req.headers.get("user-agent"),
+        });
+
+      if (featureAuditError) {
+        logger.error(
+          { error: featureAuditError, orgId, userId: user.id },
+          "Runtime controls audit log write failed",
+        );
+      }
     }
 
     return NextResponse.json({ success: true, organization: updatedOrg });

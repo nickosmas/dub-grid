@@ -1,6 +1,7 @@
 "use client";
 
 import type { Notification } from "@/types";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface NotificationsResponse {
   unreadCount: number;
@@ -29,9 +30,7 @@ async function requestNotificationsJson<T>(
 
   if (!response.ok) {
     throw new Error(
-      typeof body?.error === "string"
-        ? body.error
-        : "Notifications request failed.",
+      formatClientErrorMessage(body?.error, "Notifications request failed."),
     );
   }
 

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import {
@@ -19,6 +20,7 @@ import {
   fetchEmployeeShifts,
   updateEmployee,
   deleteEmployee,
+  EmployeeContactConflictError,
   EmployeeStatusConflictError,
   OptimisticLockError,
 } from "@/features/employees/client";
@@ -48,6 +50,7 @@ import {
   removeUserFromOrganization,
   revokeInvitation,
 } from "@/features/organization/client";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
 import { EmployeeStatusActions } from "./EmployeeStatusActions";
@@ -89,6 +92,8 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
+  const [quickRevokeInviteConfirm, setQuickRevokeInviteConfirm] =
+    useState<Invitation | null>(null);
 
   const orgId = perms.orgId ?? org?.id ?? null;
   const { directory } = useDirectory(orgId);
@@ -171,7 +176,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load employee data");
+          setError(formatClientErrorMessage(err, "We couldn't load this employee right now."));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -255,7 +260,11 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         return;
       }
       setEmployee(previousEmployee);
-      toast.error("Failed to save employee");
+      toast.error(
+        err instanceof EmployeeContactConflictError
+          ? err.message
+          : "Failed to save employee",
+      );
     }
   }, [employee, orgId, refreshDirectory, syncEmployeeCaches]);
 
@@ -476,7 +485,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           </button>
                           <button
                             type="button"
-                            onClick={() => void handleRevokeInvitation(pendingInvite.id)}
+                            onClick={() => setQuickRevokeInviteConfirm(pendingInvite)}
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                           >
                             Revoke Invitation
@@ -660,6 +669,21 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           }}
         />
       )}
+
+      {quickRevokeInviteConfirm ? (
+        <ConfirmDialog
+          title="Revoke Invitation?"
+          message={`Revoke the pending invitation for ${quickRevokeInviteConfirm.email}? The current invite link will stop working.`}
+          confirmLabel="Revoke Invitation"
+          variant="danger"
+          onConfirm={() => {
+            const invitationId = quickRevokeInviteConfirm.id;
+            setQuickRevokeInviteConfirm(null);
+            void handleRevokeInvitation(invitationId);
+          }}
+          onCancel={() => setQuickRevokeInviteConfirm(null)}
+        />
+      ) : null}
     </>
   );
 }

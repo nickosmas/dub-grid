@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServiceClient } from "@/lib/supabase-service";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { requireOrgPermissions } from "@/app/api/shared/permissions";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -9,12 +8,6 @@ const searchSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAuthenticatedUser(req);
-    if ("response" in auth) {
-      return auth.response;
-    }
-    void auth;
-
     const parsed = searchSchema.safeParse(
       Object.fromEntries(req.nextUrl.searchParams.entries()),
     );
@@ -22,7 +15,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
-    const serviceClient = getServiceClient();
+    const orgAuth = await requireOrgPermissions(
+      req,
+      parsed.data.orgId,
+      (permissions) =>
+        permissions.isGridmaster ||
+        permissions.isSuperAdmin ||
+        permissions.canViewStaff ||
+        permissions.canManageEmployees,
+      { allowDuringSetup: true },
+    );
+    if ("response" in orgAuth) {
+      return orgAuth.response;
+    }
+
+    const serviceClient = orgAuth.serviceClient;
     const { count, error } = await serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
