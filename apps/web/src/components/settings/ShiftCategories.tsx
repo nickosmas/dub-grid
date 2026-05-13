@@ -351,19 +351,27 @@ function ShiftCategoriesSettings({
             uppercase: true,
           })
         : null;
+    // Name uniqueness is scoped per focus area to match the DB's partial unique
+    // indexes (shift_categories_area_name_unique / shift_categories_global_name_unique).
+    // Archived shifts are excluded since the DB indexes filter on archived_at IS NULL.
     const duplicateName =
       cat.name.trim().length > 0 &&
       local.some(
         (candidate) =>
           candidate.id !== cat.id &&
+          candidate.archivedAt == null &&
+          (candidate.focusAreaId ?? null) === (cat.focusAreaId ?? null) &&
           candidate.name.trim().toLowerCase() === cat.name.trim().toLowerCase(),
       );
+    // Code uniqueness is enforced org-wide so the short label is unambiguous in
+    // code-display mode. Archived shifts are excluded.
     const normalizedCode = normalizeShiftAbbreviation(cat.abbr, cat.name);
     const duplicateCode =
       Boolean(normalizedCode) &&
       local.some(
         (candidate) =>
           candidate.id !== cat.id &&
+          candidate.archivedAt == null &&
           normalizeShiftAbbreviation(candidate.abbr, candidate.name)?.toUpperCase() ===
             normalizedCode?.toUpperCase(),
       );
@@ -489,7 +497,7 @@ function ShiftCategoriesSettings({
                 role="alert"
                 style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
               >
-                {nameError ?? "Another shift already uses that name."}
+                {nameError ?? "Another shift in this focus area already uses that name."}
               </p>
             ) : null}
           </div>
