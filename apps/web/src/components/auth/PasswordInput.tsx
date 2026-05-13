@@ -13,6 +13,12 @@ interface PasswordInputProps {
   minLength?: number;
   disabled?: boolean;
   style?: React.CSSProperties;
+  /**
+   * When set, replaces the default large auth-card styling with the
+   * supplied class (e.g. "dg-input" for in-app form fields).
+   * `dg-standalone-input` is still applied for iOS zoom prevention.
+   */
+  className?: string;
 }
 
 const defaultInputStyle: React.CSSProperties = {
@@ -39,15 +45,19 @@ export function PasswordInput({
   minLength = 10,
   disabled,
   style,
+  className,
 }: PasswordInputProps) {
-  const mergedStyle = { ...defaultInputStyle, ...style, paddingRight: 48 };
+  const usingClass = Boolean(className);
+  const mergedStyle = usingClass
+    ? { ...style, paddingRight: 48 }
+    : { ...defaultInputStyle, ...style, paddingRight: 48 };
 
   return (
     <div style={{ position: "relative" }}>
       <input
         type={showPassword ? "text" : "password"}
         placeholder={placeholder}
-        className="dg-standalone-input"
+        className={className ? `${className} dg-standalone-input` : "dg-standalone-input"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required

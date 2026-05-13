@@ -342,6 +342,12 @@ textarea {
   margin-bottom: 5px;
 }
 
+.dg-form-error {
+  color: var(--color-danger);
+  font-size: var(--dg-fs-footnote);
+  margin: 4px 0 0;
+}
+
 /* ── Segment Control ────────────────────────────────────── */
 .dg-segment {
   display: flex;
@@ -851,6 +857,14 @@ textarea {
   display: none;
 }
 
+.dg-profile-menu {
+  min-width: 224px;
+}
+
+.dg-profile-menu .dg-menu-item {
+  white-space: nowrap;
+}
+
 .dg-menu-item {
   display: flex;
   align-items: center;
@@ -1116,12 +1130,18 @@ textarea {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  border: 1.5px solid var(--color-border-dark);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--color-text-muted);
   background: var(--color-surface);
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
   transition: background var(--dg-duration-fast) ease, border-color var(--dg-duration-fast) ease;
+}
+
+.dg-checkbox:hover:not(:checked):not(:disabled) {
+  border-color: var(--color-text-secondary);
 }
 
 .dg-checkbox:checked {

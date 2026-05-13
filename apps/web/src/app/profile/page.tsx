@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   getRequiredStaffEmailError,
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
 import { ChevronLeft, Check, Trash2, X } from "lucide-react";
+import { PageContainer } from "@/components/PageContainer";
 import { MFASetup } from "@/components/profile/MFASetup";
 import { NotificationPreferences } from "@/components/profile/NotificationPreferences";
 import { SessionList } from "@/components/profile/SessionList";
@@ -56,23 +57,6 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-const inputFieldStyle: CSSProperties = {
-  width: "100%",
-  padding: "10px 13px",
-  border: "1.5px solid var(--color-border)",
-  borderRadius: "var(--dg-btn-radius)",
-  fontSize: "var(--dg-fs-body-sm)",
-  outline: "none",
-  boxSizing: "border-box",
-  fontFamily: "inherit",
-};
-
-const inlineErrorStyle: CSSProperties = {
-  color: "var(--color-danger)",
-  fontSize: "var(--dg-fs-footnote)",
-  margin: "4px 0 0",
-};
-
 type ProfileConfirmation =
   | "account-details"
   | "profile-change-request"
@@ -88,17 +72,7 @@ function Field({
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span
-        style={{
-          fontSize: "var(--dg-fs-footnote)",
-          fontWeight: 600,
-          color: "var(--color-text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-        }}
-      >
-        {label}
-      </span>
+      <span className="dg-label" style={{ marginBottom: 0 }}>{label}</span>
       <span
         style={{
           fontSize: "var(--dg-fs-body-sm)",
@@ -728,8 +702,8 @@ export function ProfilePageContent() {
   return (
     <>
       <div className="min-h-screen bg-[var(--color-bg)]">
-        <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-          <div className="mx-auto max-w-[1100px] space-y-6 pb-10 dg-page-enter">
+        <PageContainer maxWidth={1100} contentStyle={{ paddingBottom: 40 }}>
+          <div className="space-y-6">
             <button
               type="button"
               onClick={() =>
@@ -824,122 +798,58 @@ export function ProfilePageContent() {
                         >
                           {canEditProfileDirectly ? (
                             <div className="grid gap-3 sm:grid-cols-2">
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 6,
-                                }}
-                              >
-                                <label
-                                  style={{
-                                    fontSize: "var(--dg-fs-footnote)",
-                                    fontWeight: 600,
-                                    color: "var(--color-text-muted)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.06em",
-                                  }}
-                                >
-                                  First name
-                                </label>
+                              <div>
+                                <label className="dg-label">First name</label>
                                 <input
                                   aria-label="First name"
                                   value={editFirstName}
                                   onChange={(e) =>
                                     setEditFirstName(e.target.value)
                                   }
-                                  style={inputFieldStyle}
+                                  className="dg-input"
                                 />
                                 {accountFirstNameError ? (
-                                  <p style={inlineErrorStyle}>
+                                  <p className="dg-form-error">
                                     {accountFirstNameError}
                                   </p>
                                 ) : null}
                               </div>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: 6,
-                                }}
-                              >
-                                <label
-                                  style={{
-                                    fontSize: "var(--dg-fs-footnote)",
-                                    fontWeight: 600,
-                                    color: "var(--color-text-muted)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.06em",
-                                  }}
-                                >
-                                  Last name
-                                </label>
+                              <div>
+                                <label className="dg-label">Last name</label>
                                 <input
                                   aria-label="Last name"
                                   value={editLastName}
                                   onChange={(e) =>
                                     setEditLastName(e.target.value)
                                   }
-                                  style={inputFieldStyle}
+                                  className="dg-input"
                                 />
                                 {accountLastNameError ? (
-                                  <p style={inlineErrorStyle}>
+                                  <p className="dg-form-error">
                                     {accountLastNameError}
                                   </p>
                                 ) : null}
                               </div>
                             </div>
                           ) : null}
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 6,
-                            }}
-                          >
-                            <label
-                              style={{
-                                fontSize: "var(--dg-fs-footnote)",
-                                fontWeight: 600,
-                                color: "var(--color-text-muted)",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.06em",
-                              }}
-                            >
-                              Email
-                            </label>
+                          <div>
+                            <label className="dg-label">Email</label>
                             <input
                               type="email"
                               value={editEmail}
                               onChange={(e) => setEditEmail(e.target.value)}
-                              style={inputFieldStyle}
+                              className="dg-input"
                               autoFocus
                             />
                             {accountEmailError ? (
-                              <p style={inlineErrorStyle}>
+                              <p className="dg-form-error">
                                 {accountEmailError}
                               </p>
                             ) : null}
                           </div>
                           {employee ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 6,
-                              }}
-                            >
-                              <label
-                                style={{
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  fontWeight: 600,
-                                  color: "var(--color-text-muted)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.06em",
-                                }}
-                              >
-                                Phone
-                              </label>
+                            <div>
+                              <label className="dg-label">Phone</label>
                               <input
                                 value={editPhone}
                                 onChange={(e) => setEditPhone(e.target.value)}
@@ -949,10 +859,10 @@ export function ProfilePageContent() {
                                   }
                                 }}
                                 placeholder="Phone"
-                                style={inputFieldStyle}
+                                className="dg-input"
                               />
                               {accountPhoneError ? (
-                                <p style={inlineErrorStyle}>
+                                <p className="dg-form-error">
                                   {accountPhoneError}
                                 </p>
                               ) : null}
@@ -1047,7 +957,7 @@ export function ProfilePageContent() {
                             }
                           />
                           {requestFirstNameError ? (
-                            <p style={inlineErrorStyle}>
+                            <p className="dg-form-error">
                               {requestFirstNameError}
                             </p>
                           ) : null}
@@ -1062,7 +972,7 @@ export function ProfilePageContent() {
                             }
                           />
                           {requestLastNameError ? (
-                            <p style={inlineErrorStyle}>
+                            <p className="dg-form-error">
                               {requestLastNameError}
                             </p>
                           ) : null}
@@ -1079,7 +989,7 @@ export function ProfilePageContent() {
                           }
                         />
                         {requestNoteError ? (
-                          <p style={inlineErrorStyle}>{requestNoteError}</p>
+                          <p className="dg-form-error">{requestNoteError}</p>
                         ) : null}
                         <button
                           type="button"
@@ -1155,19 +1065,7 @@ export function ProfilePageContent() {
                             }}
                           >
                             <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  fontWeight: 600,
-                                  color: "var(--color-text-muted)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.04em",
-                                  marginBottom: 5,
-                                }}
-                              >
-                                Current Password
-                              </label>
+                              <label className="dg-label">Current Password</label>
                               <PasswordInput
                                 placeholder="Enter current password"
                                 value={currentPassword}
@@ -1175,23 +1073,11 @@ export function ProfilePageContent() {
                                 showPassword={showPassword}
                                 onToggle={() => setShowPassword((v) => !v)}
                                 autoComplete="current-password"
-                                style={inputFieldStyle}
+                                className="dg-input"
                               />
                             </div>
                             <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  fontWeight: 600,
-                                  color: "var(--color-text-muted)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.04em",
-                                  marginBottom: 5,
-                                }}
-                              >
-                                New Password
-                              </label>
+                              <label className="dg-label">New Password</label>
                               <PasswordInput
                                 placeholder="Enter new password"
                                 value={newPassword}
@@ -1200,24 +1086,12 @@ export function ProfilePageContent() {
                                 onToggle={() => setShowPassword((v) => !v)}
                                 autoComplete="new-password"
                                 ariaDescribedBy="password-strength-label password-strength-hints"
-                                style={inputFieldStyle}
+                                className="dg-input"
                               />
                               <PasswordStrength password={newPassword} />
                             </div>
                             <div>
-                              <label
-                                style={{
-                                  display: "block",
-                                  fontSize: "var(--dg-fs-footnote)",
-                                  fontWeight: 600,
-                                  color: "var(--color-text-muted)",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.04em",
-                                  marginBottom: 5,
-                                }}
-                              >
-                                Confirm New Password
-                              </label>
+                              <label className="dg-label">Confirm New Password</label>
                               <PasswordInput
                                 placeholder="Confirm new password"
                                 value={confirmNewPassword}
@@ -1225,7 +1099,7 @@ export function ProfilePageContent() {
                                 showPassword={showPassword}
                                 onToggle={() => setShowPassword((v) => !v)}
                                 autoComplete="new-password"
-                                style={inputFieldStyle}
+                                className="dg-input"
                               />
                             </div>
                             {passwordError ? (
@@ -1274,22 +1148,8 @@ export function ProfilePageContent() {
                         ) : null}
                       </div>
 
-                      <div
-                        style={{
-                          paddingTop: 4,
-                        }}
-                      >
-                        <label
-                          style={{
-                            display: "block",
-                            fontSize: "var(--dg-fs-footnote)",
-                            fontWeight: 600,
-                            color: "var(--color-text-muted)",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                            marginBottom: 12,
-                          }}
-                        >
+                      <div style={{ paddingTop: 4 }}>
+                        <label className="dg-label" style={{ marginBottom: 12 }}>
                           Two-Factor Authentication
                         </label>
                         <MFASetup
@@ -1485,7 +1345,7 @@ export function ProfilePageContent() {
               ) : null}
             </section>
           </div>
-        </div>
+        </PageContainer>
       </div>
       {confirmation ? (
         <ConfirmDialog
