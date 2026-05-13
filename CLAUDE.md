@@ -70,6 +70,42 @@
   `apps/web/src/components/CookieConsent.tsx`. This re-prompts all users to re-consent on next visit
 
 ---
+
+## 8. Design-System Conventions
+
+Two parallel button/input vocabularies exist by design — they are not interchangeable:
+
+- **`dg-btn-*` / `dg-input` / `dg-label` / `dg-form-error`** — used everywhere
+  inside the authenticated app (settings, profile, schedule, people, dashboard,
+  reports). Form fields should always use `<input className="dg-input" />` plus
+  `<label className="dg-label" />`; never re-derive these via inline styles or
+  bespoke Tailwind chains.
+
+- **`dg-auth-submit` / `dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** —
+  used only by the public auth flows (login, forgot-password, reset-password,
+  accept-invite, verify-email). They render at a larger size for the auth
+  card and pair with the `<PageShell>` / `<Card>` primitives in
+  `components/auth/AuthCard.tsx`. Do not mix `dg-auth-*` with `dg-btn-*` on
+  the same surface.
+
+Shared primitives to reach for before inventing a layout:
+
+- `<PageContainer>` — canonical authed-page wrapper (responsive padding +
+  centered max-width). Skip it for pages that own their full viewport (the
+  schedule grid) or that intentionally go full-width (reports tables).
+- `<Switch>` — replaces hand-rolled 44×24 toggle buttons.
+- `<EditorActionRow>` — dirty-state save/discard footer used by every
+  settings panel; the primary button always sits on the right.
+- `<SectionCard>` (`components/settings/shared.tsx`) — bordered/padded card
+  for single-section settings panels.
+- `<EmptyState>` — single empty-state look for any list/table panel.
+- `<ConfirmDialog>` — destructive-action confirmation (Cancel left, primary
+  right, danger-filled by default). `<Modal>` is for info dialogs only.
+- `<ErrorBoundary>` and `<NotFoundBoundary>` (`components/RouteBoundary.tsx`)
+  — every segment `error.tsx` and `not-found.tsx` should delegate to these
+  rather than re-render the chrome.
+
+---
 ---
 
 # React Best Practices
