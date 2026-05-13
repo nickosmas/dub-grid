@@ -62,6 +62,7 @@ import {
   isDefaultShiftSystemJob,
   isRegularStaffSystemJob,
 } from "@/lib/system-jobs";
+import { getShiftCategoryConflict } from "@/lib/shift-category-conflicts";
 
 export const dynamic = "force-dynamic";
 
@@ -2441,6 +2442,15 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    if (
+      data.action === "upsertShiftCategory" ||
+      data.action === "deleteShiftCategory"
+    ) {
+      const shiftConflict = getShiftCategoryConflict(error);
+      if (shiftConflict) {
+        return NextResponse.json(shiftConflict, { status: 409 });
+      }
+    }
     console.error("Settings POST failed", { action: data.action, orgId, error });
     const message =
       error instanceof Error ? error.message : "Settings request failed";

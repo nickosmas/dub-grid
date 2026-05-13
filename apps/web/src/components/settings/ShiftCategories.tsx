@@ -295,7 +295,9 @@ function ShiftCategoriesSettings({
       setEditingId(null);
       toast.success("Category saved");
     } catch (err) {
-      toast.error("Failed to save category");
+      const message =
+        err instanceof Error && err.message ? err.message : "Failed to save category";
+      toast.error(message);
       Sentry.captureException(err);
     } finally {
       setSaving(null);
