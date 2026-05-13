@@ -11,6 +11,7 @@ import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import Modal from "@/components/Modal";
 import { Eye, EyeOff } from "lucide-react";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
@@ -224,76 +225,33 @@ function DomainSelector() {
         </form>
       </Card>
 
-      {/* Help popup */}
       {showHelp && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="subdomain-help-title"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "24px",
-            background: "rgba(0,0,0,0.4)",
-          }}
-          onClick={() => setShowHelp(false)}
+        <Modal
+          title="How to find your subdomain"
+          onClose={() => setShowHelp(false)}
+          style={{ maxWidth: 360 }}
         >
-          <div
+          <p
             style={{
-              background: "var(--color-surface)",
-              borderRadius: "12px",
-              padding: "24px",
-              maxWidth: "360px",
-              boxShadow: "0 24px 48px rgba(0,0,0,0.15)",
+              margin: "0 0 20px",
+              fontSize: "var(--dg-fs-body-sm)",
+              lineHeight: 1.5,
+              color: "var(--color-text-secondary)",
             }}
-            onClick={(e) => e.stopPropagation()}
           >
-            <h2
-              id="subdomain-help-title"
-              style={{
-                margin: "0 0 12px",
-                fontSize: "var(--dg-fs-heading)",
-                fontWeight: 600,
-                color: "var(--color-text-primary)",
-              }}
-            >
-              How to find your subdomain
-            </h2>
-            <p
-              style={{
-                margin: "0 0 20px",
-                fontSize: "var(--dg-fs-body-sm)",
-                lineHeight: 1.5,
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              Your subdomain is the first part of your workspace URL (e.g.{" "}
-              <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know
-              it, contact your organization administrator.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowHelp(false)}
-              style={{
-                width: "100%",
-                padding: "10px 16px",
-                background: "var(--color-brand)",
-                color: "var(--color-text-inverse)",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "var(--dg-fs-body-sm)",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
+            Your subdomain is the first part of your workspace URL (e.g.{" "}
+            <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know
+            it, contact your organization administrator.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowHelp(false)}
+            className="dg-btn dg-btn-primary"
+            style={{ width: "100%" }}
+          >
+            Got it
+          </button>
+        </Modal>
       )}
 
     </PageShell>
