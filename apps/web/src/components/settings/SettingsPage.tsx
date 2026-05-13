@@ -28,7 +28,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
-import { SectionCard } from "./shared";
 import OrganizationGeneral from "./OrganizationGeneral";
 import OrganizationLabels from "./OrganizationLabels";
 import BillingSettings from "./BillingSettings";
@@ -144,13 +143,12 @@ export default function SettingsPage({
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
-  const departmentLabel = organization.departmentLabel || "Scheduled Departments";
+  const scheduledDepartmentLabel = "Scheduled Departments";
   const navGroups = useMemo(() => buildNavGroups(perms, {
     focusAreaLabel,
     certificationLabel,
     roleLabel,
-    departmentLabel,
-  }), [perms, focusAreaLabel, certificationLabel, roleLabel, departmentLabel]);
+  }), [perms, focusAreaLabel, certificationLabel, roleLabel]);
 
   const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
@@ -255,11 +253,6 @@ export default function SettingsPage({
 
         {activeItem && (
           <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
-            {activeItem.helpHint && (
-              <p style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-muted)", margin: "0 0 6px", lineHeight: 1.35 }}>
-                {activeItem.helpHint}
-              </p>
-            )}
             <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
               {activeItem.label}
             </h1>
@@ -292,12 +285,10 @@ export default function SettingsPage({
 
         {activeSection === "org-general" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth }}>
-            <SectionCard>
-              <OrganizationGeneral
-                organization={organization}
-                onSave={onOrganizationSave}
-              />
-            </SectionCard>
+            <OrganizationGeneral
+              organization={organization}
+              onSave={onOrganizationSave}
+            />
           </div>
         )}
 
@@ -332,12 +323,10 @@ export default function SettingsPage({
 
         {activeSection === "schedule-rules" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth }}>
-            <SectionCard>
-              <ScheduleRules
-                organization={organization}
-                onOrganizationSave={onOrganizationSave}
-              />
-            </SectionCard>
+            <ScheduleRules
+              organization={organization}
+              onOrganizationSave={onOrganizationSave}
+            />
           </div>
         )}
 
@@ -466,7 +455,7 @@ export default function SettingsPage({
               focusAreas={focusAreas}
               orgId={organization.id}
               focusAreaLabel={focusAreaLabel}
-              departmentLabel={departmentLabel}
+              departmentLabel={scheduledDepartmentLabel}
               canManageFocusAreas={canManageFocusAreas}
               canManageOrgLabels={canManageOrgLabels}
               onDepartmentsChange={onDepartmentsChange}
@@ -477,14 +466,12 @@ export default function SettingsPage({
 
         {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
           <div style={{ width: "100%", maxWidth }}>
-            <SectionCard>
-              <Indicators
-                indicatorTypes={indicatorTypes}
-                orgId={organization.id}
-                onChange={onIndicatorTypesChange}
-                canManageIndicatorTypes={canManageIndicatorTypes}
-              />
-            </SectionCard>
+            <Indicators
+              indicatorTypes={indicatorTypes}
+              orgId={organization.id}
+              onChange={onIndicatorTypesChange}
+              canManageIndicatorTypes={canManageIndicatorTypes}
+            />
           </div>
         )}
 

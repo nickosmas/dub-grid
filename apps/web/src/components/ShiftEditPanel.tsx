@@ -18,6 +18,7 @@ import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, User } from "lucide-react";
 import {
   buildShiftDiffDescriptors,
@@ -40,7 +41,7 @@ interface ShiftEditPanelProps {
   onSelect: (input: ScheduleCellInput | null, seriesScope?: SeriesScope) => void;
   onClose: () => void;
   allowShiftEdits?: boolean;
-  canEditNotes?: boolean;
+  canEditScheduleIndicators?: boolean;
   getActiveIndicatorIds?: (focusAreaId: number) => number[];
   onNoteToggle?: (indicatorTypeId: number, active: boolean, focusAreaId: number) => void;
   /** Series ID if the current shift belongs to a repeating series */
@@ -605,7 +606,7 @@ export default function ShiftEditPanel({
   onSelect,
   onClose,
   allowShiftEdits = true,
-  canEditNotes = false,
+  canEditScheduleIndicators = false,
   getActiveIndicatorIds,
   onNoteToggle,
   seriesId,
@@ -3424,44 +3425,13 @@ export default function ShiftEditPanel({
                     >
                       Mentored
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleMentoredToggleAtIndex(
-                          i,
-                          !(currentSegments[i]?.isMentored ?? false),
-                        )
+                    <Switch
+                      checked={currentSegments[i]?.isMentored === true}
+                      onChange={(next) =>
+                        handleMentoredToggleAtIndex(i, next)
                       }
-                      aria-pressed={currentSegments[i]?.isMentored === true}
-                      aria-label={`Mentored assignment for ${previewLabel}`}
-                      style={{
-                        width: 44,
-                        height: 24,
-                        borderRadius: 12,
-                        border: "none",
-                        cursor: "pointer",
-                        background: currentSegments[i]?.isMentored
-                          ? "var(--color-brand)"
-                          : "var(--color-border)",
-                        position: "relative",
-                        transition: "background 0.2s",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: "50%",
-                          background: "#fff",
-                          position: "absolute",
-                          top: 3,
-                          left: currentSegments[i]?.isMentored ? 23 : 3,
-                          transition: "left 0.2s",
-                          boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                        }}
-                      />
-                    </button>
+                      ariaLabel={`Mentored assignment for ${previewLabel}`}
+                    />
                   </div>
                 ) : null}
                 {/* Per-pill custom time editor */}
@@ -3504,7 +3474,7 @@ export default function ShiftEditPanel({
   }
 
   function renderInlineIndicators(focusAreaId: number) {
-    if (!canEditNotes || indicatorTypes.length === 0) return null;
+    if (!canEditScheduleIndicators || indicatorTypes.length === 0) return null;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
         {indicatorTypes.map(({ id, name, color }) => {
@@ -3547,7 +3517,7 @@ export default function ShiftEditPanel({
   }
 
   function renderNotesSection() {
-    if (!canEditNotes || indicatorTypes.length === 0) return null;
+    if (!canEditScheduleIndicators || indicatorTypes.length === 0) return null;
     return (
       <div>
         <div style={sectionLabel}>Indicators</div>
@@ -3863,39 +3833,11 @@ export default function ShiftEditPanel({
                       Applies the organization&apos;s mentored coverage rule.
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleMentoredToggle}
-                    aria-pressed={isMentoredAssignment}
-                    aria-label="Mentored assignment"
-                    style={{
-                      width: 44,
-                      height: 24,
-                      borderRadius: 12,
-                      border: "none",
-                      cursor: "pointer",
-                      background: isMentoredAssignment
-                        ? "var(--color-brand)"
-                        : "var(--color-border)",
-                      position: "relative",
-                      transition: "background 0.2s",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        background: "#fff",
-                        position: "absolute",
-                        top: 3,
-                        left: isMentoredAssignment ? 23 : 3,
-                        transition: "left 0.2s",
-                        boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                      }}
-                    />
-                  </button>
+                  <Switch
+                    checked={isMentoredAssignment}
+                    onChange={() => handleMentoredToggle()}
+                    ariaLabel="Mentored assignment"
+                  />
                 </div>
               )}
 

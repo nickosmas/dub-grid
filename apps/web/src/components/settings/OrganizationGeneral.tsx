@@ -9,7 +9,8 @@ import {
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE, useEmployeeCount } from "@/hooks";
-import { labelStyle } from "./shared";
+import { SectionCard, labelStyle } from "./shared";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
 import {
@@ -163,70 +164,76 @@ export default function OrganizationGeneral({
   }, [buildForm]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-        <div>
-          <label style={labelStyle}>ORGANIZATION NAME</label>
-          <input
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            maxLength={60}
-            className="dg-input"
-          />
-          {nameError ? (
-            <p
-              role="alert"
-              style={{
-                margin: "6px 0 0",
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-danger)",
-              }}
-            >
-              {nameError}
-            </p>
-          ) : null}
+    <SectionCard>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
+          <div>
+            <label style={labelStyle}>ORGANIZATION NAME</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              maxLength={60}
+              className="dg-input"
+            />
+            {nameError ? (
+              <p
+                role="alert"
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                }}
+              >
+                {nameError}
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
-      <OrganizationLocationFields
-        value={form}
-        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-        phoneError={phoneError}
-        employeeCount={employeeCount}
-        employeeCountLoading={employeeCountLoading}
-        gridTemplateColumns={isMobile ? "1fr" : "1fr 1fr"}
-      />
-
-      <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
-        {isModified ? (
-          <button
-            onClick={handleCancel}
-            disabled={saving}
-            className="dg-btn dg-btn-secondary"
-          >
-            {EDITOR_ACTION_LABELS.discard}
-          </button>
-        ) : null}
-        <button
-          onClick={handleReview}
-          disabled={!isModified || saving || hasValidationErrors}
-          className="dg-btn dg-btn-primary"
-        >
-          Review & Save
-        </button>
-      </div>
-
-      {reviewOpen ? (
-        <OrganizationChangeReviewModal
-          changes={changes}
-          saving={saving}
-          onCancel={() => {
-            if (!saving) setReviewOpen(false);
-          }}
-          onConfirm={() => {
-            void handleSave();
-          }}
+        <OrganizationLocationFields
+          value={form}
+          onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+          phoneError={phoneError}
+          employeeCount={employeeCount}
+          employeeCountLoading={employeeCountLoading}
+          gridTemplateColumns={isMobile ? "1fr" : "1fr 1fr"}
         />
-      ) : null}
-    </div>
+
+        <EditorActionRow
+          secondaryAction={
+            isModified ? (
+              <button
+                onClick={handleCancel}
+                disabled={saving}
+                className="dg-btn dg-btn-secondary"
+              >
+                {EDITOR_ACTION_LABELS.discard}
+              </button>
+            ) : null
+          }
+          primaryAction={
+            <button
+              onClick={handleReview}
+              disabled={!isModified || saving || hasValidationErrors}
+              className="dg-btn dg-btn-primary"
+            >
+              Review & Save
+            </button>
+          }
+        />
+
+        {reviewOpen ? (
+          <OrganizationChangeReviewModal
+            changes={changes}
+            saving={saving}
+            onCancel={() => {
+              if (!saving) setReviewOpen(false);
+            }}
+            onConfirm={() => {
+              void handleSave();
+            }}
+          />
+        ) : null}
+      </div>
+    </SectionCard>
   );
 }

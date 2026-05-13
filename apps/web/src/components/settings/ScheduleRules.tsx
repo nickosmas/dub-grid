@@ -10,6 +10,8 @@ import {
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
+import { Switch } from "@/components/ui/switch";
+import { SectionCard } from "./shared";
 
 export default function ScheduleRules({
   organization,
@@ -98,6 +100,7 @@ export default function ScheduleRules({
   ]);
 
   return (
+    <SectionCard>
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
         <div>
@@ -105,22 +108,11 @@ export default function ScheduleRules({
           <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>When enabled, overlapping shifts cannot be saved. Admins can override.</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <button
-            onClick={() => setEnforceConflictPrevention((current) => !current)}
-            aria-label="Enforce shift conflict prevention"
-            style={{
-              width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer",
-              background: enforceConflictPrevention ? "var(--color-brand)" : "var(--color-border)",
-              position: "relative", transition: "background 0.2s",
-            }}
-          >
-            <div style={{
-              width: 18, height: 18, borderRadius: "50%", background: "#fff",
-              position: "absolute", top: 3,
-              left: enforceConflictPrevention ? 23 : 3,
-              transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-            }} />
-          </button>
+          <Switch
+            checked={enforceConflictPrevention}
+            onChange={setEnforceConflictPrevention}
+            ariaLabel="Enforce shift conflict prevention"
+          />
         </div>
       </div>
 
@@ -196,5 +188,6 @@ export default function ScheduleRules({
         />
       )}
     </div>
+    </SectionCard>
   );
 }

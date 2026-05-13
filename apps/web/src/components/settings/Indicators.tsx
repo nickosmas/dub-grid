@@ -14,7 +14,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
-import { inputStyle } from "./shared";
+import { inputStyle, SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 
 type LocalIndicator = IndicatorType & { isNew?: boolean };
@@ -240,6 +240,7 @@ export default function Indicators({
   };
 
   return (
+    <SectionCard>
     <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {local.length === 0 && (
         <EmptyState
@@ -457,5 +458,6 @@ export default function Indicators({
         );
       })()}
     </div>
+    </SectionCard>
   );
 }
