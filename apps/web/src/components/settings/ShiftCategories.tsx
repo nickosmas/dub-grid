@@ -365,8 +365,8 @@ function ShiftCategoriesSettings({
           (candidate.focusAreaId ?? null) === (cat.focusAreaId ?? null) &&
           candidate.name.trim().toLowerCase() === cat.name.trim().toLowerCase(),
       );
-    // Code uniqueness is enforced org-wide so the short label is unambiguous in
-    // code-display mode. Archived shifts are excluded.
+    // Code uniqueness mirrors the name rule: per (org, focus_area) when scoped
+    // to a focus area, per org for area-less shifts. Archived shifts excluded.
     const normalizedCode = normalizeShiftAbbreviation(cat.abbr, cat.name);
     const duplicateCode =
       Boolean(normalizedCode) &&
@@ -374,6 +374,7 @@ function ShiftCategoriesSettings({
         (candidate) =>
           candidate.id !== cat.id &&
           candidate.archivedAt == null &&
+          (candidate.focusAreaId ?? null) === (cat.focusAreaId ?? null) &&
           normalizeShiftAbbreviation(candidate.abbr, candidate.name)?.toUpperCase() ===
             normalizedCode?.toUpperCase(),
       );
@@ -524,7 +525,7 @@ function ShiftCategoriesSettings({
                 role="alert"
                 style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
               >
-                {abbrError ?? "Another shift already uses that code."}
+                {abbrError ?? "Another shift in this focus area already uses that code."}
               </p>
             ) : null}
           </div>

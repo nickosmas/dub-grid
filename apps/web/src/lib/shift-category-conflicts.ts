@@ -62,7 +62,17 @@ export function getShiftCategoryConflict(
     };
   }
 
-  if (text.includes("shift_categories_org_code_unique")) {
+  if (text.includes("shift_categories_area_code_unique")) {
+    const message = "Another shift in this focus area already uses that code.";
+    return {
+      code: SHIFT_CATEGORY_CONFLICT_CODE,
+      error: message,
+      field: "code",
+      message,
+    };
+  }
+
+  if (text.includes("shift_categories_global_code_unique")) {
     const message = "Another shift already uses that code.";
     return {
       code: SHIFT_CATEGORY_CONFLICT_CODE,

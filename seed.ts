@@ -1612,11 +1612,11 @@ async function main() {
     }
 
     // 6. Shift Categories
-    // Codes are unique org-wide (shift_categories_org_code_unique). The seed
-    // intentionally repeats names like "Day Shift" across focus areas — codes
-    // derived from those will collide, so suffix with a counter when needed.
+    // Codes are unique per (org, focus_area). Same code may repeat across
+    // different focus areas (e.g. "D" for Day Shift in each area). Within a
+    // focus area, suffix with a counter on collision as a last-resort guard.
     const catIds: number[] = [];
-    const usedShiftAbbrs = new Set<string>();
+    const usedAbbrsByArea = new Map<number | null, Set<string>>();
       for (let i = 0; i < tenant.shiftCategories.length; i++) {
         const cat = tenant.shiftCategories[i];
         const faId = cat.faIndex !== null ? focusAreaIds[cat.faIndex] : null;
@@ -1624,13 +1624,19 @@ async function main() {
           ((cat as { abbr?: string }).abbr ?? "").trim() ||
           deriveSeedAbbr(cat.name, "SHF")
         ).toUpperCase();
+        const areaKey: number | null = faId ?? null;
+        let usedInArea = usedAbbrsByArea.get(areaKey);
+        if (!usedInArea) {
+          usedInArea = new Set<string>();
+          usedAbbrsByArea.set(areaKey, usedInArea);
+        }
         let catAbbr = baseAbbr;
         let suffix = 2;
-        while (usedShiftAbbrs.has(catAbbr)) {
+        while (usedInArea.has(catAbbr)) {
           catAbbr = `${baseAbbr}${suffix}`.slice(0, 8);
           suffix++;
         }
-        usedShiftAbbrs.add(catAbbr);
+        usedInArea.add(catAbbr);
         const catBreakMinutes = (cat as { break_minutes?: number | null }).break_minutes ?? null;
         const catColor =
           tenant.assignments.find((assignment) => assignment.catIndex === i && !assignment.is_general)?.color ??
