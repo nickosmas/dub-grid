@@ -9,6 +9,8 @@ import {
 } from "@/lib/staff-validation";
 import { optionalUsPhoneSchema } from "@dubgrid/contracts";
 import { z } from "zod";
+import { apiErrorResponse } from "@/lib/error-handling";
+import { extractRawErrorMessage } from "@/lib/client-facing";
 
 const phoneUpdateSchema = z.object({
   orgId: z.string().uuid(),
@@ -56,9 +58,8 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json(contactConflict, { status: 409 });
     }
 
-    const message =
-      error instanceof Error ? error.message : "Failed to update phone.";
-    const status = message.includes("changed elsewhere") ? 409 : 400;
-    return NextResponse.json({ error: message }, { status });
+    const rawMessage = extractRawErrorMessage(error) ?? "";
+    const status = rawMessage.includes("changed elsewhere") ? 409 : 400;
+    return apiErrorResponse(error, "Failed to update phone.", status);
   }
 }

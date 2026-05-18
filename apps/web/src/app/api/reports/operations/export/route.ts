@@ -9,6 +9,7 @@ import {
   isOperationsReportType,
   loadOperationsReport,
 } from "@/features/reports/server/operations";
+import { apiErrorResponse } from "@/lib/error-handling";
 import {
   operationsQuerySchema,
   parseOperationsFilters,
@@ -39,10 +40,7 @@ export async function GET(req: NextRequest) {
     range = parseOperationsRange(parsed.data);
     filters = parseOperationsFilters(parsed.data, range);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid filters" },
-      { status: 400 },
-    );
+    return apiErrorResponse(error, "Check the report filters and try again.", 400);
   }
 
   try {

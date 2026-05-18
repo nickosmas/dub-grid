@@ -12,6 +12,8 @@ import { rowToOrganization } from "@/lib/db/mappers";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { apiErrorResponse } from "@/lib/error-handling";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export const dynamic = "force-dynamic";
 
@@ -341,7 +343,10 @@ export async function POST(req: NextRequest) {
               superAdmin = {
                 kind: "invite-error",
                 displayName,
-                message: inviteResult.error.message,
+                message: formatClientErrorMessage(
+                  inviteResult.error,
+                  "We couldn't send that invitation.",
+                ),
               };
             }
           }
@@ -370,8 +375,6 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Gridmaster organization request failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Gridmaster organization request failed");
   }
 }

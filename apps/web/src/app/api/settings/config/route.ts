@@ -16,6 +16,7 @@ import type {
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { apiErrorResponse } from "@/lib/error-handling";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   ABSENCE_TYPE_COLS,
@@ -2452,8 +2453,6 @@ export async function POST(req: NextRequest) {
       }
     }
     console.error("Settings POST failed", { action: data.action, orgId, error });
-    const message =
-      error instanceof Error ? error.message : "Settings request failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Settings request failed");
   }
 }

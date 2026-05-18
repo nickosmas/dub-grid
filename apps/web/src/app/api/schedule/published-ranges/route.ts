@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { apiErrorResponse } from "@/lib/error-handling";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -48,8 +49,6 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load published ranges";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Failed to load published ranges");
   }
 }

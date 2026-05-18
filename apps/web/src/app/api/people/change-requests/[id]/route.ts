@@ -6,6 +6,8 @@ import {
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { apiErrorResponse } from "@/lib/error-handling";
+import { extractRawErrorMessage } from "@/lib/client-facing";
 
 export async function PATCH(
   req: NextRequest,
@@ -58,9 +60,8 @@ export async function PATCH(
       return NextResponse.json(contactConflict, { status: 409 });
     }
 
-    const message =
-      error instanceof Error ? error.message : "Failed to resolve request.";
-    const status = message.includes("changed after") ? 409 : 400;
-    return NextResponse.json({ error: message }, { status });
+    const rawMessage = extractRawErrorMessage(error) ?? "";
+    const status = rawMessage.includes("changed after") ? 409 : 400;
+    return apiErrorResponse(error, "Failed to resolve request.", status);
   }
 }

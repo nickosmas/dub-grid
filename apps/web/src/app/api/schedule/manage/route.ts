@@ -10,6 +10,7 @@ import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import {
   requireOrgPermissions,
 } from "@/app/api/shared/permissions";
+import { apiErrorResponse } from "@/lib/error-handling";
 import {
   fetchAssignmentIdByPairMap,
   fetchAssignmentLabelMap,
@@ -365,7 +366,7 @@ async function writeShiftSnapshot(
     p_custom_end_time: customEndTime,
     p_series_id: state.seriesId ?? null,
     p_from_recurring: state.fromRecurring ?? false,
-    p_expected_version: input.expectedVersion ?? 0,
+    p_expected_version: input.expectedVersion ?? null,
   });
 
   if (error) {
@@ -1348,8 +1349,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const message =
-      error instanceof Error ? error.message : "Schedule request failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Schedule request failed");
   }
 }

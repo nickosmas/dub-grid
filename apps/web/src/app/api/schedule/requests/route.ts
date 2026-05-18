@@ -8,6 +8,7 @@ import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
 import { assertSafeFilterValue } from "@/lib/db/shared";
+import { apiErrorResponse } from "@/lib/error-handling";
 import type {
   ShiftRequestStatus,
   ShiftRequestType,
@@ -499,8 +500,6 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Shift request operation failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Shift request operation failed");
   }
 }

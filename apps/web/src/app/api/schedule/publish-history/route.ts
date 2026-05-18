@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { apiErrorResponse } from "@/lib/error-handling";
 import type { PublishChange } from "@/types";
 
 const querySchema = z.object({
@@ -102,8 +103,6 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load publish history";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Failed to load publish history");
   }
 }

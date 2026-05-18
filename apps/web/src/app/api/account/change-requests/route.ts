@@ -7,6 +7,7 @@ import {
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
+import { apiErrorResponse } from "@/lib/error-handling";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuthenticatedUser(req);
@@ -55,8 +56,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ request }, { status: 201 });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create request.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, "Failed to create request.", 400);
   }
 }

@@ -5,6 +5,7 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { apiErrorResponse } from "@/lib/error-handling";
 
 const roleChangeSchema = z.object({
   targetUserId: z.string().uuid(),
@@ -45,10 +46,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
-      return NextResponse.json(
-        { error: result.error.message ?? "Failed to change role" },
-        { status: 400 },
-      );
+      return apiErrorResponse(result.error, "Failed to change role", 400);
     }
 
     return NextResponse.json({

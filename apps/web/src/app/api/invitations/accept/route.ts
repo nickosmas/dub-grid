@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
+import { apiErrorResponse } from "@/lib/error-handling";
 
 const postSchema = z.object({
   token: z.string().trim().min(1),
@@ -42,10 +43,6 @@ export async function POST(req: NextRequest) {
       orgSlug: (data.org_slug as string | null) ?? null,
     });
   } catch (error) {
-    console.error("invitation accept POST failed", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to accept invitation" },
-      { status: 500 },
-    );
+    return apiErrorResponse(error, "Failed to accept invitation");
   }
 }

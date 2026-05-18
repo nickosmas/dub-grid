@@ -18,6 +18,7 @@ import {
 } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { apiErrorResponse } from "@/lib/error-handling";
 import {
   buildStaffValidationErrorResponse,
   employeeEmploymentTypeSchema,
@@ -563,8 +564,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(contactConflict, { status: 409 });
     }
 
-    const message =
-      error instanceof Error ? error.message : "Employee request failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Employee request failed");
   }
 }

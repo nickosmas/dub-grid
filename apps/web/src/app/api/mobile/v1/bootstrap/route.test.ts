@@ -57,6 +57,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: false,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,

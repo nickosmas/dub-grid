@@ -7,6 +7,7 @@ import {
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { apiErrorResponse } from "@/lib/error-handling";
 import type { GridmasterAccount } from "@/types";
 
 const accountActionSchema = z.discriminatedUnion("action", [
@@ -129,9 +130,10 @@ export async function POST(req: NextRequest) {
         p_email: parsed.data.email,
       });
       if (result.error) {
-        return NextResponse.json(
-          { error: result.error.message ?? "Failed to promote gridmaster account" },
-          { status: 400 },
+        return apiErrorResponse(
+          result.error,
+          "Failed to promote gridmaster account",
+          400,
         );
       }
       const payload = getRpcPayload(result.data);
@@ -155,9 +157,10 @@ export async function POST(req: NextRequest) {
         p_org_role: parsed.data.orgRole,
       });
       if (result.error) {
-        return NextResponse.json(
-          { error: result.error.message ?? "Failed to demote gridmaster account" },
-          { status: 400 },
+        return apiErrorResponse(
+          result.error,
+          "Failed to demote gridmaster account",
+          400,
         );
       }
       await writeGridmasterAuditLog({
@@ -182,9 +185,10 @@ export async function POST(req: NextRequest) {
       p_deactivate: parsed.data.deactivate,
     });
     if (result.error) {
-      return NextResponse.json(
-        { error: result.error.message ?? "Failed to update gridmaster account" },
-        { status: 400 },
+      return apiErrorResponse(
+        result.error,
+        "Failed to update gridmaster account",
+        400,
       );
     }
     await writeGridmasterAuditLog({
