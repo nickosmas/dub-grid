@@ -7,6 +7,10 @@ import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
 import { fetchOrganizationBilling } from "@/features/billing/client";
+import {
+  fetchOrganizationBootstrap,
+  type OrganizationBootstrap,
+} from "@/features/organization/client/api";
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -66,8 +70,24 @@ function AppHeader() {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { isGridmaster, isLoading } = usePermissions();
+  const { isGridmaster, isLoading, orgId } = usePermissions();
   const headerRef = useRef<HTMLDivElement>(null);
+
+  // Subscribe to the bootstrap query so we can detect sandbox-mode org
+  // switches without forcing an extra fetch — the query is already
+  // mounted by AppHeader. The effective org id flips when the user
+  // enters or exits a sandbox; using it as a key on the page subtree
+  // forces React to unmount + remount, which resets every form's
+  // local state. Without this, stale sandbox values linger in form
+  // inputs after exit (and vice versa on enter) until manual refresh.
+  const bootstrapQuery = useQuery<OrganizationBootstrap>({
+    queryKey: queryKeys.org.bootstrap(null, false),
+    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    staleTime: 60_000,
+    enabled: !isGridmaster && Boolean(orgId),
+  });
+  const effectiveOrgKey =
+    bootstrapQuery.data?.org?.id ?? orgId ?? "bootstrap-pending";
 
   // Publish the actual sticky-header height as a CSS custom property so that
   // sidebar layouts (StaffView, SettingsPage, etc.) can subtract the correct
@@ -105,7 +125,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <UserViewBanner />
         {showHeader && <AppHeader />}
       </div>
-      {children}
+      <div key={effectiveOrgKey} style={{ display: "contents" }}>
+        {children}
+      </div>
     </>
   );
 }
