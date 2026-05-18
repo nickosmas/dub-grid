@@ -20,6 +20,7 @@ CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'ap
 CREATE TYPE public.profile_change_request_type AS ENUM ('profile_update', 'account_deletion');
 CREATE TYPE public.profile_change_request_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled');
 CREATE TYPE public.department_type AS ENUM ('scheduled', 'management');
+CREATE TYPE public.workspace_kind AS ENUM ('real', 'sandbox');
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -69,6 +70,9 @@ CREATE TABLE public.organizations (
   archived_at          TIMESTAMPTZ,
   suspended_at                  TIMESTAMPTZ,
   suspended_reason              TEXT,
+  workspace_kind            public.workspace_kind NOT NULL DEFAULT 'real',
+  sandbox_owner_user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  sandbox_source_org_id     UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
   enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
   coverage_rule_config JSONB NOT NULL DEFAULT '{"mentoredCoverageCreditPercent":100}'::jsonb,
   feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -622,21 +626,23 @@ COMMENT ON CONSTRAINT no_self_impersonation ON public.impersonation_sessions IS 
 -- ── notifications ───────────────────────────────────────────────────────────
 
 CREATE TABLE public.notifications (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL,
-  org_id     UUID,
-  type       TEXT NOT NULL CHECK (type IN (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL,
+  org_id      UUID,
+  type        TEXT NOT NULL CHECK (type IN (
     'impersonation_start', 'impersonation_end', 'system',
     'shift_change', 'schedule_published', 'shift_request_new',
     'shift_request_approved', 'shift_request_rejected'
   )),
-  channel    TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
-  category   TEXT,
-  title      TEXT NOT NULL,
-  message    TEXT NOT NULL,
-  metadata   JSONB DEFAULT '{}'::JSONB,
-  read_at    TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  channel     TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
+  category    TEXT,
+  priority    TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'critical')),
+  title       TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  metadata    JSONB DEFAULT '{}'::JSONB,
+  read_at     TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.notifications IS 'In-app and email notifications for users';
@@ -1213,6 +1219,8 @@ CREATE INDEX idx_impersonation_sessions_history ON public.impersonation_sessions
 CREATE INDEX idx_notifications_user_unread ON public.notifications(user_id, created_at DESC) WHERE read_at IS NULL;
 CREATE INDEX idx_notifications_user_all ON public.notifications(user_id, created_at DESC);
 CREATE INDEX idx_notifications_user_org ON public.notifications(user_id, org_id, created_at DESC);
+CREATE INDEX idx_notifications_user_inbox ON public.notifications(user_id, created_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_notifications_user_archived ON public.notifications(user_id, archived_at DESC) WHERE archived_at IS NOT NULL;
 
 -- profile_change_requests
 CREATE INDEX idx_profile_change_requests_org_status ON public.profile_change_requests(org_id, status, created_at DESC);

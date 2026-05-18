@@ -1,0 +1,123 @@
+"use client";
+
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchOrganizationBootstrap,
+  type OrganizationBootstrap,
+} from "@/features/organization/client/api";
+import { queryKeys } from "@/lib/query-keys";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+
+export default function SandboxBanner() {
+  const queryClient = useQueryClient();
+  const bootstrapQuery = useQuery<OrganizationBootstrap>({
+    queryKey: queryKeys.org.bootstrap(null, false),
+    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    staleTime: 60_000,
+  });
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const org = bootstrapQuery.data?.org ?? null;
+  if (!org || org.workspaceKind !== "sandbox") return null;
+
+  async function handleExit() {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/test-sandbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "exit" }),
+      });
+      if (!response.ok) {
+        const body = (await response.json()) as Record<string, unknown>;
+        setError(
+          formatClientErrorMessage(
+            body?.error,
+            "We couldn't exit sandbox mode right now.",
+          ),
+        );
+        setPending(false);
+        return;
+      }
+      // No navigation — middleware will see the cleared cookie on the next
+      // request and stop overriding org_id. Invalidating all queries forces
+      // every visible component to re-fetch its data against the real org.
+      await queryClient.invalidateQueries();
+    } catch {
+      setError("We couldn't reach the server. Try again in a moment.");
+      setPending(false);
+    }
+  }
+
+  return (
+    <div
+      role="status"
+      aria-label="You're in sandbox mode"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        flexWrap: "wrap",
+        padding: "8px 16px",
+        background: "var(--color-danger-bg)",
+        borderBottom: "1px solid var(--color-danger-border)",
+        color: "var(--color-danger)",
+        fontSize: "var(--dg-fs-caption)",
+        fontWeight: 600,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span
+          aria-hidden="true"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            border: "1.5px solid var(--color-danger)",
+            fontSize: 11,
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+        >
+          !
+        </span>
+        <span
+          style={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real
+          workspace.
+        </span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        {error ? (
+          <span style={{ fontWeight: 500, opacity: 0.85 }}>{error}</span>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleExit}
+          disabled={pending}
+          className="dg-btn dg-btn-primary"
+          style={{
+            minHeight: 28,
+            padding: "0 10px",
+            fontSize: "var(--dg-fs-caption)",
+          }}
+        >
+          {pending ? "Exiting…" : "Exit sandbox"}
+        </button>
+      </div>
+    </div>
+  );
+}

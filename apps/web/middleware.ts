@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
@@ -341,6 +343,62 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // ── Sandbox mode override ──────────────────────────────────────────────
+  // When a user has an active sandbox cookie, override the org context to
+  // the sandbox org id WITHOUT touching the JWT or the current subdomain.
+  // The user stays signed in, on their real-org subdomain, but every
+  // org_id-scoped read/write is routed to the sandbox copy. Exiting just
+  // clears the cookie — no JWT refresh, no navigation.
+  let isInSandbox = false;
+  if (!isImpersonating && session?.user?.id) {
+    const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
+    if (sandboxCookie) {
+      if (sandboxCookie.userId !== session?.user?.id) {
+        // Cookie was set for a different user — clear it.
+        res.cookies.set("dubgrid-sandbox", "", { path: "/", maxAge: 0 });
+      } else {
+        try {
+          const supabaseUrl2 = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl2 && serviceKey) {
+            const svc = createClient(supabaseUrl2, serviceKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            });
+            const { data } = await svc
+              .from("organizations")
+              .select("id, slug")
+              .eq("id", sandboxCookie.sandboxOrgId)
+              .eq("workspace_kind", "sandbox")
+              .eq("sandbox_owner_user_id", session?.user?.id)
+              .is("archived_at", null)
+              .maybeSingle();
+            if (data) {
+              isInSandbox = true;
+              claims = {
+                ...claims,
+                org_id: data.id,
+                // Intentionally keep claims.org_slug so the user stays on
+                // their real-org subdomain and the subdomain redirect at
+                // line 410 is a no-op.
+              };
+            } else {
+              // Cookie no longer points to a valid sandbox owned by the
+              // user — clear it.
+              res.cookies.set("dubgrid-sandbox", "", {
+                path: "/",
+                maxAge: 0,
+              });
+            }
+          }
+        } catch (e) {
+          Sentry.captureException(e, {
+            extra: { context: "middleware-sandbox-verify" },
+          });
+        }
+      }
+    }
+  }
+
   // ── Organization access check ───────────────────────────────────────────
   // The JWT hook filters out suspended orgs on token refresh, but a user
   // with a pre-suspension JWT can still access the app until it expires
@@ -455,6 +513,9 @@ export async function middleware(req: NextRequest) {
   }
   if (isImpersonating) {
     res.headers.set("x-dubgrid-impersonating", "true");
+  }
+  if (isInSandbox) {
+    res.headers.set("x-dubgrid-sandbox", "true");
   }
   return res;
 }

@@ -17,6 +17,12 @@ import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
 import type { OrganizationBillingSummary } from "@/types";
+import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
+import CreateSandboxDialog from "@/components/test-sandbox/CreateSandboxDialog";
+import {
+  fetchOrganizationBootstrap,
+  type OrganizationBootstrap,
+} from "@/features/organization/client/api";
 
 
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
@@ -123,14 +129,24 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
+type BillingNoticeTone = "info" | "warning" | "danger";
+
+interface BillingNotice {
+  label: string;
+  compactLabel: string;
+  ariaLabel: string;
+  tone: BillingNoticeTone;
+}
+
 function formatHeaderBillingNotice(
   billing: OrganizationBillingSummary,
-): { label: string; ariaLabel: string; tone: "warning" | "danger" } | null {
+): BillingNotice | null {
   const { billingAccess } = billing;
 
   if (billingAccess.isLocked) {
     return {
       label: "Billing locked",
+      compactLabel: "Locked",
       ariaLabel: "Billing locked",
       tone: "danger",
     };
@@ -139,6 +155,7 @@ function formatHeaderBillingNotice(
   if (billingAccess.state === "payment_attention_required") {
     return {
       label: "Billing attention",
+      compactLabel: "Billing",
       ariaLabel: "Billing attention required",
       tone: "warning",
     };
@@ -146,9 +163,10 @@ function formatHeaderBillingNotice(
 
   if (billingAccess.state === "trial_grace") {
     return {
-      label: "Trial grace",
+      label: "Trial in grace period",
+      compactLabel: "Grace",
       ariaLabel: "Trial is in grace period",
-      tone: "warning",
+      tone: "danger",
     };
   }
 
@@ -157,6 +175,7 @@ function formatHeaderBillingNotice(
     if (billing.status === "trialing" || !billing.status) {
       return {
         label: "Trial not set",
+        compactLabel: "Trial",
         ariaLabel: "Trial end date is not set",
         tone: "warning",
       };
@@ -167,15 +186,19 @@ function formatHeaderBillingNotice(
   if (days <= 0) {
     return {
       label: "Trial ends today",
+      compactLabel: "Today",
       ariaLabel: "Trial ends today",
-      tone: "warning",
+      tone: "danger",
     };
   }
 
+  const tone: BillingNoticeTone = days <= 3 ? "danger" : days <= 7 ? "warning" : "info";
+  const dayWord = days === 1 ? "day" : "days";
   return {
-    label: days === 1 ? "Trial 1d" : `Trial ${days}d`,
-    ariaLabel: days === 1 ? "Trial time left: 1 day" : `Trial time left: ${days} days`,
-    tone: "warning",
+    label: `Trial ends in ${days} ${dayWord}`,
+    compactLabel: `Trial ${days}d`,
+    ariaLabel: `Trial ends in ${days} ${dayWord}`,
+    tone,
   };
 }
 
@@ -204,11 +227,17 @@ function HeaderBillingNotice({
           border: "var(--color-danger-border)",
           text: "var(--color-danger)",
         }
-      : {
-          bg: "var(--color-warning-bg)",
-          border: "var(--color-warning-border)",
-          text: "var(--color-warning)",
-        };
+      : notice.tone === "warning"
+        ? {
+            bg: "var(--color-warning-bg)",
+            border: "var(--color-warning-border)",
+            text: "var(--color-warning)",
+          }
+        : {
+            bg: "var(--color-info-bg)",
+            border: "var(--color-info-border)",
+            text: "var(--color-info-text)",
+          };
 
   return (
     <Link
@@ -234,7 +263,7 @@ function HeaderBillingNotice({
         textOverflow: "ellipsis",
       }}
     >
-      {notice.label}
+      {compact ? notice.compactLabel : notice.label}
     </Link>
   );
 }
@@ -343,7 +372,23 @@ export default function Header({ orgName }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [sandboxDialogOpen, setSandboxDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const sandboxBootstrapQuery = useQuery<OrganizationBootstrap>({
+    queryKey: queryKeys.org.bootstrap(null, false),
+    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    staleTime: 60_000,
+    enabled: Boolean(authUser),
+  });
+  const isInSandbox =
+    sandboxBootstrapQuery.data?.org?.workspaceKind === "sandbox";
+  const canOpenSandbox =
+    Boolean(authUser) &&
+    !isImpersonating &&
+    !isUserViewActive &&
+    !isInSandbox &&
+    actualLevel >= 2;
 
   // Hydrate cached name from sessionStorage after mount
   useEffect(() => {
@@ -402,6 +447,13 @@ export default function Header({ orgName }: HeaderProps) {
   if (isMobile) {
     return (
       <>
+        <SandboxBanner />
+        {sandboxDialogOpen ? (
+          <CreateSandboxDialog
+            orgName={orgName}
+            onClose={() => setSandboxDialogOpen(false)}
+          />
+        ) : null}
         <div
           style={{
             background: "var(--color-surface)",
@@ -491,7 +543,15 @@ export default function Header({ orgName }: HeaderProps) {
 
   /* ── Desktop / Tablet Header ───────────────────────────── */
   return (
-    <div
+    <>
+      <SandboxBanner />
+      {sandboxDialogOpen ? (
+        <CreateSandboxDialog
+          orgName={orgName}
+          onClose={() => setSandboxDialogOpen(false)}
+        />
+      ) : null}
+      <div
       style={{
         background: "var(--color-surface)",
         padding: isTablet ? "0 16px" : "0 24px",
@@ -683,6 +743,21 @@ export default function Header({ orgName }: HeaderProps) {
               </svg>
               Profile
             </button>
+            {canOpenSandbox && (
+              <>
+                <div className="dg-menu-divider" />
+                <button
+                  type="button"
+                  className="dg-menu-item"
+                  onClick={() => { setMenuOpen(false); setSandboxDialogOpen(true); }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7h18M5 7v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  Enter sandbox mode
+                </button>
+              </>
+            )}
             {actualLevel >= 2 && !isImpersonating && (
               <>
                 <div className="dg-menu-divider" />
@@ -714,5 +789,6 @@ export default function Header({ orgName }: HeaderProps) {
         )}
       </div>
     </div>
+    </>
   );
 }
