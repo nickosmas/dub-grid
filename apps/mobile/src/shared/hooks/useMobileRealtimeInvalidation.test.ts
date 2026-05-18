@@ -10,6 +10,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "profile", "token-1"],
       ["mobile", "schedule"],
       ["mobile", "requests"],
+      ["mobile", "person", "token-1"],
     ]);
   });
 
@@ -18,6 +19,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
+      ["mobile", "person", "token-1"],
       ["mobile", "schedule"],
       ["mobile", "requests"],
     ]);
@@ -30,11 +32,13 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
+      ["mobile", "person", "token-1"],
     ]);
     expect(getMobileRealtimeInvalidationKeys("token-1", "invitations")).toEqual([
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
+      ["mobile", "person", "token-1"],
     ]);
   });
 
@@ -45,6 +49,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
+      ["mobile", "person", "token-1"],
     ]);
   });
 

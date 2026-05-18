@@ -1,87 +1,30 @@
-import { useEffect } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Redirect } from "expo-router";
 import {
   Icon,
   Label,
   NativeTabs,
   VectorIcon,
 } from "expo-router/unstable-native-tabs";
-import { AppState } from "react-native";
-import { LoadingScreen } from "../../src/shared/components/LoadingScreen";
-import { useBootstrap } from "../../src/features/auth/hooks/useBootstrap";
-import { WorkspaceLockedScreen } from "../../src/features/auth/screens/WorkspaceLockedScreen";
-import { usePushRegistration } from "../../src/features/notifications/hooks/usePushRegistration";
-import { handleExpiredMobileSession } from "../../src/shared/lib/auth-reset";
-import { getWorkspaceUnavailableMessage } from "../../src/shared/lib/errors";
-import { useSessionState } from "../../src/shared/providers/AuthSessionProvider";
+import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { mobileColors } from "../../src/shared/theme/tokens";
 
 export default function TabsLayout() {
-  const { accessToken, isLoading } = useSessionState();
-  const bootstrapQuery = useBootstrap(accessToken);
-  const lockedMessage = getWorkspaceUnavailableMessage(bootstrapQuery.error);
-  usePushRegistration(
-    accessToken,
-    lockedMessage ? null : bootstrapQuery.data?.currentOrg.id,
-  );
-  const canViewTeamSchedule = bootstrapQuery.data && !lockedMessage
-    ? bootstrapQuery.data.permissions.canViewSchedule
-    : false;
+  const gate = useTabsGate();
 
-  useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
-
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        void bootstrapQuery.refetch();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [accessToken, bootstrapQuery]);
-
-  if (isLoading) {
-    return (
-      <LoadingScreen
-        title="Loading your workspace"
-        body="Getting your schedule and mobile tools ready."
-      />
-    );
+  if (gate.kind === "blocked") {
+    return gate.element;
   }
 
-  if (!accessToken) {
-    return <Redirect href="/(auth)/login" />;
-  }
-
-  if (lockedMessage) {
-    return (
-      <WorkspaceLockedScreen
-        isRetrying={bootstrapQuery.isFetching}
-        message={lockedMessage}
-        onRetry={() => {
-          void bootstrapQuery.refetch();
-        }}
-        onSignOut={() => {
-          void handleExpiredMobileSession();
-        }}
-      />
-    );
-  }
+  const { canViewTeamSchedule } = gate;
 
   const tabTriggers = [
-    <NativeTabs.Trigger key="me" name="me">
-      <Label>Me</Label>
+    <NativeTabs.Trigger key="home" name="home">
+      <Label>Home</Label>
       <Icon
-        androidSrc={{
-          default: <VectorIcon family={Ionicons} name="person-outline" />,
-          selected: <VectorIcon family={Ionicons} name="person" />,
+        src={{
+          default: <VectorIcon family={Ionicons} name="home-outline" />,
+          selected: <VectorIcon family={Ionicons} name="home" />,
         }}
-        sf={{ default: "person", selected: "person.fill" }}
       />
     </NativeTabs.Trigger>,
     ...(canViewTeamSchedule
@@ -164,7 +107,7 @@ export default function TabsLayout() {
           fontWeight: "700",
         },
       }}
-      minimizeBehavior="onScrollDown"
+      minimizeBehavior="never"
       shadowColor={mobileColors.shadow}
       tintColor={mobileColors.brand}
     >

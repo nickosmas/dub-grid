@@ -10,7 +10,8 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MobileBootstrapResponse,
@@ -20,12 +21,12 @@ import type {
   MobilePersonUpdateBody,
 } from "@dubgrid/contracts";
 import {
-  getRequiredStaffEmailError,
+  getOptionalStaffEmailError,
   getStaffNameError,
   getStaffNotesError,
   getOptionalUsPhoneError,
+  normalizeOptionalStaffEmail,
   normalizeOptionalUsPhone,
-  normalizeRequiredStaffEmail,
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
@@ -47,6 +48,7 @@ import {
   type MobileAccountLinkChallenge,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -68,6 +70,7 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 type ConfirmAction = "bench" | "activate" | "terminate" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
@@ -95,23 +98,6 @@ function getFullName(person: MobilePerson): string {
 
 function formatStatusLabel(status: MobilePerson["status"]): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function hashCode(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string) {
-  const hue = hashCode(seed) % 360;
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    color: `hsl(${hue}, 70%, 35%)`,
-  };
 }
 
 function formatDate(value: string | null): string {
@@ -167,17 +153,27 @@ export default function PersonDetailScreen() {
   const canManageEmployees = Boolean(
     bootstrapQuery.data?.permissions.canManageEmployees,
   );
+  const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const rawPerson = personQuery.data?.person ?? null;
   const person =
     rawPerson && (canManageEmployees || rawPerson.status === "active")
       ? rawPerson
       : null;
+  const isSelf = Boolean(
+    currentUserId && person?.userId && person.userId === currentUserId,
+  );
   const canEdit = canManageEmployees && person?.status !== "terminated";
   const contentState = getMobileQueryContentState({
     hasData: personQuery.data !== undefined,
     isLoading: personQuery.isLoading || bootstrapQuery.isLoading,
     error: personQuery.error ?? bootstrapQuery.error,
   });
+
+  useEffect(() => {
+    if (isSelf) {
+      router.replace("/(tabs)/profile");
+    }
+  }, [isSelf]);
 
   useEffect(() => {
     if (person && !editing) {
@@ -332,7 +328,7 @@ export default function PersonDetailScreen() {
     if (!person || !draft) return;
     const firstNameError = getStaffNameError(draft.firstName, "First name");
     const lastNameError = getStaffNameError(draft.lastName, "Last name");
-    const emailError = getRequiredStaffEmailError(draft.email);
+    const emailError = getOptionalStaffEmailError(draft.email);
     const phoneError = getOptionalUsPhoneError(draft.phone);
     const notesError = getStaffNotesError(draft.contactNotes);
     if (
@@ -370,7 +366,7 @@ export default function PersonDetailScreen() {
       lastName: normalizeStaffName(draft.lastName),
       employmentType: draft.employmentType,
       phone: normalizeOptionalUsPhone(draft.phone),
-      email: normalizeRequiredStaffEmail(draft.email),
+      email: normalizeOptionalStaffEmail(draft.email),
       contactNotes: normalizeStaffNotes(draft.contactNotes),
       certificationId: draft.certificationId,
       focusAreaIds: draft.focusAreaIds,
@@ -402,9 +398,11 @@ export default function PersonDetailScreen() {
         refreshing={manualRefresh.isRefreshing}
       >
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load person"
+          variant="centered"
           onAction={() => {
             void personQuery.refetch();
           }}
@@ -421,7 +419,8 @@ export default function PersonDetailScreen() {
         refreshing={manualRefresh.isRefreshing}
       >
         <EmptyStateCard
-          body="This person is no longer available in the mobile directory."
+          fillScreen
+          body="This teammate isn't in your directory anymore."
           iconName="person-outline"
           title="Person not found"
         />
@@ -450,6 +449,7 @@ export default function PersonDetailScreen() {
     person.employmentType === "part_time" ? "Part-time" : "Full-time";
   const avatarTone = getAvatarTone(person.id);
   const fullName = getFullName(person);
+  const orgRoleBadge = getMobileOrgRoleBadge(person.orgRole);
   const accessText = person.userId
     ? "Active app account"
     : person.pendingInvitation
@@ -486,10 +486,10 @@ export default function PersonDetailScreen() {
         : `Terminate ${getFullName(person)}?`;
   const statusConfirmationBody =
     confirmAction === "bench"
-      ? "They will be hidden from active scheduling and shift requests."
+      ? "They'll be hidden from active scheduling and shift requests. Their history stays intact."
       : confirmAction === "activate"
-        ? "They will return to active staff lists and scheduling."
-        : "They will be archived from active staff lists and scheduling.";
+        ? "They'll return to active staff lists and scheduling."
+        : "They'll be archived from active staff lists. Their history stays intact.";
   const statusConfirmationLabel =
     confirmAction === "bench"
       ? "Bench"
@@ -504,10 +504,10 @@ export default function PersonDetailScreen() {
         : "Revoke invitation?";
   const invitationConfirmationBody =
     invitationConfirmAction === "create"
-      ? `Send an app invitation to ${person.email}?`
+      ? `An app invitation will be sent to ${person.email}.`
       : invitationConfirmAction === "resend"
-        ? `Revoke the existing invitation for ${person.email} and send a new one?`
-        : `Revoke the pending invitation for ${person.email}? The current invite link will stop working.`;
+        ? `The current invitation for ${person.email} will be canceled and a new one will be sent.`
+        : `The current invite link for ${person.email} will stop working.`;
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"
       ? "Send Invitation"
@@ -547,7 +547,8 @@ export default function PersonDetailScreen() {
           borderWidth: 1,
         }}
         avatarTextStyle={{ color: avatarTone.color }}
-        badge={formatStatusLabel(person.status)}
+        badge={orgRoleBadge?.label ?? formatStatusLabel(person.status)}
+        badgeTone={orgRoleBadge?.tone}
         initials={getInitials(person)}
         subtitle={person.email || "No email on file"}
         title={fullName}
@@ -564,24 +565,45 @@ export default function PersonDetailScreen() {
             compact
             disabled={!person.phone}
             label="Call"
+            leadingAccessory={
+              <Ionicons
+                color={mobileColors.successText}
+                name="call-outline"
+                size={18}
+              />
+            }
             onPress={() => {
               if (person.phone) void Linking.openURL(`tel:${person.phone}`);
             }}
-            tone="neutral"
+            tone="success"
           />
           <Button
             compact
             disabled={!person.email}
             label="Email"
+            leadingAccessory={
+              <Ionicons
+                color={mobileColors.brand}
+                name="mail-outline"
+                size={18}
+              />
+            }
             onPress={() => {
               if (person.email) void Linking.openURL(`mailto:${person.email}`);
             }}
-            tone="neutral"
+            tone="secondary"
           />
           {canEdit ? (
             <Button
               compact
               label="Edit"
+              leadingAccessory={
+                <Ionicons
+                  color={mobileColors.brand}
+                  name="create-outline"
+                  size={18}
+                />
+              }
               onPress={() => {
                 setEditing(true);
                 setDraft(makeDraft(person));
@@ -698,35 +720,6 @@ export default function PersonDetailScreen() {
             </ProfileList>
           </ProfileSection>
 
-          {canManageEmployees && !person.userId ? (
-            <ProfileSection title="Account access">
-              <ProfileList>
-                {person.pendingInvitation ? (
-                  <>
-                    <ProfileInfoRow
-                      iconName="mail-unread-outline"
-                      label="Invitation"
-                      value={`Pending for ${person.pendingInvitation.email}`}
-                    />
-                    <ProfileInfoRow
-                      iconName="time-outline"
-                      isLast
-                      label="Expires"
-                      value={formatDate(person.pendingInvitation.expiresAt)}
-                    />
-                  </>
-                ) : (
-                  <ProfileInfoRow
-                    iconName="key-outline"
-                    isLast
-                    label="Access"
-                    value="No app invitation sent"
-                  />
-                )}
-              </ProfileList>
-            </ProfileSection>
-          ) : null}
-
           {canManageEmployees && person.contactNotes ? (
             <ProfileSection title="Notes">
               <ProfilePanel>
@@ -743,7 +736,7 @@ export default function PersonDetailScreen() {
             {person.status === "active" ? (
               <Button
                 compact
-                disabled={statusMutation.isPending}
+                disabled={statusMutation.isPending || isSelf}
                 label="Bench"
                 onPress={() => setConfirmAction("bench")}
                 tone="warningFilled"
@@ -761,7 +754,7 @@ export default function PersonDetailScreen() {
             {person.status !== "terminated" ? (
               <Button
                 compact
-                disabled={statusMutation.isPending}
+                disabled={statusMutation.isPending || isSelf}
                 label="Terminate"
                 onPress={() => setConfirmAction("terminate")}
                 tone="dangerFilled"
@@ -807,12 +800,12 @@ export default function PersonDetailScreen() {
         </ProfileSection>
       ) : null}
       <ConfirmationModal
-        body="Save these staff profile changes?"
+        body="The staff profile will be updated."
         confirmLabel="Save"
         loading={updateMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={confirmSave}
-        title="Save person?"
+        title="Save these changes?"
         visible={showSaveConfirmation}
       />
       <ConfirmationModal
@@ -1040,7 +1033,7 @@ function EditPanel({
     firstName: getStaffNameError(draft.firstName, "First name"),
     lastName: getStaffNameError(draft.lastName, "Last name"),
     phone: getOptionalUsPhoneError(draft.phone),
-    email: getRequiredStaffEmailError(draft.email),
+    email: getOptionalStaffEmailError(draft.email),
     contactNotes: getStaffNotesError(draft.contactNotes),
     focusAreaIds:
       draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
@@ -1236,6 +1229,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+    paddingBottom: 16,
   },
   actionsRow: {
     flexDirection: "row",
@@ -1280,6 +1274,7 @@ const styles = StyleSheet.create({
   modalInfoTitle: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   modalInfoText: {
     ...mobileText.body,

@@ -3,7 +3,6 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { Redirect, router } from "expo-router";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Image,
   Linking,
@@ -19,8 +18,9 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { Button } from "../../../shared/components/Button";
+import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { LoadingScreen } from "../../../shared/components/LoadingScreen";
-import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import {
   loginToWorkspace,
@@ -37,7 +37,26 @@ import {
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileText } from "../../../shared/theme/tokens";
+import {
+  mobileColors,
+  mobileRadii,
+  mobileText,
+} from "../../../shared/theme/tokens";
+
+type Stage = "workspace" | "credentials" | "mfa";
+
+type PendingMfaLogin = MobileAuthLoginResponse & {
+  mfaRequired: true;
+  mfa: NonNullable<MobileAuthLoginResponse["mfa"]>;
+};
+
+const SESSION_HANDOFF_TIMEOUT_MS = 15_000;
+const MAX_COLUMN_WIDTH = 380;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(value: string): boolean {
+  return EMAIL_REGEX.test(value.trim());
+}
 
 function getWorkspaceSuffixLabel(apiBaseUrl: string) {
   try {
@@ -56,10 +75,41 @@ function getWorkspaceSuffixLabel(apiBaseUrl: string) {
   return ".workspace";
 }
 
-type PendingMfaLogin = MobileAuthLoginResponse & {
-  mfaRequired: true;
-  mfa: NonNullable<MobileAuthLoginResponse["mfa"]>;
-};
+function InlineError({ message }: { message: string }) {
+  return (
+    <View style={styles.errorRow}>
+      <Ionicons
+        color={mobileColors.dangerText}
+        name="alert-circle"
+        size={16}
+      />
+      <Text style={styles.errorText}>{message}</Text>
+    </View>
+  );
+}
+
+function withSessionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(
+        new Error(
+          "Sign-in is taking longer than expected. Check your internet connection and try again.",
+        ),
+      );
+    }, SESSION_HANDOFF_TIMEOUT_MS);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
 
 export default function LoginScreen() {
   const { accessToken, isLoading } = useSessionState();
@@ -69,8 +119,7 @@ export default function LoginScreen() {
   const mfaInputRef = useRef<TextInput>(null);
   const [workspaceSlug, setWorkspaceSlug] = useState("");
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
-  const [stage, setStage] =
-    useState<"workspace" | "credentials" | "mfa">("workspace");
+  const [stage, setStage] = useState<Stage>("workspace");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
@@ -91,13 +140,28 @@ export default function LoginScreen() {
   useEffect(() => {
     let active = true;
 
-    void loadLastWorkspaceSlug().then((storedSlug) => {
+    void (async () => {
+      const storedSlug = await loadLastWorkspaceSlug();
       if (!active || !storedSlug) {
         return;
       }
 
+      // Take the user straight to the credentials step — the saved slug is
+      // enough to attempt sign-in. The lookup below is purely cosmetic
+      // (friendly workspace name in the subtitle); if it fails we leave the
+      // user on the credentials step with the slug as the label.
       setWorkspaceSlug(storedSlug);
-    });
+      setStage("credentials");
+      setTimeout(() => emailInputRef.current?.focus(), 0);
+      try {
+        const result = await lookupWorkspace(storedSlug);
+        if (!active) return;
+        setWorkspaceName(result.workspace.name);
+        setWorkspaceSlug(result.workspace.slug);
+      } catch {
+        // Ignore — fall back to displaying the slug.
+      }
+    })();
 
     return () => {
       active = false;
@@ -108,13 +172,13 @@ export default function LoginScreen() {
     return (
       <LoadingScreen
         title="Checking your session"
-        body="We’re confirming whether you already have mobile access."
+        body="Hang tight while we check if you're already signed in."
       />
     );
   }
 
   if (accessToken) {
-    return <Redirect href="/(tabs)/me" />;
+    return <Redirect href="/(tabs)/home" />;
   }
 
   async function finishLogin(
@@ -123,32 +187,32 @@ export default function LoginScreen() {
   ) {
     await saveLastWorkspaceSlug(response.workspace.slug);
 
-    const { error: sessionError } = await getSupabaseClient().auth.setSession({
-      access_token: session.accessToken,
-      refresh_token: session.refreshToken,
-    });
+    const { error: sessionError } = await withSessionHandoffTimeout(
+      getSupabaseClient().auth.setSession({
+        access_token: session.accessToken,
+        refresh_token: session.refreshToken,
+      }),
+    );
 
     if (sessionError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: sessionError,
-        fallbackMessage: "We couldn't finish signing you in right now.",
+        fallbackMessage: "We couldn't finish signing you in. Try again in a moment.",
       });
       setError(nextError);
       return;
     }
 
     registerMobileSessionPresence(session.accessToken).catch(() => {});
-    router.replace("/(tabs)/me");
+    router.replace("/(tabs)/home");
   }
 
   async function handleWorkspaceContinue() {
-    if (workspaceLoading) {
-      return;
-    }
+    if (workspaceLoading) return;
 
     const normalizedSlug = workspaceSlug.trim().toLowerCase();
     if (!normalizedSlug) {
-      setError("Enter your workspace slug to continue.");
+      setError("Enter your workspace to continue.");
       return;
     }
 
@@ -161,15 +225,12 @@ export default function LoginScreen() {
       setWorkspaceSlug(result.workspace.slug);
       setWorkspaceName(result.workspace.name);
       setStage("credentials");
-
-      setTimeout(() => {
-        emailInputRef.current?.focus();
-      }, 0);
+      setTimeout(() => emailInputRef.current?.focus(), 0);
     } catch (workspaceError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: workspaceError,
         fallbackMessage:
-          "We couldn't verify that workspace. Check the subdomain and try again.",
+          "We couldn't find that workspace. Check the subdomain and try again.",
         preferInlineNetworkError: true,
       });
       setError(nextError);
@@ -179,9 +240,7 @@ export default function LoginScreen() {
   }
 
   async function handleLogin() {
-    if (submitting || !workspaceSlug || !email || !password) {
-      return;
-    }
+    if (submitting || !workspaceSlug || !email || !password) return;
 
     setSubmitting(true);
     setError(null);
@@ -197,9 +256,7 @@ export default function LoginScreen() {
         setMfaCode("");
         setPassword("");
         setStage("mfa");
-        setTimeout(() => {
-          mfaInputRef.current?.focus();
-        }, 0);
+        setTimeout(() => mfaInputRef.current?.focus(), 0);
         return;
       }
 
@@ -207,7 +264,8 @@ export default function LoginScreen() {
     } catch (loginError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: loginError,
-        fallbackMessage: "We couldn't sign you in right now. Try again in a moment.",
+        fallbackMessage:
+          "We couldn't sign you in right now. Try again in a moment.",
       });
       setError(nextError);
     } finally {
@@ -216,9 +274,7 @@ export default function LoginScreen() {
   }
 
   async function handleMfaVerify() {
-    if (submitting || !pendingMfaLogin || mfaCode.length !== 6) {
-      return;
-    }
+    if (submitting || !pendingMfaLogin || mfaCode.length !== 6) return;
 
     setSubmitting(true);
     setError(null);
@@ -233,27 +289,47 @@ export default function LoginScreen() {
     } catch (mfaError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: mfaError,
-        fallbackMessage: "We couldn't verify that code right now. Try again in a moment.",
+        fallbackMessage:
+          "We couldn't verify that code right now. Try again in a moment.",
       });
       setError(nextError);
       setMfaCode("");
-      setTimeout(() => {
-        mfaInputRef.current?.focus();
-      }, 0);
+      setTimeout(() => mfaInputRef.current?.focus(), 0);
     } finally {
       setSubmitting(false);
     }
   }
 
+  function switchWorkspace() {
+    setStage("workspace");
+    setError(null);
+    setPendingMfaLogin(null);
+    setMfaCode("");
+    setEmail("");
+    setPassword("");
+    setWorkspaceName(null);
+  }
+
+  const workspaceLabel = workspaceName ?? workspaceSlug;
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      <View style={styles.brandHeader}>
+        <Image
+          accessibilityIgnoresInvertColors
+          accessibilityLabel="DubGrid logo"
+          source={require("../../../../assets/images/logo-blue.png")}
+          style={styles.brandMark}
+        />
+        <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardArea}
       >
         <ScrollView
           contentContainerStyle={[
-            styles.container,
+            styles.scrollContent,
             {
               paddingBottom: getScreenBottomPadding("stack", insets.bottom),
             },
@@ -261,35 +337,22 @@ export default function LoginScreen() {
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.logoBlock}>
-            <View style={styles.logoRow}>
-              <Image
-                accessibilityIgnoresInvertColors
-                accessibilityLabel="DubGrid logo"
-                source={require("../../../../assets/images/logo-blue.png")}
-                style={styles.logoMark}
-              />
-              <Text style={styles.wordmark}>DubGrid</Text>
-            </View>
-            <Text style={styles.logoCaption}>Mobile sign in</Text>
-          </View>
-
-          <View style={styles.authCard}>
+          <View style={styles.column}>
             {stage === "workspace" ? (
-              <>
-                <Text style={styles.panelTitle}>Enter your subdomain</Text>
-                <Text style={styles.panelBody}>
-                  Enter your subdomain to log in.
-                </Text>
+              <View style={styles.stage}>
+                <View style={styles.header}>
+                  <Text style={styles.title}>Sign in</Text>
+                  <Text style={styles.subtitle}>
+                    Enter the subdomain for your team.
+                  </Text>
+                </View>
 
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Workspace</Text>
+                <View style={styles.fields}>
                   <View
                     style={[
-                      styles.workspaceInputRow,
-                      focusedField === "workspace" &&
-                        styles.workspaceInputRowFocused,
-                      error && stage === "workspace" && styles.inputError,
+                      styles.inputRow,
+                      focusedField === "workspace" && styles.inputRowFocused,
+                      error ? styles.inputRowError : null,
                     ]}
                   >
                     <TextInput
@@ -297,9 +360,9 @@ export default function LoginScreen() {
                       autoCapitalize="none"
                       autoCorrect={false}
                       placeholder="yourorg"
-                      placeholderTextColor="#8b95a3"
+                      placeholderTextColor={mobileColors.placeholderText}
                       returnKeyType="go"
-                      style={[styles.input, styles.workspaceInput]}
+                      style={[styles.input, styles.inputFlex]}
                       value={workspaceSlug}
                       onBlur={() => setFocusedField(null)}
                       onChangeText={(value) => {
@@ -313,125 +376,96 @@ export default function LoginScreen() {
                       }}
                       onFocus={() => setFocusedField("workspace")}
                     />
-                    <View style={styles.workspaceSuffix}>
-                      <Text style={styles.workspaceSuffixText}>
-                        {workspaceSuffix}
-                      </Text>
+                    <View style={styles.suffix}>
+                      <Text style={styles.suffixText}>{workspaceSuffix}</Text>
                     </View>
                   </View>
+
+                  {error ? <InlineError message={error} /> : null}
                 </View>
 
-                {error ? (
-                  <StatusBanner
-                    body={error}
-                    title="Workspace sign-in issue"
-                    tone="error"
+                <View style={styles.actions}>
+                  <Button
+                    disabled={workspaceLoading || !workspaceSlug.trim()}
+                    label="Continue"
+                    loading={workspaceLoading}
+                    onPress={() => {
+                      void handleWorkspaceContinue();
+                    }}
                   />
-                ) : null}
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    disabled: workspaceLoading || !workspaceSlug.trim(),
-                  }}
-                  android_ripple={
-                    workspaceLoading || !workspaceSlug.trim()
-                      ? undefined
-                      : { color: "rgba(255, 255, 255, 0.22)" }
-                  }
-                  disabled={workspaceLoading || !workspaceSlug.trim()}
-                  style={[
-                    styles.button,
-                    (workspaceLoading || !workspaceSlug.trim()) &&
-                      styles.buttonDisabled,
-                  ]}
-                  onPress={() => {
-                    void handleWorkspaceContinue();
-                  }}
-                >
-                  {workspaceLoading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.buttonText}>Continue</Text>
-                  )}
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: showWorkspaceHelp }}
-                  android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-                  style={styles.linkButton}
-                  onPress={() => {
-                    setShowWorkspaceHelp((current) => !current);
-                  }}
-                >
-                  <Text style={styles.linkButtonText}>
-                    Need help with your subdomain?
-                  </Text>
-                </Pressable>
-
-                {showWorkspaceHelp ? (
-                  <View style={styles.helperCard}>
-                    <Text style={styles.helperText}>
-                      Your subdomain is the first part of your workspace URL,
-                      like <Text style={styles.helperStrong}>yourorg</Text>
-                      {workspaceSuffix}.
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showWorkspaceHelp }}
+                    android_ripple={{ color: mobileColors.rippleNeutral }}
+                    style={styles.link}
+                    onPress={() =>
+                      setShowWorkspaceHelp((current) => !current)
+                    }
+                  >
+                    <Text style={styles.linkText}>
+                      Need help with your subdomain?
                     </Text>
-                  </View>
-                ) : null}
-              </>
+                  </Pressable>
+
+                  {showWorkspaceHelp ? (
+                    <Text style={styles.helperText}>
+                      Your subdomain is the first part of your workspace URL -
+                      for example, the{" "}
+                      <Text style={styles.helperStrong}>yourorg</Text> in{" "}
+                      <Text style={styles.helperStrong}>
+                        yourorg{workspaceSuffix}
+                      </Text>
+                      .
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
             ) : stage === "credentials" ? (
-              <>
-                <Text style={styles.panelTitle}>Sign in to your workspace</Text>
-                <Text style={styles.panelBody}>
-                  Continue into{" "}
-                  <Text style={styles.workspaceSlug}>
-                    {workspaceName ?? workspaceSlug}
-                  </Text>
-                  .
-                </Text>
-
-                <View style={styles.workspaceBadge}>
-                  <Text style={styles.workspaceBadgeText}>
-                    {workspaceSlug}
-                    {workspaceSuffix}
+              <View style={styles.stage}>
+                <View style={styles.header}>
+                  <Text style={styles.title}>Welcome back</Text>
+                  <Text style={styles.subtitle}>
+                    Continue to{" "}
+                    <Text style={styles.subtitleStrong}>{workspaceLabel}</Text>
+                    .
                   </Text>
                 </View>
 
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Email</Text>
-                  <TextInput
-                    accessibilityLabel="Email"
-                    ref={emailInputRef}
-                    autoCapitalize="none"
-                    autoComplete="email"
-                    autoCorrect={false}
-                    blurOnSubmit={false}
-                    keyboardType="email-address"
-                    placeholder="Email"
-                    placeholderTextColor="#8b95a3"
-                    returnKeyType="next"
-                    style={[
-                      styles.input,
-                      focusedField === "email" && styles.inputFocused,
-                      error && stage === "credentials" && styles.inputError,
-                    ]}
-                    textContentType="emailAddress"
-                    value={email}
-                    onBlur={() => setFocusedField(null)}
-                    onChangeText={setEmail}
-                    onFocus={() => setFocusedField("email")}
-                    onSubmitEditing={() => passwordInputRef.current?.focus()}
-                  />
-                </View>
-
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Password</Text>
+                <View style={styles.fields}>
                   <View
                     style={[
-                      styles.passwordInputRow,
-                      focusedField === "password" && styles.inputFocused,
-                      error && stage === "credentials" && styles.inputError,
+                      styles.inputRow,
+                      focusedField === "email" && styles.inputRowFocused,
+                      error ? styles.inputRowError : null,
+                    ]}
+                  >
+                    <TextInput
+                      accessibilityLabel="Email"
+                      ref={emailInputRef}
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      autoCorrect={false}
+                      blurOnSubmit={false}
+                      keyboardType="email-address"
+                      placeholder="Email"
+                      placeholderTextColor={mobileColors.placeholderText}
+                      returnKeyType="next"
+                      style={[styles.input, styles.inputFlex]}
+                      textContentType="emailAddress"
+                      value={email}
+                      onBlur={() => setFocusedField(null)}
+                      onChangeText={setEmail}
+                      onFocus={() => setFocusedField("email")}
+                      onSubmitEditing={() => passwordInputRef.current?.focus()}
+                    />
+                  </View>
+
+                  <View
+                    style={[
+                      styles.inputRow,
+                      focusedField === "password" && styles.inputRowFocused,
+                      error ? styles.inputRowError : null,
                     ]}
                   >
                     <TextInput
@@ -441,10 +475,10 @@ export default function LoginScreen() {
                       autoComplete="password"
                       autoCorrect={false}
                       placeholder="Password"
-                      placeholderTextColor="#8b95a3"
+                      placeholderTextColor={mobileColors.placeholderText}
                       returnKeyType="done"
                       secureTextEntry={!showPassword}
-                      style={[styles.input, styles.passwordInput]}
+                      style={[styles.input, styles.inputFlex]}
                       textContentType="password"
                       value={password}
                       onBlur={() => setFocusedField(null)}
@@ -459,151 +493,111 @@ export default function LoginScreen() {
                         showPassword ? "Hide password" : "Show password"
                       }
                       accessibilityRole="button"
-                      hitSlop={8}
-                      style={styles.passwordVisibilityButton}
-                      onPress={() => {
-                        setShowPassword((current) => !current);
-                      }}
+                      hitSlop={10}
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword((current) => !current)}
                     >
                       <Ionicons
-                        color="#6b7280"
+                        color={mobileColors.textMuted}
                         name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={22}
+                        size={20}
                       />
                     </Pressable>
                   </View>
+
+                  {error ? <InlineError message={error} /> : null}
                 </View>
 
-                {error ? (
-                  <StatusBanner
-                    body={error}
-                    title="Could not sign in"
-                    tone="error"
+                <View style={styles.actions}>
+                  <Button
+                    disabled={submitting || !isValidEmail(email) || !password}
+                    label="Sign In"
+                    loading={submitting}
+                    onPress={() => {
+                      void handleLogin();
+                    }}
                   />
-                ) : null}
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: submitting || !email || !password }}
-                  android_ripple={
-                    submitting || !email || !password
-                      ? undefined
-                      : { color: "rgba(255, 255, 255, 0.22)" }
-                  }
-                  disabled={submitting || !email || !password}
-                  style={[
-                    styles.button,
-                    (submitting || !email || !password) && styles.buttonDisabled,
-                  ]}
-                  onPress={() => {
-                    void handleLogin();
-                  }}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.buttonText}>Sign In</Text>
-                  )}
-                </Pressable>
-
-                <View style={styles.secondaryActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-                    style={styles.linkButton}
-                    onPress={() => {
-                      setStage("workspace");
-                      setError(null);
-                      setPendingMfaLogin(null);
-                      setMfaCode("");
-                    }}
-                  >
-                    <Text style={styles.linkButtonText}>Change workspace</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-                    style={styles.linkButton}
-                    onPress={() => {
-                      void Linking.openURL(`${apiBaseUrl}/forgot-password`);
-                    }}
-                  >
-                    <Text style={styles.linkButtonText}>Forgot password?</Text>
-                  </Pressable>
+                  <View style={styles.linkRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      android_ripple={{ color: mobileColors.rippleNeutral }}
+                      style={styles.link}
+                      onPress={switchWorkspace}
+                    >
+                      <Text style={styles.linkText}>Switch workspace</Text>
+                    </Pressable>
+                    <Text style={styles.linkSeparator}>·</Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      android_ripple={{ color: mobileColors.rippleNeutral }}
+                      style={styles.link}
+                      onPress={() => {
+                        void Linking.openURL(`${apiBaseUrl}/forgot-password`);
+                      }}
+                    >
+                      <Text style={styles.linkText}>Forgot password?</Text>
+                    </Pressable>
+                  </View>
                 </View>
-              </>
+              </View>
             ) : (
-              <>
-                <Text style={styles.panelTitle}>Two-factor authentication</Text>
-                <Text style={styles.panelBody}>
-                  Enter the 6-digit code from your authenticator app.
-                </Text>
+              <View style={styles.stage}>
+                <View style={styles.header}>
+                  <Text style={styles.title}>Two-factor authentication</Text>
+                  <Text style={styles.subtitle}>
+                    Enter the 6-digit code from your authenticator app.
+                  </Text>
+                </View>
 
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.fieldLabel}>Verification code</Text>
-                  <TextInput
-                    ref={mfaInputRef}
-                    accessibilityLabel="Verification code"
-                    autoComplete="one-time-code"
-                    inputMode="numeric"
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    onChangeText={(value) => {
-                      setMfaCode(value.replace(/\D/g, "").slice(0, 6));
-                      setError(null);
-                    }}
-                    placeholder="000000"
-                    placeholderTextColor="#8b95a3"
-                    returnKeyType="done"
-                    style={[styles.input, styles.codeInput]}
-                    textContentType="oneTimeCode"
-                    value={mfaCode}
-                    onSubmitEditing={() => {
+                <View style={styles.fields}>
+                  <View
+                    style={[
+                      styles.inputRow,
+                      styles.codeRow,
+                      error ? styles.inputRowError : null,
+                    ]}
+                  >
+                    <TextInput
+                      ref={mfaInputRef}
+                      accessibilityLabel="Verification code"
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      onChangeText={(value) => {
+                        setMfaCode(value.replace(/\D/g, "").slice(0, 6));
+                        setError(null);
+                      }}
+                      placeholder="000000"
+                      placeholderTextColor={mobileColors.placeholderText}
+                      returnKeyType="done"
+                      style={[styles.input, styles.codeInput]}
+                      textContentType="oneTimeCode"
+                      value={mfaCode}
+                      onSubmitEditing={() => {
+                        void handleMfaVerify();
+                      }}
+                    />
+                  </View>
+
+                  {error ? <InlineError message={error} /> : null}
+                </View>
+
+                <View style={styles.actions}>
+                  <Button
+                    disabled={submitting || mfaCode.length !== 6}
+                    label="Verify and Sign In"
+                    loading={submitting}
+                    onPress={() => {
                       void handleMfaVerify();
                     }}
                   />
-                </View>
 
-                {error ? (
-                  <StatusBanner
-                    body={error}
-                    title="Could not verify code"
-                    tone="error"
-                  />
-                ) : null}
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{
-                    disabled: submitting || mfaCode.length !== 6,
-                  }}
-                  android_ripple={
-                    submitting || mfaCode.length !== 6
-                      ? undefined
-                      : { color: "rgba(255, 255, 255, 0.22)" }
-                  }
-                  disabled={submitting || mfaCode.length !== 6}
-                  style={[
-                    styles.button,
-                    (submitting || mfaCode.length !== 6) &&
-                      styles.buttonDisabled,
-                  ]}
-                  onPress={() => {
-                    void handleMfaVerify();
-                  }}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <Text style={styles.buttonText}>Verify and Sign In</Text>
-                  )}
-                </Pressable>
-
-                <View style={styles.secondaryActions}>
                   <Pressable
                     accessibilityRole="button"
-                    android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-                    style={styles.linkButton}
+                    android_ripple={{ color: mobileColors.rippleNeutral }}
+                    style={styles.link}
                     onPress={() => {
                       setStage("credentials");
                       setPendingMfaLogin(null);
@@ -611,11 +605,12 @@ export default function LoginScreen() {
                       setError(null);
                     }}
                   >
-                    <Text style={styles.linkButtonText}>Back to sign in</Text>
+                    <Text style={styles.linkText}>Back to sign in</Text>
                   </Pressable>
                 </View>
-              </>
+              </View>
             )}
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -626,212 +621,153 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f7f4ef",
+    backgroundColor: mobileColors.background,
   },
   keyboardArea: {
     flex: 1,
   },
-  container: {
+  scrollContent: {
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 32,
-    gap: 20,
+    paddingTop: 8,
   },
-  logoBlock: {
-    alignItems: "center",
-    gap: 8,
+  column: {
+    width: "100%",
+    maxWidth: MAX_COLUMN_WIDTH,
+    gap: 36,
   },
-  logoRow: {
+  brandHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  logoMark: {
-    width: 34,
-    height: 34,
+  brandMark: {
+    width: 28,
+    height: 28,
   },
-  wordmark: {
+  stage: {
+    gap: 24,
+  },
+  header: {
+    gap: 6,
+  },
+  title: {
     ...mobileText.heroMetric,
-    color: "#111827",
+    color: mobileColors.textPrimary,
     fontSize: 30,
     lineHeight: 36,
   },
-  logoCaption: {
-    ...mobileText.bodyStrong,
-    color: "#6b7280",
-  },
-  authCard: {
-    width: "100%",
-    maxWidth: 440,
-    backgroundColor: "#ffffff",
-    borderRadius: 28,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    gap: 16,
-    shadowColor: "#000000",
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    elevation: 2,
-  },
-  panelTitle: {
-    ...mobileText.heroMetric,
-    color: "#111827",
-    fontSize: 28,
-    lineHeight: 34,
-    textAlign: "center",
-  },
-  panelBody: {
+  subtitle: {
     ...mobileText.body,
-    color: "#6b7280",
-    textAlign: "center",
+    color: mobileColors.textMuted,
   },
-  fieldGroup: {
-    gap: 8,
+  subtitleStrong: {
+    color: mobileColors.textPrimary,
+    fontWeight: "700",
   },
-  fieldLabel: {
-    ...mobileText.bodyStrong,
-    color: "#374151",
+  fields: {
+    gap: 12,
   },
-  workspaceInputRow: {
+  inputRow: {
     flexDirection: "row",
     alignItems: "center",
+    minHeight: 54,
+    borderRadius: mobileRadii.control,
     borderWidth: 1.5,
-    borderColor: "#d1d5db",
-    borderRadius: 12,
-    backgroundColor: "#ffffff",
+    borderColor: mobileColors.inputBorder,
+    backgroundColor: mobileColors.surface,
   },
-  workspaceInputRowFocused: {
-    borderColor: "#2563eb",
-    backgroundColor: "#ffffff",
+  inputRowFocused: {
+    borderColor: mobileColors.inputBorderFocused,
   },
-  workspaceInput: {
-    flex: 1,
-    borderWidth: 0,
+  inputRowError: {
+    borderColor: mobileColors.inputBorderError,
   },
-  workspaceSuffix: {
-    alignSelf: "stretch",
-    justifyContent: "center",
-    backgroundColor: "#f3f4f6",
-    paddingHorizontal: 14,
-    borderLeftWidth: 1,
-    borderLeftColor: "#e5e7eb",
-  },
-  workspaceSuffixText: {
-    ...mobileText.bodyStrong,
-    color: "#6b7280",
+  codeRow: {
+    minHeight: 62,
   },
   input: {
     ...mobileText.sectionTitle,
     fontWeight: "400",
-    borderWidth: 1.5,
-    borderColor: "#d1d5db",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    color: "#111827",
-    backgroundColor: "#ffffff",
+    color: mobileColors.textPrimary,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
-  inputFocused: {
-    borderColor: "#2563eb",
-    backgroundColor: "#ffffff",
+  inputFlex: {
+    flex: 1,
   },
   codeInput: {
-    fontSize: 24,
-    letterSpacing: 8,
-    lineHeight: 30,
-    textAlign: "center",
-  },
-  inputError: {
-    borderColor: "#b91c1c",
-  },
-  passwordInputRow: {
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderColor: "#d1d5db",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    flexDirection: "row",
-  },
-  passwordInput: {
-    borderWidth: 0,
     flex: 1,
-    paddingRight: 8,
+    textAlign: "center",
+    fontSize: 26,
+    letterSpacing: 10,
+    fontWeight: "600",
   },
-  passwordVisibilityButton: {
-    alignItems: "center",
-    borderRadius: 20,
-    height: 40,
+  suffix: {
+    alignSelf: "stretch",
     justifyContent: "center",
-    marginRight: 6,
-    width: 40,
+    paddingHorizontal: 14,
+    borderLeftWidth: 1,
+    borderLeftColor: mobileColors.borderSubtle,
   },
-  button: {
-    borderRadius: 999,
-    backgroundColor: "#2563eb",
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    ...mobileText.sectionTitle,
-    color: "#ffffff",
-  },
-  linkButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 44,
-    paddingVertical: 8,
-  },
-  linkButtonText: {
+  suffixText: {
     ...mobileText.bodyStrong,
-    color: "#6b7280",
-    textDecorationLine: "underline",
+    color: mobileColors.textMuted,
   },
-  helperCard: {
-    backgroundColor: "#f9fafb",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
+  eyeButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    alignSelf: "stretch",
+  },
+  actions: {
+    gap: 16,
+  },
+  link: {
+    alignSelf: "center",
+    minHeight: 36,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    justifyContent: "center",
+  },
+  linkText: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  linkSeparator: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
   },
   helperText: {
     ...mobileText.meta,
-    color: "#4b5563",
+    color: mobileColors.textMuted,
+    textAlign: "center",
   },
   helperStrong: {
-    fontWeight: "700",
-    color: "#111827",
-  },
-  workspaceSlug: {
-    color: "#111827",
-    fontWeight: "700",
-  },
-  workspaceBadge: {
-    alignSelf: "center",
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: "#eff6ff",
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-  },
-  workspaceBadgeText: {
     ...mobileText.meta,
-    color: "#1d4ed8",
-    fontWeight: "600",
+    fontWeight: "700",
+    color: mobileColors.textPrimary,
   },
-  secondaryActions: {
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 8,
+    paddingHorizontal: 4,
+  },
+  errorText: {
+    ...mobileText.meta,
+    color: mobileColors.dangerText,
+    flex: 1,
   },
 });

@@ -1,9 +1,16 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { createReactNativeModule } from "../../test/native";
+import {
+  createReactNativeModule,
+  createSafeAreaContextModule,
+} from "../../test/native";
 
 vi.mock("react-native", async () =>
   createReactNativeModule(await import("react")),
+);
+
+vi.mock("react-native-safe-area-context", async () =>
+  createSafeAreaContextModule(await import("react")),
 );
 
 let ConfirmationModal: (typeof import("./ConfirmationModal"))["ConfirmationModal"];

@@ -40,7 +40,7 @@ export function WorkspaceLockedScreen({
         ]}
       >
         <View style={styles.copy}>
-          <Text style={styles.eyebrow}>DubGrid Mobile</Text>
+          <Text style={styles.eyebrow}>DubGrid</Text>
           <Text style={styles.title}>Workspace unavailable</Text>
           <Text style={styles.body}>{body}</Text>
         </View>

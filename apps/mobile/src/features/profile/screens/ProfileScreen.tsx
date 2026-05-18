@@ -1,14 +1,17 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
+  Alert,
   Modal,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
@@ -17,13 +20,18 @@ import { ModalHeader } from "../../../shared/components/ModalHeader";
 import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfile,
   registerPushToken,
 } from "../../../shared/lib/api";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
-import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import {
+  getInlineErrorMessageOrToast,
+  pushClientFriendlyErrorToast,
+} from "../../../shared/lib/errors";
 import {
   getMobileQueryContentState,
   getQueryErrorMessage,
@@ -41,6 +49,7 @@ import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { getMobileOrgRoleBadge } from "../../people/lib/orgRoleBadges";
 import {
   ProfileHero,
   ProfileHeroMeta,
@@ -71,18 +80,7 @@ type WorkspaceSwitchClient = {
     args?: Record<string, unknown>,
   ) => Promise<{ error: { message: string } | null }>;
 };
-type ProfileConfirmation =
-  | { kind: "logout"; force?: boolean }
-  | {
-      kind: "switchWorkspace";
-      membership: {
-        id: string;
-        slug: string | null;
-        isCurrent: boolean;
-        name?: string;
-        orgRole?: string | null;
-      };
-    };
+type ProfileConfirmation = { kind: "logout"; force?: boolean };
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -102,12 +100,12 @@ export default function ProfileScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<
     string | null
   >(null);
   const [pendingConfirmation, setPendingConfirmation] =
     useState<ProfileConfirmation | null>(null);
+  const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -136,7 +134,11 @@ export default function ProfileScreen() {
       .filter((value): value is string => Boolean(value)) ?? [];
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
-  const roleLabel = ROLE_LABELS[profile?.effectiveRole ?? ""] ?? "User";
+  const orgRoleBadge = getMobileOrgRoleBadge(profile?.effectiveRole);
+  const roleLabel =
+    orgRoleBadge?.label ?? ROLE_LABELS[profile?.effectiveRole ?? ""] ?? "User";
+  const avatarSeed = profile?.linkedEmployee?.id ?? profile?.user.id ?? "";
+  const avatarTone = avatarSeed ? getAvatarTone(avatarSeed) : null;
   const staffStatusLabel = formatProfileStatus(profile?.linkedEmployee?.status);
 
   async function handleLogout() {
@@ -194,7 +196,6 @@ export default function ProfileScreen() {
     }
 
     setSwitchingWorkspaceId(input.id);
-    setWorkspaceError(null);
 
     try {
       const supabase = getSupabaseClient();
@@ -204,38 +205,34 @@ export default function ProfileScreen() {
       });
 
       if (switchResult.error) {
-        setWorkspaceError(
-          getInlineErrorMessageOrToast(pushToast, {
-            error: switchResult.error,
-            fallbackMessage: "We couldn't switch organizations right now.",
-          }),
-        );
+        pushClientFriendlyErrorToast(pushToast, {
+          error: switchResult.error,
+          fallbackMessage: "We couldn't switch organizations right now.",
+          title: "Could not switch organization",
+        });
         return;
       }
 
       const refreshResult = await supabase.auth.refreshSession();
       if (refreshResult.error || !refreshResult.data.session) {
-        setWorkspaceError(
-          getInlineErrorMessageOrToast(pushToast, {
-            error: refreshResult.error,
-            fallbackMessage:
-              "We couldn't refresh your session after switching organizations.",
-          }),
-        );
+        pushClientFriendlyErrorToast(pushToast, {
+          error: refreshResult.error,
+          fallbackMessage:
+            "We couldn't refresh your session after switching organizations.",
+          title: "Could not switch organization",
+        });
         return;
       }
 
       await saveLastWorkspaceSlug(input.slug);
       await queryClient.invalidateQueries({ queryKey: ["mobile"] });
       await Promise.all([profileQuery.refetch(), bootstrapQuery.refetch()]);
-      setIsSwitchModalVisible(false);
     } catch (error) {
-      setWorkspaceError(
-        getInlineErrorMessageOrToast(pushToast, {
-          error,
-          fallbackMessage: "We couldn't switch organizations right now.",
-        }),
-      );
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        fallbackMessage: "We couldn't switch organizations right now.",
+        title: "Could not switch organization",
+      });
     } finally {
       setSwitchingWorkspaceId(null);
     }
@@ -245,28 +242,23 @@ export default function ProfileScreen() {
     const action = pendingConfirmation;
     setPendingConfirmation(null);
     if (!action) return;
-
-    if (action.kind === "logout") {
-      void handleLogout();
-    } else {
-      void handleSwitchWorkspace(action.membership);
-    }
+    void handleLogout();
   }
 
-  const confirmationTitle =
-    pendingConfirmation?.kind === "switchWorkspace"
-      ? "Switch organization?"
-      : pendingConfirmation?.force
-        ? "Force sign out?"
-        : "Sign out?";
-  const confirmationBody =
-    pendingConfirmation?.kind === "switchWorkspace"
-      ? `Switch this mobile session to ${pendingConfirmation.membership.name ?? "this organization"}?`
-      : pendingConfirmation?.force
-        ? "Force this mobile session to sign out now?"
-        : "Sign out of this mobile session?";
-  const confirmationLabel =
-    pendingConfirmation?.kind === "switchWorkspace" ? "Switch" : "Sign Out";
+  const confirmationTitle = pendingConfirmation?.force
+    ? "Force sign out?"
+    : "Sign out?";
+  const confirmationBody = pendingConfirmation?.force
+    ? "You'll be signed out immediately, even if data hasn't synced."
+    : "You'll be signed out on this device.";
+  const confirmationLabel = "Sign Out";
+
+  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const shouldShowHeader = event.nativeEvent.contentOffset.y > 88;
+    setShowCollapsedHeader((current) =>
+      current === shouldShowHeader ? current : shouldShowHeader,
+    );
+  }
 
   return (
     <Screen
@@ -275,7 +267,12 @@ export default function ProfileScreen() {
       subtitle="Profile"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
     >
+      <Stack.Screen
+        options={createDetailStackOptions(showCollapsedHeader ? displayName : "")}
+      />
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
           <Text style={styles.loadingTitle}>Loading profile</Text>
@@ -284,9 +281,11 @@ export default function ProfileScreen() {
       ) : contentState.kind === "error" ? (
         <>
           <StatusBanner
-            actionLabel="Try Again"
+            actionLabel="Try again"
             body={contentState.message}
+            fillScreen
             title="Could not load profile"
+            variant="centered"
             onAction={() => {
               void profileQuery.refetch();
             }}
@@ -310,17 +309,32 @@ export default function ProfileScreen() {
         </>
       ) : contentState.kind === "empty" || !profile ? (
         <EmptyStateCard
-          body="We couldn't build your account summary from the current mobile session."
+          fillScreen
+          body="We couldn't load your account details. Try signing out and back in."
           iconName="person-circle-outline"
           title="Profile unavailable"
         />
       ) : (
         <>
           <ProfileHero
+            avatarStyle={
+              avatarTone
+                ? {
+                    backgroundColor: avatarTone.backgroundColor,
+                    borderColor: avatarTone.borderColor,
+                    borderWidth: 1,
+                  }
+                : undefined
+            }
+            avatarTextStyle={
+              avatarTone ? { color: avatarTone.color } : undefined
+            }
             badge={roleLabel}
+            badgeTone={orgRoleBadge?.tone}
             initials={getProfileInitials(displayName)}
             title={displayName}
             subtitle={profile.user.email || "No email on file"}
+            style={{ paddingBottom: 16 }}
           >
             <ProfileHeroMeta label="Organization" value={profile.currentOrg.name} />
             <ProfileHeroMeta
@@ -330,10 +344,6 @@ export default function ProfileScreen() {
             <ProfileHeroMeta
               label="Member since"
               value={formatDate(profile.user.createdAt)}
-            />
-            <ProfileHeroMeta
-              label="Last sign in"
-              value={formatDate(profile.user.lastSignInAt)}
             />
           </ProfileHero>
 
@@ -410,9 +420,14 @@ export default function ProfileScreen() {
               />
               <ProfileNavRow
                 iconName="lock-closed-outline"
-                isLast
                 label="Security & sessions"
                 onPress={() => router.push("/(tabs)/profile/security")}
+              />
+              <ProfileNavRow
+                iconName="notifications-outline"
+                isLast
+                label="Notifications"
+                onPress={() => router.push("/(tabs)/profile/notifications")}
               />
             </ProfileList>
           </ProfileSection>
@@ -437,7 +452,6 @@ export default function ProfileScreen() {
                 <Button
                   label="Switch organization"
                   onPress={() => {
-                    setWorkspaceError(null);
                     setIsSwitchModalVisible(true);
                   }}
                   tone="secondary"
@@ -465,12 +479,6 @@ export default function ProfileScreen() {
               }
               stickyHeaderTopPadding={15}
             >
-              {workspaceError ? (
-                <StatusBanner
-                  body={workspaceError}
-                  title="Could not switch organization"
-                />
-              ) : null}
               <ProfileSection title="Organizations">
                 <ProfileList>
                   {memberships.map((membership, index) => (
@@ -480,10 +488,29 @@ export default function ProfileScreen() {
                       membership={membership}
                       switching={switchingWorkspaceId === membership.id}
                       onPress={() => {
-                        setPendingConfirmation({
-                          kind: "switchWorkspace",
-                          membership,
-                        });
+                        // Use the native Alert API for confirmation: an iOS
+                        // pageSheet Modal cannot reliably present another RN
+                        // Modal on top, but UIAlertController always can. The
+                        // pageSheet is closed synchronously on confirm so the
+                        // refreshSession() cascade (new accessToken → query
+                        // refetches → realtime channel rebuild) doesn't tear
+                        // down a still-mounted native modal.
+                        Alert.alert(
+                          "Switch organization?",
+                          `You'll switch to ${
+                            membership.name ?? "this organization"
+                          }.`,
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Switch",
+                              onPress: () => {
+                                setIsSwitchModalVisible(false);
+                                void handleSwitchWorkspace(membership);
+                              },
+                            },
+                          ],
+                        );
                       }}
                     />
                   ))}
@@ -496,12 +523,8 @@ export default function ProfileScreen() {
       <ConfirmationModal
         body={confirmationBody}
         confirmLabel={confirmationLabel}
-        confirmTone={
-          pendingConfirmation?.kind === "switchWorkspace"
-            ? "primary"
-            : "dangerFilled"
-        }
-        loading={isSigningOut || switchingWorkspaceId != null}
+        confirmTone="dangerFilled"
+        loading={isSigningOut}
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={confirmProfileAction}
         title={confirmationTitle}
@@ -615,6 +638,7 @@ const styles = StyleSheet.create({
   workspaceOptionName: {
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   workspaceOptionMeta: {
     ...mobileText.body,
@@ -623,6 +647,6 @@ const styles = StyleSheet.create({
   workspaceOptionStatus: {
     ...mobileText.caption,
     color: mobileColors.textSubtle,
-    fontWeight: "600",
+    fontWeight: "500",
   },
 });

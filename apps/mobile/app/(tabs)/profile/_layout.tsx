@@ -23,6 +23,10 @@ export default function ProfileLayout() {
         name="security"
         options={createDetailStackOptions("Security & sessions")}
       />
+      <Stack.Screen
+        name="notifications"
+        options={createDetailStackOptions("Notifications")}
+      />
     </Stack>
   );
 }

@@ -59,7 +59,7 @@ export default function TabsLayoutWeb() {
         },
       }}
     >
-      <Tabs.Screen name="me" options={{ title: "Me" }} />
+      <Tabs.Screen name="home" options={{ title: "Home" }} />
       {canViewTeamSchedule ? (
         <Tabs.Screen name="team" options={{ title: "Schedule" }} />
       ) : null}

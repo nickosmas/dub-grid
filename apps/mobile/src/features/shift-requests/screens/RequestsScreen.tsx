@@ -701,7 +701,7 @@ export default function RequestsScreen() {
               key={tab.key}
               accessibilityState={{ selected: isActive }}
               accessibilityRole="button"
-              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+              android_ripple={{ color: mobileColors.rippleNeutral }}
               onPress={() => setSelectedTab(tab.key)}
               style={[styles.tabButton, isActive && styles.tabButtonActive]}
             >
@@ -740,24 +740,28 @@ export default function RequestsScreen() {
         </View>
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load requests"
+          variant="centered"
           onAction={() => {
             void requestsQuery.refetch();
           }}
         />
       ) : contentState.kind === "empty" ? (
         <EmptyStateCard
-          body="Requests will appear here once someone asks for coverage or a shift pickup."
+          fillScreen
+          body="Coverage and pickup requests will appear here when someone needs help."
           iconName="swap-horizontal-outline"
-          title="No request activity yet"
+          title="No requests yet"
         />
       ) : activeTab === "available" ? (
         <View style={styles.section}>
           {availableOpenShiftFeed.totalCount === 0 ? (
             <EmptyStateCard
-              body="Open shifts you can volunteer for or claim will show up here."
+              fillScreen
+              body="Open shifts you can claim will appear here."
               iconName="briefcase-outline"
               title="Nothing to pick up"
             />
@@ -804,7 +808,8 @@ export default function RequestsScreen() {
         <View style={styles.section}>
           {allRequests.length === 0 ? (
             <EmptyStateCard
-              body="Open and pending requests across the schedule will show up here."
+              fillScreen
+              body="Open and pending requests will appear here."
               iconName="list-outline"
               title="No active requests"
             />
@@ -826,9 +831,10 @@ export default function RequestsScreen() {
         <View style={styles.section}>
           {myRequests.length === 0 ? (
             <EmptyStateCard
-              body="Requests you create stay here until they are resolved or canceled."
+              fillScreen
+              body="Your requests stay here until they're resolved or canceled."
               iconName="document-text-outline"
-              title="No active requests"
+              title="You haven't made any requests"
             />
           ) : (
             myRequests.map((request) => (
@@ -848,9 +854,10 @@ export default function RequestsScreen() {
         <View style={styles.section}>
           {approvalRequests.length === 0 ? (
             <EmptyStateCard
-              body="Requests only appear here when a manager decision is needed."
+              fillScreen
+              body="Requests appear here when they need your approval."
               iconName="checkmark-done-outline"
-              title="Nothing waiting for approval"
+              title="Nothing to approve"
             />
           ) : (
             approvalRequests.map((request) => (
@@ -870,9 +877,10 @@ export default function RequestsScreen() {
         <View style={styles.section}>
           {historyRequests.length === 0 ? (
             <EmptyStateCard
-              body="Approved, rejected, canceled, and expired requests stay here."
+              fillScreen
+              body="Resolved, canceled, and expired requests appear here."
               iconName="time-outline"
-              title="No request history"
+              title="No history yet"
             />
           ) : (
             historyRequests.map((request) => (

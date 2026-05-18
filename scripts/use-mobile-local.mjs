@@ -1,6 +1,7 @@
 import { networkInterfaces } from "os";
 import { readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
+import { fileURLToPath } from "url";
 
 const repoRoot = resolve(new URL(".", import.meta.url).pathname, "..");
 const rootEnvPath = resolve(repoRoot, ".env.local");
@@ -33,7 +34,7 @@ function parseEnvFile(path) {
   return values;
 }
 
-function isLoopbackHost(hostname) {
+export function isLoopbackHost(hostname) {
   return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
@@ -42,7 +43,7 @@ function isLoopbackHost(hostname) {
   );
 }
 
-function isPrivateIpv4Address(address) {
+export function isPrivateIpv4Address(address) {
   if (/^10\./.test(address)) return true;
   if (/^192\.168\./.test(address)) return true;
 
@@ -53,22 +54,41 @@ function isPrivateIpv4Address(address) {
   return secondOctet >= 16 && secondOctet <= 31;
 }
 
-function pickLanIpAddress() {
-  const interfaces = networkInterfaces();
+// Addresses that look "private-ish" but a phone on the same Wi-Fi cannot reach:
+//   - 169.254.0.0/16 (link-local, no DHCP)
+//   - 100.64.0.0/10  (CGNAT — Tailscale, iCloud Private Relay, carrier NAT)
+export function isPhoneUnreachableIpv4Address(address) {
+  if (/^169\.254\./.test(address)) return true;
 
-  for (const addresses of Object.values(interfaces)) {
+  const match = address.match(/^100\.(\d+)\./);
+  if (!match) return false;
+
+  const secondOctet = Number(match[1]);
+  return secondOctet >= 64 && secondOctet <= 127;
+}
+
+export function getCandidateIpv4Addresses() {
+  const interfaces = networkInterfaces();
+  const candidates = [];
+
+  for (const [interfaceName, addresses] of Object.entries(interfaces)) {
     for (const address of addresses ?? []) {
       if (
         address.family === "IPv4" &&
         !address.internal &&
         isPrivateIpv4Address(address.address)
       ) {
-        return address.address;
+        candidates.push({ address: address.address, interface: interfaceName });
       }
     }
   }
 
-  return null;
+  return candidates;
+}
+
+function pickLanIpAddress() {
+  const [first] = getCandidateIpv4Addresses();
+  return first?.address ?? null;
 }
 
 function toLanUrl(candidate, lanIp) {
@@ -143,10 +163,16 @@ function main() {
   console.log("  3. Start Expo: npm run dev:mobile");
 }
 
-try {
-  main();
-} catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`[use-mobile-local] ${message}`);
-  process.exit(1);
+const isDirectInvocation =
+  process.argv[1] != null &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+
+if (isDirectInvocation) {
+  try {
+    main();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[use-mobile-local] ${message}`);
+    process.exit(1);
+  }
 }

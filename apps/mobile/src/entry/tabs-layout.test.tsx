@@ -131,6 +131,10 @@ vi.mock("../features/notifications/hooks/usePushRegistration", () => ({
   usePushRegistration,
 }));
 
+vi.mock("../features/notifications/hooks/usePushResponseHandler", () => ({
+  usePushResponseHandler: vi.fn(),
+}));
+
 vi.mock("../shared/lib/auth-reset", () => ({
   handleExpiredMobileSession,
 }));
@@ -183,17 +187,21 @@ describe("TabsLayout", () => {
 
     expect(triggerIconMock).toHaveBeenCalledTimes(5);
 
-    for (const [props] of triggerIconMock.mock.calls) {
+    const [homeProps, ...restProps] = triggerIconMock.mock.calls.map(
+      ([props]) => props,
+    );
+
+    expect(homeProps).toMatchObject({ src: expect.any(Object) });
+    expect(homeProps).not.toHaveProperty("sf");
+    expect(homeProps).not.toHaveProperty("androidSrc");
+
+    for (const props of restProps) {
       expect(props).toMatchObject({
         androidSrc: expect.any(Object),
         sf: expect.any(Object),
       });
       expect(props).not.toHaveProperty("src");
     }
-
-    expect(triggerIconMock.mock.calls[0]?.[0]).toMatchObject({
-      sf: { default: "person", selected: "person.fill" },
-    });
   });
 
   it("uses native stack headers for request, people, and profile tab pages", () => {
@@ -201,7 +209,7 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(7);
+    expect(stackScreenMock).toHaveBeenCalledTimes(8);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
     const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
@@ -254,6 +262,7 @@ describe("TabsLayout", () => {
       "account",
       "work",
       "security",
+      "notifications",
     ]);
   });
 

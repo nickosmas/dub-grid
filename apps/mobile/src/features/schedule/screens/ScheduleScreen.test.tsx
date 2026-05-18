@@ -85,7 +85,7 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   }),
 }));
 
-let MeScheduleScreen: any;
+let HomeScheduleScreen: any;
 let TeamScheduleScreen: any;
 
 type QueryResult = {
@@ -140,6 +140,7 @@ function createScheduleEntry(overrides: Partial<Record<string, unknown>> = {}) {
         displayFocusAreaName: "Skilled Nursing",
       },
     ],
+    indicators: [],
     publishedAt: "2026-04-15T18:30:00.000Z",
     publishedByName: "Mina Diaz",
     ...overrides,
@@ -235,7 +236,7 @@ function createOpenShift(overrides: Partial<Record<string, unknown>> = {}) {
 
 beforeAll(async () => {
   const module = await import("./ScheduleScreen");
-  MeScheduleScreen = module.MeScheduleScreen;
+  HomeScheduleScreen = module.HomeScheduleScreen;
   TeamScheduleScreen = module.TeamScheduleScreen;
 });
 
@@ -515,8 +516,8 @@ describe("ScheduleScreen", () => {
     vi.useRealTimers();
   });
 
-  it("renders the redesigned Me page with current shift, upcoming shifts, open shifts, cover requests, and hours", () => {
-    render(<MeScheduleScreen />);
+  it("renders the redesigned Home page with current shift, upcoming shifts, open shifts, cover requests, and hours", () => {
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByText("On Duty")).toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
@@ -563,10 +564,33 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("This Week's Hours")).not.toBeInTheDocument();
   });
 
+  it("spells out published schedule indicators as text", () => {
+    meScheduleEntries = [
+      createScheduleEntry({
+        indicators: [
+          { id: 1, name: "Training" },
+          { id: 2, name: "Float" },
+        ],
+      }),
+      createScheduleEntry({
+        date: "2026-04-17",
+        indicators: [{ id: 3, name: "New hire" }],
+      }),
+    ];
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.getAllByText("Assignment: Training, Float").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getByText("Assignment: New hire")).toBeInTheDocument();
+    expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
+  });
+
   it("uses a single no-schedule message in the Me hero", () => {
     meScheduleEntries = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const emptyState = screen.getByTestId("me-empty-schedule-state");
 
@@ -591,7 +615,7 @@ describe("ScheduleScreen", () => {
   });
 
   it("shows a success toast after a schedule request action completes", async () => {
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const mutationConfig = useMutation.mock.calls[0][0] as {
       onSuccess: (
@@ -715,7 +739,7 @@ describe("ScheduleScreen", () => {
     openShifts = [];
     shiftRequests = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const heroCard = screen.getByTestId("me-hero-card");
 
@@ -794,7 +818,7 @@ describe("ScheduleScreen", () => {
     openShifts = [];
     shiftRequests = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const heroCard = screen.getByTestId("me-hero-card");
 
@@ -856,7 +880,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("Lead")).toBeInTheDocument();
   });
 
-  it("shows mentored assignments with a full label on Me", () => {
+  it("shows mentored assignments with a full label on Home", () => {
     meScheduleEntries = [
       createScheduleEntry({
         segments: [
@@ -881,7 +905,7 @@ describe("ScheduleScreen", () => {
     shiftRequests = [];
     openShifts = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getAllByText("(Mentored)").length).toBeGreaterThan(0);
     expect(
@@ -893,7 +917,7 @@ describe("ScheduleScreen", () => {
   it("shows the next shift state when nothing is currently active", () => {
     vi.setSystemTime(new Date("2026-04-16T05:00:00.000Z"));
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByText("Upcoming")).toBeInTheDocument();
     expect(screen.getByText("Starting in 2h")).toBeInTheDocument();
@@ -962,7 +986,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getAllByText("Admin")).toHaveLength(2);
     expect(screen.getAllByText("General shift").length).toBeGreaterThan(0);
@@ -1060,7 +1084,7 @@ describe("ScheduleScreen", () => {
       });
     });
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Next week" }));
 
@@ -1075,7 +1099,7 @@ describe("ScheduleScreen", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByText("3h left")).toBeInTheDocument();
 
@@ -1155,7 +1179,7 @@ describe("ScheduleScreen", () => {
       };
     });
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     act(() => {
       vi.advanceTimersByTime(15_000);
@@ -1166,8 +1190,8 @@ describe("ScheduleScreen", () => {
     expect(requestsRefetch).not.toHaveBeenCalled();
   });
 
-  it("routes to the requests tab and claims an open shift from Me", () => {
-    render(<MeScheduleScreen />);
+  it("routes to the requests tab and claims an open shift from Home", () => {
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("See all"));
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/requests");
@@ -1250,7 +1274,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByLabelText("Open shifts carousel")).toBeInTheDocument();
     expect(screen.getByLabelText("2 open shift cards")).toBeInTheDocument();
@@ -1353,7 +1377,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByLabelText("5 open shift cards")).toBeInTheDocument();
     expect(screen.queryByText("Saturday Pickup Extra")).not.toBeInTheDocument();
@@ -1464,7 +1488,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByLabelText("Expand open shifts for Sat, Apr 18"));
     fireEvent.click(screen.getByLabelText("Expand open shifts for Sun, Apr 19"));
@@ -1477,9 +1501,9 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("Collapse open shifts for Sun, Apr 19")).toBeInTheDocument();
   });
 
-  it("volunteers for a coverage-gap open shift from Me", () => {
+  it("volunteers for a coverage-gap open shift from Home", () => {
     shiftRequests = [];
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("Volunteer"));
     expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
@@ -1549,7 +1573,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByLabelText("Multiple Shifts, 2 shifts")).toBeInTheDocument();
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
@@ -1564,15 +1588,15 @@ describe("ScheduleScreen", () => {
     );
     openShifts = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.queryByText("Open Shifts")).not.toBeInTheDocument();
     expect(screen.queryByText("Claim Shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Volunteer")).not.toBeInTheDocument();
   });
 
-  it("accepts and declines shift cover requests from Me", () => {
-    render(<MeScheduleScreen />);
+  it("accepts and declines shift cover requests from Home", () => {
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("Accept"));
     expect(screen.getByText("Accept request?")).toBeInTheDocument();

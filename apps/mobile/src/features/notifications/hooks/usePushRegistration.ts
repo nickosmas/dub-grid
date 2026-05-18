@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as Notifications from "expo-notifications";
+import type * as Notifications from "expo-notifications";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { AppState, Platform } from "react-native";
 import { registerPushToken } from "../../../shared/lib/api";
 import {
@@ -7,6 +8,17 @@ import {
   saveStoredPushDevice,
   type StoredPushDevice,
 } from "../../../shared/lib/session";
+
+const isExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const pushUnsupported = Platform.OS === "web" || isExpoGo;
+
+// Lazy-load expo-notifications so importing this hook in Expo Go doesn't
+// trigger the module's import-time "remote push removed in SDK 53" error.
+async function loadNotifications(): Promise<typeof Notifications | null> {
+  if (pushUnsupported) return null;
+  return await import("expo-notifications");
+}
 
 type PushPermissionState =
   | "unsupported"
@@ -39,13 +51,15 @@ function resolvePermissionState(
   return permissions.canAskAgain ? "undetermined" : "denied";
 }
 
-async function getStoredOrFreshPushDevice(): Promise<StoredPushDevice> {
+async function getStoredOrFreshPushDevice(
+  notifications: typeof Notifications,
+): Promise<StoredPushDevice> {
   const storedDevice = await loadStoredPushDevice();
   if (storedDevice) {
     return storedDevice;
   }
 
-  const response = await Notifications.getExpoPushTokenAsync();
+  const response = await notifications.getExpoPushTokenAsync();
   const platform = Platform.OS === "android" ? "android" : "ios";
   const device = {
     expoPushToken: response.data,
@@ -66,7 +80,7 @@ export function usePushRegistration(
   const autoRegister = options?.autoRegister ?? true;
   const [permissionState, setPermissionState] =
     useState<PushPermissionState>(
-      Platform.OS === "web" ? "unsupported" : "undetermined",
+      pushUnsupported ? "unsupported" : "undetermined",
     );
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
@@ -76,7 +90,7 @@ export function usePushRegistration(
     requestPermission?: boolean;
     disable?: boolean;
   }) {
-    if (Platform.OS === "web" || !accessToken || !currentOrgId) {
+    if (pushUnsupported || !accessToken || !currentOrgId) {
       setPermissionState("unsupported");
       return;
     }
@@ -85,10 +99,16 @@ export function usePushRegistration(
     setError(null);
 
     try {
-      let permissions = await Notifications.getPermissionsAsync();
+      const notifications = await loadNotifications();
+      if (!notifications) {
+        setPermissionState("unsupported");
+        return;
+      }
+
+      let permissions = await notifications.getPermissionsAsync();
       let permissionSnapshot = toPermissionSnapshot(permissions);
       if (!permissionSnapshot.granted && options?.requestPermission) {
-        permissions = await Notifications.requestPermissionsAsync();
+        permissions = await notifications.requestPermissionsAsync();
         permissionSnapshot = toPermissionSnapshot(permissions);
       }
 
@@ -112,7 +132,7 @@ export function usePushRegistration(
         return;
       }
 
-      const device = await getStoredOrFreshPushDevice();
+      const device = await getStoredOrFreshPushDevice(notifications);
       await registerPushToken(accessToken, device);
       await saveStoredPushDevice(device);
     } catch (registrationError) {
@@ -123,7 +143,7 @@ export function usePushRegistration(
   }
 
   useEffect(() => {
-    if (!autoRegister || !accessToken || !currentOrgId || Platform.OS === "web") {
+    if (!autoRegister || !accessToken || !currentOrgId || pushUnsupported) {
       return;
     }
 
@@ -137,7 +157,7 @@ export function usePushRegistration(
   }, [accessToken, autoRegister, currentOrgId]);
 
   useEffect(() => {
-    if (!accessToken || !currentOrgId || Platform.OS === "web") {
+    if (!accessToken || !currentOrgId || pushUnsupported) {
       return;
     }
 
@@ -157,7 +177,7 @@ export function usePushRegistration(
       permissionState,
       isRegistering,
       error,
-      isSupported: Platform.OS !== "web",
+      isSupported: !pushUnsupported,
       enablePush: () => refreshPushRegistration({ requestPermission: true }),
       disablePush: () => refreshPushRegistration({ disable: true }),
       refreshPushRegistration: () => refreshPushRegistration(),

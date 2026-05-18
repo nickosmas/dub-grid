@@ -935,6 +935,8 @@ export default function ShiftDetailScreen() {
   );
   const [selectedTargetedPickupEmployeeId, setSelectedTargetedPickupEmployeeId] =
     useState<string | null>(null);
+  const [selectedCalloffAbsenceTypeId, setSelectedCalloffAbsenceTypeId] =
+    useState<number | null>(null);
   const [pendingConfirmation, setPendingConfirmation] =
     useState<ShiftDetailConfirmation>(null);
 
@@ -1093,6 +1095,7 @@ export default function ShiftDetailScreen() {
       setSelectedSwapDate(null);
       setSwapWeekStartDate(null);
       setSelectedTargetedPickupEmployeeId(null);
+      setSelectedCalloffAbsenceTypeId(null);
       await queryClient.invalidateQueries({ queryKey: ["mobile", "requests"] });
     },
   });
@@ -1387,6 +1390,17 @@ export default function ShiftDetailScreen() {
     shiftEntry,
     teamScheduleQuery.data?.entries,
   ]);
+  const selectedTargetedPickupEntry = selectedTargetedPickupEmployeeId
+    ? (targetedPickupOptions.find(
+        (entry) => entry.employeeId === selectedTargetedPickupEmployeeId,
+      ) ?? null)
+    : null;
+  const selectedCalloffAbsenceType =
+    selectedCalloffAbsenceTypeId == null
+      ? null
+      : (activeAbsenceTypes.find(
+          (absenceType) => absenceType.id === selectedCalloffAbsenceTypeId,
+        ) ?? null);
   const canCreateRequestsForShift = Boolean(
     shiftEntry &&
     linkedEmployeeId &&
@@ -1523,6 +1537,7 @@ export default function ShiftDetailScreen() {
         : null,
     );
     setSelectedTargetedPickupEmployeeId(null);
+    setSelectedCalloffAbsenceTypeId(null);
   }
 
   function submitSwapRequest() {
@@ -1586,13 +1601,13 @@ export default function ShiftDetailScreen() {
     setPendingConfirmation({
       title:
         type === "pickup"
-          ? "Offer shift for pickup?"
-          : "Submit call off request?",
+          ? "Offer this shift for pickup?"
+          : "Submit this call-off?",
       body:
         type === "pickup"
-          ? `Offer your ${shiftLabel} shift on ${shiftDateLabel} for pickup?`
-          : `Submit a ${options?.absenceTypeLabel ?? "selected"} absence request for your ${shiftLabel} shift on ${shiftDateLabel}?`,
-      confirmLabel: type === "pickup" ? "Offer for pickup" : "Submit call off",
+          ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
+          : `A ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
+      confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
       confirmTone: type === "calloff" ? "dangerFilled" : "primary",
       onConfirm: () =>
         submitCoverageRequest(type, {
@@ -1616,9 +1631,9 @@ export default function ShiftDetailScreen() {
     }
 
     setPendingConfirmation({
-      title: "Request pickup?",
-      body: `Ask ${entry.employeeName} to pick up your ${shiftLabel} shift on ${shiftDateLabel} while you use ${absenceTypeLabel}?`,
-      confirmLabel: "Request pickup",
+      title: "Send a pickup request?",
+      body: `${entry.employeeName} will be asked to pick up your ${shiftLabel} shift on ${shiftDateLabel} so you can use ${absenceTypeLabel}.`,
+      confirmLabel: "Send Request",
       onConfirm: () =>
         submitCoverageRequest("pickup", {
           targetEmpId: entry.employeeId,
@@ -1640,9 +1655,9 @@ export default function ShiftDetailScreen() {
     );
 
     setPendingConfirmation({
-      title: "Submit swap request?",
-      body: `Swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} with ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}?`,
-      confirmLabel: "Submit swap",
+      title: "Send this swap request?",
+      body: `You'll swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} for ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}.`,
+      confirmLabel: "Send Swap",
       onConfirm: submitSwapRequest,
     });
   }
@@ -1676,15 +1691,17 @@ export default function ShiftDetailScreen() {
         <View style={styles.loadingState}>
           <Text style={styles.loadingTitle}>Loading shift</Text>
           <Text style={styles.loadingBody}>
-            Pulling the latest published shift details into the mobile app.
+            Getting the latest shift details.
           </Text>
           <DetailSkeleton sections={2} />
         </View>
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load shift"
+          variant="centered"
           onAction={() => {
             void Promise.all([
               bootstrapQuery.refetch(),
@@ -1695,9 +1712,10 @@ export default function ShiftDetailScreen() {
         />
       ) : !employeeId || !shiftDate || !shiftEntry ? (
         <EmptyStateCard
-          body="We could not find that published shift in the selected schedule range."
+          fillScreen
+          body="This shift isn't in the schedule range you're viewing."
           iconName="calendar-clear-outline"
-          title="Shift unavailable"
+          title="Shift not found"
         />
       ) : (
         <>
@@ -1752,8 +1770,8 @@ export default function ShiftDetailScreen() {
               ) : null}
               {!hasMultipleSegments && timeRange ? (
                 <DetailInfoRow
-                  iconBackgroundColor="#EEF2FF"
-                  iconColor="#4F46E5"
+                  iconBackgroundColor={mobileColors.brandSoft}
+                  iconColor={mobileColors.brand}
                   iconName="time-outline"
                   label="Shift time"
                   value={timeRange}
@@ -1765,6 +1783,7 @@ export default function ShiftDetailScreen() {
               <View style={styles.detailActionsRow}>
                 <DetailActionButton
                   disabled={createRequestMutation.isPending}
+                  iconName="exit-outline"
                   label="Drop shift"
                   onPress={() => resetRequestMode("coverage")}
                   tone="neutral"
@@ -1907,7 +1926,10 @@ export default function ShiftDetailScreen() {
                     active={coverageRequestType === "pickup"}
                     body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
                     disabled={createRequestMutation.isPending}
-                    onPress={() => setCoverageRequestType("pickup")}
+                    onPress={() => {
+                      setCoverageRequestType("pickup");
+                      setSelectedCalloffAbsenceTypeId(null);
+                    }}
                     title="Offer for pickup"
                     tone="neutral"
                   />
@@ -1918,7 +1940,10 @@ export default function ShiftDetailScreen() {
                       createRequestMutation.isPending ||
                       activeAbsenceTypes.length === 0
                     }
-                    onPress={() => setCoverageRequestType("calloff")}
+                    onPress={() => {
+                      setCoverageRequestType("calloff");
+                      setSelectedTargetedPickupEmployeeId(null);
+                    }}
                     title="Call off"
                     tone="danger"
                   />
@@ -1932,25 +1957,34 @@ export default function ShiftDetailScreen() {
                 {coverageRequestType === "pickup" ? (
                   <View style={styles.modalInlinePanel}>
                     <Text style={styles.subsectionLabel}>Offer for pickup</Text>
-                    <Button
-                      disabled={createRequestMutation.isPending}
-                      label="Offer to everyone"
-                      onPress={() => confirmCoverageRequest("pickup")}
-                    />
+                    {selectedTargetedPickupEntry ? null : (
+                      <Button
+                        disabled={createRequestMutation.isPending}
+                        label="Offer to everyone"
+                        onPress={() => confirmCoverageRequest("pickup")}
+                      />
+                    )}
                     <Text style={styles.subsectionLabel}>
                       Request specific person
                     </Text>
                     <Text style={styles.subsectionBody}>
-                      Only teammates with an absence on this date are shown.
+                      {selectedTargetedPickupEntry
+                        ? "Review your request below, then submit."
+                        : "Only teammates with an absence on this date are shown."}
                     </Text>
                     <View style={styles.swapDateFilteredList}>
                       {targetedPickupOptions.length === 0 ? (
-                        <Text style={styles.subsectionBody}>
-                          No absent teammates are available on this date.
-                        </Text>
+                        <EmptyStateCard
+                          compact
+                          iconName="person-remove-outline"
+                          title="No absent teammates on this date"
+                        />
                       ) : (
                         <View style={styles.swapOptions}>
-                          {targetedPickupOptions.map((entry) => (
+                          {(selectedTargetedPickupEntry
+                            ? [selectedTargetedPickupEntry]
+                            : targetedPickupOptions
+                          ).map((entry) => (
                             <SwapOptionCard
                               key={`${entry.employeeId}-${entry.date}`}
                               active={
@@ -1966,9 +2000,11 @@ export default function ShiftDetailScreen() {
                               showSegments={false}
                               onPress={() => {
                                 setSelectedTargetedPickupEmployeeId(
-                                  entry.employeeId,
+                                  selectedTargetedPickupEmployeeId ===
+                                    entry.employeeId
+                                    ? null
+                                    : entry.employeeId,
                                 );
-                                confirmTargetedPickupRequest(entry);
                               }}
                             />
                           ))}
@@ -1980,21 +2016,33 @@ export default function ShiftDetailScreen() {
                 {coverageRequestType === "calloff" ? (
                   <View style={styles.modalInlinePanel}>
                     <Text style={styles.subsectionLabel}>
-                      Select absence reason
+                      {selectedCalloffAbsenceType
+                        ? "Absence reason"
+                        : "Select absence reason"}
                     </Text>
+                    {selectedCalloffAbsenceType ? (
+                      <Text style={styles.subsectionBody}>
+                        Review your call-off below, then submit.
+                      </Text>
+                    ) : null}
                     <View style={styles.selectorWrap}>
-                      {activeAbsenceTypes.map((absenceType) => (
+                      {(selectedCalloffAbsenceType
+                        ? [selectedCalloffAbsenceType]
+                        : activeAbsenceTypes
+                      ).map((absenceType) => (
                         <SelectorChip
                           key={absenceType.id}
-                          active={false}
+                          active={
+                            selectedCalloffAbsenceTypeId === absenceType.id
+                          }
                           disabled={createRequestMutation.isPending}
                           label={getAbsenceTypeOptionLabel(absenceType)}
                           onPress={() =>
-                            confirmCoverageRequest("calloff", {
-                              absenceTypeId: absenceType.id,
-                              absenceTypeLabel:
-                                getAbsenceTypeOptionLabel(absenceType),
-                            })
+                            setSelectedCalloffAbsenceTypeId(
+                              selectedCalloffAbsenceTypeId === absenceType.id
+                                ? null
+                                : absenceType.id,
+                            )
                           }
                         />
                       ))}
@@ -2044,10 +2092,12 @@ export default function ShiftDetailScreen() {
 	                          )}
 	                        </Text>
 	                      ) : swapTargetOptions.length === 0 ? (
-	                        <Text style={styles.subsectionBody}>
-	                          No eligible teammate shifts are available in this
-	                          schedule range yet.
-	                        </Text>
+	                        <EmptyStateCard
+	                          compact
+	                          iconName="swap-horizontal-outline"
+	                          title="No eligible shifts"
+	                          body="Eligible teammate shifts will appear here once published."
+	                        />
 	                      ) : selectedTargetEntry ? (
 	                        <View style={styles.swapSelectedPanel}>
 	                          <Text style={styles.subsectionBody}>
@@ -2221,6 +2271,57 @@ export default function ShiftDetailScreen() {
                     createRequestMutation.isPending ? "Submitting..." : "Submit"
                   }
                   onPress={handleSubmitRequest}
+                />
+              </View>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "pickup" &&
+            selectedTargetedPickupEntry &&
+            shiftEntry ? (
+              <View style={styles.modalActionButtons}>
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedTargetedPickupEmployeeId(null)}
+                  tone="neutral"
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label={
+                    createRequestMutation.isPending ? "Submitting..." : "Submit"
+                  }
+                  onPress={() =>
+                    confirmTargetedPickupRequest(selectedTargetedPickupEntry)
+                  }
+                />
+              </View>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "calloff" &&
+            selectedCalloffAbsenceType &&
+            shiftEntry ? (
+              <View style={styles.modalActionButtons}>
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedCalloffAbsenceTypeId(null)}
+                  tone="neutral"
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label={
+                    createRequestMutation.isPending ? "Submitting..." : "Submit"
+                  }
+                  onPress={() =>
+                    confirmCoverageRequest("calloff", {
+                      absenceTypeId: selectedCalloffAbsenceType.id,
+                      absenceTypeLabel: getAbsenceTypeOptionLabel(
+                        selectedCalloffAbsenceType,
+                      ),
+                    })
+                  }
                 />
               </View>
             ) : null}
@@ -2595,9 +2696,11 @@ function ShiftmateSegmentGroups({
               ))}
             </View>
           ) : (
-            <Text style={styles.shiftmateSegmentEmpty}>
-              No one listed for {group.label}.
-            </Text>
+            <EmptyStateCard
+              compact
+              iconName="people-outline"
+              title={`No one in ${group.label} yet`}
+            />
           )}
         </View>
       ))}
@@ -3330,12 +3433,6 @@ const styles = StyleSheet.create({
     ...mobileText.meta,
     color: mobileColors.textMuted,
     fontWeight: "600",
-  },
-  shiftmateSegmentEmpty: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-    paddingVertical: 10,
   },
   shiftmateRow: {
     flexDirection: "row",

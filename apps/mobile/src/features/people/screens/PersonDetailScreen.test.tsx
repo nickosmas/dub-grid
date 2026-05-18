@@ -22,6 +22,10 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
+vi.mock("@expo/vector-icons/FontAwesome6", () => ({
+  default: () => null,
+}));
+
 vi.mock("@tanstack/react-query", () => ({
   onlineManager: {
     isOnline: () => true,
@@ -126,6 +130,7 @@ describe("PersonDetailScreen", () => {
           id: "emp-1",
           firstName: "Mina",
           lastName: "Diaz",
+          orgRole: "super_admin",
           employmentType: "full_time",
           phone: "(415) 425-3334",
           email: "mina@dubgrid.com",
@@ -158,13 +163,14 @@ describe("PersonDetailScreen", () => {
       "token-123",
       "emp-1",
     ]);
+    expect(screen.getByText("Super Admin")).toBeInTheDocument();
     expect(screen.getAllByText("Active app account")).toHaveLength(1);
     expect(screen.getAllByText("Charge Nurse").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Account Access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Account access")).not.toBeInTheDocument();
     expect(screen.queryByText("Status updated")).not.toBeInTheDocument();
   });
 
-  it("shows invitation details when the person still needs app access", () => {
+  it("omits the account access section even when the person still needs app access", () => {
     useQuery.mockReturnValue({
       data: {
         person: {
@@ -202,10 +208,10 @@ describe("PersonDetailScreen", () => {
 
     render(<PersonDetailScreen />);
 
-    expect(screen.getByText("Account access")).toBeInTheDocument();
+    expect(screen.queryByText("Account access")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Pending for mina@dubgrid.com"),
-    ).toBeInTheDocument();
+      screen.queryByText("Pending for mina@dubgrid.com"),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Status updated")).toBeInTheDocument();
   });
 

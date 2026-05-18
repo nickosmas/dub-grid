@@ -5,7 +5,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -20,6 +19,7 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { ModalHeader } from "../../../shared/components/ModalHeader";
+import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -29,6 +29,7 @@ import {
   getPeople,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -39,9 +40,11 @@ import {
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 type StatusFilter = "active" | "inactive";
 type SortMode = "seniority" | "alphabetical";
+type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 type ProfileRequestConfirmation = {
   request: MobileProfileChangeRequest;
   action: "approve" | "reject";
@@ -55,22 +58,6 @@ function formatStatusLabel(status: MobilePerson["status"]): string {
   return status === "active" ? "Active" : "Inactive";
 }
 
-function hashCode(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string) {
-  const hue = hashCode(seed) % 360;
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 94%)`,
-    borderColor: `hsl(${hue}, 70%, 86%)`,
-    color: `hsl(${hue}, 70%, 34%)`,
-  };
-}
 
 export default function PeopleScreen() {
   const accessToken = useAccessToken();
@@ -82,7 +69,7 @@ export default function PeopleScreen() {
   const [focusFilterId, setFocusFilterId] = useState<number | "all">("all");
   const [managementDepartmentFilterId, setManagementDepartmentFilterId] =
     useState<number | "all">("all");
-  const [isRefineModalVisible, setIsRefineModalVisible] = useState(false);
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
   const canManageEmployees = Boolean(
@@ -229,12 +216,13 @@ export default function PeopleScreen() {
   );
   const activeCount = visiblePeople.filter((person) => person.status === "active").length;
   const inactiveCount = visiblePeople.length - activeCount;
-  const activeRefinementCount =
+  const activeFilterCount =
     (focusFilterId === "all" ? 0 : 1) +
     (managementDepartmentFilterId === "all" ? 0 : 1) +
     (canManageEmployees && statusFilter === "inactive" ? 1 : 0) +
     (sortMode === "alphabetical" ? 1 : 0);
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
+  const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const contentState = getMobileQueryContentState({
     hasData: peopleQuery.data !== undefined,
     isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
@@ -252,16 +240,16 @@ export default function PeopleScreen() {
       <Modal
         animationType="slide"
         allowSwipeDismissal
-        onRequestClose={() => setIsRefineModalVisible(false)}
+        onRequestClose={() => setIsFilterModalVisible(false)}
         presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
-        visible={isRefineModalVisible}
+        visible={isFilterModalVisible}
       >
         <Screen
           bottomPaddingMode="modal"
           stickyHeader={
             <ModalHeader
-              title="Refine directory"
-              onClose={() => setIsRefineModalVisible(false)}
+              title="Filter directory"
+              onClose={() => setIsFilterModalVisible(false)}
             />
           }
           stickyHeaderTopPadding={15}
@@ -340,32 +328,26 @@ export default function PeopleScreen() {
 
       <View style={styles.section}>
         <View style={styles.searchBarRow}>
-          <View style={styles.searchField}>
-            <Ionicons color={mobileColors.textSubtle} name="search" size={18} />
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setSearchValue}
-              placeholder="Search people"
-              placeholderTextColor={mobileColors.textSubtle}
-              style={styles.searchInput}
-              value={searchValue}
-            />
-          </View>
+          <SearchBar
+            accessibilityLabel="Search people"
+            onChangeText={setSearchValue}
+            placeholder="Search people"
+            value={searchValue}
+          />
           <Pressable
             accessibilityLabel="Open people filters and sort"
             accessibilityRole="button"
-            accessibilityState={{ expanded: isRefineModalVisible }}
+            accessibilityState={{ expanded: isFilterModalVisible }}
             android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-            onPress={() => setIsRefineModalVisible(true)}
+            onPress={() => setIsFilterModalVisible(true)}
             style={[
-              styles.refineButton,
-              activeRefinementCount > 0 && styles.refineButtonActive,
+              styles.filterButton,
+              activeFilterCount > 0 && styles.filterButtonActive,
             ]}
           >
             <Ionicons
               color={
-                activeRefinementCount > 0
+                activeFilterCount > 0
                   ? mobileColors.textInverse
                   : mobileColors.textSecondary
               }
@@ -375,11 +357,11 @@ export default function PeopleScreen() {
             <Text
               numberOfLines={1}
               style={[
-                styles.refineButtonText,
-                activeRefinementCount > 0 && styles.refineButtonTextActive,
+                styles.filterButtonText,
+                activeFilterCount > 0 && styles.filterButtonTextActive,
               ]}
             >
-              Refine
+              Filter
             </Text>
           </Pressable>
         </View>
@@ -445,27 +427,33 @@ export default function PeopleScreen() {
         contentState.reason === "unauthorized" ? (
         <StatusBanner
           body="Your current role does not include mobile staff visibility for this workspace."
+          fillScreen
           tone="warning"
           title="Directory unavailable"
+          variant="centered"
         />
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load people"
+          variant="centered"
           onAction={() => {
             void peopleQuery.refetch();
           }}
         />
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
-          body="No teammates are available in this workspace yet."
+          fillScreen
+          body="Teammates will appear here once they're added to your workspace."
           iconName="people-outline"
           title="No teammates yet"
         />
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
-          body="Try a different name, email, phone number, focus area, or management department."
+          fillScreen
+          body="Try a different name, email, phone, or focus area."
           iconName="search-outline"
           title="No matches"
         />
@@ -494,7 +482,17 @@ export default function PeopleScreen() {
                   employmentType={person.employmentType}
                   isLast={index === filteredPeople.length - 1}
                   name={getFullName(person)}
+                  orgRole={person.orgRole}
                   onPress={() => {
+                    const isSelf = Boolean(
+                      currentUserId &&
+                        person.userId &&
+                        person.userId === currentUserId,
+                    );
+                    if (isSelf) {
+                      router.push("/(tabs)/profile");
+                      return;
+                    }
                     router.push({
                       pathname: "/(tabs)/people/[id]",
                       params: { id: person.id },
@@ -513,10 +511,10 @@ export default function PeopleScreen() {
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "Approve this account deletion request? The account deletion safeguards will run before access is removed."
+            ? "Safeguards will run before this account loses access."
             : profileRequestConfirmation?.action === "approve"
-              ? "Approve this profile change request?"
-              : "Reject this profile change request?"
+              ? "The change will be applied to this teammate's profile."
+              : "The teammate's profile will stay as it is."
         }
         confirmLabel={
           profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"
@@ -608,6 +606,7 @@ function PersonRow({
   id,
   employmentType,
   name,
+  orgRole,
   subtitle,
   status,
   accessHint,
@@ -618,6 +617,7 @@ function PersonRow({
   id: string;
   employmentType: MobilePerson["employmentType"];
   name: string;
+  orgRole: MobileOrgRole;
   subtitle: string;
   status: MobilePerson["status"];
   accessHint: string | null;
@@ -633,6 +633,7 @@ function PersonRow({
     .filter(Boolean)
     .join(" - ");
   const avatarTone = getAvatarTone(id);
+  const orgRoleBadge = getMobileOrgRoleBadge(orgRole);
   const initials =
     name
       .split(" ")
@@ -667,9 +668,16 @@ function PersonRow({
         </Text>
       </View>
       <View style={styles.personCopy}>
-        <Text numberOfLines={1} style={styles.personName}>
-          {name}
-        </Text>
+        <View style={styles.personNameRow}>
+          <Text numberOfLines={1} style={styles.personName}>
+            {name}
+          </Text>
+          {orgRoleBadge ? (
+            <View style={orgRoleBadge.containerStyle}>
+              <Text style={orgRoleBadge.textStyle}>{orgRoleBadge.label}</Text>
+            </View>
+          ) : null}
+        </View>
         <Text numberOfLines={1} style={styles.personSubtitle}>
           {subtitle}
         </Text>
@@ -709,26 +717,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
-  searchField: {
-    minHeight: 46,
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    flex: 1,
-    gap: 9,
-    paddingHorizontal: 14,
-  },
-  searchInput: {
-    ...mobileText.sectionTitle,
-    fontWeight: "400",
-    color: mobileColors.textPrimary,
-    flex: 1,
-    paddingVertical: 12,
-  },
-  refineButton: {
+  filterButton: {
     minHeight: 46,
     alignItems: "center",
     backgroundColor: mobileColors.surface,
@@ -740,16 +729,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
   },
-  refineButtonActive: {
+  filterButtonActive: {
     backgroundColor: mobileColors.brand,
     borderColor: mobileColors.brand,
   },
-  refineButtonText: {
+  filterButtonText: {
     color: mobileColors.textSecondary,
     fontSize: 14,
     fontWeight: "700",
   },
-  refineButtonTextActive: {
+  filterButtonTextActive: {
     color: mobileColors.textInverse,
   },
   selectionList: {
@@ -839,9 +828,16 @@ const styles = StyleSheet.create({
     gap: 3,
     minWidth: 0,
   },
+  personNameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    minWidth: 0,
+  },
   personName: {
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
+    flexShrink: 1,
   },
   personSubtitle: {
     ...mobileText.body,

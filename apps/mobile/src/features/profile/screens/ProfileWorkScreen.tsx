@@ -205,18 +205,25 @@ export default function ProfileWorkScreen() {
         <DetailSkeleton sections={2} />
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load work profile"
+          variant="centered"
           onAction={() => {
             void profileQuery.refetch();
           }}
         />
       ) : !profile?.linkedEmployee ? (
         <EmptyStateCard
-          body="This account is not linked to a staff profile in this organization."
+          fillScreen
+          body={
+            canEditProfileDirectly
+              ? "Open the People tab to link your account to a staff profile."
+              : "Ask an admin to link your account to a staff profile."
+          }
           iconName="person-circle-outline"
-          title="No linked staff profile"
+          title="Not linked to a staff profile"
         />
       ) : (
         <>
@@ -358,7 +365,7 @@ export default function ProfileWorkScreen() {
         </>
       )}
       <ConfirmationModal
-        body="Confirm that you want to save these staff profile changes."
+        body="Your staff profile will be updated."
         confirmLabel="Save"
         loading={directUpdateMutation.isPending}
         onCancel={() => setPendingConfirmation(null)}
@@ -369,7 +376,7 @@ export default function ProfileWorkScreen() {
             directUpdateMutation.mutate();
           }
         }}
-        title="Save staff profile?"
+        title="Save these changes?"
         visible={pendingConfirmation != null}
       />
     </Screen>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createReactNativeModule,
@@ -99,19 +99,36 @@ describe("LoginScreen", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
   });
 
-  it("loads a remembered workspace slug on mount", async () => {
+  it("auto-skips to the credentials stage when the remembered workspace resolves", async () => {
     loadLastWorkspaceSlug.mockResolvedValue("dubgrid-health");
+    lookupWorkspace.mockResolvedValue({
+      workspace: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
 
-    const { container } = render(<LoginScreen />);
+    render(<LoginScreen />);
 
-    expect(
-      container.querySelector('[data-keyboard-dismiss-mode="interactive"]'),
-    ).toBeInTheDocument();
     expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
-    expect(await screen.findByDisplayValue("dubgrid-health")).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
+    expect(screen.getByText("DubGrid Health")).toBeInTheDocument();
+    expect(lookupWorkspace).toHaveBeenCalledWith("dubgrid-health");
+  });
+
+  it("still goes to the credentials stage even when the remembered lookup fails", async () => {
+    loadLastWorkspaceSlug.mockResolvedValue("dubgrid-health");
+    lookupWorkspace.mockRejectedValue(new Error("Network request failed"));
+
+    render(<LoginScreen />);
+
+    expect(await screen.findByPlaceholderText("Email")).toBeInTheDocument();
+    expect(screen.getByText("dubgrid-health")).toBeInTheDocument();
   });
 
   it("verifies the workspace before showing the credential form", async () => {
@@ -135,7 +152,7 @@ describe("LoginScreen", () => {
     expect(screen.getByPlaceholderText("Email")).toBeInTheDocument();
   });
 
-  it("signs in successfully and routes into the Me tab", async () => {
+  it("signs in successfully and routes into the Home tab", async () => {
     lookupWorkspace.mockResolvedValue({
       workspace: {
         id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
@@ -206,7 +223,7 @@ describe("LoginScreen", () => {
       refresh_token: "refresh-123",
     });
     expect(registerMobileSessionPresence).toHaveBeenCalledWith("token-123");
-    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/me");
+    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
   });
 
   it("verifies MFA before storing the mobile session", async () => {
@@ -299,7 +316,7 @@ describe("LoginScreen", () => {
       refresh_token: "verified-refresh",
     });
     expect(registerMobileSessionPresence).toHaveBeenCalledWith("verified-token");
-    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/me");
+    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
   });
 
   it("shows a returned auth error without navigating", async () => {
@@ -409,5 +426,71 @@ describe("LoginScreen", () => {
       });
     });
     expect(screen.queryByText("Could not sign in")).not.toBeInTheDocument();
+  });
+
+  it("recovers when the mobile session handoff stalls after valid credentials", async () => {
+    lookupWorkspace.mockResolvedValue({
+      workspace: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+    });
+    loginToWorkspace.mockResolvedValue({
+      session: {
+        accessToken: "token-123",
+        refreshToken: "refresh-123",
+        expiresIn: 3600,
+        tokenType: "bearer",
+      },
+      workspace: {
+        id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+        name: "DubGrid Health",
+        slug: "dubgrid-health",
+      },
+      user: {
+        id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+        email: "staff@dubgrid.com",
+        firstName: "Mina",
+        lastName: "Diaz",
+      },
+    });
+    const setSession = vi.fn(() => new Promise(() => {}));
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        setSession,
+      },
+    } as never);
+
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+
+    expect(pushToast).toHaveBeenCalledWith({
+      tone: "error",
+      title: "Network connection issue",
+      message: "Check your internet connection and try again.",
+      durationMs: null,
+      dedupeKey: "network-connection-error",
+    });
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Sign In" })).toBeEnabled();
   });
 });

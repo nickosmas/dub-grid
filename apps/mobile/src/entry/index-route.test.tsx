@@ -18,6 +18,7 @@ vi.mock("react-native-safe-area-context", async () =>
 const routerReplace = vi.fn();
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
+const loadHasSeenOnboarding = vi.fn();
 
 vi.mock("expo-router", () => ({
   router: {
@@ -31,6 +32,10 @@ vi.mock("../shared/providers/AuthSessionProvider", () => ({
 
 vi.mock("../shared/lib/supabase", () => ({
   getSupabaseClient,
+}));
+
+vi.mock("../shared/lib/session", () => ({
+  loadHasSeenOnboarding,
 }));
 
 vi.mock("../features/auth/screens/LoginScreen", async () => {
@@ -59,6 +64,8 @@ describe("IndexScreen", () => {
     routerReplace.mockReset();
     useSessionState.mockReset();
     getSupabaseClient.mockReset();
+    loadHasSeenOnboarding.mockReset();
+    loadHasSeenOnboarding.mockResolvedValue(true);
   });
 
   it("shows the splash screen while startup is still loading", () => {
@@ -69,11 +76,11 @@ describe("IndexScreen", () => {
 
     render(<IndexScreen />);
 
-    expect(screen.getByText("DubGrid Mobile")).toBeInTheDocument();
+    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("keeps the splash visible briefly, then shows the login screen", () => {
+  it("keeps the splash visible briefly, then shows the login screen for returning users", async () => {
     useSessionState.mockReturnValue({
       accessToken: null,
       isLoading: false,
@@ -81,18 +88,18 @@ describe("IndexScreen", () => {
 
     render(<IndexScreen />);
 
-    expect(screen.getByText("Opening workspace")).toBeInTheDocument();
+    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
 
-    act(() => {
-      vi.advanceTimersByTime(899);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(899);
     });
 
-    expect(screen.getByText("Opening workspace")).toBeInTheDocument();
+    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
 
-    act(() => {
-      vi.advanceTimersByTime(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
     });
 
     expect(screen.getByText("Enter your subdomain")).toBeInTheDocument();
@@ -104,7 +111,23 @@ describe("IndexScreen", () => {
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("routes signed-in users to the Me tab after the splash delay", () => {
+  it("routes first-run users to the onboarding screen", async () => {
+    useSessionState.mockReturnValue({
+      accessToken: null,
+      isLoading: false,
+    });
+    loadHasSeenOnboarding.mockResolvedValue(false);
+
+    render(<IndexScreen />);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
+    });
+
+    expect(routerReplace).toHaveBeenCalledWith("/(auth)/onboarding");
+  });
+
+  it("routes signed-in users to the Home tab after the splash delay", async () => {
     useSessionState.mockReturnValue({
       accessToken: "token",
       isLoading: false,
@@ -112,12 +135,12 @@ describe("IndexScreen", () => {
 
     render(<IndexScreen />);
 
-    expect(screen.getByText("Opening workspace")).toBeInTheDocument();
+    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
 
-    act(() => {
-      vi.advanceTimersByTime(900);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(900);
     });
 
-    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/me");
+    expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
   });
 });

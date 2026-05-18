@@ -1,6 +1,8 @@
 import { ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import { useFonts, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -17,13 +19,24 @@ import {
 } from "../src/shared/navigation/top-level-stack";
 import { dubGridNavigationTheme } from "../src/shared/theme/tokens";
 
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function RootLayout() {
   const envValidation = validateMobileEnv();
+
+  // Hold the splash screen until DM Sans Bold is loaded so the brand
+  // wordmark never flashes in the system font fallback. If loading
+  // errors out (rare — the font is bundled into the binary), we still
+  // proceed so the app isn't stuck on the splash.
+  const [fontsLoaded, fontsError] = useFonts({ DMSans_700Bold });
+  if (!fontsLoaded && !fontsError) {
+    return null;
+  }
 
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <StatusBar style="dark" />
+        <StatusBar style="auto" />
         {envValidation.status === "invalid" ? (
           <ConfigurationScreen validation={envValidation} />
         ) : (
@@ -40,12 +53,16 @@ export default function RootLayout() {
                           options={{ headerShown: false }}
                         />
                         <Stack.Screen
+                          name="(auth)/onboarding"
+                          options={{ headerShown: false, animation: "fade" }}
+                        />
+                        <Stack.Screen
                           name="(tabs)"
                           options={{ headerShown: false }}
                         />
                         <Stack.Screen
                           name="alerts"
-                          options={createDetailStackOptions("Alerts")}
+                          options={{ headerShown: false }}
                         />
                         <Stack.Screen
                           name="shift/[employeeId]/[date]"

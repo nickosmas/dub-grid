@@ -57,6 +57,18 @@ describe("mobile shared state components", () => {
     expect(onExplore).toHaveBeenCalled();
   });
 
+  it("renders the compact empty-state variant without a body", () => {
+    render(
+      <EmptyStateCard
+        compact
+        iconName="people-outline"
+        title="No one in ICU yet"
+      />,
+    );
+
+    expect(screen.getByText("No one in ICU yet")).toBeInTheDocument();
+  });
+
   it("renders the shared skeleton variants", () => {
     render(
       <>

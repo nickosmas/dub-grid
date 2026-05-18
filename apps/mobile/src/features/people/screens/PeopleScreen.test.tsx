@@ -21,6 +21,10 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
+vi.mock("@expo/vector-icons/FontAwesome6", () => ({
+  default: () => null,
+}));
+
 vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-query")>();
 
@@ -173,6 +177,7 @@ describe("PeopleScreen", () => {
             id: "emp-1",
             firstName: "Mina",
             lastName: "Diaz",
+            orgRole: "admin",
             phone: "555-0100",
             email: "mina@dubgrid.com",
             status: "active",
@@ -199,6 +204,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
+    expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.queryByText("Details")).not.toBeInTheDocument();
 
@@ -472,7 +478,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
-  it("filters the directory by true management department from the refine modal", () => {
+  it("filters the directory by true management department from the filter modal", () => {
     useQuery.mockReturnValue({
       data: {
         people: [

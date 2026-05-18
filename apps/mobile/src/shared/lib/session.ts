@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 const SESSION_KEY = "dubgrid-mobile-session";
 const LAST_WORKSPACE_KEY = "dubgrid-mobile-last-workspace";
 const PUSH_DEVICE_KEY = "dubgrid-mobile-push-device";
+const HAS_SEEN_ONBOARDING_KEY = "dubgrid-mobile-has-seen-onboarding";
 
 export type StoredPushDevice = {
   expoPushToken: string;
@@ -119,4 +120,18 @@ export async function saveStoredPushDevice(
 
 export async function loadStoredPushDevice(): Promise<StoredPushDevice | null> {
   return loadJsonValue<StoredPushDevice>(PUSH_DEVICE_KEY);
+}
+
+export async function loadHasSeenOnboarding(): Promise<boolean> {
+  const raw = await getStoredValue(HAS_SEEN_ONBOARDING_KEY);
+  return raw === "true";
+}
+
+export async function saveHasSeenOnboarding(seen: boolean): Promise<void> {
+  if (!seen) {
+    await removeStoredValue(HAS_SEEN_ONBOARDING_KEY);
+    return;
+  }
+
+  await setStoredValue(HAS_SEEN_ONBOARDING_KEY, "true");
 }

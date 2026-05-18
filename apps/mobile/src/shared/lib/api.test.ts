@@ -18,6 +18,7 @@ describe("mobileApiRequest", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -169,6 +170,7 @@ describe("mobileApiRequest", () => {
           canPublishSchedule: false,
           canApplyRecurringSchedule: false,
           canEditNotes: false,
+          canEditScheduleIndicators: false,
           canViewRecurringShifts: false,
           canManageRecurringShifts: false,
           canManageShiftSeries: false,
@@ -240,6 +242,36 @@ describe("mobileApiRequest", () => {
     await expect(lookupWorkspace("calmhaven")).rejects.toThrow(
       "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
     );
+  });
+
+  it("times out stalled mobile API requests", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(
+      (_url: string, init: RequestInit | undefined) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const abortError = new Error("Aborted");
+            abortError.name = "AbortError";
+            reject(abortError);
+          });
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { loginToWorkspace } = await import("./api");
+
+    const loginPromise = loginToWorkspace({
+      workspaceSlug: "calmhaven",
+      email: "mina@dubgrid.com",
+      password: "super-secret",
+    });
+    const assertion = expect(loginPromise).rejects.toThrow(
+      "DubGrid took too long to respond. Check your internet connection and try again.",
+    );
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await assertion;
   });
 
   it("surfaces non-JSON 404 responses as client-friendly service errors", async () => {

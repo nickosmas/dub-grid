@@ -291,9 +291,11 @@ export default function ProfileAccountScreen() {
         <DetailSkeleton sections={2} />
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load account"
+          variant="centered"
           onAction={() => {
             void profileQuery.refetch();
           }}
@@ -301,7 +303,9 @@ export default function ProfileAccountScreen() {
       ) : !profile ? (
         <StatusBanner
           body="We couldn't build your account details from the current mobile session."
+          fillScreen
           title="Account unavailable"
+          variant="centered"
         />
       ) : (
         <>
@@ -510,7 +514,7 @@ export default function ProfileAccountScreen() {
         </>
       )}
       <ConfirmationModal
-        body="Confirm that you want to save these account and contact changes."
+        body="Your account and contact details will be updated."
         confirmLabel="Save"
         loading={saveMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
@@ -518,11 +522,11 @@ export default function ProfileAccountScreen() {
           setShowSaveConfirmation(false);
           saveMutation.mutate();
         }}
-        title="Save changes?"
+        title="Save these changes?"
         visible={showSaveConfirmation}
       />
       <ConfirmationModal
-        body="Confirm that you want to send this name change request."
+        body="Your admin will review your name change."
         confirmLabel="Send"
         loading={nameRequestMutation.isPending}
         onCancel={() => setShowNameRequestConfirmation(false)}
@@ -530,7 +534,7 @@ export default function ProfileAccountScreen() {
           setShowNameRequestConfirmation(false);
           nameRequestMutation.mutate();
         }}
-        title="Send request?"
+        title="Send this request?"
         visible={showNameRequestConfirmation}
       />
     </Screen>

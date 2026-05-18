@@ -26,7 +26,7 @@ vi.mock("expo-router", async () => {
   };
 });
 
-vi.mock("../../src/shared/components/LoadingScreen", async () => {
+vi.mock("../shared/components/LoadingScreen", async () => {
   const React = await import("react");
 
   return {
@@ -35,7 +35,7 @@ vi.mock("../../src/shared/components/LoadingScreen", async () => {
   };
 });
 
-vi.mock("../../src/features/auth/screens/WorkspaceLockedScreen", async () => {
+vi.mock("../features/auth/screens/WorkspaceLockedScreen", async () => {
   const React = await import("react");
 
   return {
@@ -67,22 +67,22 @@ vi.mock("../../src/features/auth/screens/WorkspaceLockedScreen", async () => {
   };
 });
 
-vi.mock("../../src/features/auth/hooks/useBootstrap", () => ({
+vi.mock("../features/auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
-vi.mock("../../src/shared/lib/auth-reset", () => ({
+vi.mock("../shared/lib/auth-reset", () => ({
   handleExpiredMobileSession,
 }));
 
-vi.mock("../../src/shared/providers/AuthSessionProvider", () => ({
+vi.mock("../shared/providers/AuthSessionProvider", () => ({
   useSessionState,
 }));
 
-let TabsLayoutWeb: (typeof import("./_layout.web"))["default"];
+let TabsLayoutWeb: (typeof import("../../app/(tabs)/_layout.web"))["default"];
 
 beforeAll(async () => {
-  TabsLayoutWeb = (await import("./_layout.web")).default;
+  TabsLayoutWeb = (await import("../../app/(tabs)/_layout.web")).default;
 });
 
 describe("TabsLayoutWeb", () => {
@@ -111,10 +111,10 @@ describe("TabsLayoutWeb", () => {
     });
   });
 
-  it("renders the Me and Schedule tab set without an Alerts tab", () => {
+  it("renders the Home and Schedule tab set without an Alerts tab", () => {
     render(<TabsLayoutWeb />);
 
-    expect(screen.getByText("me:Me")).toBeInTheDocument();
+    expect(screen.getByText("home:Home")).toBeInTheDocument();
     expect(screen.getByText("team:Schedule")).toBeInTheDocument();
     expect(screen.getByText("requests:Requests")).toBeInTheDocument();
     expect(screen.getByText("people:People")).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe("TabsLayoutWeb", () => {
 
     render(<TabsLayoutWeb />);
 
-    expect(screen.getByText("me:Me")).toBeInTheDocument();
+    expect(screen.getByText("home:Home")).toBeInTheDocument();
     expect(screen.queryByText("team:Schedule")).not.toBeInTheDocument();
   });
 

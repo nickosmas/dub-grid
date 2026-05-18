@@ -479,15 +479,15 @@ export default function ProfileSecurityScreen() {
           : "Revoke session?";
   const confirmationBody =
     pendingConfirmation?.kind === "deletion"
-      ? "Confirm that you want to request account deletion."
+      ? "Your admin will be notified to start the deletion process."
       : pendingConfirmation?.kind === "password"
-        ? "Confirm that you want to update your password. You will be signed out of every session."
+        ? "You'll be signed out of every device after the password is updated."
       : pendingConfirmation?.kind === "sessionScope" &&
           pendingConfirmation.scope === "global"
-        ? "This will sign your account out on every device, including this one."
+        ? "Every device, including this one, will be signed out."
         : pendingConfirmation?.kind === "sessionScope"
-          ? "This will sign your account out everywhere except this device."
-          : `Revoke access for ${pendingConfirmation?.label ?? "this device"}?`;
+          ? "Every device except this one will be signed out."
+          : `${pendingConfirmation?.label ?? "This device"} will lose access immediately.`;
   const confirmationLabel =
     pendingConfirmation?.kind === "deletion"
       ? "Request"
@@ -824,11 +824,11 @@ const styles = StyleSheet.create({
   passwordStrengthTitle: {
     ...mobileText.caption,
     color: mobileColors.textMuted,
-    fontWeight: "700",
+    fontWeight: "500",
   },
   passwordStrengthLevel: {
     ...mobileText.caption,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   passwordStrengthLevelShort: {
     color: mobileColors.dangerText,
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
   },
   passwordHintTextMet: {
     color: mobileColors.successText,
-    fontWeight: "700",
+    fontWeight: "500",
   },
   passwordVisibilityButton: {
     alignItems: "center",
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
   signOutNotice: {
     ...mobileText.meta,
     color: mobileColors.danger,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   sessionList: {
     backgroundColor: mobileColors.surface,
@@ -920,6 +920,7 @@ const styles = StyleSheet.create({
   sessionTitle: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   sessionBody: {
     ...mobileText.body,

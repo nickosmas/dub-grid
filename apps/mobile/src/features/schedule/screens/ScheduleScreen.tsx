@@ -51,6 +51,7 @@ import {
   updateShiftRequest,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { hapticSelection } from "../../../shared/lib/haptics";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
@@ -1151,6 +1152,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const activeData = scheduleQuery.data;
   const scheduleEntries = activeData?.entries ?? [];
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
+  const canManageEmployees = Boolean(
+    bootstrapQuery.data?.permissions.canManageEmployees,
+  );
   const unreadNotificationCount =
     bootstrapQuery.data?.unreadNotificationCount ?? 0;
   const selectedDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
@@ -1387,19 +1391,23 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     isLoading: scheduleQuery.isLoading || bootstrapQuery.isLoading,
     error: scheduleQuery.error ?? bootstrapQuery.error,
   });
-  const emptyStateTitle = isTeamScope
-    ? "No team shifts on this day"
-    : "No shifts on this day";
-  const emptyStateDateLabel = formatScheduleDayLabel(
+  const emptyStateTitle = "Nothing to show yet";
+  const rawEmptyStateDateLabel = formatScheduleDayLabel(
     selectedDate,
     now,
     timeZone,
-  ).toLowerCase();
+  );
+  const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(
+    rawEmptyStateDateLabel,
+  )
+    ? rawEmptyStateDateLabel.charAt(0).toLowerCase() +
+      rawEmptyStateDateLabel.slice(1)
+    : rawEmptyStateDateLabel;
   const emptyStateBody = isTeamScope
     ? activeTeamFocusAreaTab
-      ? `No assignments are published for ${activeTeamFocusAreaTab.label} on ${emptyStateDateLabel}.`
-      : `No assignments are published for ${emptyStateDateLabel}.`
-    : `Nothing is scheduled for ${emptyStateDateLabel}.`;
+      ? `${activeTeamFocusAreaTab.label} has no published shifts for ${emptyStateDateLabel}.`
+      : `No shifts have been published for ${emptyStateDateLabel}.`
+    : `You have no published shifts for ${emptyStateDateLabel}.`;
 
   useEffect(() => {
     if (!accessToken) {
@@ -1460,7 +1468,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   }
 
   function commitSelectedDate(nextDate: string | null) {
-    selectedDateRef.current = nextDate ?? todayDate;
+    const resolvedNextDate = nextDate ?? todayDate;
+    if (selectedDateRef.current !== resolvedNextDate) {
+      hapticSelection();
+    }
+    selectedDateRef.current = resolvedNextDate;
     setSelectedDateOverride(nextDate);
   }
 
@@ -1882,7 +1894,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         <View style={styles.loadingState}>
           <Text style={styles.loadingTitle}>Loading schedule</Text>
           <Text style={styles.loadingBody}>
-            Pulling the latest published schedule into mobile.
+            Getting the latest published schedule.
           </Text>
           {!isTeamScope ? (
             <>
@@ -1896,24 +1908,32 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load schedule"
+          variant="centered"
           onAction={() => {
             void refetchScreenContent();
           }}
         />
       ) : isBlockedTeamView ? (
         <EmptyStateCard
-          body="This mobile account does not have permission to view the team-wide schedule."
+          fillScreen
+          body="You don't have permission to view the team schedule. Ask an admin if you need access."
           iconName="lock-closed-outline"
           title="Team schedule unavailable"
         />
       ) : !isTeamScope && !linkedEmployee ? (
         <EmptyStateCard
-          body="This account is not connected to a staff profile yet. Use the web app to finish account linking, then refresh mobile."
+          fillScreen
+          body={
+            canManageEmployees
+              ? "Open the People tab to link your account to a staff profile. This page will update automatically once you're done."
+              : "Ask an admin to finish setting up your account. This page will update automatically once they're done."
+          }
           iconName="person-add-outline"
-          title="No linked staff profile"
+          title="Your account isn't linked yet"
         />
       ) : !isTeamScope ? (
         <View
@@ -2004,6 +2024,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         </View>
       ) : shiftGroups.length === 0 ? (
         <EmptyStateCard
+          fillScreen
           body={emptyStateBody}
           iconName="calendar-clear-outline"
           title={emptyStateTitle}
@@ -2249,7 +2270,7 @@ function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   );
 }
 
-export function MeScheduleScreen() {
+export function HomeScheduleScreen() {
   return <ScheduleScreen scope="mine" />;
 }
 
@@ -3041,22 +3062,12 @@ function MeHeroCard({
 }) {
   if (!featuredItem) {
     return (
-      <View style={styles.meSectionBlock}>
-        <View
-          style={styles.meScheduleEmptyState}
-          testID="me-empty-schedule-state"
-        >
-          <View style={styles.meScheduleEmptyIcon}>
-            <Ionicons
-              color={mobileColors.textMuted}
-              name="calendar-outline"
-              size={24}
-            />
-          </View>
-          <Text style={styles.meScheduleEmptyTitle}>
-            Nothing scheduled this week
-          </Text>
-        </View>
+      <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
+        <EmptyStateCard
+          iconName="calendar-outline"
+          title="Nothing scheduled this week"
+          body="Your upcoming shifts will appear here once published."
+        />
       </View>
     );
   }
@@ -4332,28 +4343,6 @@ const styles = StyleSheet.create({
   },
   meHeroCardPressed: {
     opacity: 0.94,
-  },
-  meScheduleEmptyState: {
-    alignItems: "center",
-    gap: 12,
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    paddingVertical: 20,
-  },
-  meScheduleEmptyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    backgroundColor: mobileColors.surfaceMuted,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  meScheduleEmptyTitle: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
   },
   meHeroGlow: {
     position: "absolute",

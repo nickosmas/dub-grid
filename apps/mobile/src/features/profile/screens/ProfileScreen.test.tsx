@@ -153,6 +153,7 @@ const bootstrapData = {
     canPublishSchedule: false,
     canApplyRecurringSchedule: false,
     canEditNotes: false,
+    canEditScheduleIndicators: false,
     canViewRecurringShifts: false,
     canManageRecurringShifts: false,
     canManageShiftSeries: false,
@@ -330,7 +331,7 @@ describe("ProfileScreen", () => {
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/account");
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/work");
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/security");
-    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/me");
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/home");
     expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/requests");
     expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/notifications");
   });

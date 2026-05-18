@@ -142,7 +142,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("Could not load requests")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Try Again"));
+    fireEvent.click(screen.getByText("Try again"));
     expect(refetch).toHaveBeenCalled();
   });
 
@@ -199,7 +199,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("No request activity yet")).toBeInTheDocument();
+    expect(screen.getByText("No requests yet")).toBeInTheDocument();
   });
 
   it("shows coverage-gap open shifts and volunteers from the requests tab", () => {
@@ -741,7 +741,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("Approve")).toBeInTheDocument();
-    expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
   });
 
   it("shows the all-requests tab for schedule editors without a linked employee", () => {
@@ -806,6 +806,6 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
-    expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
   });
 });

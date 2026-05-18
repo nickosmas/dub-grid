@@ -182,7 +182,7 @@ describe("ProfileWorkScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(screen.getByText("Save staff profile?")).toBeInTheDocument();
+    expect(screen.getByText("Save these changes?")).toBeInTheDocument();
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", { name: "Save" }),
     );

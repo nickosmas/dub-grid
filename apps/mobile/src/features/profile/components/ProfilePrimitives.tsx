@@ -51,20 +51,24 @@ export function ProfileHero({
   title,
   subtitle,
   badge,
+  badgeTone = "brand",
   avatarStyle,
   avatarTextStyle,
+  style,
   children,
 }: {
   initials: string;
   title: string;
   subtitle: string;
   badge?: string;
+  badgeTone?: "brand" | "contrast" | "warning";
   avatarStyle?: StyleProp<ViewStyle>;
   avatarTextStyle?: StyleProp<TextStyle>;
+  style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
   return (
-    <View style={styles.hero}>
+    <View style={[styles.hero, style]}>
       <View style={styles.heroTop}>
         <View style={[styles.avatar, avatarStyle]}>
           <Text style={[styles.avatarText, avatarTextStyle]}>{initials}</Text>
@@ -75,8 +79,22 @@ export function ProfileHero({
               {title}
             </Text>
             {badge ? (
-              <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>{badge}</Text>
+              <View
+                style={[
+                  styles.heroBadge,
+                  badgeTone === "contrast" && styles.heroBadgeContrast,
+                  badgeTone === "warning" && styles.heroBadgeWarning,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.heroBadgeText,
+                    badgeTone === "contrast" && styles.heroBadgeTextContrast,
+                    badgeTone === "warning" && styles.heroBadgeTextWarning,
+                  ]}
+                >
+                  {badge}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -100,9 +118,7 @@ export function ProfileHeroMeta({
   return (
     <View style={styles.heroMetaItem}>
       <Text style={styles.heroMetaLabel}>{label}</Text>
-      <Text numberOfLines={1} style={styles.heroMetaValue}>
-        {value}
-      </Text>
+      <Text style={styles.heroMetaValue}>{value}</Text>
     </View>
   );
 }
@@ -378,17 +394,8 @@ export const profilePrimitiveStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
     gap: 14,
-    padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
+    paddingTop: 4,
   },
   heroTop: {
     alignItems: "center",
@@ -429,26 +436,40 @@ const styles = StyleSheet.create({
     color: mobileColors.textMuted,
   },
   heroBadge: {
+    alignItems: "center",
     alignSelf: "flex-start",
     backgroundColor: mobileColors.brandSoft,
     borderColor: mobileColors.brandBorder,
     borderRadius: mobileRadii.pill,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   heroBadgeText: {
     ...mobileText.caption,
     color: mobileColors.brand,
-    fontWeight: "700",
+    fontWeight: "600",
+  },
+  heroBadgeContrast: {
+    backgroundColor: mobileColors.textPrimary,
+    borderColor: mobileColors.textPrimary,
+  },
+  heroBadgeTextContrast: {
+    color: mobileColors.textInverse,
+  },
+  heroBadgeWarning: {
+    backgroundColor: mobileColors.warningSoft,
+    borderColor: mobileColors.warningBorder,
+  },
+  heroBadgeTextWarning: {
+    color: mobileColors.warningText,
   },
   heroDetail: {
-    borderTopColor: mobileColors.borderSubtle,
-    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    paddingTop: 14,
   },
   heroMetaItem: {
     flex: 1,
@@ -462,6 +483,7 @@ const styles = StyleSheet.create({
   heroMetaValue: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   section: {
     gap: 10,
@@ -469,6 +491,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...mobileText.label,
     color: mobileColors.textSubtle,
+    fontWeight: "500",
+    letterSpacing: 0.4,
     textTransform: "uppercase",
   },
   panel: {
@@ -519,6 +543,7 @@ const styles = StyleSheet.create({
   rowValue: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   rowDetail: {
     ...mobileText.body,
@@ -527,6 +552,7 @@ const styles = StyleSheet.create({
   navLabel: {
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   field: {
     gap: 7,
@@ -534,7 +560,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...mobileText.caption,
     color: mobileColors.textSubtle,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   input: {
     ...mobileText.sectionTitle,
@@ -610,10 +636,11 @@ const styles = StyleSheet.create({
   chipText: {
     ...mobileText.caption,
     color: mobileColors.textSecondary,
-    fontWeight: "700",
+    fontWeight: "500",
   },
   chipTextSelected: {
     color: mobileColors.brand,
+    fontWeight: "600",
   },
   iconBadge: {
     alignItems: "center",

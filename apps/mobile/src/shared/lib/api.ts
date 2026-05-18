@@ -12,6 +12,7 @@ import {
   mobileProfileResponseSchema,
   mobileProfileSessionRevokeResponseSchema,
   mobileProfileSessionsResponseSchema,
+  mobileNotificationBulkResponseSchema,
   mobileNotificationReadResponseSchema,
   mobileNotificationsResponseSchema,
   mobileOrgScheduleResponseSchema,
@@ -58,8 +59,17 @@ type SupabaseSessionLike = {
   token_type: string;
 };
 
+const MOBILE_REQUEST_TIMEOUT_MS = 15_000;
+
 function assertApiBaseUrl(): string {
   return getMobileEnvConfig().apiBaseUrl;
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "AbortError" || /aborted/i.test(error.message))
+  );
 }
 
 function createMobileTransportErrorMessage(
@@ -67,7 +77,10 @@ function createMobileTransportErrorMessage(
   error: unknown,
 ): string {
   void baseUrl;
-  void error;
+  if (isAbortError(error)) {
+    return "DubGrid took too long to respond. Check your internet connection and try again.";
+  }
+
   return "We couldn't connect to DubGrid from this device. Check your internet connection and try again.";
 }
 
@@ -131,19 +144,34 @@ async function mobileRequest<T>(
   handleAuthFailure: boolean,
 ): Promise<T> {
   const baseUrl = assertApiBaseUrl();
-  return createJsonApiRequest({
-    baseUrl,
-    path,
-    init,
-    parse,
-    handleAuthFailure,
-    onAuthFailure: async () => {
-      const { handleExpiredMobileSession } = await import("./auth-reset");
-      await handleExpiredMobileSession();
-    },
-    onTransportErrorMessage: createMobileTransportErrorMessage,
-    onNonJsonErrorMessage: createNonJsonApiErrorMessage,
-  });
+  const timeoutController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+    timeoutController.abort();
+  }, MOBILE_REQUEST_TIMEOUT_MS);
+
+  try {
+    return await createJsonApiRequest({
+      baseUrl,
+      path,
+      init: {
+        ...init,
+        signal: timeoutController.signal,
+      },
+      parse,
+      handleAuthFailure,
+      onAuthFailure: async () => {
+        const { handleExpiredMobileSession } = await import("./auth-reset");
+        await handleExpiredMobileSession();
+      },
+      onTransportErrorMessage: createMobileTransportErrorMessage,
+      onNonJsonErrorMessage: createNonJsonApiErrorMessage,
+    });
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  }
 }
 
 function withQuery(
@@ -617,9 +645,37 @@ export function updateShiftRequest(
   );
 }
 
-export function getNotifications(accessToken: string) {
+export type MobileNotificationsListParams = {
+  limit?: number;
+  cursorCreatedAt?: string;
+  cursorId?: string;
+  category?: string;
+  type?: string;
+  priority?: "low" | "normal" | "high" | "critical";
+  read?: "unread" | "read";
+  search?: string;
+  includeArchived?: boolean;
+  sort?: "asc" | "desc";
+};
+
+export function getNotifications(
+  accessToken: string,
+  params: MobileNotificationsListParams = {},
+) {
+  const query: Record<string, string | undefined> = {
+    limit: params.limit ? String(params.limit) : undefined,
+    cursorCreatedAt: params.cursorCreatedAt,
+    cursorId: params.cursorId,
+    category: params.category,
+    type: params.type,
+    priority: params.priority,
+    read: params.read,
+    search: params.search,
+    includeArchived: params.includeArchived ? "1" : undefined,
+    sort: params.sort,
+  };
   return mobileApiRequest(
-    "/api/mobile/v1/notifications",
+    appendQueryParams("/api/mobile/v1/notifications", query),
     accessToken,
     { method: "GET" },
     (value) => mobileNotificationsResponseSchema.parse(value),
@@ -644,6 +700,24 @@ export function markAllNotificationsRead(accessToken: string) {
     accessToken,
     { method: "POST" },
     (value) => mobileNotificationReadResponseSchema.parse(value),
+  );
+}
+
+export function bulkUpdateNotifications(
+  accessToken: string,
+  body: {
+    ids: string[];
+    action: "read" | "unread" | "archive" | "unarchive" | "delete";
+  },
+) {
+  return mobileApiRequest(
+    "/api/mobile/v1/notifications/actions",
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileNotificationBulkResponseSchema.parse(value),
   );
 }
 

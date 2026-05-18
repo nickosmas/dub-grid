@@ -409,6 +409,10 @@ describe("ShiftDetailScreen", () => {
                   isMentored: true,
                 },
               ],
+              indicators: [
+                { id: 1, name: "Training" },
+                { id: 2, name: "Float" },
+              ],
               publishedAt: "2026-04-15T18:30:00.000Z",
               publishedByName: "Mina Diaz",
             },
@@ -452,6 +456,8 @@ describe("ShiftDetailScreen", () => {
     expect(mentoredJobPill).not.toHaveTextContent("(MENTORED)");
     expect(screen.getByText("ICU")).toBeInTheDocument();
     expect(screen.getByLabelText("Focus area ICU")).toBeInTheDocument();
+    expect(screen.getByText("Assignment: Training, Float")).toBeInTheDocument();
+    expect(screen.queryByText("Indicators")).not.toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
@@ -1995,10 +2001,10 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Offer to everyone"));
 
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Offer shift for pickup?")).toBeInTheDocument();
-    expect(screen.getByText(/Offer your/)).toBeInTheDocument();
+    expect(screen.getByText("Offer this shift for pickup?")).toBeInTheDocument();
+    expect(screen.getByText(/will be offered/)).toBeInTheDocument();
 
-    confirmDialog("Offer for pickup");
+    confirmDialog("Offer Shift");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
@@ -2096,7 +2102,7 @@ describe("ShiftDetailScreen", () => {
     ).toBeDisabled();
     fireEvent.click(screen.getByText("Offer for pickup"));
     fireEvent.click(screen.getByText("Offer to everyone"));
-    confirmDialog("Offer for pickup");
+    confirmDialog("Offer Shift");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
@@ -2303,12 +2309,19 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Jordan Lee"));
 
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Request pickup?")).toBeInTheDocument();
+    expect(screen.queryByText("Send a pickup request?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Zoe Adams")).not.toBeInTheDocument();
+    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Submit"));
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Send a pickup request?")).toBeInTheDocument();
     expect(
-      screen.getByText(/Ask Jordan Lee to pick up your/),
+      screen.getByText(/Jordan Lee will be asked to pick up your/),
     ).toBeInTheDocument();
 
-    confirmDialog("Request pickup");
+    confirmDialog("Send Request");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "pickup",
@@ -2335,12 +2348,17 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Sick"));
 
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Submit call off request?")).toBeInTheDocument();
+    expect(screen.queryByText("Submit this call-off?")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Submit"));
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
     expect(
-      screen.getByText(/Submit a Sick absence request/),
+      screen.getByText(/A Sick absence will be submitted/),
     ).toBeInTheDocument();
 
-    confirmDialog("Submit call off");
+    confirmDialog("Submit Call-off");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "calloff",
@@ -2410,10 +2428,11 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Drop shift"));
     fireEvent.click(screen.getByText("Call off"));
     fireEvent.click(screen.getByText("Paid time off"));
+    fireEvent.click(screen.getByText("Submit"));
 
-    expect(screen.getByText("Submit call off request?")).toBeInTheDocument();
+    expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
     expect(
-      screen.getByText(/Submit a Paid time off absence request/),
+      screen.getByText(/A Paid time off absence will be submitted/),
     ).toBeInTheDocument();
   });
 
@@ -2433,10 +2452,10 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Submit"));
 
     expect(mutate).not.toHaveBeenCalled();
-    expect(screen.getByText("Submit swap request?")).toBeInTheDocument();
-    expect(screen.getByText(/Swap your/)).toBeInTheDocument();
+    expect(screen.getByText("Send this swap request?")).toBeInTheDocument();
+    expect(screen.getByText(/You.ll swap your/)).toBeInTheDocument();
 
-    confirmDialog("Submit swap");
+    confirmDialog("Send Swap");
 
     expect(mutate).toHaveBeenCalledWith({
       type: "swap",

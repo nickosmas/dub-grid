@@ -225,7 +225,7 @@ describe("ProfileSecurityScreen", () => {
     expect(screen.getByText("Update password?")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Confirm that you want to update your password. You will be signed out of every session.",
+        "You'll be signed out of every device after the password is updated.",
       ),
     ).toBeInTheDocument();
 

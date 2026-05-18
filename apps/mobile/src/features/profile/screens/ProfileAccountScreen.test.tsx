@@ -137,7 +137,7 @@ describe("ProfileAccountScreen", () => {
     ).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    expect(screen.queryByText("Save changes?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Save these changes?")).not.toBeInTheDocument();
   });
 
   it("prompts before saving valid normalized account edits", () => {
@@ -153,10 +153,10 @@ describe("ProfileAccountScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-    expect(screen.getByText("Save changes?")).toBeInTheDocument();
+    expect(screen.getByText("Save these changes?")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Confirm that you want to save these account and contact changes.",
+        "Your account and contact details will be updated.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByDisplayValue("mina+new@dubgrid.com")).toBeInTheDocument();

@@ -28,6 +28,7 @@ export function getMobileRealtimeInvalidationKeys(
   const bootstrap = ["mobile", "bootstrap", accessToken] as const;
   const profile = ["mobile", "profile", accessToken] as const;
   const people = ["mobile", "people", accessToken] as const;
+  const person = ["mobile", "person", accessToken] as const;
   const schedule = ["mobile", "schedule"] as const;
   const requests = ["mobile", "requests"] as const;
 
@@ -42,13 +43,13 @@ export function getMobileRealtimeInvalidationKeys(
     case "certifications":
     case "organization_roles":
     case "indicator_types":
-      return [bootstrap, profile, schedule, requests];
+      return [bootstrap, profile, schedule, requests, person];
     case "organization_memberships":
     case "subscriptions":
     case "invitations":
-      return [bootstrap, profile, people];
+      return [bootstrap, profile, people, person];
     case "employees":
-      return [bootstrap, profile, people, schedule, requests];
+      return [bootstrap, profile, people, person, schedule, requests];
     case "shift_requests":
       return [requests, schedule];
     case "schedule_cells":
