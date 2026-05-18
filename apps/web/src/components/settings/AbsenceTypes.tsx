@@ -77,7 +77,6 @@ function AbsenceTypeRow({
   const [expanded, setExpanded] = useState(!!absenceType.isNew);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
 
@@ -125,7 +124,6 @@ function AbsenceTypeRow({
       return;
     }
     setForm(buildFormState(absenceType));
-    setSaveError(null);
     if (closeAfter) {
       setExpanded(false);
     }
@@ -137,7 +135,6 @@ function AbsenceTypeRow({
       return;
     }
     setExpanded(false);
-    setSaveError(null);
   }, [absenceType.id, absenceType.isNew, onDeleted]);
 
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -160,7 +157,6 @@ function AbsenceTypeRow({
   const handleSave = useCallback(async () => {
     if (!canSave) return;
     setSaving(true);
-    setSaveError(null);
     try {
       const saved = await upsertAbsenceType({
         id: absenceType.isNew ? undefined : absenceType.id,
@@ -189,11 +185,8 @@ function AbsenceTypeRow({
       setExpanded(false);
       toast.success("Absence type saved");
     } catch (error) {
-      setSaveError(
-        formatClientErrorMessage(error, "We couldn't save that. Please try again."),
-      );
       Sentry.captureException(error);
-      toast.error("Failed to save absence type");
+      toast.error(formatClientErrorMessage(error, "We couldn't save that absence type."));
     } finally {
       setSaving(false);
     }
@@ -209,15 +202,15 @@ function AbsenceTypeRow({
     setShowDeleteConfirm(true);
   }, [absenceType.id, absenceType.isNew, onDeleted, orgId]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(async (hard: boolean) => {
     setDeleting(true);
     try {
-      await deleteAbsenceType(absenceType.id, orgId);
+      await deleteAbsenceType(absenceType.id, orgId, hard);
       onDeleted(absenceType.id);
-      toast.success("Absence type archived");
+      toast.success(hard ? "Absence type deleted" : "Absence type archived");
     } catch (error) {
       Sentry.captureException(error);
-      toast.error("Failed to archive absence type");
+      toast.error(hard ? "Failed to delete absence type" : "Failed to archive absence type");
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -330,11 +323,9 @@ function AbsenceTypeRow({
             />
           </div>
 
-          {(duplicateLabel || saveError) && (
+          {duplicateLabel && (
             <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
-              {duplicateLabel ? "Another absence type already uses that code." : null}
-              {duplicateLabel && saveError ? " " : null}
-              {saveError ? <><strong>Error:</strong> {saveError}</> : null}
+              Another absence type already uses that code.
             </p>
           )}
 
@@ -347,8 +338,11 @@ function AbsenceTypeRow({
               ) : undefined
             }
             secondaryAction={(
-              <button onClick={() => isDirty ? discardDraft(false) : closeEditor()} className="dg-btn dg-btn-secondary dg-btn-sm">
-                {getEditorDismissLabel(isDirty)}
+              <button
+                onClick={() => (absenceType.isNew || !isDirty ? closeEditor() : discardDraft(false))}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: Boolean(absenceType.isNew) })}
               </button>
             )}
             primaryAction={(
@@ -361,35 +355,53 @@ function AbsenceTypeRow({
       )}
 
       {unsavedChangesDialog}
-      {showDeleteConfirm && (
-        dependencyInfo?.hasDependencies ? (
+      {showDeleteConfirm && (() => {
+        const hasActive = dependencyInfo?.hasDependencies ?? false;
+        const hasAny = dependencyInfo?.hasAnyReferences ?? true;
+        if (hasActive) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${form.name}"?`}
+              message={
+                <>
+                  <strong>{form.name}</strong> is currently {dependencyInfo!.summary.toLowerCase()}.
+                  <br /><br />
+                  Archiving keeps history intact but removes the type from future scheduling.
+                </>
+              }
+              confirmLabel="Archive"
+              variant="warning"
+              isLoading={deleting}
+              onConfirm={() => handleDelete(false)}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
+          );
+        }
+        if (hasAny) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${form.name}"?`}
+              message={<>This will archive <strong>{form.name}</strong>. Historical records will stay intact.</>}
+              confirmLabel="Archive"
+              variant="warning"
+              isLoading={deleting}
+              onConfirm={() => handleDelete(false)}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
+          );
+        }
+        return (
           <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={
-              <>
-                <strong>{form.name}</strong> is currently {dependencyInfo.summary.toLowerCase()}.
-                <br /><br />
-                Archiving keeps history intact but removes the type from future scheduling.
-              </>
-            }
-            confirmLabel="Archive"
-            variant="warning"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        ) : (
-          <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={<>This will archive <strong>{form.name}</strong>. Historical records will stay intact.</>}
-            confirmLabel="Archive"
+            title={`Delete "${form.name}"?`}
+            message={<>This will permanently delete <strong>{form.name}</strong>. Nothing references it.</>}
+            confirmLabel="Delete"
             variant="danger"
             isLoading={deleting}
-            onConfirm={handleDelete}
+            onConfirm={() => handleDelete(true)}
             onCancel={() => setShowDeleteConfirm(false)}
           />
-        )
-      )}
+        );
+      })()}
     </div>
   );
 }

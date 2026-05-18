@@ -444,7 +444,7 @@ function CoverageOptionRow({
           <EditorActionRow
             secondaryAction={(
               <button onClick={handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-                {getEditorDismissLabel(isDirty)}
+                {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
               </button>
             )}
             primaryAction={(

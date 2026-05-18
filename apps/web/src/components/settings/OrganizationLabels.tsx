@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Organization } from "@/types";
 import {
   OrganizationSettingsConflictError,
@@ -12,6 +12,10 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { SectionCard, labelStyle } from "./shared";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import {
+  useRegisterWizardEditor,
+  useWizardMode,
+} from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationLabels({
   organization,
@@ -23,11 +27,11 @@ export default function OrganizationLabels({
   readOnly?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
+  const isWizardMode = useWizardMode();
   const buildForm = useCallback(() => ({
     focusAreaLabel: organization.focusAreaLabel,
     certificationLabel: organization.certificationLabel,
     roleLabel: organization.roleLabel,
-    departmentLabel: organization.departmentLabel,
   }), [organization]);
   const [form, setForm] = useState(buildForm);
   const [saving, setSaving] = useState(false);
@@ -59,23 +63,13 @@ export default function OrganizationLabels({
             disallowUrl: true,
           })
         : null,
-    departmentLabel:
-      form.departmentLabel.trim().length > 0
-        ? getLineTextError(form.departmentLabel, {
-            label: "Department label",
-            maxLength: 50,
-            required: true,
-            disallowUrl: true,
-          })
-        : null,
   } as const;
   const hasFieldErrors = Object.values(fieldErrors).some(Boolean);
 
   const isModified =
     form.focusAreaLabel !== organization.focusAreaLabel ||
     form.certificationLabel !== organization.certificationLabel ||
-    form.roleLabel !== organization.roleLabel ||
-    form.departmentLabel !== organization.departmentLabel;
+    form.roleLabel !== organization.roleLabel;
 
   // Warn before navigating away with unsaved changes
   useEffect(() => {
@@ -85,11 +79,16 @@ export default function OrganizationLabels({
     return () => window.removeEventListener("beforeunload", handler);
   }, [isModified]);
 
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = useCallback(async () => {
+    lastSaveErrorRef.current = null;
     if (hasFieldErrors) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
       return;
     }
     if (!organization.updatedAt) {
+      lastSaveErrorRef.current = new Error("Organization data is out of date.");
       toast.error("Organization data is out of date. Refresh and try again.");
       return;
     }
@@ -124,15 +123,6 @@ export default function OrganizationLabels({
                 disallowUrl: true,
               })
             : "Roles",
-        departmentLabel:
-          form.departmentLabel.trim()
-            ? normalizeLineText(form.departmentLabel, {
-                label: "Department label",
-                maxLength: 50,
-                required: true,
-                disallowUrl: true,
-              })
-            : "Scheduled Departments",
       };
       const persisted = await updateOrganizationSettings({
         orgId: organization.id,
@@ -140,18 +130,17 @@ export default function OrganizationLabels({
         focusAreaLabel: updated.focusAreaLabel,
         certificationLabel: updated.certificationLabel,
         roleLabel: updated.roleLabel,
-        departmentLabel: updated.departmentLabel,
       });
       onSave(persisted);
       toast.success("Labels saved");
     } catch (err) {
+      lastSaveErrorRef.current = err;
       if (err instanceof OrganizationSettingsConflictError) {
         onSave(err.latestOrganization);
         setForm({
           focusAreaLabel: err.latestOrganization.focusAreaLabel,
           certificationLabel: err.latestOrganization.certificationLabel,
           roleLabel: err.latestOrganization.roleLabel,
-          departmentLabel: err.latestOrganization.departmentLabel,
         });
         toast.error("Labels changed elsewhere. Review the latest values and try again.");
       } else {
@@ -166,6 +155,19 @@ export default function OrganizationLabels({
   const handleCancel = useCallback(() => {
     setForm(buildForm());
   }, [buildForm]);
+
+  useRegisterWizardEditor(
+    "organization-labels",
+    {
+      isDirty: () => isModified,
+      hasErrors: () => hasFieldErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode && !readOnly,
+  );
 
   return (
     <SectionCard>
@@ -231,32 +233,9 @@ export default function OrganizationLabels({
               e.g. Responsibilities, Positions
             </p>
           </div>
-          <div>
-            <label style={labelStyle}>SCHEDULED DEPARTMENTS LABEL</label>
-            <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "0 0 6px" }}>
-              Scheduled only. Does not rename management departments.
-            </p>
-            <input
-              value={form.departmentLabel}
-              onChange={(e) => setForm((p) => ({ ...p, departmentLabel: e.target.value }))}
-              placeholder="Scheduled Departments"
-              maxLength={30}
-              className="dg-input"
-              readOnly={readOnly}
-              style={fieldErrors.departmentLabel ? { borderColor: "var(--color-danger)" } : undefined}
-            />
-            {fieldErrors.departmentLabel ? (
-              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
-                {fieldErrors.departmentLabel}
-              </p>
-            ) : null}
-            <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
-              e.g. Scheduled Departments, Teams, Service Lines
-            </p>
-          </div>
         </div>
 
-        {!readOnly && <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
+        {!readOnly && !isWizardMode && <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
           {isModified ? (
             <button
               onClick={handleCancel}

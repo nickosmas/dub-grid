@@ -82,7 +82,7 @@ function ShiftCategoriesSettings({
   const handleDeleteClick = async (catId: number) => {
     const cat = local.find(c => c.id === catId);
     if (!cat) return;
-    if ((cat as { isNew?: boolean }).isNew) { handleDelete(cat); return; }
+    if ((cat as { isNew?: boolean }).isNew) { handleDelete(cat, false); return; }
     const deps = await checkShiftCategoryDependencies(catId, orgId);
     setCatDepInfo(deps);
     setConfirmDeleteId(catId);
@@ -303,7 +303,7 @@ function ShiftCategoriesSettings({
     }
   };
 
-  const handleDelete = async (cat: ShiftCategory & { isNew?: boolean }) => {
+  const handleDelete = async (cat: ShiftCategory & { isNew?: boolean }, hard: boolean) => {
     if (cat.isNew) {
       newCategoryDefaultsRef.current.delete(cat.id);
       const updated = local.filter((c) => c.id !== cat.id);
@@ -313,12 +313,12 @@ function ShiftCategoriesSettings({
     }
     setDeleting(cat.id);
     try {
-      await deleteShiftCategory(cat.id, orgId);
+      await deleteShiftCategory(cat.id, orgId, hard);
       const updated = local.filter((c) => c.id !== cat.id);
       setLocal(updated);
       onChange(updated);
       setEditingId(null);
-      toast.success("Category deleted");
+      toast.success(hard ? "Category deleted" : "Category archived");
     } catch (err) {
       toast.error("Failed to delete category");
       Sentry.captureException(err);
@@ -630,9 +630,9 @@ function ShiftCategoriesSettings({
         )}
         {/* Actions */}
         <EditorActionRow
-          destructiveAction={canManageScheduleDefinitions ? (
+          destructiveAction={canManageScheduleDefinitions && !cat.isNew ? (
             <button
-              onClick={() => cat.isNew ? handleDelete(cat) : handleDeleteClick(cat.id)}
+              onClick={() => handleDeleteClick(cat.id)}
               disabled={isDeletingThis}
               className="dg-btn dg-btn-danger dg-btn-sm"
             >
@@ -641,11 +641,11 @@ function ShiftCategoriesSettings({
           ) : undefined}
           secondaryAction={(
             <button
-              onClick={() => isDirty ? discardCategoryChanges(cat, false) : handleClose(cat)}
+              onClick={() => (cat.isNew || !isDirty ? handleClose(cat) : discardCategoryChanges(cat, false))}
               disabled={isSavingThis}
               className="dg-btn dg-btn-secondary dg-btn-sm"
             >
-              {getEditorDismissLabel(isDirty)}
+              {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: Boolean(cat.isNew) })}
             </button>
           )}
           primaryAction={(
@@ -742,28 +742,46 @@ function ShiftCategoriesSettings({
       {confirmDeleteId !== null && (() => {
         const cat = local.find(c => c.id === confirmDeleteId);
         if (!cat) return null;
-        return catDepInfo?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${cat.name}"?`}
-            message={<>
-              <strong>{cat.name}</strong> is currently {catDepInfo.summary.toLowerCase()}.
-              <br /><br />
-              Archiving will preserve historical records. Any derived compatibility labels tied to this shift will become uncategorized.
-            </>}
-            confirmLabel="Archive"
-            variant="warning"
-            isLoading={deleting === confirmDeleteId}
-            onConfirm={() => handleDelete(cat)}
-            onCancel={() => setConfirmDeleteId(null)}
-          />
-        ) : (
+        const hasActive = catDepInfo?.hasDependencies ?? false;
+        const hasAny = catDepInfo?.hasAnyReferences ?? true;
+        if (hasActive) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${cat.name}"?`}
+              message={<>
+                <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.
+                <br /><br />
+                Archiving will preserve historical records. Any derived compatibility labels tied to this shift will become uncategorized.
+              </>}
+              confirmLabel="Archive"
+              variant="warning"
+              isLoading={deleting === confirmDeleteId}
+              onConfirm={() => handleDelete(cat, false)}
+              onCancel={() => setConfirmDeleteId(null)}
+            />
+          );
+        }
+        if (hasAny) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${cat.name}"?`}
+              message={<>This will archive <strong>{cat.name || "this category"}</strong>. Historical records will be preserved.</>}
+              confirmLabel="Archive"
+              variant="warning"
+              isLoading={deleting === confirmDeleteId}
+              onConfirm={() => handleDelete(cat, false)}
+              onCancel={() => setConfirmDeleteId(null)}
+            />
+          );
+        }
+        return (
           <ConfirmDialog
             title={`Delete "${cat.name}"?`}
-            message={<>This will archive <strong>{cat.name || "this category"}</strong>. Historical records will be preserved.</>}
+            message={<>This will permanently delete <strong>{cat.name || "this category"}</strong>. Nothing references it.</>}
             confirmLabel="Delete"
             variant="danger"
             isLoading={deleting === confirmDeleteId}
-            onConfirm={() => handleDelete(cat)}
+            onConfirm={() => handleDelete(cat, true)}
             onCancel={() => setConfirmDeleteId(null)}
           />
         );

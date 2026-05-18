@@ -18,6 +18,11 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { toast } from "sonner";
+import {
+  useRegisterWizardEditor,
+  useWizardMode,
+} from "@/components/onboarding/WizardModeContext";
 
 export default function StringListSettings({
   label,
@@ -37,7 +42,12 @@ export default function StringListSettings({
 }: {
   label: string;
   items: NamedItem[];
-  onSave: (items: NamedItem[]) => Promise<void>;
+  /**
+   * Persist the edited list. `hardDeleteIds` lists IDs the user confirmed for
+   * permanent deletion (no archived row left behind). The server always
+   * re-verifies before performing a hard delete.
+   */
+  onSave: (items: NamedItem[], hardDeleteIds: number[]) => Promise<void>;
   placeholder: string;
   canEdit?: boolean;
   hideAbbr?: boolean;
@@ -58,9 +68,13 @@ export default function StringListSettings({
   wideTable?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
-  const [isEditing, setIsEditing] = useState(initialEditing ?? false);
+  const isWizardMode = useWizardMode();
+  const [isEditing, setIsEditing] = useState(
+    isWizardMode ? true : (initialEditing ?? false),
+  );
   const [local, setLocal] = useState<NamedItem[]>(items);
   const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; item: NamedItem; deps: DependencyInfo | null } | null>(null);
+  const [pendingHardDeleteIds, setPendingHardDeleteIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const nextTmpId = useRef(-1);
@@ -157,6 +171,7 @@ export default function StringListSettings({
     setLocal([...items]);
     setError(null);
     setDeleteConfirm(null);
+    setPendingHardDeleteIds(new Set());
   }, [items]);
 
   const handleDiscard = () => {
@@ -168,8 +183,12 @@ export default function StringListSettings({
     setIsEditing(false);
   };
 
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = async () => {
+    lastSaveErrorRef.current = null;
     if (hasValidationErrors) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
       setError(
         rowErrors.find((row) => row.name || row.abbr)?.name ??
           rowErrors.find((row) => row.name || row.abbr)?.abbr ??
@@ -206,6 +225,7 @@ export default function StringListSettings({
     const dupes = keys.filter((k, i) => k && keys.indexOf(k) !== i);
     if (dupes.length > 0) {
       const dupeName = dupes[0].split("::")[0];
+      lastSaveErrorRef.current = new Error(`Duplicate name: "${dupeName}"`);
       setError(`Duplicate name: "${dupeName}"`);
       return;
     }
@@ -213,14 +233,29 @@ export default function StringListSettings({
     setSaving(true);
     setError(null);
     try {
-      await onSave(cleaned);
+      await onSave(cleaned, Array.from(pendingHardDeleteIds));
+      setPendingHardDeleteIds(new Set());
       setIsEditing(false);
     } catch (err) {
-      setError(formatClientErrorMessage(err, `We couldn't save ${label.toLowerCase()}.`));
+      lastSaveErrorRef.current = err;
+      toast.error(formatClientErrorMessage(err, `We couldn't save ${label.toLowerCase()}.`));
     } finally {
       setSaving(false);
     }
   };
+
+  useRegisterWizardEditor(
+    `string-list:${label}`,
+    {
+      isDirty: () => isDirty,
+      hasErrors: () => hasValidationErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode && canEdit,
+  );
 
   const addRow = useCallback(() => {
     const id = nextTmpId.current--;
@@ -241,21 +276,29 @@ export default function StringListSettings({
     });
   }, [showScheduleRoleToggle]);
 
-  const handleRemove = (i: number) => {
+  const handleRemove = (i: number, hard: boolean) => {
+    const item = local[i];
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
+    if (hard && item && item.id > 0) {
+      setPendingHardDeleteIds((prev) => {
+        const next = new Set(prev);
+        next.add(item.id);
+        return next;
+      });
+    }
   };
 
   const handleDeleteClick = async (i: number) => {
     const item = local[i];
     // New unsaved items (negative ID) — remove immediately without confirmation
-    if (item.id <= 0) { handleRemove(i); return; }
+    if (item.id <= 0) { handleRemove(i, false); return; }
     // Existing items — check dependencies
     if (onCheckDependencies) {
       const deps = await onCheckDependencies(item.id);
       setDeleteConfirm({ idx: i, item, deps });
     } else {
-      // No dependency checker provided — remove immediately
-      handleRemove(i);
+      // No dependency checker provided — fall back to archive on save
+      handleRemove(i, false);
     }
   };
 
@@ -309,7 +352,7 @@ export default function StringListSettings({
   const handleNameBackspace = (e: React.KeyboardEvent<HTMLInputElement>, item: NamedItem, idx: number) => {
     if (e.key === "Backspace" && !item.name && !item.abbr && item.id < 0) {
       e.preventDefault();
-      handleRemove(idx);
+      handleRemove(idx, false);
       if (idx > 0) {
         const prevId = local[idx - 1].id;
         requestAnimationFrame(() => {
@@ -359,11 +402,11 @@ export default function StringListSettings({
       ? `24px 2fr 1fr${scheduleRoleCol}${deptCol} auto`
       : `2fr 1fr${scheduleRoleCol}${deptCol}`;
 
-  const footerActions = isEditing ? (
+  const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
       secondaryAction={(
         <button onClick={isDirty ? handleDiscard : handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-          {getEditorDismissLabel(isDirty)}
+          {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
         </button>
       )}
       primaryAction={(
@@ -726,41 +769,58 @@ export default function StringListSettings({
 
       {footerActions}
 
-      {deleteConfirm && (
-        deleteConfirm.deps?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${deleteConfirm.item.name}"?`}
-            message={<>
-              <strong>{deleteConfirm.item.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
-              <br /><br />
-              Archiving will preserve historical records but remove it from dropdowns and new assignments.
-              Consider renaming instead if this item is still needed under a different name.
-            </>}
-            confirmLabel="Archive"
-            variant="warning"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
-            onCancel={() => setDeleteConfirm(null)}
-            secondaryConfirmLabel="Rename Instead"
-            onSecondaryConfirm={() => {
-              setDeleteConfirm(null);
-              // Focus the name input for renaming
-              requestAnimationFrame(() => {
-                nameRefs.current.get(deleteConfirm.item.id)?.focus();
-                nameRefs.current.get(deleteConfirm.item.id)?.select();
-              });
-            }}
-          />
-        ) : (
+      {deleteConfirm && (() => {
+        const deps = deleteConfirm.deps;
+        const hasActive = deps?.hasDependencies ?? false;
+        const hasAny = deps?.hasAnyReferences ?? true;
+        if (hasActive) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${deleteConfirm.item.name}"?`}
+              message={<>
+                <strong>{deleteConfirm.item.name}</strong> is currently {deps!.summary.toLowerCase()}.
+                <br /><br />
+                Archiving will preserve historical records but remove it from dropdowns and new assignments.
+                Consider renaming instead if this item is still needed under a different name.
+              </>}
+              confirmLabel="Archive"
+              variant="warning"
+              onConfirm={() => { handleRemove(deleteConfirm.idx, false); setDeleteConfirm(null); }}
+              onCancel={() => setDeleteConfirm(null)}
+              secondaryConfirmLabel="Rename Instead"
+              onSecondaryConfirm={() => {
+                setDeleteConfirm(null);
+                requestAnimationFrame(() => {
+                  nameRefs.current.get(deleteConfirm.item.id)?.focus();
+                  nameRefs.current.get(deleteConfirm.item.id)?.select();
+                });
+              }}
+            />
+          );
+        }
+        if (hasAny) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${deleteConfirm.item.name}"?`}
+              message={<>This will archive <strong>{deleteConfirm.item.name}</strong>. Historical records will be preserved.</>}
+              confirmLabel="Archive"
+              variant="warning"
+              onConfirm={() => { handleRemove(deleteConfirm.idx, false); setDeleteConfirm(null); }}
+              onCancel={() => setDeleteConfirm(null)}
+            />
+          );
+        }
+        return (
           <ConfirmDialog
             title={`Delete "${deleteConfirm.item.name}"?`}
-            message={<>This will archive <strong>{deleteConfirm.item.name}</strong>. Historical records will be preserved.</>}
+            message={<>This will permanently delete <strong>{deleteConfirm.item.name}</strong>. Nothing references it.</>}
             confirmLabel="Delete"
             variant="danger"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
+            onConfirm={() => { handleRemove(deleteConfirm.idx, true); setDeleteConfirm(null); }}
             onCancel={() => setDeleteConfirm(null)}
           />
-        )
-      )}
+        );
+      })()}
     </div>
   );
 

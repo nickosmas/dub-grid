@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { Department, FocusArea } from "@/types";
 import {
   checkDepartmentDependencies,
+  checkFocusAreaDependencies,
   deleteFocusArea,
   saveDepartments,
   upsertFocusArea,
@@ -24,6 +25,10 @@ import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
+import {
+  useRegisterWizardEditor,
+  useWizardMode,
+} from "@/components/onboarding/WizardModeContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -272,14 +277,20 @@ function DepartmentSection({
       ? `No ${departmentLabel.toLowerCase()} defined yet`
       : "No management departments defined yet";
 
+  const isWizardMode = useWizardMode();
+
   // ── Edit lifecycle state ────────────────────────────────────────────────────
-  const [isEditing, setIsEditing] = useState(false);
-  const [localDepts, setLocalDepts] = useState<Department[]>([]);
-  const [localFAs, setLocalFAs] = useState<FocusArea[]>([]);
+  const [isEditing, setIsEditing] = useState(isWizardMode);
+  const [localDepts, setLocalDepts] = useState<Department[]>(() =>
+    isWizardMode ? [...depts] : [],
+  );
+  const [localFAs, setLocalFAs] = useState<FocusArea[]>(() => []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; dept: Department; deps: DependencyInfo | null } | null>(null);
-  const [faDeleteConfirm, setFaDeleteConfirm] = useState<{ faId: number; fa: FocusArea } | null>(null);
+  const [faDeleteConfirm, setFaDeleteConfirm] = useState<{ faId: number; fa: FocusArea; deps: DependencyInfo | null } | null>(null);
+  const [pendingHardDeleteDeptIds, setPendingHardDeleteDeptIds] = useState<Set<number>>(new Set());
+  const [pendingHardDeleteFaIds, setPendingHardDeleteFaIds] = useState<Set<number>>(new Set());
 
   const nextTmpId = useRef(-1);
   const nextTmpFaId = useRef(-1000);
@@ -425,7 +436,19 @@ function DepartmentSection({
     setError(null);
     setDeleteConfirm(null);
     setFaDeleteConfirm(null);
+    setPendingHardDeleteDeptIds(new Set());
+    setPendingHardDeleteFaIds(new Set());
   }, [depts, faByDept, propFAs, type]);
+
+  // Wizard mode starts in editing state — sync the draft from props on mount so
+  // the editor has a workable list to render even before the user touches it.
+  const wizardHydratedRef = useRef(false);
+  useEffect(() => {
+    if (isWizardMode && !wizardHydratedRef.current) {
+      wizardHydratedRef.current = true;
+      setLocalFAs([...propFAs]);
+    }
+  }, [isWizardMode, propFAs]);
 
   const handleEnterEdit = () => {
     syncDraftFromProps();
@@ -441,8 +464,12 @@ function DepartmentSection({
     setIsEditing(false);
   };
 
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = async () => {
+    lastSaveErrorRef.current = null;
     if (hasValidationErrors) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
       setError(
         departmentErrors.find((department) => department.name || department.abbr)?.name ??
           departmentErrors.find((department) => department.name || department.abbr)?.abbr ??
@@ -481,7 +508,12 @@ function DepartmentSection({
     try {
       // Phase 1: Save departments
       const otherDepts = allDepartments.filter(d => d.type !== type || !!d.archivedAt);
-      const savedDepts = await saveDepartments(orgId, [...otherDepts, ...cleaned], allDepartments);
+      const savedDepts = await saveDepartments(
+        orgId,
+        [...otherDepts, ...cleaned],
+        allDepartments,
+        Array.from(pendingHardDeleteDeptIds),
+      );
 
       // Phase 2: Save focus areas (scheduled only)
       if (type === "scheduled") {
@@ -496,11 +528,17 @@ function DepartmentSection({
           }
         }
 
-        // Determine deleted FAs
+        // Determine deleted FAs. FAs whose parent dept is being hard-deleted are
+        // cascade-deleted server-side and must not be sent here (the dept row no
+        // longer exists at this point).
         const localFaIds = new Set(localFAs.filter(fa => fa.id > 0).map(fa => fa.id));
-        const deletedFAs = propFAs.filter(fa => fa.id > 0 && !localFaIds.has(fa.id));
+        const deletedFAs = propFAs.filter(fa =>
+          fa.id > 0 &&
+          !localFaIds.has(fa.id) &&
+          !(fa.departmentId != null && pendingHardDeleteDeptIds.has(fa.departmentId)),
+        );
         for (const fa of deletedFAs) {
-          await deleteFocusArea(fa.id, orgId);
+          await deleteFocusArea(fa.id, orgId, pendingHardDeleteFaIds.has(fa.id));
         }
 
         // Upsert new and modified FAs
@@ -557,7 +595,8 @@ function DepartmentSection({
       setLocalFAs([]);
       toast.success(`${title} saved`);
     } catch (err) {
-      setError(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
+      lastSaveErrorRef.current = err;
+      toast.error(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
       Sentry.captureException(err);
     } finally {
       setSaving(false);
@@ -625,11 +664,18 @@ function DepartmentSection({
     setDeleteConfirm({ idx: i, dept, deps });
   };
 
-  const handleRemove = (i: number) => {
+  const handleRemove = (i: number, hard: boolean) => {
     const dept = localDepts[i];
     setLocalDepts(prev => prev.filter((_, idx) => idx !== i));
     if (type === "scheduled") {
       setLocalFAs(prev => prev.filter(fa => fa.departmentId !== dept.id));
+    }
+    if (hard) {
+      setPendingHardDeleteDeptIds(prev => {
+        const next = new Set(prev);
+        next.add(dept.id);
+        return next;
+      });
     }
   };
 
@@ -650,16 +696,24 @@ function DepartmentSection({
     }]);
   };
 
-  const handleFADeleteClick = (fa: FocusArea) => {
+  const handleFADeleteClick = async (fa: FocusArea) => {
     if (fa.id < 0) {
       setLocalFAs(prev => prev.filter(f => f.id !== fa.id));
       return;
     }
-    setFaDeleteConfirm({ faId: fa.id, fa });
+    const deps = await checkFocusAreaDependencies(fa.id, orgId);
+    setFaDeleteConfirm({ faId: fa.id, fa, deps });
   };
 
-  const handleFARemove = (faId: number) => {
+  const handleFARemove = (faId: number, hard: boolean) => {
     setLocalFAs(prev => prev.filter(f => f.id !== faId));
+    if (hard) {
+      setPendingHardDeleteFaIds(prev => {
+        const next = new Set(prev);
+        next.add(faId);
+        return next;
+      });
+    }
   };
 
   // ── Keyboard navigation ─────────────────────────────────────────────────────
@@ -675,7 +729,7 @@ function DepartmentSection({
     }
     if (e.key === "Backspace" && !dept.name && dept.id < 0) {
       e.preventDefault();
-      handleRemove(idx);
+      handleRemove(idx, false);
       if (idx > 0) {
         const prevId = localDepts[idx - 1].id;
         requestAnimationFrame(() => {
@@ -685,12 +739,26 @@ function DepartmentSection({
     }
   };
 
+  // Register with wizard so Continue can save this section.
+  useRegisterWizardEditor(
+    `departments:${type}`,
+    {
+      isDirty: () => isDirty,
+      hasErrors: () => hasValidationErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode && canEdit,
+  );
+
   // ── Action buttons ────────────────────────────────────────────────────────
-  const footerActions = isEditing ? (
+  const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
       secondaryAction={(
         <button onClick={isDirty ? handleDiscard : handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-          {getEditorDismissLabel(isDirty)}
+          {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
         </button>
       )}
       primaryAction={(
@@ -924,50 +992,101 @@ function DepartmentSection({
       {footerActions}
 
       {/* Delete confirmation dialogs */}
-      {deleteConfirm && (
-        deleteConfirm.deps?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${deleteConfirm.dept.name}"?`}
-            message={<>
-              <strong>{deleteConfirm.dept.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
-              <br /><br />
-              Archiving will preserve historical records but remove it from active use. Consider renaming instead if this department is still needed.
-            </>}
-            confirmLabel="Archive"
-            variant="warning"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
-            onCancel={() => setDeleteConfirm(null)}
-            secondaryConfirmLabel="Rename Instead"
-            onSecondaryConfirm={() => {
-              setDeleteConfirm(null);
-              requestAnimationFrame(() => {
-                nameRefs.current.get(deleteConfirm.dept.id)?.focus();
-                nameRefs.current.get(deleteConfirm.dept.id)?.select();
-              });
-            }}
-          />
-        ) : (
+      {deleteConfirm && (() => {
+        const deps = deleteConfirm.deps;
+        const hasActive = deps?.hasDependencies ?? false;
+        const hasAny = deps?.hasAnyReferences ?? true;
+        if (hasActive) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${deleteConfirm.dept.name}"?`}
+              message={<>
+                <strong>{deleteConfirm.dept.name}</strong> is currently {deps!.summary.toLowerCase()}.
+                <br /><br />
+                Archiving will preserve historical records but remove it from active use. Consider renaming instead if this department is still needed.
+              </>}
+              confirmLabel="Archive"
+              variant="warning"
+              onConfirm={() => { handleRemove(deleteConfirm.idx, false); setDeleteConfirm(null); }}
+              onCancel={() => setDeleteConfirm(null)}
+              secondaryConfirmLabel="Rename Instead"
+              onSecondaryConfirm={() => {
+                setDeleteConfirm(null);
+                requestAnimationFrame(() => {
+                  nameRefs.current.get(deleteConfirm.dept.id)?.focus();
+                  nameRefs.current.get(deleteConfirm.dept.id)?.select();
+                });
+              }}
+            />
+          );
+        }
+        if (hasAny) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${deleteConfirm.dept.name}"?`}
+              message={<>This will archive <strong>{deleteConfirm.dept.name || "this department"}</strong>. Historical records will be preserved.</>}
+              confirmLabel="Archive"
+              variant="warning"
+              onConfirm={() => { handleRemove(deleteConfirm.idx, false); setDeleteConfirm(null); }}
+              onCancel={() => setDeleteConfirm(null)}
+            />
+          );
+        }
+        return (
           <ConfirmDialog
             title={`Delete "${deleteConfirm.dept.name}"?`}
-            message={<>This will archive <strong>{deleteConfirm.dept.name || "this department"}</strong>. Historical records will be preserved.</>}
+            message={<>This will permanently delete <strong>{deleteConfirm.dept.name || "this department"}</strong>. Nothing references it, so no history will be lost.</>}
             confirmLabel="Delete"
             variant="danger"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
+            onConfirm={() => { handleRemove(deleteConfirm.idx, true); setDeleteConfirm(null); }}
             onCancel={() => setDeleteConfirm(null)}
           />
-        )
-      )}
+        );
+      })()}
 
-      {faDeleteConfirm && (
-        <ConfirmDialog
-          title={`Delete "${faDeleteConfirm.fa.name}"?`}
-          message={<>This will archive <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Employees assigned to it will need reassignment.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          onConfirm={() => { handleFARemove(faDeleteConfirm.faId); setFaDeleteConfirm(null); }}
-          onCancel={() => setFaDeleteConfirm(null)}
-        />
-      )}
+      {faDeleteConfirm && (() => {
+        const deps = faDeleteConfirm.deps;
+        const hasActive = deps?.hasDependencies ?? false;
+        const hasAny = deps?.hasAnyReferences ?? true;
+        if (hasActive) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${faDeleteConfirm.fa.name}"?`}
+              message={<>
+                <strong>{faDeleteConfirm.fa.name}</strong> is currently {deps!.summary.toLowerCase()}.
+                <br /><br />
+                Archiving will preserve historical records but remove it from active use.
+              </>}
+              confirmLabel="Archive"
+              variant="warning"
+              onConfirm={() => { handleFARemove(faDeleteConfirm.faId, false); setFaDeleteConfirm(null); }}
+              onCancel={() => setFaDeleteConfirm(null)}
+            />
+          );
+        }
+        if (hasAny) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${faDeleteConfirm.fa.name}"?`}
+              message={<>This will archive <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Historical records will be preserved.</>}
+              confirmLabel="Archive"
+              variant="warning"
+              onConfirm={() => { handleFARemove(faDeleteConfirm.faId, false); setFaDeleteConfirm(null); }}
+              onCancel={() => setFaDeleteConfirm(null)}
+            />
+          );
+        }
+        return (
+          <ConfirmDialog
+            title={`Delete "${faDeleteConfirm.fa.name}"?`}
+            message={<>This will permanently delete <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Nothing references it.</>}
+            confirmLabel="Delete"
+            variant="danger"
+            onConfirm={() => { handleFARemove(faDeleteConfirm.faId, true); setFaDeleteConfirm(null); }}
+            onCancel={() => setFaDeleteConfirm(null)}
+          />
+        );
+      })()}
     </SectionCard>
   );
 }

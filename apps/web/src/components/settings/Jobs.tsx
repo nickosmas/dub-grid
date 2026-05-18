@@ -743,7 +743,6 @@ function JobRow({
   const [expanded, setExpanded] = useState(!!job.isNew && !isDefaultShiftJob);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
 
@@ -936,7 +935,6 @@ function JobRow({
 
   const resetDraft = useCallback(() => {
     setForm(buildJobFormState(job, shiftCategories, focusAreas));
-    setSaveError(null);
   }, [focusAreas, job, shiftCategories]);
 
   const discardDraft = useCallback(
@@ -959,7 +957,6 @@ function JobRow({
       return;
     }
     setExpanded(false);
-    setSaveError(null);
   }, [job.id, job.isNew, onDeleted]);
 
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -1011,7 +1008,6 @@ function JobRow({
     if (!canSave) return;
 
     setSaving(true);
-    setSaveError(null);
     try {
       const timingDefaults = normalizeShiftlessJobTiming({
         assignmentMode: section === "shiftless" ? "shiftless" : "with_shift",
@@ -1063,11 +1059,8 @@ function JobRow({
       setExpanded(false);
       toast.success("Job saved");
     } catch (error) {
-      setSaveError(
-        formatClientErrorMessage(error, "We couldn't save that job."),
-      );
       Sentry.captureException(error);
-      toast.error("Failed to save job");
+      toast.error(formatClientErrorMessage(error, "We couldn't save that job."));
     } finally {
       setSaving(false);
     }
@@ -1097,15 +1090,15 @@ function JobRow({
     setShowDeleteConfirm(true);
   }, [job.id, job.isNew, onDeleted, orgId]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(async (hard: boolean) => {
     setDeleting(true);
     try {
-      await deleteJobDefinition(job.id, orgId);
+      await deleteJobDefinition(job.id, orgId, hard);
       onDeleted(job.id);
-      toast.success("Job archived");
+      toast.success(hard ? "Job deleted" : "Job archived");
     } catch (error) {
       Sentry.captureException(error);
-      toast.error("Failed to archive job");
+      toast.error(hard ? "Failed to delete job" : "Failed to archive job");
     } finally {
       setDeleting(false);
       setShowDeleteConfirm(false);
@@ -2142,12 +2135,6 @@ function JobRow({
             </p>
           ) : null}
 
-          {saveError ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
-              <strong>Error:</strong> {saveError}
-            </p>
-          ) : null}
-
           <EditorActionRow
             destructiveAction={
               canManageScheduleDefinitions && !job.isNew && !isLockedIdentityJob ? (
@@ -2162,10 +2149,10 @@ function JobRow({
             }
             secondaryAction={(
               <button
-                onClick={() => (isDirty ? discardDraft(false) : closeEditor())}
+                onClick={() => (job.isNew || !isDirty ? closeEditor() : discardDraft(false))}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                {getEditorDismissLabel(isDirty)}
+                {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: job.isNew })}
               </button>
             )}
             primaryAction={(
@@ -2182,40 +2169,54 @@ function JobRow({
       ) : null}
 
       {unsavedChangesDialog}
-      {showDeleteConfirm ? (
-        dependencyInfo?.hasDependencies ? (
+      {showDeleteConfirm ? (() => {
+        const hasActive = dependencyInfo?.hasDependencies ?? false;
+        const hasAny = dependencyInfo?.hasAnyReferences ?? true;
+        if (hasActive) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${form.name}"?`}
+              message={(
+                <>
+                  <strong>{form.name}</strong> is currently {dependencyInfo!.summary.toLowerCase()}.
+                  <br />
+                  <br />
+                  Archiving will preserve history but remove the job from future scheduling and coverage configuration.
+                </>
+              )}
+              confirmLabel="Archive"
+              variant="warning"
+              isLoading={deleting}
+              onConfirm={() => handleDelete(false)}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
+          );
+        }
+        if (hasAny) {
+          return (
+            <ConfirmDialog
+              title={`Archive "${form.name}"?`}
+              message={<>This will archive <strong>{form.name}</strong>. Historical records will stay intact.</>}
+              confirmLabel="Archive"
+              variant="warning"
+              isLoading={deleting}
+              onConfirm={() => handleDelete(false)}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
+          );
+        }
+        return (
           <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={(
-              <>
-                <strong>{form.name}</strong> is currently {dependencyInfo.summary.toLowerCase()}.
-                <br />
-                <br />
-                Archiving will preserve history but remove the job from future scheduling and coverage configuration.
-              </>
-            )}
-            confirmLabel="Archive"
-            variant="warning"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        ) : (
-          <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={(
-              <>
-                This will archive <strong>{form.name}</strong>. Historical records will stay intact.
-              </>
-            )}
-            confirmLabel="Archive"
+            title={`Delete "${form.name}"?`}
+            message={<>This will permanently delete <strong>{form.name}</strong>. Nothing references it.</>}
+            confirmLabel="Delete"
             variant="danger"
             isLoading={deleting}
-            onConfirm={handleDelete}
+            onConfirm={() => handleDelete(true)}
             onCancel={() => setShowDeleteConfirm(false)}
           />
-        )
-      ) : null}
+        );
+      })() : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Organization } from "@/types";
 import {
   OrganizationSettingsConflictError,
@@ -27,6 +27,10 @@ import {
   getOptionalUsPhoneFieldError,
   normalizeLineText,
 } from "@/lib/form-validation";
+import {
+  useRegisterWizardEditor,
+  useWizardMode,
+} from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationGeneral({
   organization,
@@ -35,6 +39,7 @@ export default function OrganizationGeneral({
   organization: Organization;
   onSave: (o: Organization) => void;
 }) {
+  const isWizardMode = useWizardMode();
   const isMobile = useMediaQuery(MOBILE);
   const { employeeCount, loading: employeeCountLoading } = useEmployeeCount(organization.id);
   const buildForm = useCallback(
@@ -98,9 +103,18 @@ export default function OrganizationGeneral({
     return () => window.removeEventListener("beforeunload", handler);
   }, [isModified]);
 
+  // Tracks whether the most recent handleSave call completed successfully.
+  // Wizard mode reads this after `save()` returns to decide whether to advance.
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = useCallback(async () => {
-    if (nameError || phoneError) return;
+    lastSaveErrorRef.current = null;
+    if (nameError || phoneError) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
+      return;
+    }
     if (!organization.updatedAt) {
+      lastSaveErrorRef.current = new Error("Organization data is out of date.");
       toast.error("Organization data is out of date. Refresh and try again.");
       return;
     }
@@ -128,6 +142,7 @@ export default function OrganizationGeneral({
       setReviewOpen(false);
       toast.success("Settings saved");
     } catch (err) {
+      lastSaveErrorRef.current = err;
       if (err instanceof OrganizationSettingsConflictError) {
         onSave(err.latestOrganization);
         setForm(buildForm(err.latestOrganization));
@@ -157,6 +172,22 @@ export default function OrganizationGeneral({
     if (!isModified || saving || hasValidationErrors) return;
     setReviewOpen(true);
   }, [hasValidationErrors, isModified, saving]);
+
+  // Wizard mode: expose save() so the wizard's Continue button can save this
+  // section without the user clicking Review & Save first. The review modal
+  // is bypassed during onboarding — there's no production data to protect yet.
+  useRegisterWizardEditor(
+    "organization-general",
+    {
+      isDirty: () => isModified,
+      hasErrors: () => hasValidationErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode,
+  );
 
   const handleCancel = useCallback(() => {
     setReviewOpen(false);
@@ -198,28 +229,30 @@ export default function OrganizationGeneral({
           gridTemplateColumns={isMobile ? "1fr" : "1fr 1fr"}
         />
 
-        <EditorActionRow
-          secondaryAction={
-            isModified ? (
+        {!isWizardMode && (
+          <EditorActionRow
+            secondaryAction={
+              isModified ? (
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="dg-btn dg-btn-secondary"
+                >
+                  {EDITOR_ACTION_LABELS.discard}
+                </button>
+              ) : null
+            }
+            primaryAction={
               <button
-                onClick={handleCancel}
-                disabled={saving}
-                className="dg-btn dg-btn-secondary"
+                onClick={handleReview}
+                disabled={!isModified || saving || hasValidationErrors}
+                className="dg-btn dg-btn-primary"
               >
-                {EDITOR_ACTION_LABELS.discard}
+                Review & Save
               </button>
-            ) : null
-          }
-          primaryAction={
-            <button
-              onClick={handleReview}
-              disabled={!isModified || saving || hasValidationErrors}
-              className="dg-btn dg-btn-primary"
-            >
-              Review & Save
-            </button>
-          }
-        />
+            }
+          />
+        )}
 
         {reviewOpen ? (
           <OrganizationChangeReviewModal

@@ -403,9 +403,14 @@ export default function SettingsPage({
               wideTable
               items={certifications}
               placeholder="e.g. RN"
-              onSave={async (updated) => {
+              onSave={async (updated, hardDeleteIds) => {
                 try {
-                  const saved = await saveCertifications(organization.id, updated, certifications);
+                  const saved = await saveCertifications(
+                    organization.id,
+                    updated,
+                    certifications,
+                    hardDeleteIds,
+                  );
                   onCertificationsChange(saved);
                   toast.success("Certifications saved");
                 } catch (err) {
@@ -429,9 +434,14 @@ export default function SettingsPage({
               wideTable
               items={orgRoles}
               placeholder="e.g. Charge Nurse"
-              onSave={async (updated) => {
+              onSave={async (updated, hardDeleteIds) => {
                 try {
-                  const saved = await saveOrganizationRoles(organization.id, updated, orgRoles);
+                  const saved = await saveOrganizationRoles(
+                    organization.id,
+                    updated,
+                    orgRoles,
+                    hardDeleteIds,
+                  );
                   onOrgRolesChange(saved);
                   toast.success("Roles saved");
                 } catch (err) {

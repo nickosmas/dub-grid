@@ -15,6 +15,13 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 export interface DependencyInfo {
   hasDependencies: boolean;
   summary: string;
+  /**
+   * True if anything anywhere references this row — including archived rows,
+   * historical schedule cells, recurring shifts, etc. When false the server
+   * will hard-delete (DELETE FROM) instead of archiving on the next remove.
+   * Optional for backwards compatibility with older server responses.
+   */
+  hasAnyReferences?: boolean;
 }
 
 type RequestOptions = RequestInit & {
@@ -85,9 +92,10 @@ export async function saveCertifications(
   orgId: string,
   items: NamedItem[],
   existing: NamedItem[],
+  hardDeleteIds: number[] = [],
 ): Promise<NamedItem[]> {
   const body = await postSettingsAction<{ items: NamedItem[] }>(
-    { action: "saveCertifications", orgId, items, existing },
+    { action: "saveCertifications", orgId, items, existing, hardDeleteIds },
     "Failed to save certifications.",
   );
   return body.items;
@@ -134,9 +142,10 @@ export async function saveOrganizationRoles(
   orgId: string,
   items: NamedItem[],
   existing: NamedItem[],
+  hardDeleteIds: number[] = [],
 ): Promise<NamedItem[]> {
   const body = await postSettingsAction<{ items: NamedItem[] }>(
-    { action: "saveOrganizationRoles", orgId, items, existing },
+    { action: "saveOrganizationRoles", orgId, items, existing, hardDeleteIds },
     "Failed to save roles.",
   );
   return body.items;
@@ -183,9 +192,10 @@ export async function saveDepartments(
   orgId: string,
   items: Department[],
   existing: Department[],
+  hardDeleteIds: number[] = [],
 ): Promise<Department[]> {
   const body = await postSettingsAction<{ items: Department[] }>(
-    { action: "saveDepartments", orgId, items, existing },
+    { action: "saveDepartments", orgId, items, existing, hardDeleteIds },
     "Failed to save departments.",
   );
   return body.items;
@@ -238,12 +248,26 @@ export async function upsertFocusArea(
   return body.item;
 }
 
+export function checkFocusAreaDependencies(
+  focusAreaId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
+  return requestSettingsJson<DependencyInfo>(
+    buildQuery("checkFocusAreaDependencies", {
+      orgId,
+      itemId: String(focusAreaId),
+    }),
+    { errorMessage: "Failed to check focus area dependencies." },
+  );
+}
+
 export function deleteFocusArea(
   focusAreaId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteFocusArea", orgId, itemId: focusAreaId },
+    { action: "deleteFocusArea", orgId, itemId: focusAreaId, hard },
     "Failed to delete focus area.",
   );
 }
@@ -298,9 +322,10 @@ export async function upsertShiftCategory(
 export function deleteShiftCategory(
   categoryId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteShiftCategory", orgId, itemId: categoryId },
+    { action: "deleteShiftCategory", orgId, itemId: categoryId, hard },
     "Failed to delete shift.",
   );
 }
@@ -355,9 +380,10 @@ export async function upsertJobDefinition(
 export function deleteJobDefinition(
   jobId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteJobDefinition", orgId, itemId: jobId },
+    { action: "deleteJobDefinition", orgId, itemId: jobId, hard },
     "Failed to delete job.",
   );
 }
@@ -443,9 +469,10 @@ export async function upsertAbsenceType(
 export function deleteAbsenceType(
   absenceTypeId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteAbsenceType", orgId, itemId: absenceTypeId },
+    { action: "deleteAbsenceType", orgId, itemId: absenceTypeId, hard },
     "Failed to delete absence type.",
   );
 }
@@ -484,12 +511,26 @@ export async function upsertIndicatorType(
   return body.item;
 }
 
+export function checkIndicatorTypeDependencies(
+  indicatorTypeId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
+  return requestSettingsJson<DependencyInfo>(
+    buildQuery("checkIndicatorTypeDependencies", {
+      orgId,
+      itemId: String(indicatorTypeId),
+    }),
+    { errorMessage: "Failed to check indicator type dependencies." },
+  );
+}
+
 export function deleteIndicatorType(
   indicatorTypeId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteIndicatorType", orgId, itemId: indicatorTypeId },
+    { action: "deleteIndicatorType", orgId, itemId: indicatorTypeId, hard },
     "Failed to delete indicator type.",
   );
 }
