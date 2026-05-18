@@ -1,6 +1,7 @@
 import type { ShiftTypeBreakdown, FocusAreaBreakdown } from "@/lib/dashboard-stats";
 import DonutChart from "../DonutChart";
 import Modal from "@/components/Modal";
+import { EmptyState } from "@/components/EmptyState";
 
 interface ExpandedBreakdownProps {
   breakdown: ShiftTypeBreakdown;
@@ -19,7 +20,7 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
         {/* Grid of focus area donuts */}
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {breakdown.byFocusArea.length === 0 ? (
-            <div style={emptyStyle}>No shifts this week</div>
+            <EmptyState compact heading="No shifts this week" />
           ) : (
             <div
               style={{
@@ -121,11 +122,4 @@ const cardStyle = {
   borderRadius: "var(--dg-radius-md)",
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
-};
-
-const emptyStyle = {
-  fontSize: 13,
-  color: "var(--color-text-subtle)",
-  textAlign: "center" as const,
-  padding: "32px 0",
 };

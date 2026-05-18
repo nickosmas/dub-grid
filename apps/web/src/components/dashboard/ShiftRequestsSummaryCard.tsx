@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
 import {
   formatShiftRequestStatusLabel,
   formatShiftRequestTypeLabel,
@@ -222,9 +223,7 @@ export default function ShiftRequestsSummaryCard({
         </div>
         <div className="dg-card-body" style={{ padding: "4px 18px 14px" }}>
           {pendingApproval.length === 0 ? (
-            <div style={{ fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", padding: "16px 0" }}>
-              No pending requests
-            </div>
+            <EmptyState compact heading="No pending requests" />
           ) : (
             pendingApproval.slice(0, 5).map((req) => (
               <RequestRow
@@ -307,9 +306,7 @@ export default function ShiftRequestsSummaryCard({
               ))}
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: "var(--color-text-subtle)", textAlign: "center", padding: "12px 0" }}>
-            You have no active requests
-          </div>
+          <EmptyState compact heading="You have no active requests" />
         )}
 
         {/* Available pickups */}

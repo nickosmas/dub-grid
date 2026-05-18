@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { fetchOrganizationInvitations } from "@/features/organization/client";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { EmptyState } from "@/components/EmptyState";
 import type { Invitation } from "@/types";
 
 interface InvitationStatusCardProps {
@@ -93,9 +94,7 @@ export default function InvitationStatusCard({ orgId }: InvitationStatusCardProp
       </div>
       <div className="dg-card-body" style={{ padding: "4px 18px 14px" }}>
         {pending.length === 0 && recentlyAccepted.length === 0 ? (
-          <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", textAlign: "center", padding: "16px 0" }}>
-            No active invitations
-          </div>
+          <EmptyState compact heading="No active invitations" />
         ) : (
           <>
             {/* Pending */}

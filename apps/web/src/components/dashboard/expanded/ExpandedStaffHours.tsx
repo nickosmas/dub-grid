@@ -5,6 +5,7 @@ import { getAvatarInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
 
 type SortMode = "hours" | "name" | "ot";
 
@@ -115,7 +116,7 @@ export default function ExpandedStaffHours({
         {/* Staff list */}
         <div style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {sorted.length === 0 ? (
-            <div style={emptyStyle}>No staff matching filters</div>
+            <EmptyState compact heading="No staff matching filters" />
           ) : (
             sorted.map((h) => {
               const emp = empMap.get(h.empId);
@@ -224,10 +225,3 @@ export default function ExpandedStaffHours({
 }
 
 const modalStyle = { maxWidth: 700, width: "90vw" };
-
-const emptyStyle = {
-  fontSize: 13,
-  color: "var(--color-text-subtle)",
-  textAlign: "center" as const,
-  padding: "32px 0",
-};

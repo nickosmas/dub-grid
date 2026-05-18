@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { ActivityIconVariant, ActivityItem } from "@/lib/dashboard-stats";
 import Modal from "@/components/Modal";
+import { EmptyState } from "@/components/EmptyState";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
   success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
@@ -114,7 +115,7 @@ export default function ExpandedActivity({
         {/* Feed list */}
         <div style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {filtered.length === 0 ? (
-            <div style={emptyStyle}>No activity matching filter</div>
+            <EmptyState compact heading="No activity matching filter" />
           ) : (
             filtered.map((item, i) => (
               <Link
@@ -153,10 +154,3 @@ export default function ExpandedActivity({
 }
 
 const modalStyle = { maxWidth: 700, width: "90vw" };
-
-const emptyStyle = {
-  fontSize: 13,
-  color: "var(--color-text-subtle)",
-  textAlign: "center" as const,
-  padding: "32px 0",
-};
