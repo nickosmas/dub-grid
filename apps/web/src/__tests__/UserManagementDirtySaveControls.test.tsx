@@ -94,6 +94,7 @@ describe("UserManagement dirty save controls", () => {
           canPublishSchedule: false,
           canApplyRecurringSchedule: false,
           canEditNotes: false,
+          canEditScheduleIndicators: false,
           canViewRecurringShifts: false,
           canManageRecurringShifts: false,
           canManageShiftSeries: false,

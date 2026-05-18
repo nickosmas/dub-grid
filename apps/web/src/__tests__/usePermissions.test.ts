@@ -311,6 +311,7 @@ describe("usePermissions hook", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: true,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,
