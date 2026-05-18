@@ -70,7 +70,7 @@ export function resolveCodeLabels(
 
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
-export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, enforce_conflict_prevention, coverage_rule_config, subscription_status, trial_ends_at, data_retention_days, feature_overrides, updated_at";
+export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_source_org_id, sandbox_owner_user_id, sandbox_expires_at, sandbox_template_version, enforce_conflict_prevention, coverage_rule_config, subscription_status, trial_ends_at, data_retention_days, feature_overrides, updated_at";
 export const ORGANIZATION_WITH_BILLING_COLS = `${ORGANIZATION_COLS}, stripe_customer_id, subscription_seats`;
 export const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 export const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";

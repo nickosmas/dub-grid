@@ -1,4 +1,5 @@
 export type ShiftDisplayMode = "code" | "name";
+export type WorkspaceKind = "real" | "sandbox";
 
 export interface CoverageRuleConfig {
   mentoredCoverageCreditPercent: number;
@@ -27,6 +28,11 @@ export interface Organization {
   archivedAt?: string | null;
   suspendedAt?: string | null;
   suspendedReason?: string | null;
+  workspaceKind: WorkspaceKind;
+  sandboxSourceOrgId: string | null;
+  sandboxOwnerUserId: string | null;
+  sandboxExpiresAt: string | null;
+  sandboxTemplateVersion: number | null;
   enforceConflictPrevention: boolean;
   coverageRuleConfig?: CoverageRuleConfig;
   stripeCustomerId?: string | null;
