@@ -2054,6 +2054,7 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          active_org_id: string | null
           app_version: string | null
           created_at: string
           device_label: string | null
@@ -2062,11 +2063,12 @@ export type Database = {
           last_active_at: string
           org_id: string | null
           platform: string | null
-          refresh_token_hash: string
+          refresh_token_hash: string | null
           supabase_session_id: string | null
           user_id: string
         }
         Insert: {
+          active_org_id?: string | null
           app_version?: string | null
           created_at?: string
           device_label?: string | null
@@ -2075,11 +2077,12 @@ export type Database = {
           last_active_at?: string
           org_id?: string | null
           platform?: string | null
-          refresh_token_hash: string
+          refresh_token_hash?: string | null
           supabase_session_id?: string | null
           user_id: string
         }
         Update: {
+          active_org_id?: string | null
           app_version?: string | null
           created_at?: string
           device_label?: string | null
@@ -2088,7 +2091,7 @@ export type Database = {
           last_active_at?: string
           org_id?: string | null
           platform?: string | null
-          refresh_token_hash?: string
+          refresh_token_hash?: string | null
           supabase_session_id?: string | null
           user_id?: string
         }

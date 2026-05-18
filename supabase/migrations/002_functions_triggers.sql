@@ -97,10 +97,12 @@ LANGUAGE PLPGSQL SECURITY DEFINER VOLATILE
 SET search_path = 'public'
 AS $$
 DECLARE
-  claims       JSONB;
-  user_profile RECORD;
-  uid          UUID;
-  lock_until   TIMESTAMPTZ;
+  claims         JSONB;
+  user_profile   RECORD;
+  uid            UUID;
+  lock_until     TIMESTAMPTZ;
+  v_session_id   UUID;
+  v_effective_org UUID;
 BEGIN
   claims := event -> 'claims';
 
@@ -131,7 +133,36 @@ BEGIN
   DELETE FROM public.jwt_refresh_locks
    WHERE user_id = uid AND locked_until <= NOW();
 
+  -- Per-session org isolation: when the auth event carries a session_id,
+  -- look up that session's active_org_id (set by switch_org). This lets
+  -- multiple devices for the same user maintain independent org contexts.
+  --
+  -- On first contact for a session (no row exists yet), eagerly INSERT a row
+  -- that freezes the session's active_org_id at the user's current default
+  -- (profiles.org_id). Without this eager insert, an established session
+  -- without a row would re-read profiles.org_id on every refresh and inherit
+  -- any cross-device switches — defeating per-session isolation.
+  v_session_id := NULLIF(event -> 'claims' ->> 'session_id', '')::UUID;
+
+  IF v_session_id IS NOT NULL THEN
+    SELECT s.active_org_id
+      INTO v_effective_org
+      FROM public.user_sessions s
+     WHERE s.supabase_session_id = v_session_id
+       AND s.user_id = uid;
+
+    IF NOT FOUND THEN
+      INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
+      SELECT uid, v_session_id, p.org_id
+        FROM public.profiles p
+       WHERE p.id = uid
+      ON CONFLICT (supabase_session_id) DO NOTHING
+      RETURNING active_org_id INTO v_effective_org;
+    END IF;
+  END IF;
+
   -- Resolve user profile with org context.
+  -- Effective org = per-session active_org_id (if set) else profiles.org_id.
   -- Archived orgs are filtered out (AND o.archived_at IS NULL).
   -- Suspended orgs are filtered out (AND o.suspended_at IS NULL).
   -- Deactivated users get no org claims (AND p.deactivated_at IS NULL on membership join).
@@ -139,16 +170,20 @@ BEGIN
   -- which must result in no org claims being set (prevents read access
   -- to an org the user has no membership for).
   SELECT
-    p.org_id,
-    p.platform_role::TEXT  AS platform_role,
-    cm.org_role::TEXT       AS org_role,
-    o.slug                 AS org_slug
+    COALESCE(v_effective_org, p.org_id) AS org_id,
+    p.platform_role::TEXT               AS platform_role,
+    cm.org_role::TEXT                   AS org_role,
+    o.slug                              AS org_slug
   INTO user_profile
   FROM public.profiles p
   LEFT JOIN public.organization_memberships cm
-    ON cm.user_id = p.id AND cm.org_id = p.org_id AND cm.archived_at IS NULL
+    ON cm.user_id = p.id
+   AND cm.org_id = COALESCE(v_effective_org, p.org_id)
+   AND cm.archived_at IS NULL
   LEFT JOIN public.organizations o
-    ON o.id = p.org_id AND o.archived_at IS NULL AND o.suspended_at IS NULL
+    ON o.id = COALESCE(v_effective_org, p.org_id)
+   AND o.archived_at IS NULL
+   AND o.suspended_at IS NULL
   WHERE p.id = uid
     AND p.deactivated_at IS NULL;
 
@@ -654,9 +689,11 @@ LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
-  v_uid UUID;
+  v_uid        UUID;
+  v_session_id UUID;
 BEGIN
   v_uid := auth.uid();
+  v_session_id := NULLIF(auth.jwt() ->> 'session_id', '')::UUID;
 
   IF public.is_gridmaster() THEN
     IF NOT EXISTS (
@@ -682,14 +719,29 @@ BEGIN
     RAISE EXCEPTION 'Organization not found';
   END IF;
 
+  -- Per-session org isolation: write active_org_id on the caller's user_sessions
+  -- row so only this device's next JWT refresh adopts the new org. Other active
+  -- sessions for this user keep their own active_org_id and are unaffected.
+  -- Upserts to handle the window before the client first calls track-session.
+  IF v_session_id IS NOT NULL THEN
+    INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
+    VALUES (v_uid, v_session_id, target_org_id)
+    ON CONFLICT (supabase_session_id) DO UPDATE
+      SET active_org_id  = EXCLUDED.active_org_id,
+          last_active_at = NOW();
+  END IF;
+
+  -- Also update profiles.org_id as the default org for FUTURE sessions
+  -- (e.g., next fresh sign-in on a new device). This does NOT affect existing
+  -- sessions' claims because the hook prefers user_sessions.active_org_id.
   UPDATE public.profiles
   SET org_id = target_org_id, updated_at = NOW()
   WHERE id = v_uid;
 
   -- No jwt_refresh_lock here: the caller refreshes immediately after this RPC,
-  -- and the JWT hook reads profiles.org_id from DB so the new claims resolve
-  -- correctly. A lock would block the caller's own refreshSession() call.
-  -- Other tabs/devices pick up the new org on their next natural token refresh.
+  -- and the JWT hook reads from user_sessions.active_org_id (this session only).
+  -- A lock would block the caller's own refreshSession() call. Other sessions
+  -- are unaffected and do not need to refresh.
 END;
 $$;
 

@@ -720,6 +720,7 @@ CREATE TABLE public.user_sessions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL,
   org_id             UUID,
+  active_org_id      UUID,
   supabase_session_id UUID UNIQUE,
   platform           TEXT,
   app_version        TEXT,
@@ -727,17 +728,18 @@ CREATE TABLE public.user_sessions (
   ip_address         INET,
   last_active_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-  refresh_token_hash TEXT NOT NULL UNIQUE
+  refresh_token_hash TEXT UNIQUE
 );
 
 COMMENT ON TABLE public.user_sessions IS 'Tracks individual device sessions for per-device session management';
-COMMENT ON COLUMN public.user_sessions.org_id IS 'Organization context active in the session when the device last reported presence';
+COMMENT ON COLUMN public.user_sessions.org_id IS 'Snapshot of the JWT org_id at the last presence ping (audit only — not authoritative for claims)';
+COMMENT ON COLUMN public.user_sessions.active_org_id IS 'Authoritative per-session org context read by custom_access_token_hook on JWT refresh. Set by switch_org; falls back to profiles.org_id when NULL';
 COMMENT ON COLUMN public.user_sessions.supabase_session_id IS 'Supabase auth session_id claim for correlating web and mobile sessions';
 COMMENT ON COLUMN public.user_sessions.platform IS 'Client platform for the session (web, ios, android)';
 COMMENT ON COLUMN public.user_sessions.app_version IS 'Client application version when reported';
 COMMENT ON COLUMN public.user_sessions.device_label IS 'User-friendly device identifier (e.g., "Chrome on MacOS")';
 COMMENT ON COLUMN public.user_sessions.ip_address IS 'IP address of the device at session creation';
-COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification - UNIQUE constraint prevents duplicate sessions';
+COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification. UNIQUE prevents duplicates; NULL allowed for rows created by switch_org before the client first calls track-session';
 
 
 -- ── schedule_draft_sessions ───────────────────────────────────────────────────
@@ -1039,7 +1041,8 @@ ALTER TABLE public.mobile_device_tokens
 -- user_sessions
 ALTER TABLE public.user_sessions
   ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
-  ADD CONSTRAINT user_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+  ADD CONSTRAINT user_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT user_sessions_active_org_id_fkey FOREIGN KEY (active_org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
 
 -- shift_requests
 ALTER TABLE public.shift_requests

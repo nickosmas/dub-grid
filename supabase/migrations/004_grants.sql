@@ -25,6 +25,11 @@ GRANT SELECT ON TABLE public.organizations TO supabase_auth_admin;
 -- Hook needs to read/delete jwt_refresh_locks to check/clean locks
 GRANT SELECT, DELETE ON TABLE public.jwt_refresh_locks TO supabase_auth_admin;
 
+-- Hook needs to read user_sessions.active_org_id for per-session org isolation,
+-- and INSERT a row on first contact (freezes the session's active_org_id at
+-- profiles.org_id so later cross-device switches don't contaminate this session).
+GRANT SELECT, INSERT ON TABLE public.user_sessions TO supabase_auth_admin;
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 2. GRANTS ON EXISTING OBJECTS
 --

@@ -6,7 +6,6 @@ import {
 } from "./schedule";
 import {
   optionalStaffEmailSchema,
-  requiredStaffEmailSchema,
   optionalUsPhoneSchema,
   staffNameSchema,
   staffNotesSchema,
@@ -92,6 +91,7 @@ export const mobilePermissionsSchema = z.object({
   canPublishSchedule: z.boolean(),
   canApplyRecurringSchedule: z.boolean(),
   canEditNotes: z.boolean(),
+  canEditScheduleIndicators: z.boolean(),
   canViewRecurringShifts: z.boolean(),
   canManageRecurringShifts: z.boolean(),
   canManageShiftSeries: z.boolean(),
@@ -693,7 +693,7 @@ export const mobilePersonUpdateBodySchema = z.object({
   firstName: staffNameSchema,
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema,
-  email: requiredStaffEmailSchema,
+  email: optionalStaffEmailSchema,
   contactNotes: staffNotesSchema,
   employmentType: z.enum(["full_time", "part_time"]).optional(),
   certificationId: z.number().int().nullable(),

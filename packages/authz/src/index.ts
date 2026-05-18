@@ -14,6 +14,7 @@ const ALL_PERMS: AdminPermissions = {
   canPublishSchedule: true,
   canApplyRecurringSchedule: true,
   canEditNotes: true,
+  canEditScheduleIndicators: true,
   canViewRecurringShifts: true,
   canManageRecurringShifts: true,
   canManageShiftSeries: true,
@@ -41,6 +42,7 @@ export const READ_ONLY_PERMS: AdminPermissions = {
   canPublishSchedule: false,
   canApplyRecurringSchedule: false,
   canEditNotes: false,
+  canEditScheduleIndicators: false,
   canViewRecurringShifts: false,
   canManageRecurringShifts: false,
   canManageShiftSeries: false,
@@ -168,6 +170,7 @@ export function buildPermissionContext(
       canManageIndicatorTypes: false,
       canManageCoverageRequirements: false,
       canApproveShiftRequests: false,
+      canEditScheduleIndicators: false,
     };
   }
 

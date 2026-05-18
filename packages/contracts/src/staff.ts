@@ -111,14 +111,26 @@ export const requiredStaffEmailSchema = z
   })
   .transform((value) => value.trim().toLowerCase());
 
+export function getOptionalStaffEmailError(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+  const result = z.string().email().safeParse(trimmed);
+  if (!result.success) {
+    return "Invalid email address";
+  }
+  return null;
+}
+
 export function normalizeOptionalStaffEmail(value: string): string {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) {
     return "";
   }
-  const result = z.string().email().safeParse(trimmed);
-  if (!result.success) {
-    throw new Error("Invalid email address");
+  const error = getOptionalStaffEmailError(trimmed);
+  if (error) {
+    throw new Error(error);
   }
   return trimmed;
 }
