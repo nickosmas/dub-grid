@@ -9,7 +9,9 @@ import {
   type ProfileChangeRequest,
 } from "@/features/account/client";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { Inbox } from "lucide-react";
 
 interface ReferenceItem {
   id: number;
@@ -263,11 +265,11 @@ export function ProfileChangeRequestQueue({
           </div>
         </div>
       ) : requests.length === 0 ? (
-        <div className="dg-card">
-          <div className="dg-card-body text-[14px] text-[var(--color-text-muted)]">
-            No pending people requests.
-          </div>
-        </div>
+        <EmptyState
+          icon={<Inbox size={28} />}
+          heading="No pending people requests"
+          description="Profile updates and account deletion requests from members will appear here for review."
+        />
       ) : (
         requests.map((request) => (
           <div key={request.id} className="dg-card">

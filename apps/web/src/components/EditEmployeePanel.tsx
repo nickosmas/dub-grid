@@ -753,7 +753,7 @@ export default function EditEmployeePanel({
                 onClick={handleDismiss}
                 className="dg-btn dg-btn-secondary"
               >
-                {getEditorDismissLabel(isModified)}
+                {getEditorDismissLabel({ hasUnsavedChanges: isModified })}
               </button>
             }
             primaryAction={

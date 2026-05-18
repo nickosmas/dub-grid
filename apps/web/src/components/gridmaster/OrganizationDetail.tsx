@@ -1191,7 +1191,7 @@ function OverviewTab({
                     onClick={hasChanges ? handleDiscardEditing : handleCancelEditing}
                     disabled={saving}
                   >
-                    {getEditorDismissLabel(hasChanges)}
+                    {getEditorDismissLabel({ hasUnsavedChanges: hasChanges })}
                   </button>
                 )}
                 primaryAction={(

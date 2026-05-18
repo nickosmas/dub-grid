@@ -894,7 +894,7 @@ export function ProfilePageContent() {
                               className="dg-btn dg-btn-secondary dg-btn-sm"
                             >
                               <X size={14} />
-                              {getEditorDismissLabel(hasAccountChanges)}
+                              {getEditorDismissLabel({ hasUnsavedChanges: hasAccountChanges })}
                             </button>
                           </div>
                         </form>
@@ -1141,7 +1141,7 @@ export function ProfilePageContent() {
                                 }
                                 className="dg-btn dg-btn-secondary dg-btn-sm"
                               >
-                                {getEditorDismissLabel(hasPasswordChanges)}
+                                {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
                               </button>
                             </div>
                           </form>

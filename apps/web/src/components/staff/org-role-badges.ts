@@ -16,26 +16,10 @@ export function getHighlightedOrgRole(
 }
 
 export function getOrgRoleBadgeStyle(
-  role: DirectoryPerson["orgRole"] | null | undefined,
+  _role: DirectoryPerson["orgRole"] | null | undefined,
 ): CSSProperties {
-  if (role === "super_admin") {
-    return {
-      background: "var(--color-warning-bg)",
-      border: "1px solid var(--color-warning-border)",
-      color: "var(--color-warning-text)",
-    };
-  }
-
-  if (role === "admin") {
-    return {
-      background: "var(--color-brand-bg)",
-      border: "1px solid var(--color-brand-border)",
-      color: "var(--color-brand)",
-    };
-  }
-
   return {
-    background: "var(--color-border-light)",
+    background: "var(--color-bg-secondary)",
     border: "1px solid var(--color-border-light)",
     color: "var(--color-text-muted)",
   };

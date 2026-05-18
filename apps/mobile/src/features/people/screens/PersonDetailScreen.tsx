@@ -137,6 +137,8 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] =
+    useState(false);
   const [benchNote, setBenchNote] = useState("");
   const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
   const [accountLinkChallenge, setAccountLinkChallenge] =
@@ -622,12 +624,15 @@ export default function PersonDetailScreen() {
           draft={draft}
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
-          onChange={setDraft}
           onCancel={() => {
             setEditing(false);
             setDraft(makeDraft(person));
           }}
+          onCancelWithChanges={() => setShowDiscardCancelConfirmation(true)}
+          onChange={setDraft}
+          onDiscard={() => setDraft(makeDraft(person))}
           onSave={handleSave}
+          original={person}
           roleLabel={roleLabel}
           roles={bootstrapQuery.data?.roles ?? []}
         />
@@ -809,6 +814,19 @@ export default function PersonDetailScreen() {
         visible={showSaveConfirmation}
       />
       <ConfirmationModal
+        body="Your edits will be lost."
+        confirmLabel="Discard"
+        confirmTone="dangerFilled"
+        onCancel={() => setShowDiscardCancelConfirmation(false)}
+        onConfirm={() => {
+          setShowDiscardCancelConfirmation(false);
+          setEditing(false);
+          setDraft(makeDraft(person));
+        }}
+        title="Discard unsaved changes?"
+        visible={showDiscardCancelConfirmation}
+      />
+      <ConfirmationModal
         body={statusConfirmationBody}
         confirmLabel={statusConfirmationLabel}
         confirmTone={
@@ -986,6 +1004,13 @@ function getScheduledDepartmentIds(
   return departmentIds;
 }
 
+function sameIds(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) return false;
+  const sortedLeft = [...left].sort((a, b) => a - b);
+  const sortedRight = [...right].sort((a, b) => a - b);
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
 function formatIdList(ids: number[], map: Map<number, string>): string {
   const values = ids
     .map((id) => map.get(id))
@@ -1010,8 +1035,11 @@ function EditPanel({
   certifications,
   roleLabel,
   roles,
+  original,
   onChange,
   onCancel,
+  onCancelWithChanges,
+  onDiscard,
   onSave,
 }: {
   draft: EditDraft;
@@ -1022,8 +1050,11 @@ function EditPanel({
   certifications: MobileNamedItem[];
   roleLabel: string;
   roles: MobileNamedItem[];
+  original: MobilePerson;
   onChange: (draft: EditDraft) => void;
   onCancel: () => void;
+  onCancelWithChanges: () => void;
+  onDiscard: () => void;
   onSave: () => void;
 }) {
   const [focusedField, setFocusedField] = useState<
@@ -1039,6 +1070,17 @@ function EditPanel({
       draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
+  const hasChanges =
+    draft.firstName.trim() !== original.firstName ||
+    draft.lastName.trim() !== original.lastName ||
+    draft.employmentType !== original.employmentType ||
+    draft.phone.trim() !== original.phone ||
+    draft.email.trim() !== original.email ||
+    draft.contactNotes !== original.contactNotes ||
+    draft.certificationId !== original.certificationId ||
+    !sameIds(draft.focusAreaIds, original.focusAreaIds) ||
+    !sameIds(draft.roleIds, original.roleIds) ||
+    !sameIds(draft.departmentIds, original.departmentIds);
   const setField = <K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
     onChange({ ...draft, [key]: value });
   };
@@ -1201,16 +1243,23 @@ function EditPanel({
       <View style={styles.actionsRow}>
         <Button
           compact
-          disabled={disabled || hasValidationErrors}
+          disabled={disabled || !hasChanges || hasValidationErrors}
           label={disabled ? "Saving..." : "Save changes"}
           onPress={onSave}
         />
         <Button
           compact
-          disabled={disabled}
+          disabled={disabled || !hasChanges}
           label="Discard"
-          onPress={onCancel}
+          onPress={onDiscard}
           tone="neutral"
+        />
+        <Button
+          compact
+          disabled={disabled}
+          label="Cancel"
+          onPress={hasChanges ? onCancelWithChanges : onCancel}
+          tone="ghost"
         />
       </View>
     </>
