@@ -40,10 +40,19 @@ export default function SandboxBanner() {
         setPendingAction(null);
         return;
       }
-      // No navigation — middleware reads the updated cookie on the next
-      // request. Invalidating every query forces visible components to
-      // refetch against the new org context (real for exit, fresh
-      // sandbox for reset).
+      // No navigation. Two things must happen for the UI to reflect
+      // the org switch cleanly:
+      //
+      //   1. queryClient.clear() — purge ALL cached data. Without this,
+      //      forms re-mount reading stale cached values from the prior
+      //      sandbox session (the save mutation cached sandbox results
+      //      under the real-org cache key because client code derives
+      //      query keys from the unrefreshed JWT's org id).
+      //   2. invalidateQueries() — restart fetches for any query that
+      //      still has subscribers, so the page repopulates quickly
+      //      from the new org context rather than waiting for an idle
+      //      moment.
+      queryClient.clear();
       await queryClient.invalidateQueries();
       setPendingAction(null);
     } catch {

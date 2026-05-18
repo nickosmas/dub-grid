@@ -40,8 +40,11 @@ export default function CreateSandboxDialog({
       }
       // The sandbox cookie was set by the server response. No navigation —
       // middleware reads the cookie on the next request and overrides
-      // org_id. Invalidate every query so the visible UI refetches against
-      // the sandbox.
+      // org_id. clear() purges any pre-sandbox cache so the page can't
+      // briefly show real-org data after the AppShell remount; the
+      // subsequent invalidateQueries kicks off fresh fetches for any
+      // query that still has active subscribers.
+      queryClient.clear();
       await queryClient.invalidateQueries();
       onClose();
     } catch {
