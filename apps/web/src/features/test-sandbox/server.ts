@@ -2,10 +2,162 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 const MAX_SLUG_ATTEMPTS = 5;
 
+// Strip auto-managed and audit columns when cloning a row.
+const STRIP_FIELDS = new Set([
+  "id",
+  "org_id",
+  "created_at",
+  "updated_at",
+  "created_by",
+  "updated_by",
+]);
+
 function randomSandboxSlug(): string {
   const random = Math.random().toString(36).slice(2, 10);
   const stamp = Date.now().toString(36).slice(-6);
   return `sandbox-${stamp}${random}`;
+}
+
+interface Remapping {
+  col: string;
+  map: Map<number, number>;
+  isArray?: boolean;
+}
+
+/**
+ * Read every non-archived row of `table` belonging to `sourceOrgId`,
+ * remap any FK columns through the supplied id maps, strip user-linkage
+ * columns, and insert into `sandboxOrgId`. Returns a map of source row
+ * id → new row id so downstream tables can resolve their own FK refs.
+ */
+async function cloneOrgTable(
+  svc: SupabaseClient,
+  table: string,
+  sourceOrgId: string,
+  sandboxOrgId: string,
+  remappings: Remapping[] = [],
+  extraStripFields: string[] = [],
+): Promise<Map<number, number>> {
+  const { data: rows, error } = await svc
+    .from(table)
+    .select("*")
+    .eq("org_id", sourceOrgId);
+  if (error) throw error;
+  if (!rows || rows.length === 0) return new Map();
+
+  // Deterministic order so the new rows come back in the same order we
+  // sent them — PostgREST returns inserts in input order, which lets us
+  // build the id remap by index.
+  rows.sort((a, b) => Number(a.id) - Number(b.id));
+
+  const stripAll = new Set([...STRIP_FIELDS, ...extraStripFields]);
+  const newRows = rows.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) {
+      if (stripAll.has(key)) continue;
+      out[key] = value;
+    }
+    for (const r of remappings) {
+      const val = out[r.col];
+      if (val == null) continue;
+      if (r.isArray) {
+        out[r.col] = (val as number[])
+          .map((srcId) => r.map.get(srcId))
+          .filter((v): v is number => v != null);
+      } else {
+        const mapped = r.map.get(val as number);
+        out[r.col] = mapped ?? null;
+      }
+    }
+    out.org_id = sandboxOrgId;
+    return out;
+  });
+
+  const { data: inserted, error: insErr } = await svc
+    .from(table)
+    .insert(newRows)
+    .select("id");
+  if (insErr) throw insErr;
+
+  const map = new Map<number, number>();
+  if (inserted) {
+    for (let i = 0; i < rows.length; i += 1) {
+      map.set(Number(rows[i].id), Number(inserted[i].id));
+    }
+  }
+  return map;
+}
+
+/**
+ * Clones org-scoped config + employees from a source org into a sandbox.
+ * Mutating data (schedule_cells, snapshots, recurring shifts, requests,
+ * notes) is intentionally NOT copied — the sandbox starts with a fresh
+ * empty schedule so the user can experiment without seeing real shifts.
+ */
+async function cloneOrgIntoSandbox(
+  svc: SupabaseClient,
+  sourceOrgId: string,
+  sandboxOrgId: string,
+): Promise<void> {
+  // Phase 1 — tables with no inter-table FKs (other than org_id)
+  const [departmentMap, certificationMap, absenceMap, indicatorMap] =
+    await Promise.all([
+      cloneOrgTable(svc, "departments", sourceOrgId, sandboxOrgId),
+      cloneOrgTable(svc, "certifications", sourceOrgId, sandboxOrgId),
+      cloneOrgTable(svc, "absence_types", sourceOrgId, sandboxOrgId),
+      cloneOrgTable(svc, "indicator_types", sourceOrgId, sandboxOrgId),
+    ]);
+
+  // Phase 2 — depend on phase 1
+  const [focusAreaMap, roleMap] = await Promise.all([
+    cloneOrgTable(svc, "focus_areas", sourceOrgId, sandboxOrgId, [
+      { col: "department_id", map: departmentMap },
+    ]),
+    cloneOrgTable(svc, "organization_roles", sourceOrgId, sandboxOrgId, [
+      { col: "department_id", map: departmentMap },
+    ]),
+  ]);
+
+  // Phase 3 — shift categories depend on focus areas
+  const shiftCategoryMap = await cloneOrgTable(
+    svc,
+    "shift_categories",
+    sourceOrgId,
+    sandboxOrgId,
+    [{ col: "focus_area_id", map: focusAreaMap }],
+  );
+
+  // Phase 4 — jobs depend on focus areas, shift categories, departments,
+  // roles, and certifications.
+  await cloneOrgTable(svc, "jobs", sourceOrgId, sandboxOrgId, [
+    { col: "focus_area_ids", map: focusAreaMap, isArray: true },
+    { col: "applicable_shift_ids", map: shiftCategoryMap, isArray: true },
+    { col: "department_ids", map: departmentMap, isArray: true },
+    { col: "eligible_role_ids", map: roleMap, isArray: true },
+    { col: "required_certification_ids", map: certificationMap, isArray: true },
+  ]);
+
+  // Phase 5 — employees. Strip user_id so the cloned employees are
+  // detached from any auth user (they're test data, not linked to real
+  // accounts). version is server-managed so let the default kick in.
+  await cloneOrgTable(
+    svc,
+    "employees",
+    sourceOrgId,
+    sandboxOrgId,
+    [
+      { col: "certification_id", map: certificationMap },
+      { col: "focus_area_ids", map: focusAreaMap, isArray: true },
+      { col: "department_ids", map: departmentMap, isArray: true },
+      { col: "dept_admin_ids", map: departmentMap, isArray: true },
+      { col: "role_ids", map: roleMap, isArray: true },
+    ],
+    ["user_id", "version"],
+  );
+
+  // Silence unused-var lint for maps that aren't referenced again
+  void absenceMap;
+  void indicatorMap;
 }
 
 /**
@@ -31,9 +183,10 @@ export async function findActiveSandboxForUser(
 }
 
 /**
- * Create a fresh sandbox workspace owned by `actor` and seeded with the
- * minimum config required for the user to be able to navigate the app
- * inside it. Returns the new sandbox's id.
+ * Create a fresh sandbox workspace owned by `actor`, seeded with a clone
+ * of the source org's config (focus areas, departments, jobs, shift
+ * categories, certifications, roles, absence types, indicator types) and
+ * its employees. Returns the new sandbox's id + slug.
  */
 export async function createSandboxForUser(input: {
   serviceClient: SupabaseClient;
@@ -42,8 +195,6 @@ export async function createSandboxForUser(input: {
 }): Promise<{ id: string; slug: string }> {
   const { serviceClient, actor, sourceOrgId } = input;
 
-  // Pull a few display fields from the source so the sandbox feels related
-  // to the org the user is testing on.
   const { data: sourceOrg, error: sourceErr } = await serviceClient
     .from("organizations")
     .select(
@@ -87,7 +238,6 @@ export async function createSandboxForUser(input: {
       break;
     }
     lastError = insertErr;
-    // Slug collision (unique constraint) — retry with a new random slug.
     if (insertErr?.code !== "23505") {
       throw insertErr;
     }
@@ -96,28 +246,37 @@ export async function createSandboxForUser(input: {
     throw lastError ?? new Error("Could not allocate a sandbox workspace.");
   }
 
-  // Add the actor as a super_admin member of their sandbox so RLS allows
-  // them to interact with it just like any real workspace they belong to.
-  const { error: membershipErr } = await serviceClient
-    .from("organization_memberships")
-    .insert({
-      user_id: actor.id,
-      org_id: createdOrgId,
-      org_role: "super_admin",
-      onboarding_completed_at: new Date().toISOString(),
-    });
-  if (membershipErr) {
-    // Best-effort cleanup if membership fails.
-    await serviceClient.from("organizations").delete().eq("id", createdOrgId);
-    throw membershipErr;
+  try {
+    // Add the actor as super_admin so RLS lets them touch the sandbox
+    // like any workspace they belong to.
+    const { error: membershipErr } = await serviceClient
+      .from("organization_memberships")
+      .insert({
+        user_id: actor.id,
+        org_id: createdOrgId,
+        org_role: "super_admin",
+        onboarding_completed_at: new Date().toISOString(),
+      });
+    if (membershipErr) throw membershipErr;
+
+    // Clone the source org's structural config and people.
+    await cloneOrgIntoSandbox(serviceClient, sourceOrgId, createdOrgId);
+  } catch (err) {
+    // Best-effort cleanup — if any step after the org insert fails, drop
+    // the half-built sandbox so the user isn't left with a broken row.
+    await serviceClient
+      .from("organizations")
+      .delete()
+      .eq("id", createdOrgId);
+    throw err;
   }
 
   return { id: createdOrgId, slug: createdSlug };
 }
 
 /**
- * Verify ownership and hard-delete the sandbox org. FK cascades take care of
- * memberships, focus areas, departments, schedule rows, etc.
+ * Verify ownership and hard-delete the sandbox org. FK cascades take care
+ * of memberships, focus areas, departments, schedule rows, etc.
  */
 export async function deleteSandboxForUser(input: {
   serviceClient: SupabaseClient;
