@@ -573,6 +573,284 @@ async function dispatchNotificationEventInternal(
           },
         );
       }
+      return;
+    }
+
+    // ── Schedule (non-publish flows) ────────────────────────────────────
+
+    case "recurring_shift_updated": {
+      const userId = await getEmployeeUserId(event.empId);
+      if (!userId || userId === actorUserId) return;
+      const message =
+        event.mode === "upsert"
+          ? "Your recurring shift was updated."
+          : "Your recurring shift was removed.";
+      await sendNotification(
+        userId,
+        event.orgId,
+        "recurring_shift_updated" as NotificationType,
+        "Recurring shift updated",
+        message,
+        { empId: event.empId, mode: event.mode },
+      );
+      return;
+    }
+
+    case "shift_series_changed": {
+      const userIds =
+        event.empIds && event.empIds.length > 0
+          ? await getAffectedUserIdsForEmpIds(event.empIds)
+          : await getSeriesAffectedUserIds(event.seriesId);
+      const message =
+        event.mode === "create"
+          ? "A recurring shift series was created for you."
+          : event.mode === "update_all"
+            ? "A recurring shift series you're on was updated."
+            : "A recurring shift series you're on was removed.";
+      await Promise.all(
+        userIds
+          .filter((id) => id !== actorUserId)
+          .map((userId) =>
+            sendNotification(
+              userId,
+              event.orgId,
+              "shift_series_updated" as NotificationType,
+              "Shift series updated",
+              message,
+              { seriesId: event.seriesId, mode: event.mode },
+            ),
+          ),
+      );
+      return;
+    }
+
+    case "schedule_note_changed": {
+      // Only notify when the resulting note is published — drafts are
+      // editor-only state and shouldn't surface in user inboxes.
+      if (event.status !== "published") return;
+      const userId = await getEmployeeUserId(event.empId);
+      if (!userId || userId === actorUserId) return;
+      const title =
+        event.mode === "delete"
+          ? "Schedule note removed"
+          : "Schedule note added";
+      const message = `Schedule note ${event.mode === "delete" ? "removed" : "added"} for ${event.date}.`;
+      await sendNotification(
+        userId,
+        event.orgId,
+        "schedule_note_published" as NotificationType,
+        title,
+        message,
+        { empId: event.empId, date: event.date, mode: event.mode },
+      );
+      return;
+    }
+
+    case "recurring_schedules_applied": {
+      const userIds = await getAffectedUserIdsForEmpIds(event.affectedEmpIds);
+      await Promise.all(
+        userIds
+          .filter((id) => id !== actorUserId)
+          .map((userId) =>
+            sendNotification(
+              userId,
+              event.orgId,
+              "recurring_schedules_applied" as NotificationType,
+              "Recurring shifts applied",
+              `Recurring shifts have been applied to your schedule for ${event.startDate} to ${event.endDate}.`,
+              {
+                startDate: event.startDate,
+                endDate: event.endDate,
+              },
+            ),
+          ),
+      );
+      return;
+    }
+
+    // ── Membership lifecycle ────────────────────────────────────────────
+
+    case "invitation_created": {
+      // The send_invitation RPC already triggers an email to the invitee.
+      // We skip in-app notification because the invitee typically has no
+      // user account yet. If one exists, the email is still the canonical
+      // delivery channel.
+      return;
+    }
+
+    case "invitation_accepted": {
+      const orgName = await getOrgName(event.orgId);
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const inviter = event.invitationId
+        ? (await getInvitation(event.invitationId))?.invitedBy ?? null
+        : null;
+      const recipients = new Set<string>(superAdmins);
+      if (inviter) recipients.add(inviter);
+      recipients.delete(actorUserId);
+      await Promise.all(
+        [...recipients].map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "invitation_accepted" as NotificationType,
+            "Invitation accepted",
+            `A new member joined ${orgName}.`,
+            {
+              acceptedUserId: event.acceptedUserId,
+              invitationId: event.invitationId ?? null,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "invitation_revoked": {
+      const orgName = await getOrgName(event.orgId);
+      const inv = await getInvitation(event.invitationId);
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const recipients = new Set<string>(superAdmins);
+      if (inv?.invitedBy) recipients.add(inv.invitedBy);
+      recipients.delete(actorUserId);
+      await Promise.all(
+        [...recipients].map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "invitation_revoked" as NotificationType,
+            "Invitation revoked",
+            `An invitation to ${event.inviteeEmail} for ${orgName} was revoked.`,
+            {
+              invitationId: event.invitationId,
+              inviteeEmail: event.inviteeEmail,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "invitation_resent": {
+      // Like invitation_created — the resend itself sends a new email.
+      // No in-app row needed (invitee usually has no user yet).
+      return;
+    }
+
+    case "membership_removed": {
+      const orgName = await getOrgName(event.orgId);
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const recipients = new Set<string>(superAdmins);
+      // The removed user themselves always gets notified (they need to know).
+      recipients.add(event.removedUserId);
+      recipients.delete(actorUserId);
+      await Promise.all(
+        [...recipients].map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "membership_removed" as NotificationType,
+            userId === event.removedUserId
+              ? "You were removed from an organization"
+              : "Member removed",
+            userId === event.removedUserId
+              ? `You no longer have access to ${orgName}.`
+              : `A member was removed from ${orgName}.`,
+            { removedUserId: event.removedUserId },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "admin_permissions_changed": {
+      if (event.targetUserId === actorUserId) return;
+      await sendNotification(
+        event.targetUserId,
+        event.orgId,
+        "admin_permissions_changed" as NotificationType,
+        "Your admin permissions changed",
+        "Your administrator permissions in this organization were updated.",
+        {
+          before: event.before,
+          after: event.after,
+        },
+      );
+      return;
+    }
+
+    // ── Employee ────────────────────────────────────────────────────────
+
+    case "employee_created": {
+      const orgName = await getOrgName(event.orgId);
+      const empUserId = await getEmployeeUserId(event.empId);
+      const empName = await getEmployeeName(event.empId);
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const recipients = new Set<string>(superAdmins);
+      if (empUserId) recipients.add(empUserId);
+      recipients.delete(actorUserId);
+      await Promise.all(
+        [...recipients].map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "employee_created" as NotificationType,
+            userId === empUserId
+              ? "You were added to an organization"
+              : "Employee added",
+            userId === empUserId
+              ? `Your employee record was created in ${orgName}.`
+              : `${empName} was added to ${orgName}.`,
+            { empId: event.empId },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "employee_status_changed": {
+      const empUserId = await getEmployeeUserId(event.empId);
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const recipients = new Set<string>(superAdmins);
+      if (empUserId) recipients.add(empUserId);
+      recipients.delete(actorUserId);
+      const transition = `${event.fromStatus} → ${event.toStatus}`;
+      await Promise.all(
+        [...recipients].map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "employee_status_changed" as NotificationType,
+            userId === empUserId
+              ? "Your employment status changed"
+              : "Employee status changed",
+            userId === empUserId
+              ? `Your status was changed (${transition}).`
+              : `An employee's status changed (${transition}).`,
+            {
+              empId: event.empId,
+              fromStatus: event.fromStatus,
+              toStatus: event.toStatus,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "employee_profile_changed": {
+      const empUserId = await getEmployeeUserId(event.empId);
+      if (!empUserId || empUserId === actorUserId) return;
+      await sendNotification(
+        empUserId,
+        event.orgId,
+        "employee_profile_changed" as NotificationType,
+        "Your employee profile was updated",
+        event.fields.length > 0
+          ? `Updated fields: ${event.fields.join(", ")}.`
+          : "Your employee profile was updated.",
+        { empId: event.empId, fields: event.fields },
+      );
+      return;
     }
   }
 }

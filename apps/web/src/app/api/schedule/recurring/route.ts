@@ -10,6 +10,7 @@ import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { rowToRecurringShift } from "@/lib/db/mappers";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 export const dynamic = "force-dynamic";
 
@@ -290,6 +291,13 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "recurring_shift_updated",
+          orgId: data.orgId,
+          empId: data.employeeId,
+          mode: "upsert",
+        });
+
         return NextResponse.json({ success: true });
       }
 
@@ -313,6 +321,13 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "recurring_shift_updated",
+          orgId: data.orgId,
+          empId: data.employeeId,
+          mode: "delete",
+        });
 
         return NextResponse.json({ success: true });
       }
