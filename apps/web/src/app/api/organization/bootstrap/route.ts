@@ -15,6 +15,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { parseHost } from "@/lib/subdomain";
 import { getImpersonationFromCookie, IMPERSONATION_COOKIE_NAME } from "@/lib/impersonation";
+import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import {
   rowToAbsenceType,
@@ -44,7 +45,11 @@ function parseIncludeAssignments(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("includeAssignments") !== "0";
 }
 
-async function resolveOrganizationId(req: NextRequest, claims: Record<string, unknown>): Promise<{
+async function resolveOrganizationId(
+  req: NextRequest,
+  claims: Record<string, unknown>,
+  userId: string | null,
+): Promise<{
   orgId: string | null;
   isGridmaster: boolean;
 }> {
@@ -57,6 +62,19 @@ async function resolveOrganizationId(req: NextRequest, claims: Record<string, un
 
   if (impersonation?.targetOrgId) {
     return { orgId: impersonation.targetOrgId, isGridmaster: false };
+  }
+
+  // Sandbox mode: when the user has an active sandbox cookie matching
+  // their auth id, treat the sandbox org as the bootstrap target. Middleware
+  // already verified the cookie + ownership before this request landed, but
+  // we do the userId check here too as a defense-in-depth before exposing
+  // org data.
+  const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  const sandbox = sandboxCookieValue
+    ? getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`)
+    : null;
+  if (sandbox && userId && sandbox.userId === userId) {
+    return { orgId: sandbox.sandboxOrgId, isGridmaster: false };
   }
 
   if (claims.platform_role === "gridmaster") {
@@ -94,7 +112,11 @@ export async function GET(req: NextRequest) {
     }
 
     const includeAssignments = parseIncludeAssignments(req);
-    const { orgId, isGridmaster } = await resolveOrganizationId(req, auth.claims);
+    const { orgId, isGridmaster } = await resolveOrganizationId(
+      req,
+      auth.claims,
+      auth.user?.id ?? null,
+    );
 
     if (isGridmaster && !orgId) {
       return NextResponse.json({
