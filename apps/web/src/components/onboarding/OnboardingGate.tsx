@@ -33,15 +33,6 @@ function isPublicRoute(pathname: string): boolean {
   );
 }
 
-function isSetupCompletionRoute(pathname: string): boolean {
-  return (
-    pathname === "/setup" ||
-    pathname === "/people" ||
-    pathname === "/settings" ||
-    pathname.startsWith("/settings/")
-  );
-}
-
 function isBillingRecoveryRoute(
   pathname: string,
   section: string | null,
@@ -92,15 +83,6 @@ export default function OnboardingGate({
 import OnboardingWizard from "./OnboardingWizard";
 import SetupPendingScreen from "./SetupPendingScreen";
 
-function SetupRedirect() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/setup");
-  }, [router]);
-
-  return null;
-}
 
 function BillingRedirect() {
   const router = useRouter();
@@ -173,10 +155,17 @@ function OnboardingCheck({
     if (!canCompleteSetup) {
       return <SetupPendingScreen />;
     }
-    if (!isSetupCompletionRoute(pathname)) {
-      return <SetupRedirect />;
-    }
-    return <>{children}</>;
+    // /setup as a standalone route was removed in the onboarding refactor
+    // (commit d7e7b96). Render the wizard inline so users with incomplete
+    // org setup see it on whatever route they landed on after login.
+    return (
+      <OnboardingWizard
+        role={role}
+        orgId={orgId}
+        userId={userId}
+        isOrgSetup={isOrgSetupComplete}
+      />
+    );
   }
 
   if (onboardingStatus?.completed) return <>{children}</>;
