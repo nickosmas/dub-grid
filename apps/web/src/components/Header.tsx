@@ -725,7 +725,7 @@ export default function Header({ orgName }: HeaderProps) {
 
         {menuOpen && (
           <div
-            className="dg-menu"
+            className="dg-menu dg-profile-menu"
             style={{
               position: "absolute",
               top: "calc(100% + 6px)",
@@ -752,9 +752,11 @@ export default function Header({ orgName }: HeaderProps) {
                   onClick={() => { setMenuOpen(false); setSandboxDialogOpen(true); }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7h18M5 7v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                    <line x1="9" y1="3" x2="15" y2="3" />
+                    <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3" />
+                    <line x1="7" y1="14" x2="17" y2="14" />
                   </svg>
-                  Enter sandbox mode
+                  Test sandbox
                 </button>
               </>
             )}
