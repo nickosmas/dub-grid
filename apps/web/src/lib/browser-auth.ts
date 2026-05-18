@@ -47,6 +47,20 @@ function isStaleRefreshTokenError(error: unknown): boolean {
   );
 }
 
+function isAuthLockContentionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { message } = error as { message?: string };
+  const normalized = message?.toLowerCase() ?? "";
+  // Supabase auth client uses the Web Locks API to serialize token
+  // refreshes. When two callers race (common right after a forced
+  // refreshSession + navigation), the loser is told its lock was stolen.
+  // That's a transient, recoverable condition — another concurrent caller
+  // is already providing the authoritative answer.
+  return (
+    normalized.includes("lock") && normalized.includes("stolen")
+  );
+}
+
 export function isRecoverableBrowserAuthError(error: unknown): boolean {
   return isMissingSessionError(error) || isStaleRefreshTokenError(error);
 }
@@ -111,6 +125,15 @@ export async function getBrowserSession(): Promise<Session | null> {
   } = await supabase.auth.getSession();
 
   if (error) {
+    if (isAuthLockContentionError(error)) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const retry = await supabase.auth.getSession();
+      if (retry.error) {
+        if (isRecoverableBrowserAuthError(retry.error)) return null;
+        throw retry.error;
+      }
+      return retry.data.session;
+    }
     if (isRecoverableBrowserAuthError(error)) return null;
     throw error;
   }
@@ -124,6 +147,17 @@ export async function getVerifiedBrowserUser(): Promise<User | null> {
   } = await supabase.auth.getUser();
 
   if (error) {
+    if (isAuthLockContentionError(error)) {
+      // A concurrent caller stole the auth lock; wait a tick and re-read
+      // (the winner's getUser() will have populated session state).
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const retry = await supabase.auth.getUser();
+      if (retry.error) {
+        if (isRecoverableBrowserAuthError(retry.error)) return null;
+        throw retry.error;
+      }
+      return retry.data.user;
+    }
     if (isRecoverableBrowserAuthError(error)) return null;
     throw error;
   }
