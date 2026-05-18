@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   fetchOrganizationBootstrap,
   type OrganizationBootstrap,
@@ -10,7 +10,6 @@ import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export default function SandboxBanner() {
-  const queryClient = useQueryClient();
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
     queryKey: queryKeys.org.bootstrap(null, false),
     queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
@@ -40,21 +39,25 @@ export default function SandboxBanner() {
         setPendingAction(null);
         return;
       }
-      // No navigation. Two things must happen for the UI to reflect
-      // the org switch cleanly:
+      // Hard-reload on exit and reset.
       //
-      //   1. queryClient.clear() — purge ALL cached data. Without this,
-      //      forms re-mount reading stale cached values from the prior
-      //      sandbox session (the save mutation cached sandbox results
-      //      under the real-org cache key because client code derives
-      //      query keys from the unrefreshed JWT's org id).
-      //   2. invalidateQueries() — restart fetches for any query that
-      //      still has subscribers, so the page repopulates quickly
-      //      from the new org context rather than waiting for an idle
-      //      moment.
-      queryClient.clear();
-      await queryClient.invalidateQueries();
-      setPendingAction(null);
+      // We tried two softer approaches first — queryClient.invalidate
+      // alone, then queryClient.clear() + invalidate + an AppShell
+      // keyed remount — and both still left stale values in components
+      // whose state lives outside React Query (settings forms that
+      // hydrate local useState from props on mount, custom-labels-style
+      // forms that snapshot data into local refs, context providers
+      // that cache lookups, etc.). Forcing a same-page reload is the
+      // only way to guarantee every component's local state is reset
+      // when the active org id changes, without trying to enumerate
+      // every form's hydration pattern.
+      //
+      // Same-page reload, not a navigation — the URL stays put, so
+      // this doesn't feel like a logout. The cookie was cleared
+      // (exit) or rewritten (reset) by the server response, so the
+      // reloaded page sees the new sandbox state on its first
+      // bootstrap fetch.
+      window.location.reload();
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");
       setPendingAction(null);
