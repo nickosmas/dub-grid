@@ -37,12 +37,14 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import ChangeReviewModal from "@/components/review/ChangeReviewModal";
 import { buildInvitationRevocationChanges, buildMembershipAccessChanges } from "@/lib/access-management";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 // ── Admin permission metadata ──────────────────────────────────────────────────
 
 const PERM_GROUPS: { label: string; keys: (keyof AdminPermissions)[] }[] = [
   { label: "Schedule", keys: ["canEditShifts", "canPublishSchedule", "canApplyRecurringSchedule", "canApproveShiftRequests"] },
   { label: "Notes", keys: ["canEditNotes"] },
+  { label: "Schedule Indicators", keys: ["canEditScheduleIndicators"] },
   { label: "Recurring", keys: ["canViewRecurringShifts", "canManageRecurringShifts", "canManageShiftSeries"] },
   { label: "Staff", keys: ["canViewEmployeeDetails", "canManageEmployees"] },
   { label: "Configuration", keys: ["canViewFocusAreas", "canManageFocusAreas", "canViewScheduleDefinitions", "canManageScheduleDefinitions", "canViewIndicatorTypes", "canManageIndicatorTypes", "canManageOrgSettings", "canViewOrgLabels", "canManageOrgLabels", "canViewCoverageRequirements", "canManageCoverageRequirements"] },
@@ -58,6 +60,7 @@ function emptyAdminPerms(): AdminPermissions {
     canPublishSchedule: false,
     canApplyRecurringSchedule: false,
     canEditNotes: false,
+    canEditScheduleIndicators: false,
     canViewRecurringShifts: false,
     canManageRecurringShifts: false,
     canManageShiftSeries: false,
@@ -155,7 +158,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
     let mounted = true;
     fetchOrganizationUsers(orgId)
       .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
-      .catch((e) => { if (mounted) { setError(e.message); setLoading(false); } });
+      .catch((e) => { if (mounted) { setError(formatClientErrorMessage(e, "Failed to load users")); setLoading(false); } });
     fetchOrganizationInvitations(orgId)
       .then((inv) => { if (mounted) setInvitations(inv); })
       .catch(() => {});
@@ -335,7 +338,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         return;
       }
       toast.error("Failed to change role");
-      setError(e instanceof Error ? e.message : "Failed to change role");
+      setError(formatClientErrorMessage(e, "Failed to change role"));
     } finally {
       setSaving(null);
     }
@@ -374,7 +377,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         toast.error("User access changed elsewhere. Review the latest values and try again.");
         return;
       }
-      toast.error(e instanceof Error ? e.message : "Failed to revoke access");
+      toast.error(formatClientErrorMessage(e, "Failed to revoke access"));
     } finally {
       setRevoking(false);
       setRevokeConfirm(null);
@@ -426,7 +429,7 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
         return;
       }
       toast.error("Failed to save permissions");
-      setError(e instanceof Error ? e.message : "Failed to save permissions");
+      setError(formatClientErrorMessage(e, "Failed to save permissions"));
     } finally {
       setSavingPerms(null);
     }

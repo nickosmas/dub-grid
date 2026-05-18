@@ -18,6 +18,7 @@ import type {
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { formatDateKey } from "@/lib/utils";
 
 export interface ScheduleActorNamesResponse {
   names: Record<string, string>;
@@ -33,13 +34,6 @@ export class OptimisticLockError extends Error {
       `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${actualVersion !== undefined ? `, but found version ${actualVersion}` : ""}`,
     );
     this.name = "OptimisticLockError";
-  }
-}
-
-export class ScheduleDraftConflictError extends Error {
-  constructor(public readonly latestSummary: DraftBreakdown) {
-    super("Schedule drafts changed elsewhere.");
-    this.name = "ScheduleDraftConflictError";
   }
 }
 
@@ -631,54 +625,31 @@ export function applyRecurringSchedules(
   }>({
     action: "applyRecurringSchedules",
     orgId,
-    startDate: startDate.toISOString().slice(0, 10),
-    endDate: endDate.toISOString().slice(0, 10),
+    // Local-tz formatting: toISOString() converts to UTC and shifts the date
+    // by one for users east of UTC, silently truncating the range.
+    startDate: formatDateKey(startDate),
+    endDate: formatDateKey(endDate),
   }).then((data) => data.generated);
-}
-
-export async function fetchScheduleDraftSummary(input: {
-  orgId: string;
-  scope?: "all" | "mine";
-  startDate?: string;
-  endDate?: string;
-}): Promise<DraftBreakdown> {
-  const params = new URLSearchParams({ orgId: input.orgId });
-  if (input.scope) params.set("scope", input.scope);
-  if (input.startDate) params.set("startDate", input.startDate);
-  if (input.endDate) params.set("endDate", input.endDate);
-
-  const response = await fetch(`/api/shifts/draft-summary?${params.toString()}`);
-  const body = (await response.json().catch(() => null)) as
-    | { summary?: DraftBreakdown; error?: string }
-    | null;
-  if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to load schedule draft summary"));
-  }
-  return body.summary;
 }
 
 export async function publishSchedule(
   orgId: string,
   startDate: Date,
   endDate: Date,
-  expectedSummary?: DraftBreakdown,
 ): Promise<DraftBreakdown> {
   const response = await fetch("/api/shifts/publish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       orgId,
-      startDate: startDate.toISOString().slice(0, 10),
-      endDate: endDate.toISOString().slice(0, 10),
-      expectedSummary,
+      // See applyRecurringSchedules above — must format in local tz.
+      startDate: formatDateKey(startDate),
+      endDate: formatDateKey(endDate),
     }),
   });
   const body = (await response.json().catch(() => null)) as
     | { summary?: DraftBreakdown; error?: string }
     | null;
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
   if (!response.ok || !body?.summary) {
     throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
   }
@@ -688,7 +659,6 @@ export async function publishSchedule(
 export async function discardScheduleDrafts(
   orgId: string,
   userId?: string,
-  expectedSummary?: DraftBreakdown,
 ): Promise<DraftBreakdown> {
   const response = await fetch("/api/shifts/discard", {
     method: "POST",
@@ -696,15 +666,11 @@ export async function discardScheduleDrafts(
     body: JSON.stringify({
       orgId,
       scope: userId ? "mine" : "all",
-      expectedSummary,
     }),
   });
   const body = (await response.json().catch(() => null)) as
     | { summary?: DraftBreakdown; error?: string }
     | null;
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
   if (!response.ok || !body?.summary) {
     throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
   }

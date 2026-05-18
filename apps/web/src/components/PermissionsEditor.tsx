@@ -60,7 +60,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
     icon: "calendar",
     category: "CORE",
     viewKeys: [],
-    editKeys: ["canEditShifts", "canPublishSchedule", "canEditNotes"],
+    editKeys: ["canEditShifts", "canPublishSchedule", "canEditNotes", "canEditScheduleIndicators"],
     alwaysOnView: true,
   },
   {
@@ -136,6 +136,7 @@ const DEFAULT_PERMISSIONS: AdminPermissions = {
   canPublishSchedule: false,
   canApplyRecurringSchedule: false,
   canEditNotes: false,
+  canEditScheduleIndicators: false,
   canViewRecurringShifts: false,
   canManageRecurringShifts: false,
   canManageShiftSeries: false,

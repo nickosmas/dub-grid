@@ -29,6 +29,7 @@ import {
   borderColor,
   getPresetByBg,
 } from "@/lib/colors";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 // ── Shift Categories Settings ──────────────────────────────────────────────────
 const SHIFT_ABBR_MAX_LENGTH = 8;
@@ -295,9 +296,7 @@ function ShiftCategoriesSettings({
       setEditingId(null);
       toast.success("Category saved");
     } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : "Failed to save category";
-      toast.error(message);
+      toast.error(formatClientErrorMessage(err, "Failed to save category"));
       Sentry.captureException(err);
     } finally {
       setSaving(null);

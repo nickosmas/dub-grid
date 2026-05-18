@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { Suspense } from "react";
-import { DM_Sans, DM_Mono, Geist } from "next/font/google";
+import { DM_Sans, DM_Mono } from "next/font/google";
 import { createWebCssVariables } from "@dubgrid/design-tokens";
 import "./globals.css";
 import "@/lib/env";
@@ -51,7 +51,6 @@ import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import PostHogProvider from "@/components/PostHogProvider";
 import { Toaster } from "sonner";
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const webCssVariables = createWebCssVariables() as CSSProperties;
 
 export default function RootLayout({
@@ -64,12 +63,7 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       style={webCssVariables}
-      className={cn(
-        dmSans.variable,
-        dmMono.variable,
-        "font-sans",
-        geist.variable,
-      )}
+      className={cn(dmSans.variable, dmMono.variable, "font-sans")}
     >
       <body suppressHydrationWarning>
         <AuthProvider>

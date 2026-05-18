@@ -437,10 +437,10 @@ export default function DashboardView({
     () => buildPublishedDateSet(publishedDateRanges),
     [publishedDateRanges],
   );
-  const publishedWindowState = useMemo<PublishedWindowState>(() => {
-    if (coverageRequirements.length === 0) return "published";
-    return getPublishedWindowState(periodDates, publishedDateSet);
-  }, [coverageRequirements.length, periodDates, publishedDateSet]);
+  const publishedWindowState = useMemo<PublishedWindowState>(
+    () => getPublishedWindowState(periodDates, publishedDateSet),
+    [periodDates, publishedDateSet],
+  );
   const publishedPeriodDates = useMemo(
     () =>
       coverageRequirements.length === 0
@@ -744,6 +744,7 @@ export default function DashboardView({
   const coveragePct = periodStats.coverage?.pct ?? 100;
   const isCoverageUnpublished = publishedWindowState === "unpublished";
   const isCoveragePartial = publishedWindowState === "partial";
+  const hasCoverageRequirements = coverageRequirements.length > 0;
   const showOT = permissions.canEditShifts;
   const heroSummary = useMemo(() => {
     if (urgentGapCount > 0) {
@@ -796,10 +797,26 @@ export default function DashboardView({
       return {
         statusLabel: "Pending publish",
         title: "This period has not been published yet",
-        description:
-          "Coverage and open-gap metrics will appear after the first publish.",
+        description: hasCoverageRequirements
+          ? "Coverage and open-gap metrics will appear after the first publish."
+          : "Publish this period so the schedule is visible to your team.",
         actionLabel: "Open schedule",
         actionHref: "/schedule",
+      };
+    }
+
+    if (!hasCoverageRequirements) {
+      return {
+        statusLabel: "Setup",
+        title: "Coverage requirements not configured",
+        description:
+          "Set staffing requirements so coverage and open-gap tracking can surface here.",
+        actionLabel: permissions.canManageCoverageRequirements
+          ? "Configure coverage"
+          : "Open schedule",
+        actionHref: permissions.canManageCoverageRequirements
+          ? "/settings"
+          : "/schedule",
       };
     }
 
@@ -825,35 +842,42 @@ export default function DashboardView({
   }, [
     urgentGapCount,
     permissions.canApproveShiftRequests,
+    permissions.canManageCoverageRequirements,
     shiftRequests.pendingApproval.length,
     showOT,
     otAlerts.length,
     draftTotal,
     isCoverageUnpublished,
+    hasCoverageRequirements,
     coveragePct,
   ]);
 
   const heroMetrics = useMemo(() => {
     const coverageDetail = isCoverageUnpublished
       ? "Not published yet"
-      : isCoveragePartial
-        ? "Published dates only"
-        : "Current staffing coverage";
+      : !hasCoverageRequirements
+        ? "Not configured"
+        : isCoveragePartial
+          ? "Published dates only"
+          : "Current staffing coverage";
     const openGapDetail = isCoverageUnpublished
       ? "Not published yet"
-      : isCoveragePartial
-        ? "Published dates only"
-        : "Staffing gaps this period";
+      : !hasCoverageRequirements
+        ? "Not configured"
+        : isCoveragePartial
+          ? "Published dates only"
+          : "Staffing gaps this period";
+    const hideCoverageValue = isCoverageUnpublished || !hasCoverageRequirements;
     const metrics = [
       {
         label: "Coverage",
-        value: isCoverageUnpublished ? "\u2014" : `${coveragePct}%`,
+        value: hideCoverageValue ? "\u2014" : `${coveragePct}%`,
         detail: coverageDetail,
         href: "/schedule",
       },
       {
         label: "Open gaps",
-        value: isCoverageUnpublished ? "\u2014" : `${openShiftSlotCount}`,
+        value: hideCoverageValue ? "\u2014" : `${openShiftSlotCount}`,
         detail: openGapDetail,
         href: "/schedule",
       },
@@ -877,6 +901,7 @@ export default function DashboardView({
     return metrics;
   }, [
     coveragePct,
+    hasCoverageRequirements,
     isCoveragePartial,
     isCoverageUnpublished,
     openShiftSlotCount,

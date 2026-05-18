@@ -24,6 +24,7 @@ import {
 } from "@/lib/form-validation";
 import { PresetColorPicker, labelStyle } from "./shared";
 import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 type AbsenceTypeFormState = {
   label: string;
@@ -188,11 +189,9 @@ function AbsenceTypeRow({
       setExpanded(false);
       toast.success("Absence type saved");
     } catch (error) {
-      const message =
-        error && typeof error === "object" && "message" in error
-          ? String((error as { message?: string }).message ?? "Unknown error")
-          : "Unknown error";
-      setSaveError(message);
+      setSaveError(
+        formatClientErrorMessage(error, "We couldn't save that. Please try again."),
+      );
       Sentry.captureException(error);
       toast.error("Failed to save absence type");
     } finally {

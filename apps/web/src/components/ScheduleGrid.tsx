@@ -2231,11 +2231,27 @@ const SectionBlock = memo(function SectionBlock({
                                       }),
                                     };
                                   }
-                                  const publishRingKind =
+                                  // Absence cells produce no pill diffs (pills
+                                  // are keyed off after-side assignment ids,
+                                  // which absences don't have), so the ring
+                                  // kind has to come from the cell-level diff
+                                  // directly. We never promote that change to a
+                                  // text badge — the banner legend explains the
+                                  // ring colors instead.
+                                  const publishRingKind: ShiftDiffBorderKind =
                                     publishBadge?.kind === "new" ||
                                     publishBadge?.kind === "modified"
                                       ? publishBadge.kind
-                                      : null;
+                                      : isPubDiff &&
+                                          publishDiffSummary &&
+                                          publishDiffSummary.pillDiffs
+                                            .length === 0 &&
+                                          (publishDiffSummary.cellBadge
+                                            ?.kind === "new" ||
+                                            publishDiffSummary.cellBadge
+                                              ?.kind === "modified")
+                                        ? publishDiffSummary.cellBadge.kind
+                                        : null;
 
                                   let draftBadge: GridDiffBadgeConfig | null =
                                     null;

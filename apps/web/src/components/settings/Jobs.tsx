@@ -65,6 +65,7 @@ import {
   normalizeCode,
   normalizeLineText,
 } from "@/lib/form-validation";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 type JobSection = "defaultShift" | "scheduled" | "shiftless";
 
@@ -1062,11 +1063,9 @@ function JobRow({
       setExpanded(false);
       toast.success("Job saved");
     } catch (error) {
-      const message =
-        error && typeof error === "object" && "message" in error
-          ? String((error as { message?: string }).message ?? "Unknown error")
-          : "Unknown error";
-      setSaveError(message);
+      setSaveError(
+        formatClientErrorMessage(error, "We couldn't save that job."),
+      );
       Sentry.captureException(error);
       toast.error("Failed to save job");
     } finally {
