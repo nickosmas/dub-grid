@@ -1,10 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
+import { getServiceClient } from "@/lib/supabase-service";
+import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 
 type Claims = JwtPayload & {
   platform_role?: unknown;
   org_id?: unknown;
+  org_role?: unknown;
+  in_sandbox?: unknown;
 };
 
 type AuthResult =
@@ -103,6 +107,61 @@ export async function requireAuthenticatedUserWithClaims(
         { status: 401 },
       ),
     };
+  }
+
+  // ── Sandbox claim override ─────────────────────────────────────────────
+  // When the caller has a valid sandbox cookie, rewrite claims.org_id to
+  // the sandbox so every downstream endpoint that reads auth.claims.org_id
+  // (the universal pattern in this codebase) routes its query/write to the
+  // sandbox copy, not the user's real workspace. Without this rewrite,
+  // any mutating endpoint that reads claims.org_id directly will write to
+  // the real org while the user thinks they're in the sandbox.
+  //
+  // Defense in depth: we re-verify ownership server-side here. The cookie
+  // alone is not trusted. Middleware also verifies, and so does
+  // /api/test-sandbox; this is the third gate.
+  const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  if (sandboxCookieValue) {
+    const sb = getSandboxFromCookie(
+      `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,
+    );
+    if (sb && sb.userId === auth.user.id) {
+      try {
+        const serviceClient = getServiceClient();
+        const { data: ownedSandbox } = await serviceClient
+          .from("organizations")
+          .select("id")
+          .eq("id", sb.sandboxOrgId)
+          .eq("workspace_kind", "sandbox")
+          .eq("sandbox_owner_user_id", auth.user.id)
+          .is("archived_at", null)
+          .maybeSingle();
+        if (ownedSandbox) {
+          return {
+            ...auth,
+            claims: {
+              ...claims,
+              org_id: ownedSandbox.id,
+              // User is super_admin of their own sandbox; widen the role
+              // so admin-gated features work inside the sandbox even if
+              // the user is a non-admin on their real org. (Menu-level
+              // gating already prevents user-tier accounts from entering
+              // a sandbox in the first place.)
+              org_role: "super_admin",
+              // org_slug intentionally NOT changed — keeps user on the
+              // real-org subdomain. Some endpoints use slug for routing;
+              // exposing the sandbox slug would cause subdomain hops.
+              in_sandbox: true,
+            },
+          };
+        }
+      } catch {
+        // Verification failed transiently — fall through to real claims.
+        // Better to under-route to the real org than mis-route on bad
+        // state. The user's data is at risk only on writes, and writes
+        // already require explicit org_id filtering at every callsite.
+      }
+    }
   }
 
   return { ...auth, claims };
