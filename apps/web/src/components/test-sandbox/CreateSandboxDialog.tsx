@@ -4,6 +4,14 @@ import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { refreshBrowserSession } from "@/features/account/client/auth";
+import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
+
+function buildOrgUrl(slug: string | null, path: string): string {
+  if (typeof window === "undefined") return path;
+  const parsed = parseHost(window.location.host);
+  if (!slug) return path;
+  return `${window.location.protocol}//${buildSubdomainHost(slug, parsed)}${path}`;
+}
 
 interface CreateSandboxDialogProps {
   orgName?: string;
@@ -39,7 +47,10 @@ export default function CreateSandboxDialog({
       }
       // Flush the stale JWT so the next page load sees the sandbox org claims.
       await refreshBrowserSession();
-      window.location.assign("/schedule");
+      const sandbox = (body?.sandbox as Record<string, unknown> | undefined) ?? null;
+      const org = (sandbox?.org as Record<string, unknown> | undefined) ?? null;
+      const slug = typeof org?.slug === "string" ? org.slug : null;
+      window.location.assign(buildOrgUrl(slug, "/schedule"));
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");
       setIsLoading(false);

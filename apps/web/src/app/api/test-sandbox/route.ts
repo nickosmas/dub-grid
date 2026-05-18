@@ -95,13 +95,16 @@ export async function POST(req: NextRequest) {
 
   try {
     if (parsed.data.action === "exit") {
-      await deleteSandboxWorkspace({
+      const result = await deleteSandboxWorkspace({
         serviceClient,
         requestClient,
         actor: auth.user,
         sandboxOrgId: parsed.data.sandboxOrgId,
       });
-      return NextResponse.json({ success: true });
+      return NextResponse.json({
+        success: true,
+        sourceOrgSlug: result.sourceOrgSlug,
+      });
     }
 
     // action === "create" — enter sandbox mode.

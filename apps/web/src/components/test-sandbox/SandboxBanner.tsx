@@ -9,6 +9,14 @@ import {
 import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { refreshBrowserSession } from "@/features/account/client/auth";
+import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
+
+function buildOrgUrl(slug: string | null, path: string): string {
+  if (typeof window === "undefined") return path;
+  const parsed = parseHost(window.location.host);
+  if (!slug) return path;
+  return `${window.location.protocol}//${buildSubdomainHost(slug, parsed)}${path}`;
+}
 
 export default function SandboxBanner() {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
@@ -32,8 +40,8 @@ export default function SandboxBanner() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "exit", sandboxOrgId: org.id }),
       });
+      const body = (await response.json()) as Record<string, unknown>;
       if (!response.ok) {
-        const body = (await response.json()) as Record<string, unknown>;
         setError(
           formatClientErrorMessage(
             body?.error,
@@ -45,7 +53,9 @@ export default function SandboxBanner() {
       }
       // Flush the stale JWT so the next page load sees the source-org claims.
       await refreshBrowserSession();
-      window.location.assign("/schedule");
+      const sourceOrgSlug =
+        typeof body?.sourceOrgSlug === "string" ? body.sourceOrgSlug : null;
+      window.location.assign(buildOrgUrl(sourceOrgSlug, "/schedule"));
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");
       setPending(false);

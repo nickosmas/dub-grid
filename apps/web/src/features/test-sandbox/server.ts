@@ -1050,12 +1050,19 @@ export async function deleteSandboxWorkspace(input: {
   requestClient: SupabaseClient;
   actor: User;
   sandboxOrgId: string;
-}): Promise<{ sourceOrgId: string }> {
+}): Promise<{ sourceOrgId: string; sourceOrgSlug: string | null }> {
   const { sourceOrgId } = await resolveSandboxWorkspaceReset({
     serviceClient: input.serviceClient,
     actor: input.actor,
     sandboxOrgId: input.sandboxOrgId,
   });
+
+  const { data: sourceOrg, error: sourceOrgError } = await input.serviceClient
+    .from("organizations")
+    .select("slug")
+    .eq("id", sourceOrgId)
+    .maybeSingle();
+  if (sourceOrgError) throw sourceOrgError;
 
   // Switch the caller's session back to the source workspace before the
   // sandbox row disappears so they don't end up authenticated against a
@@ -1072,5 +1079,8 @@ export async function deleteSandboxWorkspace(input: {
     .eq("workspace_kind", "sandbox");
   if (deleteError) throw deleteError;
 
-  return { sourceOrgId };
+  return {
+    sourceOrgId,
+    sourceOrgSlug: (sourceOrg?.slug as string | null) ?? null,
+  };
 }
