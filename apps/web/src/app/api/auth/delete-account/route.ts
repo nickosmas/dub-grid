@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { canManageProfileChangeRequests } from "@/features/account/server";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { extractJwtClaims } from "@/features/permissions/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -20,6 +20,8 @@ export async function DELETE(req: NextRequest) {
   // ── CSRF: validate Origin header ──────────────────────────────────
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   try {
     // Auth check

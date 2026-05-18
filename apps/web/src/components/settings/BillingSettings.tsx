@@ -24,7 +24,7 @@ import {
   openBillingPortal,
   startBillingCheckout,
 } from "@/features/billing/client";
-import { useLogout } from "@/hooks";
+import { useIsInSandbox, useLogout } from "@/hooks";
 import {
   describeAction,
   formatDetails,
@@ -555,6 +555,7 @@ export default function BillingSettings({
 }) {
   const queryClient = useQueryClient();
   const { signOutLocal } = useLogout();
+  const isInSandbox = useIsInSandbox();
   const searchParams = useSearchParams();
   const handledBillingReturnRef = useRef<string | null>(null);
   const [openingCheckout, setOpeningCheckout] = useState(false);
@@ -932,7 +933,13 @@ export default function BillingSettings({
                       !billing.canManageBilling ||
                       !billing.stripeConfigured ||
                       openingCheckout ||
-                      openingPortal
+                      openingPortal ||
+                      isInSandbox
+                    }
+                    title={
+                      isInSandbox
+                        ? "Billing actions are disabled in sandbox mode."
+                        : undefined
                     }
                   >
                     <ExternalLink size={15} aria-hidden="true" />

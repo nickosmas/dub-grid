@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createStripeCustomer, createCheckoutSession } from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import {
   countBillableAppUsers,
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
   // ── CSRF: validate Origin header ──────────────────────────────────
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   try {
     let body: unknown;

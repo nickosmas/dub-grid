@@ -8,7 +8,7 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -186,6 +186,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
@@ -324,6 +326,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
@@ -408,6 +412,8 @@ export async function DELETE(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;

@@ -88,6 +88,33 @@ export async function requireAuthenticatedUser(
   return { user };
 }
 
+/**
+ * Returns a 403 response if the caller has an active sandbox cookie.
+ *
+ * Use as the first line of any side-effecting endpoint that talks to
+ * external systems (Stripe, email, GDPR erasure) or persists state
+ * that's meant to be irreversible. Sandbox users should never be able
+ * to trigger emails, charge cards, or schedule data deletion — even
+ * if their cookie is stale, we err on the side of "don't fire real
+ * side effects when the user thinks they're in a sandbox."
+ *
+ * Just checks cookie presence — no DB lookup. Cheap to use everywhere.
+ */
+export function forbidIfSandboxCookie(req: NextRequest): NextResponse | null {
+  const cookie = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  if (!cookie) return null;
+  return NextResponse.json(
+    {
+      error:
+        "This action isn't available in sandbox mode. Exit the sandbox to perform it on your real workspace.",
+    },
+    { status: 403 },
+  );
+}
+
+/** Type guard re-export so callers can use Claims directly. */
+export type AuthenticatedClaims = Claims;
+
 export async function requireAuthenticatedUserWithClaims(
   req: NextRequest,
 ): Promise<ClaimsAuthResult> {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
@@ -18,6 +18,8 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   // ── Auth check ──────────────────────────────────────────────────────
   const auth = await requireAuthenticatedUserWithClaims(req);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -13,6 +13,9 @@ import * as Sentry from "@/lib/sentry";
 const GDPR_EXPORT_AUDIT_ACTION = "data.portability_exported";
 
 export async function GET(req: NextRequest) {
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) return auth.response;
