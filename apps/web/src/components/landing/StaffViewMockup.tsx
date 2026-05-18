@@ -22,6 +22,7 @@ const STAFF = [
     cert: "JLCSN",
     roles: "DCSN",
     status: 0,
+    employment: "FT" as const,
   },
   {
     name: "Carol Henderson",
@@ -31,6 +32,7 @@ const STAFF = [
     cert: "JLCSN",
     roles: "Supv",
     status: 0,
+    employment: "FT" as const,
   },
   {
     name: "Evelyn Hartwell",
@@ -40,6 +42,7 @@ const STAFF = [
     cert: "JLCSN",
     roles: "SC Mgr",
     status: 0,
+    employment: "FT" as const,
   },
   {
     name: "Kevin Donovan",
@@ -49,6 +52,7 @@ const STAFF = [
     cert: "STAFF",
     roles: "",
     status: 1,
+    employment: "PT" as const,
   },
   {
     name: "Hannah Stratton",
@@ -58,6 +62,7 @@ const STAFF = [
     cert: "JLCSN",
     roles: "Supv",
     status: 0,
+    employment: "FT" as const,
   },
   {
     name: "Marilyn Davenport",
@@ -67,10 +72,11 @@ const STAFF = [
     cert: "JLCSN",
     roles: "DVCSN",
     status: 2,
+    employment: "PT" as const,
   },
 ];
 
-const HEADER_COLS = ["Name", "Assigned Wings", "Certification", "Roles", "Account"];
+const HEADER_COLS = ["Name", "Focus Areas", "Certification", "Roles", "Account"];
 
 export default function StaffViewMockup() {
   return (
@@ -279,6 +285,9 @@ export default function StaffViewMockup() {
               <div style={{ minWidth: 0 }}>
                 <div
                   style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
                     fontSize: 14,
                     fontWeight: 600,
                     color: "var(--color-text-secondary)",
@@ -286,6 +295,20 @@ export default function StaffViewMockup() {
                   }}
                 >
                   {person.name}
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: "1px 5px",
+                      borderRadius: 4,
+                      background: "var(--color-bg-secondary)",
+                      color: "var(--color-text-muted)",
+                      border: "1px solid var(--color-border-light)",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {person.employment}
+                  </span>
                 </div>
               </div>
             </div>

@@ -13,7 +13,7 @@
    Phone 2. The shift-requests "Available" tab. Calm Haven seed data. ── */
 
 import {
-  User,
+  Home,
   Calendar,
   ArrowLeftRight,
   Users,
@@ -66,7 +66,7 @@ const SCALE = 0.6;
    Bottom tab bar. App/(tabs)/_layout.tsx NativeTabs
    ───────────────────────────────────────────────────────────────────── */
 const TABS = [
-  { label: "Me", Icon: User },
+  { label: "Home", Icon: Home },
   { label: "Schedule", Icon: Calendar },
   { label: "Requests", Icon: ArrowLeftRight },
   { label: "People", Icon: Users },
@@ -1035,7 +1035,7 @@ export default function MobileAppMockup() {
         alignItems: "flex-start",
       }}
     >
-      <Phone active="Me">
+      <Phone active="Home">
         <ScheduleScreen />
       </Phone>
       <Phone active="Requests">
