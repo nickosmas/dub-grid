@@ -38,6 +38,93 @@ export type NotificationEvent =
       targetUserId: string;
       fromRole: string;
       toRole: string;
+    }
+  // ── Schedule (non-publish flows) ────────────────────────────────────────
+  | {
+      action: "recurring_shift_updated";
+      orgId: string;
+      empId: string;
+      mode: "upsert" | "delete";
+    }
+  | {
+      action: "shift_series_changed";
+      orgId: string;
+      seriesId: string;
+      mode: "create" | "update_all" | "delete";
+      /** Pre-resolved affected employees. If omitted, looked up from shifts in series. */
+      empIds?: string[];
+    }
+  | {
+      action: "schedule_note_changed";
+      orgId: string;
+      empId: string;
+      date: string;
+      mode: "upsert" | "delete";
+      /** Resulting note status — only notifies when 'published'. */
+      status: "draft" | "published" | "draft_deleted";
+    }
+  | {
+      action: "recurring_schedules_applied";
+      orgId: string;
+      startDate: string;
+      endDate: string;
+      affectedEmpIds: string[];
+    }
+  // ── Membership lifecycle ────────────────────────────────────────────────
+  | {
+      action: "invitation_created";
+      orgId: string;
+      invitationId: string;
+      inviteeEmail: string;
+    }
+  | {
+      action: "invitation_accepted";
+      orgId: string;
+      acceptedUserId: string;
+      invitationId?: string | null;
+    }
+  | {
+      action: "invitation_revoked";
+      orgId: string;
+      invitationId: string;
+      inviteeEmail: string;
+    }
+  | {
+      action: "invitation_resent";
+      orgId: string;
+      invitationId: string;
+      inviteeEmail: string;
+    }
+  | {
+      action: "membership_removed";
+      orgId: string;
+      removedUserId: string;
+    }
+  | {
+      action: "admin_permissions_changed";
+      orgId: string;
+      targetUserId: string;
+      before: Record<string, boolean> | null;
+      after: Record<string, boolean> | null;
+    }
+  // ── Employee ────────────────────────────────────────────────────────────
+  | {
+      action: "employee_created";
+      orgId: string;
+      empId: string;
+    }
+  | {
+      action: "employee_status_changed";
+      orgId: string;
+      empId: string;
+      fromStatus: string;
+      toStatus: string;
+    }
+  | {
+      action: "employee_profile_changed";
+      orgId: string;
+      empId: string;
+      fields: string[];
     };
 
 async function getAdminsWithPermission(
@@ -173,6 +260,105 @@ function getShiftRequestTypeLabel(type: "pickup" | "swap" | "calloff"): string {
 
 function capitalize(value: string): string {
   return value.length > 0 ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : value;
+}
+
+async function getOrgSuperAdmins(orgId: string): Promise<string[]> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("organization_memberships")
+    .select("user_id")
+    .eq("org_id", orgId)
+    .eq("org_role", "super_admin")
+    .is("archived_at", null);
+  return (data ?? []).map((row) => row.user_id as string).filter(Boolean);
+}
+
+async function getEmployeeUserId(empId: string): Promise<string | null> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("employees")
+    .select("user_id")
+    .eq("id", empId)
+    .maybeSingle();
+  return (data?.user_id as string | null) ?? null;
+}
+
+async function getEmployeeName(empId: string): Promise<string> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("employees")
+    .select("first_name, last_name")
+    .eq("id", empId)
+    .maybeSingle();
+  if (!data) return "An employee";
+  return `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim() || "An employee";
+}
+
+async function getSeriesAffectedUserIds(seriesId: string): Promise<string[]> {
+  const db = getServiceClient();
+  const { data: shifts } = await db
+    .from("schedule_cell_snapshots")
+    .select("cell:schedule_cells(emp_id)")
+    .eq("series_id", seriesId);
+  if (!shifts) return [];
+  const empIds = new Set<string>();
+  for (const row of shifts as Array<{ cell: { emp_id?: string } | null }>) {
+    const empId = row.cell?.emp_id;
+    if (empId) empIds.add(empId);
+  }
+  if (empIds.size === 0) return [];
+  const { data: emps } = await db
+    .from("employees")
+    .select("user_id")
+    .in("id", [...empIds])
+    .not("user_id", "is", null);
+  return (emps ?? [])
+    .map((emp) => emp.user_id as string)
+    .filter(Boolean);
+}
+
+async function getAffectedUserIdsForEmpIds(
+  empIds: string[],
+): Promise<string[]> {
+  if (empIds.length === 0) return [];
+  const db = getServiceClient();
+  const { data } = await db
+    .from("employees")
+    .select("user_id")
+    .in("id", empIds)
+    .not("user_id", "is", null);
+  return (data ?? []).map((row) => row.user_id as string).filter(Boolean);
+}
+
+async function getInvitation(
+  invitationId: string,
+): Promise<{
+  invitedBy: string | null;
+  email: string | null;
+  orgId: string | null;
+} | null> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("invitations")
+    .select("invited_by, email, org_id")
+    .eq("id", invitationId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    invitedBy: (data.invited_by as string | null) ?? null,
+    email: (data.email as string | null) ?? null,
+    orgId: (data.org_id as string | null) ?? null,
+  };
+}
+
+async function getOrgName(orgId: string): Promise<string> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("organizations")
+    .select("name")
+    .eq("id", orgId)
+    .maybeSingle();
+  return (data?.name as string | null) ?? "your organization";
 }
 
 async function notifyShiftRequestApprovers(input: {

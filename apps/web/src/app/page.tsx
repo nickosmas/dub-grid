@@ -14,6 +14,8 @@ import StaffViewMockup from "@/components/landing/StaffViewMockup";
 import SettingsMockup from "@/components/landing/SettingsMockup";
 import PermissionsMockup from "@/components/landing/PermissionsMockup";
 import RecurringShiftsMockup from "@/components/landing/RecurringShiftsMockup";
+import DashboardMockup from "@/components/landing/DashboardMockup";
+import MobileAppMockup from "@/components/landing/MobileAppMockup";
 import {
   CalendarDays,
   Users,
@@ -435,8 +437,23 @@ export default function RootPage() {
         </div>
       </RevealSection>
 
-      {/* ── Settings Mockup ── */}
+      {/* ── Dashboard Mockup ── */}
       <RevealSection className="py-12 sm:py-16 lg:py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
+              Your command center
+            </h2>
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
+              Coverage, hours, and open shifts on one screen. Spot the gap before it becomes a problem.
+            </p>
+          </div>
+          <DashboardMockup />
+        </div>
+      </RevealSection>
+
+      {/* ── Settings Mockup ── */}
+      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
@@ -451,7 +468,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Recurring Shifts Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
+      <RevealSection className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
@@ -466,7 +483,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Staff View Mockup ── */}
-      <RevealSection className="py-12 sm:py-16 lg:py-20">
+      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
@@ -527,6 +544,23 @@ export default function RootPage() {
             <div className="w-full lg:w-auto lg:shrink-0">
               <PermissionsMockup />
             </div>
+          </div>
+        </div>
+      </RevealSection>
+
+      {/* ── Mobile App Mockup ── */}
+      <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
+              Take it with you
+            </h2>
+            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
+              Check your schedule, swap shifts, and pick up open work from anywhere. Built native for iOS and Android.
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <MobileAppMockup />
           </div>
         </div>
       </RevealSection>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { NamedItem, Department } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
@@ -77,6 +77,19 @@ export default function StringListSettings({
   const [pendingHardDeleteIds, setPendingHardDeleteIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Wizard mode: when the persisted `items` prop changes (typically because we
+  // just saved this list), resync the local draft so its IDs match the server.
+  // Without this, the next saveAll would see negative temp IDs vs real IDs and
+  // report isDirty=true, causing a retry-after-failure to re-run the save with
+  // a stale snapshot that hard-deletes the rows we just created.
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    if (!isWizardMode) return;
+    if (itemsRef.current === items) return;
+    itemsRef.current = items;
+    setLocal(items);
+  }, [isWizardMode, items]);
   const nextTmpId = useRef(-1);
   const nameRefs = useRef<Map<number, HTMLInputElement>>(new Map());
   const abbrRefs = useRef<Map<number, HTMLInputElement>>(new Map());
@@ -235,7 +248,10 @@ export default function StringListSettings({
     try {
       await onSave(cleaned, Array.from(pendingHardDeleteIds));
       setPendingHardDeleteIds(new Set());
-      setIsEditing(false);
+      // Wizard mode stays editable so the user can keep refining if the broader
+      // saveAll fails on a later section. Non-wizard usage collapses back to
+      // read-only after a successful save.
+      if (!isWizardMode) setIsEditing(false);
     } catch (err) {
       lastSaveErrorRef.current = err;
       toast.error(formatClientErrorMessage(err, `We couldn't save ${label.toLowerCase()}.`));

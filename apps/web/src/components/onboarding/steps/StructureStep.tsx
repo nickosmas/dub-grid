@@ -94,7 +94,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
       description={`Set up your ${deptLabel.toLowerCase()}, the ${roleLabel.toLowerCase()} people carry, and the ${certLabel.toLowerCase()} that gate scheduling decisions.`}
       onNext={handleNext}
       onBack={onBack}
-      nextDisabled={!hasDepartments || saving}
+      nextDisabled={saving}
       nextLoading={saving}
       wide
     >

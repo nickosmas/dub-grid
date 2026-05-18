@@ -263,7 +263,7 @@ describe("Header permission-based tab visibility", () => {
     renderHeader(<Header />);
 
     expect(
-      await screen.findByRole("link", { name: "Trial time left: 14 days" }),
+      await screen.findByRole("link", { name: "Trial ends in 14 days" }),
     ).toHaveAttribute("href", "/settings?section=org-billing");
   });
 

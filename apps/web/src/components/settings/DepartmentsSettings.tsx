@@ -440,15 +440,25 @@ function DepartmentSection({
     setPendingHardDeleteFaIds(new Set());
   }, [depts, faByDept, propFAs, type]);
 
-  // Wizard mode starts in editing state — sync the draft from props on mount so
-  // the editor has a workable list to render even before the user touches it.
-  const wizardHydratedRef = useRef(false);
+  // Wizard mode: keep the editor open across saveAll iterations and resync the
+  // draft whenever the persisted prop changes (typically because we just saved
+  // this section). Without this, temp IDs in localDepts would still differ from
+  // the server-assigned real IDs and isDirty would stay true — so a retry after
+  // a later section's failure would re-run this save with a stale snapshot and
+  // hard-delete the rows we just persisted.
+  const lastDeptsRef = useRef(depts);
+  const lastPropFAsRef = useRef(propFAs);
   useEffect(() => {
-    if (isWizardMode && !wizardHydratedRef.current) {
-      wizardHydratedRef.current = true;
+    if (!isWizardMode) return;
+    if (lastDeptsRef.current !== depts) {
+      lastDeptsRef.current = depts;
+      setLocalDepts([...depts]);
+    }
+    if (lastPropFAsRef.current !== propFAs) {
+      lastPropFAsRef.current = propFAs;
       setLocalFAs([...propFAs]);
     }
-  }, [isWizardMode, propFAs]);
+  }, [isWizardMode, depts, propFAs]);
 
   const handleEnterEdit = () => {
     syncDraftFromProps();
@@ -590,9 +600,14 @@ function DepartmentSection({
       }
 
       onDepartmentsChange(savedDepts);
-      setIsEditing(false);
-      setLocalDepts([]);
-      setLocalFAs([]);
+      // Wizard mode keeps the editor open so saveAll can retry after a later
+      // section fails, and so the user can keep adding/editing rows. The local
+      // draft is resynced from props via a useEffect below.
+      if (!isWizardMode) {
+        setIsEditing(false);
+        setLocalDepts([]);
+        setLocalFAs([]);
+      }
       toast.success(`${title} saved`);
     } catch (err) {
       lastSaveErrorRef.current = err;

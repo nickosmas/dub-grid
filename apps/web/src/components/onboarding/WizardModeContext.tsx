@@ -72,11 +72,6 @@ export function useWizardEditorCollector(): {
 } {
   const editorsRef = useRef<Map<string, WizardEditorHandle>>(new Map());
   const orderRef = useRef<string[]>([]);
-  // Tracks editors that have already persisted successfully in this step
-  // session. Prevents a retry-after-partial-failure from re-running a save
-  // whose local state still looks "dirty" (e.g., negative temp IDs vs the
-  // real IDs the server just assigned) and corrupting the persisted data.
-  const savedRef = useRef<Set<string>>(new Set());
 
   const register = useCallback((id: string, handle: WizardEditorHandle) => {
     editorsRef.current.set(id, handle);
@@ -84,7 +79,6 @@ export function useWizardEditorCollector(): {
     return () => {
       editorsRef.current.delete(id);
       orderRef.current = orderRef.current.filter((entry) => entry !== id);
-      savedRef.current.delete(id);
     };
   }, []);
 
@@ -104,26 +98,26 @@ export function useWizardEditorCollector(): {
 
   const saveAll = useCallback(async () => {
     for (const id of orderRef.current) {
-      if (savedRef.current.has(id)) continue;
       const handle = editorsRef.current.get(id);
       if (!handle) continue;
+      // isDirty must drop back to false after a successful save, otherwise a
+      // retry after a later editor's failure could re-run this save with a
+      // stale local snapshot (e.g., temp IDs) and corrupt the persisted data.
+      // Editors handle this by resyncing local state from props in wizard mode.
       if (!handle.isDirty()) continue;
       await handle.save();
-      savedRef.current.add(id);
     }
   }, []);
 
   const hasAnyErrors = useCallback(() => {
-    for (const [id, handle] of editorsRef.current.entries()) {
-      if (savedRef.current.has(id)) continue;
+    for (const handle of editorsRef.current.values()) {
       if (handle.hasErrors()) return true;
     }
     return false;
   }, []);
 
   const hasDirty = useCallback(() => {
-    for (const [id, handle] of editorsRef.current.entries()) {
-      if (savedRef.current.has(id)) continue;
+    for (const handle of editorsRef.current.values()) {
       if (handle.isDirty()) return true;
     }
     return false;

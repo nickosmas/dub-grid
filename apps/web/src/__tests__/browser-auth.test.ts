@@ -236,6 +236,40 @@ describe("browser auth helpers", () => {
     ]);
   });
 
+  it("clearSupabaseBrowserAuthState releases the in-flight dedupe slots so a hung call can't deadlock future callers", async () => {
+    // Simulate the stale-cookie hang: first getSession() never resolves.
+    let neverResolve!: () => void;
+    mockGetSession.mockImplementationOnce(
+      () =>
+        new Promise(() => {
+          // Held forever — this is the hung promise.
+          neverResolve = () => {};
+        }),
+    );
+
+    // Kick off the hung call; intentionally do NOT await it.
+    const hungPromise = getBrowserSession();
+
+    // The slot is now occupied by the hung promise. Without clearing it,
+    // any subsequent caller would await `hungPromise` forever.
+    clearSupabaseBrowserAuthState();
+
+    // Now a fresh caller should get a brand-new underlying SDK call, not
+    // the hung one.
+    mockGetSession.mockResolvedValueOnce({
+      data: { session: { access_token: "fresh" } },
+      error: null,
+    });
+    const fresh = await getBrowserSession();
+    expect(fresh).toEqual({ access_token: "fresh" });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+
+    // The hung promise stays alive but is now orphaned; tests don't care.
+    expect(hungPromise).toBeInstanceOf(Promise);
+    // Reference neverResolve so its assignment isn't dead-code-eliminated.
+    expect(typeof neverResolve).toBe("function");
+  });
+
   it("clears persisted Supabase auth keys from storage and cookies", () => {
     window.localStorage.setItem("sb-test-auth-token", "local");
     window.sessionStorage.setItem("sb-test-code-verifier", "session");
