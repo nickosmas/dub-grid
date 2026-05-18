@@ -178,14 +178,14 @@ const TENANTS = [
       // Management departments (with permission templates)
       { name: "Administration", type: "management" as const, permissions: {
         canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
-        canEditNotes: true, canManageRecurringShifts: true, canManageShiftSeries: true,
+        canEditNotes: true, canEditScheduleIndicators: true, canManageRecurringShifts: true, canManageShiftSeries: true,
         canViewStaff: true, canManageEmployees: true, canManageFocusAreas: true,
         canManageScheduleDefinitions: true, canManageIndicatorTypes: true, canManageOrgSettings: false,
         canManageOrgLabels: true, canManageCoverageRequirements: true, canApproveShiftRequests: true,
       }},
       { name: "Human Resources", type: "management" as const, permissions: {
         canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
-        canEditNotes: false, canManageRecurringShifts: false, canManageShiftSeries: false,
+        canEditNotes: false, canEditScheduleIndicators: false, canManageRecurringShifts: false, canManageShiftSeries: false,
         canViewStaff: true, canManageEmployees: true, canManageFocusAreas: false,
         canManageScheduleDefinitions: false, canManageIndicatorTypes: false, canManageOrgSettings: false,
         canManageOrgLabels: false, canManageCoverageRequirements: false, canApproveShiftRequests: false,
@@ -900,89 +900,64 @@ function selectBaseAssignment(
   )[0];
 }
 
-async function writePublishedWorkScheduleCell(
+async function writePublishedWorkScheduleCellsBatch(
   db: Client,
-  input: {
-    orgId: string;
+  orgId: string,
+  cells: Array<{
     empId: string;
     date: string;
     shiftIds: Array<number | null>;
     jobIds: number[];
     focusAreaId: number | null;
-    customStartTime?: string | null;
-    customEndTime?: string | null;
-    fromRecurring?: boolean;
-  },
+  }>,
 ): Promise<void> {
+  if (cells.length === 0) return;
+  const payload = JSON.stringify(
+    cells.map((c) => ({
+      emp_id: c.empId,
+      dt: c.date,
+      shift_ids: c.shiftIds,
+      job_ids: c.jobIds,
+      focus_area_id: c.focusAreaId,
+    })),
+  );
   await db.query(
     `SELECT public.write_schedule_cell_snapshot_internal(
-       $1::uuid,
-       $2::uuid,
-       $3::date,
-       'published',
-       'worked',
-       COALESCE($4::bigint[], '{}'::bigint[]),
-       COALESCE($5::bigint[], '{}'::bigint[]),
-       NULL,
-       $6::text,
-       $7::text,
-       NULL,
-       COALESCE($8::boolean, false),
-       $9::bigint,
-       NULL,
-       NULL
+       $1::uuid, x.emp_id, x.dt, 'published', 'worked',
+       COALESCE(x.shift_ids, '{}'::bigint[]),
+       COALESCE(x.job_ids, '{}'::bigint[]),
+       NULL, NULL, NULL, NULL, false, x.focus_area_id, NULL, NULL
+     )
+     FROM jsonb_to_recordset($2::jsonb) AS x(
+       emp_id uuid, dt date, shift_ids bigint[], job_ids bigint[], focus_area_id bigint
      )`,
-    [
-      input.orgId,
-      input.empId,
-      input.date,
-      input.shiftIds,
-      input.jobIds,
-      input.customStartTime ?? null,
-      input.customEndTime ?? null,
-      input.fromRecurring ?? false,
-      input.focusAreaId,
-    ],
+    [orgId, payload],
   );
 }
 
-async function writePublishedAbsenceScheduleCell(
+async function writePublishedAbsenceScheduleCellsBatch(
   db: Client,
-  input: {
-    orgId: string;
-    empId: string;
-    date: string;
-    absenceTypeId: number;
-    focusAreaId?: number | null;
-    fromRecurring?: boolean;
-  },
+  orgId: string,
+  cells: Array<{ empId: string; date: string; absenceTypeId: number }>,
 ): Promise<void> {
+  if (cells.length === 0) return;
+  const payload = JSON.stringify(
+    cells.map((c) => ({
+      emp_id: c.empId,
+      dt: c.date,
+      absence_type_id: c.absenceTypeId,
+    })),
+  );
   await db.query(
     `SELECT public.write_schedule_cell_snapshot_internal(
-       $1::uuid,
-       $2::uuid,
-       $3::date,
-       'published',
-       'absence',
-       '{}'::bigint[],
-       '{}'::bigint[],
-       $4::bigint,
-       NULL,
-       NULL,
-       NULL,
-       COALESCE($5::boolean, false),
-       $6::bigint,
-       NULL,
-       NULL
+       $1::uuid, x.emp_id, x.dt, 'published', 'absence',
+       '{}'::bigint[], '{}'::bigint[], x.absence_type_id,
+       NULL, NULL, NULL, false, NULL, NULL, NULL
+     )
+     FROM jsonb_to_recordset($2::jsonb) AS x(
+       emp_id uuid, dt date, absence_type_id bigint
      )`,
-    [
-      input.orgId,
-      input.empId,
-      input.date,
-      input.absenceTypeId,
-      input.fromRecurring ?? false,
-      input.focusAreaId ?? null,
-    ],
+    [orgId, payload],
   );
 }
 
@@ -1332,80 +1307,92 @@ async function seedJobsForOrg(
   }));
 
   const jobIdByKey = new Map<string, number>();
-  for (const job of orderedJobs) {
-    const { rows: [row] } = await db.query(
-      `INSERT INTO public.jobs (
-         org_id,
-         name,
-         abbr,
-         show_on_grid,
-         assignment_mode,
-         eligibility_mode,
-         focus_area_ids,
-         department_ids,
-         applicable_shift_ids,
-         eligible_role_ids,
-         required_certification_ids,
-         color,
-         border_color,
-         text_color,
-         shift_time_overrides,
-         shift_color_overrides,
-         default_start_time,
-         default_end_time,
-         default_duration_hours,
-         default_duration_minutes,
-         sort_order,
-         system_key
+  if (orderedJobs.length > 0) {
+    const jobSeeds = orderedJobs.map((job) => ({
+      key: job.key,
+      name: job.name,
+      abbr: job.abbr,
+      show_on_grid: job.show_on_grid,
+      assignment_mode: job.assignment_mode,
+      eligibility_mode: job.eligibility_mode,
+      focus_area_ids: job.focus_area_ids,
+      department_ids: job.department_ids,
+      applicable_shift_ids: job.applicable_shift_ids,
+      eligible_role_ids: job.eligible_role_ids,
+      required_certification_ids: job.required_certification_ids,
+      color: job.color,
+      border_color: job.border_color,
+      text_color: job.text_color,
+      shift_time_overrides: job.shift_time_overrides,
+      shift_color_overrides: job.shift_color_overrides,
+      default_start_time: job.default_start_time,
+      default_end_time: job.default_end_time,
+      default_duration_hours: job.default_duration_hours,
+      default_duration_minutes: job.default_duration_minutes,
+      sort_order: job.sort_order,
+      system_key: job.system_key,
+    }));
+    const { rows } = await db.query(
+      `WITH input AS (
+         SELECT * FROM jsonb_to_recordset($2::jsonb) AS x(
+           key text, name text, abbr text, show_on_grid boolean,
+           assignment_mode text, eligibility_mode text,
+           focus_area_ids bigint[], department_ids bigint[],
+           applicable_shift_ids bigint[], eligible_role_ids bigint[],
+           required_certification_ids bigint[],
+           color text, border_color text, text_color text,
+           shift_time_overrides jsonb, shift_color_overrides jsonb,
+           default_start_time time, default_end_time time,
+           default_duration_hours smallint, default_duration_minutes smallint,
+           sort_order int, system_key text
+         )
+       ),
+       inserted AS (
+         INSERT INTO public.jobs (
+           org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode,
+           focus_area_ids, department_ids, applicable_shift_ids,
+           eligible_role_ids, required_certification_ids,
+           color, border_color, text_color,
+           shift_time_overrides, shift_color_overrides,
+           default_start_time, default_end_time,
+           default_duration_hours, default_duration_minutes,
+           sort_order, system_key
+         )
+         SELECT $1, name, abbr, show_on_grid, assignment_mode, eligibility_mode,
+                focus_area_ids, department_ids, applicable_shift_ids,
+                eligible_role_ids, required_certification_ids,
+                color, border_color, text_color,
+                shift_time_overrides, shift_color_overrides,
+                default_start_time, default_end_time,
+                default_duration_hours, default_duration_minutes,
+                sort_order, system_key
+         FROM input
+         RETURNING id, sort_order
        )
-       VALUES (
-         $1, $2, $3, $4, $5, $6,
-         $7::bigint[],
-         $8::bigint[],
-         $9::bigint[],
-         $10::bigint[],
-         $11::bigint[],
-         $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22
-       )
-       RETURNING id`,
-      [
-        orgId,
-        job.name,
-        job.abbr,
-        job.show_on_grid,
-        job.assignment_mode,
-        job.eligibility_mode,
-        job.focus_area_ids,
-        job.department_ids,
-        job.applicable_shift_ids,
-        job.eligible_role_ids,
-        job.required_certification_ids,
-        job.color,
-        job.border_color,
-        job.text_color,
-        JSON.stringify(job.shift_time_overrides),
-        JSON.stringify(job.shift_color_overrides),
-        job.default_start_time,
-        job.default_end_time,
-        job.default_duration_hours,
-        job.default_duration_minutes,
-        job.sort_order,
-        job.system_key,
-      ],
+       SELECT i.id, inp.key
+       FROM inserted i
+       JOIN input inp ON inp.sort_order = i.sort_order
+       ORDER BY inp.sort_order`,
+      [orgId, JSON.stringify(jobSeeds)],
     );
-    jobIdByKey.set(job.key, id(row.id));
+    for (const row of rows) {
+      jobIdByKey.set(row.key, id(row.id));
+    }
   }
 
+  const shiftAbbrUpdatesToApply: Array<{ shift_id: number; abbr: string }> = [];
   for (const [shiftId, abbr] of shiftAbbrUpdates) {
     const shift = shiftById.get(shiftId);
-    if (shift?.abbr?.trim()) {
-      continue;
-    }
+    if (shift?.abbr?.trim()) continue;
+    shiftAbbrUpdatesToApply.push({ shift_id: shiftId, abbr });
+  }
+  if (shiftAbbrUpdatesToApply.length > 0) {
     await db.query(
-      `UPDATE public.shift_categories
-       SET abbr = $1
-       WHERE id = $2`,
-      [abbr, shiftId],
+      `UPDATE public.shift_categories sc
+       SET abbr = u.abbr
+       FROM jsonb_to_recordset($1::jsonb) AS u(shift_id bigint, abbr text)
+       WHERE sc.id = u.shift_id`,
+      [JSON.stringify(shiftAbbrUpdatesToApply)],
     );
   }
 
@@ -1549,66 +1536,102 @@ async function main() {
 
     // 2. Departments
     const deptIds: number[] = [];
-    if (tenant.departments) {
-      for (let i = 0; i < tenant.departments.length; i++) {
-        const dept = tenant.departments[i];
-        const deptAbbr = ((dept as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(dept.name, "DEPT");
-        const { rows: [row] } = await db.query(
-          `INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
-           VALUES ($1, $2, $3, $4::department_type, $5, $6::jsonb) RETURNING id`,
-          [orgId, dept.name, deptAbbr, dept.type, i, dept.permissions ? JSON.stringify(dept.permissions) : null]
-        );
-        deptIds.push(id(row.id));
-      }
+    if (tenant.departments && tenant.departments.length > 0) {
+      const deptSeeds = tenant.departments.map((dept, i) => ({
+        name: dept.name,
+        abbr: ((dept as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(dept.name, "DEPT"),
+        type: dept.type,
+        sort_order: i,
+        permissions: dept.permissions ?? null,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
+           SELECT $1, name, abbr, type::department_type, sort_order, permissions
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             name text, abbr text, type text, sort_order int, permissions jsonb
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(deptSeeds)],
+      );
+      for (const row of rows) deptIds.push(id(row.id));
     }
 
     // 3. Focus Areas
     const focusAreaIds: number[] = [];
-    for (let i = 0; i < tenant.focusAreas.length; i++) {
-      const fa = tenant.focusAreas[i];
-      const deptId = tenant.focusAreaDeptIndex?.[i] != null
-        ? deptIds[tenant.focusAreaDeptIndex[i]]
-        : null;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.focus_areas (org_id, department_id, name, color, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [
-          orgId,
-          deptId,
-          fa.name,
-          FOCUS_AREA_PRESET_COLORS[i % FOCUS_AREA_PRESET_COLORS.length],
-          i,
-        ]
+    if (tenant.focusAreas.length > 0) {
+      const faSeeds = tenant.focusAreas.map((fa, i) => ({
+        department_id: tenant.focusAreaDeptIndex?.[i] != null
+          ? deptIds[tenant.focusAreaDeptIndex[i]]
+          : null,
+        name: fa.name,
+        color: FOCUS_AREA_PRESET_COLORS[i % FOCUS_AREA_PRESET_COLORS.length],
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.focus_areas (org_id, department_id, name, color, sort_order)
+           SELECT $1, department_id, name, color, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             department_id bigint, name text, color text, sort_order int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(faSeeds)],
       );
-      focusAreaIds.push(id(row.id));
+      for (const row of rows) focusAreaIds.push(id(row.id));
     }
 
     // 4. Certifications
     const certIds: number[] = [];
-    for (let i = 0; i < tenant.certifications.length; i++) {
-      const c = tenant.certifications[i];
-      const deptId = c.deptIndex != null ? deptIds[c.deptIndex] : null;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [orgId, deptId, c.name, c.abbr, i]
+    if (tenant.certifications.length > 0) {
+      const certSeeds = tenant.certifications.map((c, i) => ({
+        department_id: c.deptIndex != null ? deptIds[c.deptIndex] : null,
+        name: c.name,
+        abbr: c.abbr,
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
+           SELECT $1, department_id, name, abbr, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             department_id bigint, name text, abbr text, sort_order int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(certSeeds)],
       );
-      certIds.push(id(row.id));
+      for (const row of rows) certIds.push(id(row.id));
     }
 
     // 5. Organization Roles
     const roleIds: number[] = [];
-    for (let i = 0; i < tenant.orgRoles.length; i++) {
-      const r = tenant.orgRoles[i];
-      const deptId = r.deptIndex != null ? deptIds[r.deptIndex] : null;
-      const isScheduleRole =
-        (r as { isScheduleRole?: boolean }).isScheduleRole ?? true;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.organization_roles (org_id, department_id, name, abbr, is_schedule_role, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [orgId, deptId, r.name, r.abbr, isScheduleRole, i]
+    if (tenant.orgRoles.length > 0) {
+      const roleSeeds = tenant.orgRoles.map((r, i) => ({
+        department_id: r.deptIndex != null ? deptIds[r.deptIndex] : null,
+        name: r.name,
+        abbr: r.abbr,
+        is_schedule_role: (r as { isScheduleRole?: boolean }).isScheduleRole ?? true,
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.organization_roles (org_id, department_id, name, abbr, is_schedule_role, sort_order)
+           SELECT $1, department_id, name, abbr, is_schedule_role, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             department_id bigint, name text, abbr text, is_schedule_role boolean, sort_order int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(roleSeeds)],
       );
-      roleIds.push(id(row.id));
+      for (const row of rows) roleIds.push(id(row.id));
     }
 
     // 6. Shift Categories
@@ -1616,9 +1639,9 @@ async function main() {
     // different focus areas (e.g. "D" for Day Shift in each area). Within a
     // focus area, suffix with a counter on collision as a last-resort guard.
     const catIds: number[] = [];
-    const usedAbbrsByArea = new Map<number | null, Set<string>>();
-      for (let i = 0; i < tenant.shiftCategories.length; i++) {
-        const cat = tenant.shiftCategories[i];
+    if (tenant.shiftCategories.length > 0) {
+      const usedAbbrsByArea = new Map<number | null, Set<string>>();
+      const catSeeds = tenant.shiftCategories.map((cat, i) => {
         const faId = cat.faIndex !== null ? focusAreaIds[cat.faIndex] : null;
         const baseAbbr = (
           ((cat as { abbr?: string }).abbr ?? "").trim() ||
@@ -1641,27 +1664,62 @@ async function main() {
         const catColor =
           tenant.assignments.find((assignment) => assignment.catIndex === i && !assignment.is_general)?.color ??
           DEFAULT_JOB_PRESET.bg;
-        const { rows: [row] } = await db.query(
-        `INSERT INTO public.shift_categories (org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-        [orgId, cat.name, catAbbr, cat.start_time, cat.end_time, catColor, i, faId, catBreakMinutes]
+        return {
+          name: cat.name,
+          abbr: catAbbr,
+          start_time: cat.start_time,
+          end_time: cat.end_time,
+          color: catColor,
+          sort_order: i,
+          focus_area_id: faId,
+          break_minutes: catBreakMinutes,
+        };
+      });
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.shift_categories
+             (org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes)
+           SELECT $1, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             name text, abbr text, start_time time, end_time time, color text,
+             sort_order int, focus_area_id bigint, break_minutes int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(catSeeds)],
       );
-      catIds.push(id(row.id));
+      for (const row of rows) catIds.push(id(row.id));
     }
 
     // 7a. Absence Types
     interface AbsenceTypeRow { id: number; label: string }
     const absenceTypeRows: AbsenceTypeRow[] = [];
-    for (let i = 0; i < tenant.absenceTypes.length; i++) {
-      const at = tenant.absenceTypes[i];
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.absence_types
-           (org_id, label, name, color, border_color, text_color, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id, label`,
-        [orgId, at.label, at.name, at.color, at.border_color, at.text_color, i]
+    if (tenant.absenceTypes.length > 0) {
+      const absenceSeeds = tenant.absenceTypes.map((at, i) => ({
+        label: at.label,
+        name: at.name,
+        color: at.color,
+        border_color: at.border_color,
+        text_color: at.text_color,
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.absence_types
+             (org_id, label, name, color, border_color, text_color, sort_order)
+           SELECT $1, label, name, color, border_color, text_color, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             label text, name text, color text, border_color text, text_color text, sort_order int
+           )
+           RETURNING id, label, sort_order
+         )
+         SELECT id, label FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(absenceSeeds)],
       );
-      absenceTypeRows.push({ id: id(row.id), label: row.label });
+      for (const row of rows) {
+        absenceTypeRows.push({ id: id(row.id), label: row.label });
+      }
     }
 
     const assignmentRows: SeedAssignmentRow[] = tenant.assignments.map((assignment, index) => ({
@@ -1685,12 +1743,17 @@ async function main() {
     }));
 
     // 8. Indicator Types
-    for (let i = 0; i < tenant.indicatorTypes.length; i++) {
-      const it = tenant.indicatorTypes[i];
+    if (tenant.indicatorTypes.length > 0) {
+      const indSeeds = tenant.indicatorTypes.map((it, i) => ({
+        name: it.name,
+        color: it.color,
+        sort_order: i,
+      }));
       await db.query(
         `INSERT INTO public.indicator_types (org_id, name, color, sort_order)
-         VALUES ($1, $2, $3, $4)`,
-        [orgId, it.name, it.color, i]
+         SELECT $1, name, color, sort_order
+         FROM jsonb_to_recordset($2::jsonb) AS x(name text, color text, sort_order int)`,
+        [orgId, JSON.stringify(indSeeds)],
       );
     }
 
@@ -1702,54 +1765,105 @@ async function main() {
     }
 
     interface EmpRow { id: string; focus_area_ids: number[]; status: string }
-    const employees: EmpRow[] = [];
-    for (let i = 0; i < empNames.length; i++) {
-      const fullName = empNames[i];
+    interface EmpSeed {
+      first_name: string;
+      last_name: string;
+      seniority: number;
+      phone: string;
+      email: string;
+      certification_id: number;
+      role_ids: number[];
+      focus_area_ids: number[];
+      status: string;
+    }
+    const empSeeds: EmpSeed[] = empNames.map((fullName, i) => {
       const nameParts = fullName.split(" ");
       const lastName = nameParts.pop()!;
       const firstName = nameParts.join(" ") || lastName;
       const certId = certIds[i % certIds.length];
-      // Spread employees across focus areas evenly
       const primaryFaIdx = i % focusAreaIds.length;
       const empFaIds = [focusAreaIds[primaryFaIdx]];
-      // Every 3rd employee gets a secondary focus area
       if (i % 3 === 0 && focusAreaIds.length > 1) {
         empFaIds.push(focusAreaIds[(primaryFaIdx + 1) % focusAreaIds.length]);
       }
       const empRoleIds = i % 4 === 0 ? [roleIds[i % roleIds.length]] : [];
       const status = i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "benched" : "terminated";
+      return {
+        first_name: firstName,
+        last_name: lastName,
+        seniority: empNames.length - i,
+        phone: copycat.phoneNumber(`${tenant.slug}-${fullName}-${i}`),
+        email: copycat.email(`${tenant.slug}-${fullName}-${i}`),
+        certification_id: certId,
+        role_ids: empRoleIds,
+        focus_area_ids: empFaIds,
+        status,
+      };
+    });
 
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.employees
-           (org_id, first_name, last_name, seniority, phone, email, contact_notes, certification_id, role_ids, focus_area_ids, status, status_note)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::bigint[],$10::integer[],$11::employee_status,$12)
-         RETURNING id, focus_area_ids, status`,
-        [orgId, firstName, lastName, empNames.length - i,
-         copycat.phoneNumber(`${tenant.slug}-${fullName}-${i}`),
-         copycat.email(`${tenant.slug}-${fullName}-${i}`),
-         "", certId, empRoleIds, empFaIds, status, ""]
+    const employees: EmpRow[] = [];
+    if (empSeeds.length > 0) {
+      const { rows: empRows } = await db.query(
+        `WITH input AS (
+           SELECT *, (row_number() OVER ())::int AS ord
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             first_name text, last_name text, seniority int, phone text, email text,
+             certification_id bigint, role_ids bigint[], focus_area_ids bigint[], status text
+           )
+         ),
+         inserted AS (
+           INSERT INTO public.employees
+             (org_id, first_name, last_name, seniority, phone, email, contact_notes,
+              certification_id, role_ids, focus_area_ids, status, status_note)
+           SELECT $1, first_name, last_name, seniority, phone, email, '',
+                  certification_id, role_ids, focus_area_ids, status::employee_status, ''
+           FROM input
+           RETURNING id, first_name, last_name, seniority, focus_area_ids, status
+         )
+         SELECT i.id, i.focus_area_ids, i.status
+         FROM inserted i
+         JOIN input inp
+           ON inp.first_name = i.first_name
+          AND inp.last_name = i.last_name
+          AND inp.seniority = i.seniority
+         ORDER BY inp.ord`,
+        [orgId, JSON.stringify(empSeeds)],
       );
-      employees.push({
-        id: row.id,
-        focus_area_ids: (row.focus_area_ids ?? []).map(id),
-        status: row.status,
-      });
+      for (const row of empRows) {
+        employees.push({
+          id: row.id,
+          focus_area_ids: (row.focus_area_ids ?? []).map(id),
+          status: row.status,
+        });
+      }
     }
 
     // 9b. Assign ~20% of employees to management departments
     // Every 5th employee gets a mgmt dept. First of each pair is a dept admin, rest are users.
     const mgmtDeptIds = deptIds.filter((_, idx) => tenant.departments?.[idx]?.type === 'management');
     if (mgmtDeptIds.length > 0) {
-      let adminToggle = true; // alternate admin/user within each dept
+      const mgmtUpdates: Array<{ emp_id: string; dept_ids: number[]; admin_ids: number[] }> = [];
+      let adminToggle = true;
       for (let i = 0; i < employees.length; i++) {
         if (i % 5 === 0) {
           const mgmtId = mgmtDeptIds[i % mgmtDeptIds.length];
-          await db.query(
-            `UPDATE public.employees SET department_ids = $1, dept_admin_ids = $2 WHERE id = $3`,
-            [[mgmtId], adminToggle ? [mgmtId] : [], employees[i].id]
-          );
+          mgmtUpdates.push({
+            emp_id: employees[i].id,
+            dept_ids: [mgmtId],
+            admin_ids: adminToggle ? [mgmtId] : [],
+          });
           adminToggle = !adminToggle;
         }
+      }
+      if (mgmtUpdates.length > 0) {
+        await db.query(
+          `UPDATE public.employees e
+           SET department_ids = u.dept_ids,
+               dept_admin_ids = u.admin_ids
+           FROM jsonb_to_recordset($1::jsonb) AS u(emp_id uuid, dept_ids bigint[], admin_ids bigint[])
+           WHERE e.id = u.emp_id`,
+          [JSON.stringify(mgmtUpdates)],
+        );
       }
     }
 
@@ -1816,25 +1930,8 @@ async function main() {
       }
     }
 
-    for (const workShift of workShiftValues) {
-      await writePublishedWorkScheduleCell(db, {
-        orgId,
-        empId: workShift.empId,
-        date: workShift.date,
-        shiftIds: workShift.shiftIds,
-        jobIds: workShift.jobIds,
-        focusAreaId: workShift.focusAreaId,
-      });
-    }
-
-    for (const absence of absenceValues) {
-      await writePublishedAbsenceScheduleCell(db, {
-        orgId,
-        empId: absence.empId,
-        date: absence.date,
-        absenceTypeId: absence.absenceTypeId,
-      });
-    }
+    await writePublishedWorkScheduleCellsBatch(db, orgId, workShiftValues);
+    await writePublishedAbsenceScheduleCellsBatch(db, orgId, absenceValues);
 
     console.log(`    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.assignments.length} schedule labels, ${seededJobs.totalJobCount} jobs, ${employees.length} employees, ${shiftCount} shifts`);
   }
@@ -1886,26 +1983,26 @@ async function main() {
   ];
 
   // All admin permissions (full edit access — for admin-role users)
-  const allAdminPerms = `'${JSON.stringify({
+  const allAdminPermsObj = {
     canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
-    canEditNotes: true, canViewRecurringShifts: true, canManageRecurringShifts: true, canManageShiftSeries: true,
+    canEditNotes: true, canEditScheduleIndicators: true, canViewRecurringShifts: true, canManageRecurringShifts: true, canManageShiftSeries: true,
     canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: true,
     canViewFocusAreas: true, canManageFocusAreas: true, canViewScheduleDefinitions: true, canManageScheduleDefinitions: true,
     canViewIndicatorTypes: true, canManageIndicatorTypes: true, canManageOrgSettings: true,
     canViewOrgLabels: true, canManageOrgLabels: true, canViewCoverageRequirements: true, canManageCoverageRequirements: true,
     canApproveShiftRequests: true, canViewDashboardAnalytics: true,
-  })}'::jsonb`;
+  };
 
   // View-only permissions for user-role members (no edit access, can see everything)
-  const userViewPerms = `'${JSON.stringify({
+  const userViewPermsObj = {
     canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
-    canEditNotes: false, canViewRecurringShifts: true, canManageRecurringShifts: false, canManageShiftSeries: false,
+    canEditNotes: false, canEditScheduleIndicators: false, canViewRecurringShifts: true, canManageRecurringShifts: false, canManageShiftSeries: false,
     canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: false,
     canViewFocusAreas: true, canManageFocusAreas: false, canViewScheduleDefinitions: true, canManageScheduleDefinitions: false,
     canViewIndicatorTypes: true, canManageIndicatorTypes: false, canManageOrgSettings: false,
     canViewOrgLabels: true, canManageOrgLabels: false, canViewCoverageRequirements: true, canManageCoverageRequirements: false,
     canApproveShiftRequests: false, canViewDashboardAnalytics: true,
-  })}'::jsonb`;
+  };
 
   for (const user of TEST_USERS) {
     const orgIdStr = user.preferred_org === 'ardenwood'
@@ -1979,24 +2076,44 @@ async function main() {
 
   const memberUsers = TEST_USERS.filter((u) => u.platform_role !== "gridmaster");
 
+  const membershipSeeds: Array<{
+    email: string;
+    org_id: string;
+    org_role: string;
+    admin_permissions: Record<string, boolean> | null;
+  }> = [];
   for (const user of memberUsers) {
-    const adminPermsSql = user.org_role === "admin" ? allAdminPerms
-      : user.org_role === "user" ? userViewPerms
-      : "NULL";
-
+    const adminPermissions =
+      user.org_role === "admin" ? allAdminPermsObj
+      : user.org_role === "user" ? userViewPermsObj
+      : null;
     for (const org of allOrgs) {
-      await db.query(`
-        INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions)
-        SELECT p.id, $1, '${user.org_role}'::org_role, ${adminPermsSql}
-        FROM public.profiles p
-        JOIN auth.users u ON u.id = p.id
-        WHERE u.email = '${user.email}'
-        ON CONFLICT (user_id, org_id) DO UPDATE
-          SET org_role          = EXCLUDED.org_role,
-              admin_permissions = EXCLUDED.admin_permissions
-      `, [org.id]);
+      membershipSeeds.push({
+        email: user.email,
+        org_id: org.id,
+        org_role: user.org_role,
+        admin_permissions: adminPermissions,
+      });
     }
+  }
 
+  if (membershipSeeds.length > 0) {
+    await db.query(
+      `INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions)
+       SELECT p.id, m.org_id, m.org_role::org_role, m.admin_permissions
+       FROM jsonb_to_recordset($1::jsonb) AS m(
+         email text, org_id uuid, org_role text, admin_permissions jsonb
+       )
+       JOIN auth.users a ON a.email = m.email
+       JOIN public.profiles p ON p.id = a.id
+       ON CONFLICT (user_id, org_id) DO UPDATE
+         SET org_role          = EXCLUDED.org_role,
+             admin_permissions = EXCLUDED.admin_permissions`,
+      [JSON.stringify(membershipSeeds)],
+    );
+  }
+
+  for (const user of memberUsers) {
     console.log(`    ✓ ${user.label}: ${allOrgs.length} organizations`);
   }
 

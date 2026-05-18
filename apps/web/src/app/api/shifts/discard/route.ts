@@ -4,7 +4,6 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
-import { draftBreakdownsEqual } from "@/lib/draft-utils";
 import {
   discardScheduleDraftsDirect,
   fetchScheduleDraftBreakdown,
@@ -17,14 +16,6 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   orgId: z.string().uuid(),
   scope: z.enum(["mine", "all"]),
-  expectedSummary: z.object({
-    newShifts: z.number().int().nonnegative(),
-    modifiedShifts: z.number().int().nonnegative(),
-    deletedShifts: z.number().int().nonnegative(),
-    newNotes: z.number().int().nonnegative(),
-    deletedNotes: z.number().int().nonnegative(),
-    totalChanges: z.number().int().nonnegative(),
-  }).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -58,7 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { orgId, scope, expectedSummary } = parsed.data;
+  const { orgId, scope } = parsed.data;
 
   try {
     const orgAuth = await requireOrgPermissions(
@@ -77,22 +68,12 @@ export async function POST(req: NextRequest) {
     }
     const serviceClient = orgAuth.serviceClient;
 
-    const latestSummary = await fetchScheduleDraftBreakdown({
+    // Snapshot the breakdown that's about to be discarded, for the audit log.
+    const discardedSummary = await fetchScheduleDraftBreakdown({
       orgId,
       updatedBy: scope === "mine" ? user.id : undefined,
       serviceClient,
     });
-
-    if (expectedSummary && !draftBreakdownsEqual(expectedSummary, latestSummary)) {
-      return NextResponse.json(
-        {
-          error: "Schedule drafts changed elsewhere. Review the latest summary and try again.",
-          code: "SCHEDULE_DRAFT_CONFLICT",
-          summary: latestSummary,
-        },
-        { status: 409 },
-      );
-    }
 
     await discardScheduleDraftsDirect({
       orgId,
@@ -109,11 +90,11 @@ export async function POST(req: NextRequest) {
       resource_id: orgId,
       details: {
         scope,
-        summary: latestSummary,
+        summary: discardedSummary,
       },
     });
 
-    return NextResponse.json({ success: true, summary: latestSummary });
+    return NextResponse.json({ success: true, summary: discardedSummary });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "shifts/discard", orgId } });
     logger.error({ error: err, orgId }, "Schedule discard failed");

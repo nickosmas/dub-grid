@@ -185,45 +185,7 @@ describe("POST /api/shifts/discard", () => {
     auditInsert.mockResolvedValue({ error: null });
   });
 
-  it("returns a conflict response with the latest summary when discard review becomes stale", async () => {
-    fetchScheduleDraftBreakdown.mockResolvedValue({
-      newShifts: 0,
-      modifiedShifts: 2,
-      deletedShifts: 0,
-      newNotes: 1,
-      deletedNotes: 0,
-      totalChanges: 3,
-    });
-
-    const response = await POST(
-      makeRequest({
-        orgId: "11111111-1111-4111-8111-111111111111",
-        scope: "mine",
-        expectedSummary: {
-          newShifts: 0,
-          modifiedShifts: 1,
-          deletedShifts: 0,
-          newNotes: 1,
-          deletedNotes: 0,
-          totalChanges: 2,
-        },
-      }),
-    );
-
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual(
-      expect.objectContaining({
-        code: "SCHEDULE_DRAFT_CONFLICT",
-        summary: expect.objectContaining({
-          totalChanges: 3,
-        }),
-      }),
-    );
-    expect(discardScheduleDraftsDirect).not.toHaveBeenCalled();
-    expect(auditInsert).not.toHaveBeenCalled();
-  });
-
-  it("discards the caller's drafts and records the reviewed summary in the audit log", async () => {
+  it("discards the caller's drafts and records the pre-discard summary in the audit log", async () => {
     const summary = {
       newShifts: 0,
       modifiedShifts: 1,
@@ -239,7 +201,6 @@ describe("POST /api/shifts/discard", () => {
       makeRequest({
         orgId: "11111111-1111-4111-8111-111111111111",
         scope: "mine",
-        expectedSummary: summary,
       }),
     );
 
@@ -265,5 +226,37 @@ describe("POST /api/shifts/discard", () => {
         }),
       }),
     );
+  });
+
+  it("does not 409 even when the live draft count differs from an old client summary", async () => {
+    // Regression guard: the strict expectedSummary equality check was removed.
+    fetchScheduleDraftBreakdown.mockResolvedValue({
+      newShifts: 0,
+      modifiedShifts: 2,
+      deletedShifts: 0,
+      newNotes: 1,
+      deletedNotes: 0,
+      totalChanges: 3,
+    });
+    discardScheduleDraftsDirect.mockResolvedValue(undefined);
+
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        scope: "mine",
+        // Bogus stale summary that the old code would have used to 409.
+        expectedSummary: {
+          newShifts: 0,
+          modifiedShifts: 1,
+          deletedShifts: 0,
+          newNotes: 1,
+          deletedNotes: 0,
+          totalChanges: 2,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(discardScheduleDraftsDirect).toHaveBeenCalled();
   });
 });

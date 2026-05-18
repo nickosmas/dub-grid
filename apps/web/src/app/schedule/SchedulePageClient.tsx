@@ -91,7 +91,6 @@ import {
 } from "@/lib/schedule-cells";
 import {
   OptimisticLockError,
-  ScheduleDraftConflictError,
   applyRecurringSchedules,
   createShiftSeries,
   deleteScheduleNote,
@@ -104,7 +103,6 @@ import {
   fetchRecentPublishHistory,
   fetchRecurringShifts,
   fetchScheduleActorNames,
-  fetchScheduleDraftSummary,
   fetchScheduleNotes,
   fetchShifts,
   getScheduleLastViewed,
@@ -117,13 +115,11 @@ import {
   upsertShiftBatch,
   upsertShiftTimes,
   type DeleteShiftBatchItem,
-  type UpsertShiftBatchItem,
 } from "@/features/schedule/client";
 import {
   computeDraftBreakdown,
-  draftBreakdownsEqual,
+  computeOutOfWindowDraftGroups,
   formatDraftBreakdownSummary,
-  type DraftBreakdown,
 } from "@/lib/draft-utils";
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
@@ -181,6 +177,8 @@ import {
   IMPORT_PREVIOUS_BATCH_SIZE,
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
+  planImportPrevious,
+  type ImportPreviousPlan,
   type ScheduleOperation,
 } from "./_lib/operations";
 import {
@@ -251,6 +249,7 @@ function SchedulerContent() {
   const {
     canEditShifts,
     canEditNotes,
+    canEditScheduleIndicators,
     canApplyRecurringSchedule,
     canViewRecurringShifts,
     canManageShiftSeries,
@@ -385,16 +384,6 @@ function SchedulerContent() {
     useState<PrintConfig | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
-  const [publishReviewSummary, setPublishReviewSummary] =
-    useState<DraftBreakdown | null>(null);
-  const [discardMineReviewSummary, setDiscardMineReviewSummary] =
-    useState<DraftBreakdown | null>(null);
-  const [discardAllReviewSummary, setDiscardAllReviewSummary] =
-    useState<DraftBreakdown | null>(null);
-  const [loadingPublishReviewSummary, setLoadingPublishReviewSummary] =
-    useState(false);
-  const [loadingDiscardReviewSummary, setLoadingDiscardReviewSummary] =
-    useState(false);
   const [showAutoFillConfirm, setShowAutoFillConfirm] = useState(false);
   const [autoFillPreview, setAutoFillPreview] = useState<{
     count: number;
@@ -416,8 +405,11 @@ function SchedulerContent() {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [importPreview, setImportPreview] = useState<{
     count: number;
+    disqualifiedCount: number;
+    disqualifiedSample: string[];
     sourceRange: string;
     targetRange: string;
+    plan: ImportPreviousPlan;
   } | null>(null);
   const [activeOperation, setActiveOperation] =
     useState<ScheduleOperation | null>(null);
@@ -491,12 +483,6 @@ function SchedulerContent() {
     ],
   );
 
-  const draftBreakdown = useMemo(
-    () => computeDraftBreakdown(shifts, notes),
-    [shifts, notes],
-  );
-
-  const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
   const monthStart = useMemo(
     () => new Date(weekStart.getFullYear(), weekStart.getMonth(), 1),
     [weekStart],
@@ -516,127 +502,85 @@ function SchedulerContent() {
     };
   }, [monthStart, spanWeeks, weekStart]);
 
-  const publishSummary = useMemo(
-    () => formatDraftBreakdownSummary(publishReviewSummary ?? draftBreakdown),
-    [draftBreakdown, publishReviewSummary],
+  const publishWindowDateRange = useMemo(
+    () => ({
+      startDateKey: formatDateKey(currentPublishWindow.startDate),
+      endDateKey: formatDateKey(currentPublishWindow.endDate),
+    }),
+    [currentPublishWindow.endDate, currentPublishWindow.startDate],
   );
-  const discardSummaryReady =
-    discardMineReviewSummary !== null &&
-    (!isSuperAdmin || discardAllReviewSummary !== null);
-  const isDiscardSummaryLoading =
-    loadingDiscardReviewSummary || !discardSummaryReady;
+
+  // Breakdown for the currently visible publish window — drives the yellow
+  // DraftBanner and the publish confirm dialog. Scoping is critical: the
+  // publish RPC only commits cells whose date falls in [startDate, endDate],
+  // so the banner count and the publish button must agree on the same set.
+  const draftBreakdown = useMemo(
+    () => computeDraftBreakdown(shifts, notes, publishWindowDateRange),
+    [shifts, notes, publishWindowDateRange],
+  );
+
+  // Local "my drafts" breakdown — filter shifts by updatedBy. Notes can't be
+  // filtered client-side (no updatedBy on the local ScheduleNote shape), so
+  // they're included whole; the server-side discard with scope="mine" filters
+  // notes correctly via updated_by, so any over-count here is purely cosmetic
+  // for the dialog summary.
+  const mineBreakdown = useMemo(() => {
+    const uid = authUser?.id ?? null;
+    if (!uid) return draftBreakdown;
+    const mineShifts: typeof shifts = {};
+    for (const [key, entry] of Object.entries(shifts)) {
+      if (entry?.updatedBy === uid) mineShifts[key] = entry;
+    }
+    return computeDraftBreakdown(mineShifts, notes, publishWindowDateRange);
+  }, [authUser?.id, draftBreakdown, shifts, notes, publishWindowDateRange]);
+
+  // Drafts that exist in the loaded ±90-day data but fall OUTSIDE the current
+  // publish window. Surfaced as a secondary notice so the user can navigate
+  // to those periods and publish them.
+  const outOfWindowDraftGroups = useMemo(
+    () =>
+      computeOutOfWindowDraftGroups(
+        shifts,
+        notes,
+        publishWindowDateRange,
+        (dateKey) => {
+          const [y, m, d] = dateKey.split("-").map((n) => Number(n));
+          const date = new Date(y, m - 1, d);
+          return formatDateKey(
+            getScheduleStartForSpan({
+              date,
+              span: spanWeeks,
+              payPeriodStartDate,
+            }),
+          );
+        },
+        (periodKey) => {
+          const [y, m, d] = periodKey.split("-").map((n) => Number(n));
+          return new Date(y, m - 1, d);
+        },
+      ),
+    [shifts, notes, publishWindowDateRange, spanWeeks, payPeriodStartDate],
+  );
+
+  const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
+
+  const publishSummary = useMemo(
+    () => formatDraftBreakdownSummary(draftBreakdown),
+    [draftBreakdown],
+  );
+  // Super admins see both "discard mine" and "discard all" options only when
+  // the org actually has drafts from other editors (i.e. mine totals differ).
   const showOrganizationDiscardScope =
-    isSuperAdmin &&
-    discardMineReviewSummary !== null &&
-    discardAllReviewSummary !== null &&
-    !draftBreakdownsEqual(discardMineReviewSummary, discardAllReviewSummary);
+    isSuperAdmin && mineBreakdown.totalChanges !== draftBreakdown.totalChanges;
 
   const openDiscardConfirm = useCallback(() => {
-    setDiscardMineReviewSummary(null);
-    setDiscardAllReviewSummary(null);
-    setLoadingDiscardReviewSummary(true);
     setShowDiscardConfirm(true);
   }, []);
 
   const closeDiscardConfirm = useCallback(() => {
     if (cancelingMode) return;
     setShowDiscardConfirm(false);
-    setLoadingDiscardReviewSummary(false);
-    setDiscardMineReviewSummary(null);
-    setDiscardAllReviewSummary(null);
   }, [cancelingMode]);
-
-  useEffect(() => {
-    if (!showPublishConfirm || !org) return;
-
-    let cancelled = false;
-    setLoadingPublishReviewSummary(true);
-    setPublishReviewSummary(null);
-
-    void fetchScheduleDraftSummary({
-      orgId: org.id,
-      scope: "all",
-      startDate: formatDateKey(currentPublishWindow.startDate),
-      endDate: formatDateKey(currentPublishWindow.endDate),
-    })
-      .then((summary) => {
-        if (!cancelled) setPublishReviewSummary(summary);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setPublishReviewSummary(null);
-          setShowPublishConfirm(false);
-          Sentry.captureException(err, {
-            extra: { context: "schedule.publish_summary", orgId: org.id },
-          });
-          toast.error(
-            err instanceof Error
-              ? err.message
-              : "Failed to load the latest publish summary",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingPublishReviewSummary(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentPublishWindow.endDate, currentPublishWindow.startDate, org, showPublishConfirm]);
-
-  useEffect(() => {
-    if (!showDiscardConfirm || !org) return;
-
-    let cancelled = false;
-    setLoadingDiscardReviewSummary(true);
-    setDiscardMineReviewSummary(null);
-    setDiscardAllReviewSummary(null);
-
-    const requests: Promise<void>[] = [
-      fetchScheduleDraftSummary({
-        orgId: org.id,
-        scope: "mine",
-      }).then((summary) => {
-        if (!cancelled) setDiscardMineReviewSummary(summary);
-      }),
-    ];
-
-    if (isSuperAdmin) {
-      requests.push(
-        fetchScheduleDraftSummary({
-          orgId: org.id,
-          scope: "all",
-        }).then((summary) => {
-          if (!cancelled) setDiscardAllReviewSummary(summary);
-        }),
-      );
-    }
-
-    void Promise.all(requests)
-      .catch((err) => {
-        if (!cancelled) {
-          setDiscardMineReviewSummary(null);
-          setDiscardAllReviewSummary(null);
-          setShowDiscardConfirm(false);
-          Sentry.captureException(err, {
-            extra: { context: "schedule.discard_summary", orgId: org.id },
-          });
-          toast.error(
-            err instanceof Error
-              ? err.message
-              : "Failed to load the latest discard summary",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingDiscardReviewSummary(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSuperAdmin, org, showDiscardConfirm]);
 
   const stopOperationTrickle = useCallback(() => {
     if (operationTrickleIntervalRef.current) {
@@ -4389,38 +4333,27 @@ function SchedulerContent() {
 
   // ── Import Previous Schedule ────────────────────────────────────────────────
 
-  // Preview: count how many shifts would be imported, then show confirmation
+  // Preview: count how many shifts would be imported, then show confirmation.
+  // Runs the same qualification filter the executor uses so the count matches
+  // what will actually land in the DB.
   const handleImportPreviousPreview = useCallback(() => {
     if (!org || spanWeeks === "month") return;
 
     const days = spanWeeks * 7;
     const sourceStart = addDays(weekStart, -days);
 
-    // Count source shifts that have data AND whose target cell is empty
-    let count = 0;
-    for (let i = 0; i < days; i++) {
-      const sourceDate = addDays(sourceStart, i);
-      const targetDate = addDays(weekStart, i);
-      const sourceDateKey = formatDateKey(sourceDate);
-      const targetDateKey = formatDateKey(targetDate);
+    const plan = planImportPrevious({
+      days,
+      sourceStart,
+      weekStart,
+      employees,
+      shifts,
+      checkQualification,
+      buildEntryPayload,
+      currentUserId: currentUserRef.current?.id ?? null,
+    });
 
-      for (const emp of employees) {
-        const sourceKey = `${emp.id}_${sourceDateKey}`;
-        const targetKey = `${emp.id}_${targetDateKey}`;
-        const sourceShift = shifts[sourceKey];
-        if (
-          sourceShift &&
-          (sourceShift.assignmentIds.length > 0 ||
-            sourceShift.absenceTypeId != null) &&
-          !sourceShift.isDelete &&
-          !shifts[targetKey]
-        ) {
-          count++;
-        }
-      }
-    }
-
-    if (count === 0) {
+    if (plan.upsertItems.length === 0 && plan.disqualified.length === 0) {
       toast.info(
         "No shifts to import — either the previous period is empty or all slots are already filled",
       );
@@ -4429,105 +4362,71 @@ function SchedulerContent() {
 
     const sourceRange = `${formatDate(sourceStart)} – ${formatDate(addDays(sourceStart, days - 1))}`;
     const targetRange = `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, days - 1))}`;
-    setImportPreview({ count, sourceRange, targetRange });
+    const disqualifiedSample = plan.disqualified
+      .slice(0, 3)
+      .map((s) => `${s.empName} on ${s.date}`);
+    setImportPreview({
+      count: plan.upsertItems.length,
+      disqualifiedCount: plan.disqualified.length,
+      disqualifiedSample,
+      sourceRange,
+      targetRange,
+      plan,
+    });
     setShowImportConfirm(true);
-  }, [org, spanWeeks, weekStart, employees, shifts]);
+  }, [
+    org,
+    spanWeeks,
+    weekStart,
+    employees,
+    shifts,
+    checkQualification,
+    buildEntryPayload,
+  ]);
 
-  // Actually apply the import (called after confirmation)
+  // Actually apply the import (called after confirmation). Re-plans against
+  // the current shifts state in case another editor modified the target while
+  // the confirm dialog was open — the stored preview plan is a safety net,
+  // not the authoritative input.
   const handleImportPrevious = useCallback(async () => {
-    if (!org || spanWeeks === "month") return;
+    if (!org || spanWeeks === "month" || !importPreview) return;
     const days = spanWeeks * 7;
     const sourceStart = addDays(weekStart, -days);
-    const sourceRange = `${formatDate(sourceStart)} – ${formatDate(addDays(sourceStart, days - 1))}`;
-    const targetRange = `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, days - 1))}`;
+
+    const plan = planImportPrevious({
+      days,
+      sourceStart,
+      weekStart,
+      employees,
+      shifts,
+      checkQualification,
+      buildEntryPayload,
+      currentUserId: currentUserRef.current?.id ?? null,
+    });
+    const { upsertItems, shiftUpdates, disqualified } = plan;
+    const count = upsertItems.length;
+
     startScheduleOperation({
       kind: "import_previous",
       title: "Importing previous schedule...",
-      detail: importPreview?.count
-        ? `Copying ${importPreview.count} shift${importPreview.count === 1 ? "" : "s"} from ${importPreview.sourceRange} into ${importPreview.targetRange}.`
-        : `Copying shifts from ${sourceRange} into ${targetRange}.`,
+      detail: `Copying ${count} shift${count === 1 ? "" : "s"} from ${importPreview.sourceRange} into ${importPreview.targetRange}.`,
       progress: 6,
     });
     setShowImportConfirm(false);
     setIsImportingPrevious(true);
 
     try {
-      const shiftUpdates: Record<string, ShiftMap[string]> = {};
-      const upsertItems: UpsertShiftBatchItem[] = [];
-      // BUG 1.11: Track disqualified shifts to show warning
-      const disqualifiedShifts: Array<{
-        empName: string;
-        date: string;
-        reason: string;
-      }> = [];
-
-      for (let i = 0; i < days; i++) {
-        const sourceDate = addDays(sourceStart, i);
-        const targetDate = addDays(weekStart, i);
-        const sourceDateKey = formatDateKey(sourceDate);
-        const targetDateKey = formatDateKey(targetDate);
-
-        for (const emp of employees) {
-          const sourceKey = `${emp.id}_${sourceDateKey}`;
-          const targetKey = `${emp.id}_${targetDateKey}`;
-          const sourceShift = shifts[sourceKey];
-
-          if (
-            sourceShift &&
-            (sourceShift.assignmentIds.length > 0 ||
-              sourceShift.absenceTypeId != null) &&
-            !sourceShift.isDelete &&
-            !shifts[targetKey]
-          ) {
-            // BUG 1.11: Check qualification for worked assignments (ignore absence types)
-            if (sourceShift.assignmentIds.length > 0) {
-              const disqualifyReason = checkQualification(
-                emp.id,
-                sourceShift.assignmentIds,
-              );
-              if (disqualifyReason) {
-                disqualifiedShifts.push({
-                  empName: getEmployeeDisplayName(emp),
-                  date: formatDate(targetDate),
-                  reason: disqualifyReason,
-                });
-                continue; // Skip this shift
-              }
-            }
-
-            // Build optimistic state entry
-            shiftUpdates[targetKey] = {
-              label: sourceShift.label,
-              assignmentIds: sourceShift.assignmentIds,
-              absenceTypeId: sourceShift.absenceTypeId,
-              isDraft: true,
-              draftKind: "new",
-              publishedAssignmentDefinitionIds: [],
-              publishedLabel: "",
-              updatedBy: currentUserRef.current?.id ?? null,
-            };
-
-            upsertItems.push({
-              employeeId: emp.id,
-              date: targetDateKey,
-              input: buildEntryPayload(sourceShift),
-            });
-          }
-        }
-      }
-
-      // Show warning if any shifts were skipped due to disqualification
-      if (disqualifiedShifts.length > 0) {
-        const msg = disqualifiedShifts
+      // Surface disqualified skips that the preview didn't already disclose
+      // (covers the case where source state shifted between preview & execute).
+      if (disqualified.length > importPreview.disqualifiedCount) {
+        const msg = disqualified
           .slice(0, 3)
           .map((s) => `${s.empName} on ${s.date}`)
           .join(", ");
         const suffix =
-          disqualifiedShifts.length > 3
-            ? ` and ${disqualifiedShifts.length - 3} more`
-            : "";
+          disqualified.length > 3 ? ` and ${disqualified.length - 3} more` : "";
         toast.warning(
-          `Skipped ${disqualifiedShifts.length} shift(s) due to qualifications: ${msg}${suffix}`,
+          `Skipped ${disqualified.length} shift(s) due to qualifications: ${msg}${suffix}`,
         );
       }
 
@@ -4535,7 +4434,6 @@ function SchedulerContent() {
       setShifts((prev) => ({ ...prev, ...shiftUpdates }));
       broadcastDraftChanged({ shifts: shiftUpdates });
 
-      const count = upsertItems.length;
       if (count === 0) {
         finishScheduleOperation(
           "import_previous",
@@ -4575,8 +4473,14 @@ function SchedulerContent() {
       );
     } catch (err) {
       clearScheduleOperation("import_previous");
-      toast.error("Failed to save some imported shifts — refreshing");
-      Sentry.captureException(err);
+      if (err instanceof OptimisticLockError) {
+        toast.warning(
+          "Some target cells already had data — refreshing the schedule to reconcile.",
+        );
+      } else {
+        toast.error("Failed to save some imported shifts — refreshing");
+        Sentry.captureException(err);
+      }
       await refetchScheduleData();
     } finally {
       setIsImportingPrevious(false);
@@ -4590,6 +4494,7 @@ function SchedulerContent() {
     employees,
     shifts,
     broadcastDraftChanged,
+    buildEntryPayload,
     checkQualification,
     refetchScheduleData,
     startScheduleOperation,
@@ -4730,12 +4635,7 @@ function SchedulerContent() {
         endDate = addDays(weekStart, spanWeeks * 7 - 1);
       }
 
-      await publishSchedule(
-        org.id,
-        startDate,
-        endDate,
-        publishReviewSummary ?? undefined,
-      );
+      await publishSchedule(org.id, startDate, endDate);
 
       // Notify affected employees about the published schedule
       queueNotification({
@@ -4759,7 +4659,6 @@ function SchedulerContent() {
         lastViewedRef.current,
       );
       setPublishHistory(recentPublishes);
-      setPublishReviewSummary(null);
       setShowPublishDiff(false);
       closeEditPanel();
       setShowDiffOverlay(false);
@@ -4771,14 +4670,6 @@ function SchedulerContent() {
       clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
       sendReliableBroadcast("schedule_published", {}, { key: "schedule_published" });
     } catch (err: unknown) {
-      if (err instanceof ScheduleDraftConflictError) {
-        setPublishReviewSummary(err.latestSummary);
-        await refetchScheduleData();
-        toast.error(
-          "Schedule drafts changed elsewhere. Review the latest summary and try again.",
-        );
-        return;
-      }
       Sentry.captureException(err);
       toast.error("Failed to publish schedule");
     } finally {
@@ -4793,7 +4684,6 @@ function SchedulerContent() {
     refetchPublishedRanges,
     closeEditPanel,
     clearPendingBroadcast,
-    publishReviewSummary,
     sendReliableBroadcast,
   ]);
 
@@ -4808,15 +4698,10 @@ function SchedulerContent() {
         await discardScheduleDrafts(
           org.id,
           discardAll ? undefined : user.id,
-          discardAll
-            ? (discardAllReviewSummary ?? undefined)
-            : (discardMineReviewSummary ?? undefined),
         );
 
         const refreshed = await refetchScheduleDataRef.current();
         setShowDiscardConfirm(false);
-        setDiscardMineReviewSummary(null);
-        setDiscardAllReviewSummary(null);
         closeEditPanel();
         setShowDiffOverlay(false);
         if (discardAll) {
@@ -4841,18 +4726,6 @@ function SchedulerContent() {
           discardAll ? "All changes discarded" : "Your changes discarded",
         );
       } catch (err: unknown) {
-        if (err instanceof ScheduleDraftConflictError) {
-          if (discardAll) {
-            setDiscardAllReviewSummary(err.latestSummary);
-          } else {
-            setDiscardMineReviewSummary(err.latestSummary);
-          }
-          await refetchScheduleDataRef.current();
-          toast.error(
-            "Schedule drafts changed elsewhere. Review the latest summary and try again.",
-          );
-          return;
-        }
         toast.error("Failed to discard changes");
         Sentry.captureException(err);
       } finally {
@@ -4864,8 +4737,6 @@ function SchedulerContent() {
       broadcastDraftChanged,
       closeEditPanel,
       clearPendingBroadcast,
-      discardAllReviewSummary,
-      discardMineReviewSummary,
       sendReliableBroadcast,
     ],
   );
@@ -5622,6 +5493,72 @@ function SchedulerContent() {
                 canPublish={canPublishSchedule}
               />
             )}
+            {!isBulkDeleteMode &&
+              canEditShifts &&
+              outOfWindowDraftGroups.length > 0 && (
+                <div
+                  className="dg-draft-banner no-print"
+                  data-tour="draft-banner-other-weeks"
+                  style={{
+                    background: "var(--color-info-bg)",
+                    borderColor: "var(--color-info-border)",
+                    color: "var(--color-info-text)",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div
+                    className="dg-draft-banner-dot"
+                    style={{ background: "var(--color-info-text)" }}
+                  />
+                  <span style={{ fontWeight: 600 }}>
+                    Also unpublished:
+                  </span>
+                  <span style={{ opacity: 0.85 }}>
+                    {(() => {
+                      const total = outOfWindowDraftGroups.reduce(
+                        (s, g) => s + g.count,
+                        0,
+                      );
+                      return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week"}${outOfWindowDraftGroups.length === 1 ? "" : "s"}`;
+                    })()}
+                  </span>
+                  <div
+                    className="dg-draft-banner-actions"
+                    style={{ flexWrap: "wrap" }}
+                  >
+                    {outOfWindowDraftGroups.map((group) => {
+                      const end =
+                        spanWeeks === "month"
+                          ? new Date(
+                              group.periodStart.getFullYear(),
+                              group.periodStart.getMonth() + 1,
+                              0,
+                            )
+                          : addDays(group.periodStart, spanWeeks * 7 - 1);
+                      return (
+                        <Hint
+                          key={group.periodKey}
+                          content={hint(
+                            `Jump to this period to publish or discard its drafts`,
+                          )}
+                          side="bottom"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setWeekStart(group.periodStart)}
+                            className="dg-btn dg-btn-secondary dg-btn-sm"
+                          >
+                            {`${formatDate(group.periodStart)}–${formatDate(end)}`}{" "}
+                            <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                              ({group.count})
+                            </span>
+                          </button>
+                        </Hint>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             {!isBulkDeleteMode && publishHistory.length > 0 &&
               (() => {
                 const latest = publishHistory[0];
@@ -6272,7 +6209,7 @@ function SchedulerContent() {
               onSelect={handleShiftSelect}
               onConfirmDraft={handleConfirmEditPanel}
               allowShiftEdits={canEditShifts}
-              canEditNotes={canEditNotes}
+              canEditScheduleIndicators={canEditScheduleIndicators}
               getActiveIndicatorIds={panelActiveIndicatorIds}
               onNoteToggle={handleNoteToggle}
               onClose={closeEditPanel}
@@ -6534,55 +6471,48 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Discard drafts?"
               message={
-                isDiscardSummaryLoading ? (
-                  "Checking latest drafts..."
-                ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "var(--dg-fs-body-sm)",
+                      lineHeight: 1.5,
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    {showOrganizationDiscardScope
+                      ? "Published schedule stays live. Choose which drafts to discard."
+                      : "Published schedule stays live. These drafts will be removed."}
+                  </p>
                   <div
                     style={{
-                      display: "flex",
-                      flexDirection: "column",
+                      display: "grid",
+                      gridTemplateColumns: showOrganizationDiscardScope
+                        ? "repeat(auto-fit, minmax(220px, 1fr))"
+                        : "1fr",
                       gap: 10,
                     }}
                   >
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: "var(--dg-fs-body-sm)",
-                        lineHeight: 1.5,
-                        color: "var(--color-text-secondary)",
-                      }}
-                    >
-                      {showOrganizationDiscardScope
-                        ? "Published schedule stays live. Choose which drafts to discard."
-                        : "Published schedule stays live. These drafts will be removed."}
-                    </p>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: showOrganizationDiscardScope
-                          ? "repeat(auto-fit, minmax(220px, 1fr))"
-                          : "1fr",
-                        gap: 10,
-                      }}
-                    >
-                      {discardMineReviewSummary ? (
-                        <DraftReviewSummary
-                          title="Your drafts"
-                          breakdown={discardMineReviewSummary}
-                          emptyMessage="No drafts to discard."
-                        />
-                      ) : null}
-                      {showOrganizationDiscardScope &&
-                      discardAllReviewSummary ? (
-                        <DraftReviewSummary
-                          title="All drafts"
-                          breakdown={discardAllReviewSummary}
-                          emptyMessage="No organization drafts."
-                        />
-                      ) : null}
-                    </div>
+                    <DraftReviewSummary
+                      title="Your drafts"
+                      breakdown={mineBreakdown}
+                      emptyMessage="No drafts to discard."
+                    />
+                    {showOrganizationDiscardScope ? (
+                      <DraftReviewSummary
+                        title="All drafts"
+                        breakdown={draftBreakdown}
+                        emptyMessage="No organization drafts."
+                      />
+                    ) : null}
                   </div>
-                )
+                </div>
               }
               confirmLabel="Discard my drafts"
               cancelLabel="Keep drafts"
@@ -6590,10 +6520,7 @@ function SchedulerContent() {
               maxWidth={560}
               wrapActions
               isLoading={cancelingMode === "mine"}
-              confirmDisabled={
-                isDiscardSummaryLoading ||
-                (discardMineReviewSummary?.totalChanges ?? 0) === 0
-              }
+              confirmDisabled={mineBreakdown.totalChanges === 0}
               onConfirm={() => {
                 void handleCancelChanges();
               }}
@@ -6602,10 +6529,7 @@ function SchedulerContent() {
                 showOrganizationDiscardScope ? "Discard all drafts" : undefined
               }
               isSecondaryLoading={cancelingMode === "all"}
-              secondaryConfirmDisabled={
-                isDiscardSummaryLoading ||
-                (discardAllReviewSummary?.totalChanges ?? 0) === 0
-              }
+              secondaryConfirmDisabled={draftBreakdown.totalChanges === 0}
               onSecondaryConfirm={
                 showOrganizationDiscardScope
                   ? () => {
@@ -6620,15 +6544,13 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Publish Schedule?"
               message={
-                loadingPublishReviewSummary
-                  ? `Checking the latest unpublished changes for ${currentPublishWindow.label}…`
-                  : allCoverageGaps.length > 0
-                    ? `Publish ${publishReviewSummary?.totalChanges ?? draftBreakdown.totalChanges} unpublished change${(publishReviewSummary?.totalChanges ?? draftBreakdown.totalChanges) === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}. ${allCoverageGaps.length} coverage gap${allCoverageGaps.length === 1 ? "" : "s"} remain${allCoverageGaps.length === 1 ? "s" : ""} in this period.`
-                    : `Publish ${publishReviewSummary?.totalChanges ?? draftBreakdown.totalChanges} unpublished change${(publishReviewSummary?.totalChanges ?? draftBreakdown.totalChanges) === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}.`
+                allCoverageGaps.length > 0
+                  ? `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}. ${allCoverageGaps.length} coverage gap${allCoverageGaps.length === 1 ? "" : "s"} remain${allCoverageGaps.length === 1 ? "s" : ""} in this period.`
+                  : `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}.`
               }
               confirmLabel="Publish"
               variant={allCoverageGaps.length > 0 ? "warning" : "info"}
-              isLoading={loadingPublishReviewSummary || isPublishing}
+              isLoading={isPublishing}
               onConfirm={() => {
                 setShowPublishConfirm(false);
                 handlePublish();
@@ -6669,7 +6591,17 @@ function SchedulerContent() {
           {showImportConfirm && importPreview && (
             <ConfirmDialog
               title="Import Previous Schedule?"
-              message={`This will copy ${importPreview.count} shift${importPreview.count !== 1 ? "s" : ""} from ${importPreview.sourceRange} into ${importPreview.targetRange}. Only empty slots will be filled — existing shifts will not be overwritten.`}
+              message={(() => {
+                const copyLine = `This will copy ${importPreview.count} shift${importPreview.count !== 1 ? "s" : ""} from ${importPreview.sourceRange} into ${importPreview.targetRange}. Only empty slots will be filled — existing shifts will not be overwritten.`;
+                if (importPreview.disqualifiedCount === 0) return copyLine;
+                const sample = importPreview.disqualifiedSample.join(", ");
+                const suffix =
+                  importPreview.disqualifiedCount >
+                  importPreview.disqualifiedSample.length
+                    ? ` and ${importPreview.disqualifiedCount - importPreview.disqualifiedSample.length} more`
+                    : "";
+                return `${copyLine} ${importPreview.disqualifiedCount} shift${importPreview.disqualifiedCount === 1 ? "" : "s"} cannot be copied because the assigned employees no longer have the required qualifications (${sample}${suffix}).`;
+              })()}
               confirmLabel="Import Shifts"
               variant="info"
               isLoading={isImportingPrevious}

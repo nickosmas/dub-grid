@@ -185,46 +185,7 @@ describe("POST /api/shifts/publish", () => {
     auditInsert.mockResolvedValue({ error: null });
   });
 
-  it("returns a conflict response with the latest summary when drafts changed elsewhere", async () => {
-    fetchScheduleDraftBreakdown.mockResolvedValue({
-      newShifts: 1,
-      modifiedShifts: 1,
-      deletedShifts: 0,
-      newNotes: 0,
-      deletedNotes: 0,
-      totalChanges: 2,
-    });
-
-    const response = await POST(
-      makeRequest({
-        orgId: "11111111-1111-4111-8111-111111111111",
-        startDate: "2026-04-12",
-        endDate: "2026-04-18",
-        expectedSummary: {
-          newShifts: 1,
-          modifiedShifts: 0,
-          deletedShifts: 0,
-          newNotes: 0,
-          deletedNotes: 0,
-          totalChanges: 1,
-        },
-      }),
-    );
-
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual(
-      expect.objectContaining({
-        code: "SCHEDULE_DRAFT_CONFLICT",
-        summary: expect.objectContaining({
-          totalChanges: 2,
-        }),
-      }),
-    );
-    expect(publishScheduleDirect).not.toHaveBeenCalled();
-    expect(auditInsert).not.toHaveBeenCalled();
-  });
-
-  it("publishes and records the reviewed summary in the audit log", async () => {
+  it("publishes and records the post-publish summary in the audit log", async () => {
     const summary = {
       newShifts: 2,
       modifiedShifts: 1,
@@ -241,7 +202,6 @@ describe("POST /api/shifts/publish", () => {
         orgId: "11111111-1111-4111-8111-111111111111",
         startDate: "2026-04-12",
         endDate: "2026-04-18",
-        expectedSummary: summary,
       }),
     );
 
@@ -270,5 +230,41 @@ describe("POST /api/shifts/publish", () => {
         }),
       }),
     );
+  });
+
+  it("does not 409 even when the live draft count differs from an old client summary", async () => {
+    // Regression guard: the strict expectedSummary equality check was removed.
+    // The route should ignore the expectedSummary param entirely and proceed
+    // with publishing whatever drafts exist in the DB at the moment.
+    const liveSummary = {
+      newShifts: 5,
+      modifiedShifts: 0,
+      deletedShifts: 0,
+      newNotes: 0,
+      deletedNotes: 0,
+      totalChanges: 5,
+    };
+    fetchScheduleDraftBreakdown.mockResolvedValue(liveSummary);
+    publishScheduleDirect.mockResolvedValue(undefined);
+
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        startDate: "2026-04-12",
+        endDate: "2026-04-18",
+        // Bogus stale summary that the old code would have used to 409.
+        expectedSummary: {
+          newShifts: 1,
+          modifiedShifts: 0,
+          deletedShifts: 0,
+          newNotes: 0,
+          deletedNotes: 0,
+          totalChanges: 1,
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(publishScheduleDirect).toHaveBeenCalled();
   });
 });

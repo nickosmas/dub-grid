@@ -9,9 +9,35 @@ export interface DraftBreakdown {
   totalChanges: number;
 }
 
+export interface DateRangeFilter {
+  /** Inclusive lower bound, formatted as YYYY-MM-DD (local). */
+  startDateKey: string;
+  /** Inclusive upper bound, formatted as YYYY-MM-DD (local). */
+  endDateKey: string;
+}
+
+/**
+ * Extracts the YYYY-MM-DD date suffix from a shift or note map key.
+ * - Shift keys: `${empId}_${dateKey}`
+ * - Note keys: `${empId}_${dateKey}` or `${empId}_${dateKey}_${focusAreaId}`
+ * Returns null if the key doesn't contain a recognizable date segment.
+ */
+export function extractDateKeyFromCellKey(key: string): string | null {
+  const parts = key.split('_');
+  if (parts.length < 2) return null;
+  const candidate = parts[1] ?? '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : null;
+}
+
+function isInRange(dateKey: string, range?: DateRangeFilter): boolean {
+  if (!range) return true;
+  return dateKey >= range.startDateKey && dateKey <= range.endDateKey;
+}
+
 export function computeDraftBreakdown(
   shifts: ShiftMap,
   notes: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>,
+  range?: DateRangeFilter,
 ): DraftBreakdown {
   let newShifts = 0;
   let modifiedShifts = 0;
@@ -19,7 +45,12 @@ export function computeDraftBreakdown(
   let newNotes = 0;
   let deletedNotes = 0;
 
-  for (const entry of Object.values(shifts)) {
+  for (const [key, entry] of Object.entries(shifts)) {
+    if (entry.draftKind == null) continue;
+    if (range) {
+      const dateKey = extractDateKeyFromCellKey(key);
+      if (!dateKey || !isInRange(dateKey, range)) continue;
+    }
     switch (entry.draftKind) {
       case 'new': newShifts++; break;
       case 'modified': modifiedShifts++; break;
@@ -27,7 +58,11 @@ export function computeDraftBreakdown(
     }
   }
 
-  for (const noteList of Object.values(notes)) {
+  for (const [key, noteList] of Object.entries(notes)) {
+    if (range) {
+      const dateKey = extractDateKeyFromCellKey(key);
+      if (!dateKey || !isInRange(dateKey, range)) continue;
+    }
     for (const note of noteList) {
       if (note.status === 'draft') newNotes++;
       if (note.status === 'draft_deleted') deletedNotes++;
@@ -42,6 +77,63 @@ export function computeDraftBreakdown(
     deletedNotes,
     totalChanges: newShifts + modifiedShifts + deletedShifts + newNotes + deletedNotes,
   };
+}
+
+export interface OutOfWindowDraftGroup {
+  /** Sortable key — the YYYY-MM-DD start of the grouping period. */
+  periodKey: string;
+  /** Local Date for the period's first day, suitable for navigation. */
+  periodStart: Date;
+  /** Total draft count (shifts + notes) in this period. */
+  count: number;
+}
+
+/**
+ * Groups draft-bearing dates that fall OUTSIDE the given window into period
+ * buckets (defined by `getPeriodKey` / `parsePeriodKey` so callers can decide
+ * whether buckets are weeks, pay periods, or months — matching the user's
+ * current view granularity). Used to surface "you also have N drafts in
+ * other weeks" so the user knows the banner publish won't touch them.
+ */
+export function computeOutOfWindowDraftGroups(
+  shifts: ShiftMap,
+  notes: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>,
+  window: DateRangeFilter,
+  getPeriodKey: (dateKey: string) => string,
+  parsePeriodKey: (periodKey: string) => Date,
+): OutOfWindowDraftGroup[] {
+  const counts = new Map<string, number>();
+
+  const tally = (dateKey: string | null) => {
+    if (!dateKey) return;
+    if (isInRange(dateKey, window)) return;
+    const periodKey = getPeriodKey(dateKey);
+    counts.set(periodKey, (counts.get(periodKey) ?? 0) + 1);
+  };
+
+  for (const [key, entry] of Object.entries(shifts)) {
+    if (entry.draftKind == null) continue;
+    tally(extractDateKeyFromCellKey(key));
+  }
+
+  for (const [key, noteList] of Object.entries(notes)) {
+    const dateKey = extractDateKeyFromCellKey(key);
+    if (!dateKey || isInRange(dateKey, window)) continue;
+    const periodKey = getPeriodKey(dateKey);
+    for (const note of noteList) {
+      if (note.status === 'draft' || note.status === 'draft_deleted') {
+        counts.set(periodKey, (counts.get(periodKey) ?? 0) + 1);
+      }
+    }
+  }
+
+  return [...counts.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([periodKey, count]) => ({
+      periodKey,
+      periodStart: parsePeriodKey(periodKey),
+      count,
+    }));
 }
 
 export function draftBreakdownsEqual(
