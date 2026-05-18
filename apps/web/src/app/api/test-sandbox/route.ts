@@ -18,29 +18,21 @@ export const dynamic = "force-dynamic";
 const requestSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("enter") }),
   z.object({ action: z.literal("exit") }),
+  // Reset = wipe and re-create. Used by the banner's Reset button so the
+  // user can discard accumulated sandbox changes and start with a fresh
+  // clone of the source org.
+  z.object({ action: z.literal("reset") }),
 ]);
+
+// One week — long enough that browser restarts don't kick the user out of
+// sandbox mode. The cookie is still cleared explicitly on Exit, so this is
+// purely about durability across normal tab/window churn.
+const SANDBOX_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 function getClaimOrgId(claims: { org_id?: unknown }): string | null {
   return typeof claims.org_id === "string" && claims.org_id.length > 0
     ? claims.org_id
     : null;
-}
-
-function readSandboxCookie(req: NextRequest): string | null {
-  const cookieHeader = req.headers.get("cookie") ?? "";
-  const prefix = `${SANDBOX_COOKIE_NAME}=`;
-  const cookie = cookieHeader
-    .split(/;\s*/)
-    .find((c) => c.startsWith(prefix));
-  if (!cookie) return null;
-  try {
-    const data = JSON.parse(decodeURIComponent(cookie.slice(prefix.length))) as
-      | { sandboxOrgId?: unknown }
-      | null;
-    return typeof data?.sandboxOrgId === "string" ? data.sandboxOrgId : null;
-  } catch {
-    return null;
-  }
 }
 
 export async function POST(req: NextRequest) {
@@ -66,29 +58,29 @@ export async function POST(req: NextRequest) {
 
   try {
     if (parsed.data.action === "exit") {
-      const cookieSandboxId = readSandboxCookie(req);
-      if (!cookieSandboxId) {
-        // Already not in sandbox mode — treat as a no-op success so the
-        // client gets to its happy path either way.
-        const response = NextResponse.json({ success: true });
-        response.cookies.set(SANDBOX_COOKIE_NAME, "", {
-          path: "/",
-          maxAge: 0,
-        });
-        return response;
-      }
+      // Delete every sandbox owned by this user. Don't rely on the cookie
+      // — if the cookie's stale or missing we still want a clean exit so
+      // orphans can't get re-attached on the next Enter.
       await deleteSandboxForUser({
         serviceClient,
         actor: auth.user,
-        sandboxOrgId: cookieSandboxId,
       });
       const response = NextResponse.json({ success: true });
       response.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
       return response;
     }
 
-    // action === "enter"
-    const sourceOrgId = getClaimOrgId(auth.claims);
+    // action === "enter" or "reset". The auth layer rewrites
+    // claims.org_id to the sandbox when a sandbox cookie is present, so
+    // we can't read the source org from there. Pull it from the auth
+    // user's profile instead.
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("org_id")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    const sourceOrgId =
+      (profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims);
     if (!sourceOrgId) {
       return NextResponse.json(
         { error: "Pick a workspace before entering sandbox mode." },
@@ -96,10 +88,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const existing = await findActiveSandboxForUser(
-      serviceClient,
-      auth.user.id,
-    );
+    // For "reset": wipe any existing sandbox first so the recreate step
+    // gives the user a truly fresh clone. For "enter": reuse the existing
+    // sandbox if there is one (typical case is the user re-clicking enter
+    // from another tab and expecting their in-progress work back).
+    if (parsed.data.action === "reset") {
+      await deleteSandboxForUser({ serviceClient, actor: auth.user });
+    }
+
+    const existing =
+      parsed.data.action === "reset"
+        ? null
+        : await findActiveSandboxForUser(serviceClient, auth.user.id);
     const sandbox =
       existing ??
       (await createSandboxForUser({
@@ -123,8 +123,7 @@ export async function POST(req: NextRequest) {
         httpOnly: false,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
-        // Effectively a session cookie — no max-age. Clears when the
-        // browser session ends, or when /api/test-sandbox exit clears it.
+        maxAge: SANDBOX_COOKIE_MAX_AGE_SECONDS,
       },
     );
     return response;

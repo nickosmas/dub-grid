@@ -16,41 +16,49 @@ export default function SandboxBanner() {
     queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
     staleTime: 60_000,
   });
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"exit" | "reset" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const org = bootstrapQuery.data?.org ?? null;
   if (!org || org.workspaceKind !== "sandbox") return null;
 
-  async function handleExit() {
-    setPending(true);
+  async function postSandboxAction(
+    action: "exit" | "reset",
+    errorFallback: string,
+  ) {
+    setPendingAction(action);
     setError(null);
     try {
       const response = await fetch("/api/test-sandbox", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "exit" }),
+        body: JSON.stringify({ action }),
       });
       if (!response.ok) {
         const body = (await response.json()) as Record<string, unknown>;
-        setError(
-          formatClientErrorMessage(
-            body?.error,
-            "We couldn't exit sandbox mode right now.",
-          ),
-        );
-        setPending(false);
+        setError(formatClientErrorMessage(body?.error, errorFallback));
+        setPendingAction(null);
         return;
       }
-      // No navigation — middleware will see the cleared cookie on the next
-      // request and stop overriding org_id. Invalidating all queries forces
-      // every visible component to re-fetch its data against the real org.
+      // No navigation — middleware reads the updated cookie on the next
+      // request. Invalidating every query forces visible components to
+      // refetch against the new org context (real for exit, fresh
+      // sandbox for reset).
       await queryClient.invalidateQueries();
+      setPendingAction(null);
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");
-      setPending(false);
+      setPendingAction(null);
     }
   }
+
+  const handleExit = () =>
+    postSandboxAction("exit", "We couldn't exit sandbox mode right now.");
+  const handleReset = () =>
+    postSandboxAction(
+      "reset",
+      "We couldn't reset the sandbox right now.",
+    );
 
   return (
     <div
@@ -106,8 +114,22 @@ export default function SandboxBanner() {
         ) : null}
         <button
           type="button"
+          onClick={handleReset}
+          disabled={pendingAction != null}
+          className="dg-btn dg-btn-secondary"
+          title="Discard all sandbox changes and start over with a fresh clone of your workspace."
+          style={{
+            minHeight: 28,
+            padding: "0 10px",
+            fontSize: "var(--dg-fs-caption)",
+          }}
+        >
+          {pendingAction === "reset" ? "Resetting…" : "Reset sandbox"}
+        </button>
+        <button
+          type="button"
           onClick={handleExit}
-          disabled={pending}
+          disabled={pendingAction != null}
           className="dg-btn dg-btn-primary"
           style={{
             minHeight: 28,
@@ -115,7 +137,7 @@ export default function SandboxBanner() {
             fontSize: "var(--dg-fs-caption)",
           }}
         >
-          {pending ? "Exiting…" : "Exit sandbox"}
+          {pendingAction === "exit" ? "Exiting…" : "Exit sandbox"}
         </button>
       </div>
     </div>

@@ -8,6 +8,10 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import {
+  getSandboxFromCookie,
+  SANDBOX_COOKIE_NAME,
+} from "@/lib/sandbox-cookie";
 
 type PermissionContext = ReturnType<typeof buildPermissionContext>;
 
@@ -207,6 +211,45 @@ export async function requireOrgPermissions(
   }
 
   const serviceClient = getServiceClient();
+
+  // ── Sandbox org-redirect ────────────────────────────────────────────
+  // Many endpoints accept `orgId` from the client (URL/body/query), and
+  // some client code derives that orgId from the unrefreshed JWT — which
+  // still points at the user's real workspace. Without this redirect, a
+  // settings/save POST issued while the user is "inside" a sandbox would
+  // mutate the real workspace.
+  //
+  // When the user has an active sandbox cookie (verified server-side
+  // here), route ALL org-scoped checks to their sandbox regardless of
+  // the orgId argument. Gridmasters intentionally manage other orgs, so
+  // we exempt them — their actions on non-sandbox orgs stay as-is.
+  const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  if (sandboxCookieValue) {
+    const sb = getSandboxFromCookie(
+      `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,
+    );
+    if (sb && sb.userId === auth.user.id && sb.sandboxOrgId !== orgId) {
+      const { data: ownedSandbox } = await serviceClient
+        .from("organizations")
+        .select("id")
+        .eq("id", sb.sandboxOrgId)
+        .eq("workspace_kind", "sandbox")
+        .eq("sandbox_owner_user_id", auth.user.id)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (ownedSandbox) {
+        const { data: profile } = await serviceClient
+          .from("profiles")
+          .select("platform_role")
+          .eq("id", auth.user.id)
+          .maybeSingle();
+        if (profile?.platform_role !== "gridmaster") {
+          orgId = ownedSandbox.id;
+        }
+      }
+    }
+  }
+
   const userClient = createRequestSupabaseClient(req);
   const [{ data: membership }, { data: profile }, { data: organization }] = await Promise.all([
     serviceClient

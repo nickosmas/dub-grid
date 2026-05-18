@@ -195,10 +195,13 @@ export async function createSandboxForUser(input: {
 }): Promise<{ id: string; slug: string }> {
   const { serviceClient, actor, sourceOrgId } = input;
 
+  // Copy as much of the source org row as we can so the sandbox feels
+  // identical to the real workspace. Anything Stripe-, suspension-, or
+  // sandbox-specific is replaced below.
   const { data: sourceOrg, error: sourceErr } = await serviceClient
     .from("organizations")
     .select(
-      "name, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date",
+      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, coverage_rule_config, feature_overrides",
     )
     .eq("id", sourceOrgId)
     .maybeSingle();
@@ -219,6 +222,7 @@ export async function createSandboxForUser(input: {
         workspace_kind: "sandbox",
         sandbox_owner_user_id: actor.id,
         sandbox_source_org_id: sourceOrgId,
+        // Display + label clones
         focus_area_label: sourceOrg?.focus_area_label ?? null,
         certification_label: sourceOrg?.certification_label ?? null,
         role_label: sourceOrg?.role_label ?? null,
@@ -226,7 +230,32 @@ export async function createSandboxForUser(input: {
         shift_display_mode: sourceOrg?.shift_display_mode ?? "code",
         timezone: sourceOrg?.timezone ?? "UTC",
         pay_period_start_date: sourceOrg?.pay_period_start_date ?? null,
-        // Sandboxes are exempt from billing gates.
+        // Address + contact (so the sandbox feels like a real org)
+        address: sourceOrg?.address ?? "",
+        address_line_1: sourceOrg?.address_line_1 ?? "",
+        address_line_2: sourceOrg?.address_line_2 ?? "",
+        address_city: sourceOrg?.address_city ?? "",
+        address_state: sourceOrg?.address_state ?? "",
+        address_postal_code: sourceOrg?.address_postal_code ?? "",
+        address_country: sourceOrg?.address_country ?? "",
+        phone: sourceOrg?.phone ?? "",
+        employee_count: sourceOrg?.employee_count ?? null,
+        // Branding + presentation
+        logo_url: sourceOrg?.logo_url ?? null,
+        app_name: sourceOrg?.app_name ?? null,
+        meta_description: sourceOrg?.meta_description ?? null,
+        theme_config: sourceOrg?.theme_config ?? {},
+        landing_page_config: sourceOrg?.landing_page_config ?? {},
+        // Operational config
+        data_retention_days: sourceOrg?.data_retention_days ?? 365,
+        enforce_conflict_prevention:
+          sourceOrg?.enforce_conflict_prevention ?? false,
+        coverage_rule_config: sourceOrg?.coverage_rule_config ?? {
+          mentoredCoverageCreditPercent: 100,
+        },
+        feature_overrides: sourceOrg?.feature_overrides ?? {},
+        // Sandboxes are exempt from billing gates — never inherit
+        // subscription state from the source.
         subscription_status: "active",
         trial_ends_at: null,
       })
@@ -275,29 +304,34 @@ export async function createSandboxForUser(input: {
 }
 
 /**
- * Verify ownership and hard-delete the sandbox org. FK cascades take care
- * of memberships, focus areas, departments, schedule rows, etc.
+ * Hard-delete EVERY sandbox org owned by `actor`, not just one. The
+ * original implementation only deleted the org pointed at by the cookie,
+ * which left orphans behind whenever an exit happened with a missing
+ * cookie (closed tab, expired session). Those orphans then got "reused"
+ * by the next Enter via findActiveSandboxForUser, so the user saw
+ * yesterday's sandbox data come back. Deleting all owned sandboxes makes
+ * Exit guaranteed-clean regardless of cookie state.
+ *
+ * FK cascades take care of memberships, focus areas, departments,
+ * schedule rows, etc.
  */
 export async function deleteSandboxForUser(input: {
   serviceClient: SupabaseClient;
   actor: User;
-  sandboxOrgId: string;
-}): Promise<void> {
-  const { data, error } = await input.serviceClient
+}): Promise<{ deletedCount: number }> {
+  const { data: owned, error } = await input.serviceClient
     .from("organizations")
     .select("id")
-    .eq("id", input.sandboxOrgId)
     .eq("workspace_kind", "sandbox")
-    .eq("sandbox_owner_user_id", input.actor.id)
-    .maybeSingle();
+    .eq("sandbox_owner_user_id", input.actor.id);
   if (error) throw error;
-  if (!data) {
-    throw new Error("Sandbox not found or not owned by the caller.");
-  }
+  if (!owned || owned.length === 0) return { deletedCount: 0 };
 
+  const ids = owned.map((row) => row.id as string);
   const { error: deleteError } = await input.serviceClient
     .from("organizations")
     .delete()
-    .eq("id", input.sandboxOrgId);
+    .in("id", ids);
   if (deleteError) throw deleteError;
+  return { deletedCount: ids.length };
 }
