@@ -51,6 +51,9 @@ describe("rowToOrganization", () => {
       subscription_seats: null,
       data_retention_days: 365,
       feature_overrides: {},
+      workspace_kind: "real",
+      sandbox_owner_user_id: null,
+      sandbox_source_org_id: null,
       updated_at: null,
     };
 
@@ -101,6 +104,9 @@ describe("rowToOrganization", () => {
       subscription_seats: null,
       data_retention_days: 365,
       feature_overrides: {},
+      workspace_kind: "real",
+      sandbox_owner_user_id: null,
+      sandbox_source_org_id: null,
       updated_at: null,
     };
 

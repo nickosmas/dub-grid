@@ -73,6 +73,9 @@ function makeOrganization(): Organization {
     subscriptionSeats: null,
     dataRetentionDays: 365,
     featureOverrides: {},
+    workspaceKind: "real",
+    sandboxOwnerUserId: null,
+    sandboxSourceOrgId: null,
   };
 }
 

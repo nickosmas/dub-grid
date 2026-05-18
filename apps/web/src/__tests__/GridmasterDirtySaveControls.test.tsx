@@ -106,6 +106,9 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
     featureOverrides: {
       disable_realtime: false,
     },
+    workspaceKind: "real",
+    sandboxOwnerUserId: null,
+    sandboxSourceOrgId: null,
     ...overrides,
   };
 }

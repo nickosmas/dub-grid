@@ -115,6 +115,9 @@ const baseOrganization: Organization = {
   enforceConflictPrevention: true,
   dataRetentionDays: 90,
   featureOverrides: {},
+  workspaceKind: "real",
+  sandboxOwnerUserId: null,
+  sandboxSourceOrgId: null,
   updatedAt: "2026-04-15T18:00:00.000000+00:00",
 };
 
@@ -244,16 +247,19 @@ describe("settings dirty save controls", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("custom labels treat the department label as scheduled departments and keep management departments explicit", () => {
+  it("custom labels does not expose a Scheduled Departments field — that label is fixed", () => {
     render(
       <OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />,
     );
 
-    expect(screen.getByText("SCHEDULED DEPARTMENTS LABEL")).toBeInTheDocument();
+    expect(screen.queryByText("SCHEDULED DEPARTMENTS LABEL")).not.toBeInTheDocument();
     expect(
-      screen.getByText("Scheduled only. Does not rename management departments."),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
+      screen.queryByText("Scheduled only. Does not rename management departments."),
+    ).not.toBeInTheDocument();
+    // The other three labels remain customizable.
+    expect(screen.getByText("FOCUS AREAS LABEL")).toBeInTheDocument();
+    expect(screen.getByText("CERTIFICATIONS LABEL")).toBeInTheDocument();
+    expect(screen.getByText("ROLES LABEL")).toBeInTheDocument();
   });
 
   it("display mode uses Cancel while the mode selection is dirty", async () => {
@@ -410,7 +416,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    await user.click(screen.getByText("Readings"));
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
@@ -463,7 +469,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    await user.click(screen.getByText("Readings"));
 
     const input = screen.getByDisplayValue("Readings");
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -494,41 +500,59 @@ describe("settings dirty save controls", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("indicator rows prompt before switching away from dirty edits", async () => {
+  it("Add Indicator shows Cancel on a pristine new row, and Cancel removes the draft", async () => {
     const user = userEvent.setup();
-    const indicators: IndicatorType[] = [
-      {
-        id: 1,
-        orgId: "org-1",
-        name: "Readings",
-        color: "#ff0000",
-        sortOrder: 0,
-      },
-      {
-        id: 2,
-        orgId: "org-1",
-        name: "Isolation",
-        color: "#00aa00",
-        sortOrder: 1,
-      },
-    ];
 
     render(
       <Indicators
-        indicatorTypes={indicators}
+        indicatorTypes={[]}
         orgId="org-1"
         onChange={vi.fn()}
         canManageIndicatorTypes
       />,
     );
 
-    await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
+    await user.click(screen.getByRole("button", { name: /\+ add indicator/i }));
+
+    expect(
+      screen.getByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^discard$/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(screen.queryByPlaceholderText("e.g. Readings")).not.toBeInTheDocument();
+  });
+
+  it("indicator rows prompt before discarding a dirty edit on collapse", async () => {
+    const user = userEvent.setup();
+    const indicator: IndicatorType = {
+      id: 1,
+      orgId: "org-1",
+      name: "Readings",
+      color: "#ff0000",
+      sortOrder: 0,
+    };
+
+    render(
+      <Indicators
+        indicatorTypes={[indicator]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageIndicatorTypes
+      />,
+    );
+
+    await user.click(screen.getByText("Readings"));
 
     const input = screen.getByDisplayValue("Readings");
     await user.clear(input);
     await user.type(input, "Daily Readings");
 
-    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    // Clicking the row header again while dirty should prompt before closing.
+    await user.click(screen.getByText("Daily Readings"));
 
     expect(
       await screen.findByRole("dialog", { name: /unsaved changes/i }),
@@ -562,7 +586,7 @@ describe("settings dirty save controls", () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole("button", { name: /^edit$/i }));
+      .click(screen.getByText("Readings"));
 
     const input = screen.getByDisplayValue("Readings");
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -1580,6 +1604,37 @@ describe("settings dirty save controls", () => {
     });
   });
 
+  it("Add Shift shows Cancel on a pristine new row, and Cancel removes the draft", async () => {
+    const user = userEvent.setup();
+    const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
+
+    render(
+      <ShiftCategoriesSettings
+        shiftCategories={[]}
+        focusAreas={[focusArea]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /\+ add shift/i }));
+
+    expect(
+      screen.getByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^discard$/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(
+      screen.queryByPlaceholderText("e.g. Day Shift"),
+    ).not.toBeInTheDocument();
+    expect(upsertShiftCategory).not.toHaveBeenCalled();
+  });
+
   it("shift category editors auto-fill a code from the shift name before saving", async () => {
     const user = userEvent.setup();
     const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
@@ -1772,6 +1827,78 @@ describe("settings dirty save controls", () => {
       screen.queryByRole("dialog", { name: /unsaved changes/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Mentor Updated")).toBeInTheDocument();
+  });
+
+  it("Add Scheduled Job shows Cancel, and Cancel removes the unsaved draft without calling the API", async () => {
+    const user = userEvent.setup();
+    const department = makeDepartment({
+      id: 1,
+      orgId: "org-1",
+      name: "Nursing",
+      type: "scheduled",
+    });
+    const focusArea = makeFocusArea({
+      id: 1,
+      orgId: "org-1",
+      name: "North",
+      departmentId: 1,
+    });
+    const shiftCategory = makeShiftCategory({
+      id: 10,
+      orgId: "org-1",
+      name: "Day Shift",
+      abbr: "D",
+      focusAreaId: 1,
+      sortOrder: 0,
+    });
+
+    render(
+      <JobsSettings
+        jobs={[]}
+        orgId="org-1"
+        orgRoles={[]}
+        certifications={[]}
+        departments={[department]}
+        focusAreas={[focusArea]}
+        shiftCategories={[shiftCategory]}
+        roleLabel="Roles"
+        certificationLabel="Certifications"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /add scheduled job/i }),
+    );
+
+    // Pristine new draft must offer Cancel, not Discard or Close.
+    expect(
+      screen.getByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^discard$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^close$/i }),
+    ).not.toBeInTheDocument();
+
+    // Type something so the draft is "dirty" — Cancel must still be shown.
+    await user.type(
+      screen.getByPlaceholderText("e.g. Supervisor"),
+      "Supervisor",
+    );
+    expect(
+      screen.getByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    // Editor closes, no draft row remains, and no save fired.
+    expect(
+      screen.queryByPlaceholderText("e.g. Supervisor"),
+    ).not.toBeInTheDocument();
+    expect(upsertJobDefinition).not.toHaveBeenCalled();
   });
 
   it("general jobs clear legacy duration values when fixed times are already set", async () => {
@@ -2793,6 +2920,37 @@ describe("settings dirty save controls", () => {
     });
   });
 
+  it("Add Absence Type shows Cancel on a pristine new row, and Cancel removes the draft", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AbsenceTypesSettings
+        absenceTypes={[]}
+        orgId="org-1"
+        onChange={vi.fn()}
+        canManageScheduleDefinitions
+        shiftDisplayMode="code"
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: /\+ add absence type/i }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^discard$/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+
+    expect(
+      screen.queryByPlaceholderText("e.g. Vacation"),
+    ).not.toBeInTheDocument();
+  });
+
   it("absence type editors disable Save until there is a real persisted-value change", async () => {
     const user = userEvent.setup();
     const absenceTypes: AbsenceType[] = [
@@ -2930,7 +3088,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /^edit$/i }));
+    await user.click(screen.getByText("Readings"));
     const input = screen.getByDisplayValue("Readings");
     await user.clear(input);
     await user.type(input, "https://bad.example");

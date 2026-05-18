@@ -133,6 +133,9 @@ const org: Organization = {
   coverageRuleConfig: { mentoredCoverageCreditPercent: 50 },
   dataRetentionDays: 365,
   featureOverrides: {},
+  workspaceKind: "real",
+  sandboxOwnerUserId: null,
+  sandboxSourceOrgId: null,
 };
 
 function makeShiftMap(todayKey: string): ShiftMap {
