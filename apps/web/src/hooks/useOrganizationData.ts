@@ -268,12 +268,20 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
 
   const broadcastOrgInvalidations = useCallback(
     (...queryKeysToBroadcast: readonly (readonly unknown[])[]) => {
+      // Cross-tab notification via BroadcastChannel. The channel does NOT
+      // deliver to the sending tab, so we also invalidate locally below to
+      // force same-tab consumers (e.g. settings panels rendering the just-
+      // saved data in a sibling component) to refetch immediately.
       broadcastInvalidation(queryKeys.org.bootstrapAll());
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.org.bootstrapAll(),
+      });
       for (const key of queryKeysToBroadcast) {
         broadcastInvalidation(key);
+        void queryClient.invalidateQueries({ queryKey: key });
       }
     },
-    [],
+    [queryClient],
   );
 
   useEffect(() => {

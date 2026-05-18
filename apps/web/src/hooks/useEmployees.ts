@@ -14,6 +14,7 @@ import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
+import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
 import type { Employee } from "@/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -34,6 +35,11 @@ export interface EmployeesData {
 
 export function useEmployees(orgId: string | null): EmployeesData {
   const queryClient = useQueryClient();
+
+  // Subscribe to org-wide CDC so adds/edits made elsewhere (e.g. /people in
+  // another tab, or another step in the onboarding wizard) invalidate this
+  // hook's `employees.all` query and refetch automatically.
+  useOrgRealtimeInvalidation({ orgId, queryClient });
 
   // Fetch all employees via React Query
   const employeesQuery = useQuery({

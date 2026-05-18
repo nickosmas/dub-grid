@@ -77,6 +77,13 @@ function reportLockContention(call: "getSession" | "getUser"): void {
   captureMessage(`Supabase auth lock contention on ${call}`, "warning");
 }
 
+// In-flight dedupe: collapse concurrent callers onto a single underlying
+// SDK call. Without this, AuthProvider + usePermissions + any third hook
+// that mounts in the same render pass each race for the auth lock and
+// trigger the "Lock stolen" error. With this, they all await one promise.
+let inFlightSession: Promise<Session | null> | null = null;
+let inFlightUser: Promise<User | null> | null = null;
+
 function clearMatchingStorage(storage: Storage): void {
   const keysToDelete: string[] = [];
   for (let index = 0; index < storage.length; index += 1) {
@@ -93,6 +100,14 @@ function clearMatchingStorage(storage: Storage): void {
 }
 
 export function clearSupabaseBrowserAuthState(): void {
+  // Whatever auth state is currently in flight is now invalid — release the
+  // dedupe slots so the next caller starts fresh. Without this, an SDK call
+  // that's hung on stale cookies (the scenario AuthProvider's 5s race exists
+  // to escape) would permanently occupy the in-flight slot and every future
+  // caller would await the same hung promise.
+  inFlightSession = null;
+  inFlightUser = null;
+
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
   try {
@@ -129,13 +144,6 @@ export function clearSupabaseBrowserAuthState(): void {
     }
   }
 }
-
-// In-flight dedupe: collapse concurrent callers onto a single underlying
-// SDK call. Without this, AuthProvider + usePermissions + any third hook
-// that mounts in the same render pass each race for the auth lock and
-// trigger the "Lock stolen" error. With this, they all await one promise.
-let inFlightSession: Promise<Session | null> | null = null;
-let inFlightUser: Promise<User | null> | null = null;
 
 async function readSessionOnce(): Promise<Session | null> {
   const {
@@ -187,18 +195,23 @@ async function readUserOnce(): Promise<User | null> {
 
 export function getBrowserSession(): Promise<Session | null> {
   if (inFlightSession) return inFlightSession;
-  inFlightSession = readSessionOnce().finally(() => {
-    inFlightSession = null;
+  // Identity-check inside .finally so that if the slot has already been
+  // reassigned (e.g. cleared by clearSupabaseBrowserAuthState and replaced
+  // by a fresh caller), this stale finalizer doesn't clobber the new value.
+  const promise: Promise<Session | null> = readSessionOnce().finally(() => {
+    if (inFlightSession === promise) inFlightSession = null;
   });
-  return inFlightSession;
+  inFlightSession = promise;
+  return promise;
 }
 
 export function getVerifiedBrowserUser(): Promise<User | null> {
   if (inFlightUser) return inFlightUser;
-  inFlightUser = readUserOnce().finally(() => {
-    inFlightUser = null;
+  const promise: Promise<User | null> = readUserOnce().finally(() => {
+    if (inFlightUser === promise) inFlightUser = null;
   });
-  return inFlightUser;
+  inFlightUser = promise;
+  return promise;
 }
 
 // Sequential, not Promise.all. Running getSession + getUser in parallel

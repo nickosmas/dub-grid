@@ -160,6 +160,7 @@ export function usePermissions(): Permissions {
     if (!accessToken || !userId) return;
     const { orgId } = extractJwtClaims(accessToken);
 
+    let mounted = true;
     let membershipChannel: BrowserRealtimeChannel | null = null;
     let departmentChannel: BrowserRealtimeChannel | null = null;
     // Unique channel name per effect instance avoids reusing an already-subscribed
@@ -171,6 +172,11 @@ export function usePermissions(): Permissions {
       void (async () => {
         try {
           const { permissions } = await fetchAccountPermissions();
+          // Guard against an event firing in the gap between the channel
+          // emitting and our cleanup completing — and against the user
+          // changing while the fetch was in flight (don't write the new
+          // user's perms under the old user's cache key).
+          if (!mounted) return;
           permsCache = permissions;
           permsCacheTimestamp = Date.now();
           permsCacheUserId = userId;
@@ -211,6 +217,7 @@ export function usePermissions(): Permissions {
     }
 
     return () => {
+      mounted = false;
       if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
       if (departmentChannel) void removeBrowserRealtimeChannel(departmentChannel);
     };
