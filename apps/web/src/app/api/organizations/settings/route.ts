@@ -37,7 +37,6 @@ const bodySchema = z.object({
   focusAreaLabel: z.string().trim().max(50).optional(),
   certificationLabel: z.string().trim().max(50).optional(),
   roleLabel: z.string().trim().max(50).optional(),
-  departmentLabel: z.string().trim().max(50).optional(),
   shiftDisplayMode: z.enum(["code", "name"]).optional(),
   timezone: z.string().trim().optional(),
   payPeriodStartDate: z
@@ -115,7 +114,11 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { orgId, expectedUpdatedAt, ...fields } = parsed.data;
+  // bodyOrgId is what the client sent. The effective orgId we ultimately
+  // read and write against is `orgId`, assigned below from the auth
+  // result — it may have been redirected to the user's sandbox by
+  // requireOrgPermissions.
+  const { orgId: bodyOrgId, expectedUpdatedAt, ...fields } = parsed.data;
   const fieldErrors = {
     ...(fields.name !== undefined
       ? {
@@ -204,15 +207,6 @@ export async function PUT(req: NextRequest) {
           }),
         }
       : {}),
-    ...(fields.departmentLabel !== undefined
-      ? {
-          departmentLabel: getLineTextError(fields.departmentLabel, {
-            label: "Department label",
-            maxLength: 50,
-            required: true,
-          }),
-        }
-      : {}),
   } as const;
   const firstFieldError = Object.values(fieldErrors).find(Boolean);
   if (firstFieldError) {
@@ -226,7 +220,7 @@ export async function PUT(req: NextRequest) {
     // ── Permission check ──────────────────────────────────────────────
     const orgAuth = await requireOrgPermissions(
       req,
-      orgId,
+      bodyOrgId,
       (permissions) =>
         permissions.isGridmaster ||
         permissions.isSuperAdmin ||
@@ -236,6 +230,11 @@ export async function PUT(req: NextRequest) {
     if ("response" in orgAuth) {
       return orgAuth.response;
     }
+    // requireOrgPermissions may have redirected the orgId to the user's
+    // sandbox. Every read/write below uses the effective orgId, not the
+    // body's — otherwise the validation lands on sandbox while writes
+    // hit the real workspace.
+    const orgId = orgAuth.orgId;
     const serviceClient = orgAuth.serviceClient;
 
     const { data: existingRow, error: existingError } = await serviceClient
@@ -333,14 +332,6 @@ export async function PUT(req: NextRequest) {
               required: true,
             })
           : currentOrg.roleLabel,
-      departmentLabel:
-        fields.departmentLabel !== undefined
-          ? normalizeLineText(fields.departmentLabel, {
-              label: "Department label",
-              maxLength: 50,
-              required: true,
-            })
-          : currentOrg.departmentLabel,
       shiftDisplayMode: fields.shiftDisplayMode ?? currentOrg.shiftDisplayMode,
       timezone:
         fields.timezone !== undefined
@@ -399,9 +390,6 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("roleLabel")) {
       update.role_label = nextOrg.roleLabel;
-    }
-    if (changeKeys.has("departmentLabel")) {
-      update.department_label = nextOrg.departmentLabel;
     }
     if (changeKeys.has("shiftDisplayMode")) {
       update.shift_display_mode = nextOrg.shiftDisplayMode;
@@ -509,8 +497,13 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({ success: true, organization: updatedOrg });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "organizations/settings", orgId } });
-    logger.error({ error: err, orgId }, "Organization settings update failed");
+    Sentry.captureException(err, {
+      extra: { context: "organizations/settings", orgId: bodyOrgId },
+    });
+    logger.error(
+      { error: err, orgId: bodyOrgId },
+      "Organization settings update failed",
+    );
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

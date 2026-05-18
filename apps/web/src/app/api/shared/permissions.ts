@@ -33,6 +33,18 @@ export interface AuthorizedOrgRequest {
   permissions: PermissionContext;
   serviceClient: ReturnType<typeof getServiceClient>;
   userClient: ReturnType<typeof createRequestSupabaseClient>;
+  /**
+   * The effective org id this request is authorized against. May differ
+   * from the orgId argument the caller passed in: when the caller is in
+   * sandbox mode, requireOrgPermissions redirects to the sandbox org id.
+   *
+   * Endpoints that perform org-scoped writes MUST use this field, not
+   * the orgId from the request body. Otherwise, the permission check
+   * validates against the sandbox while the actual mutation lands on
+   * the real workspace — exactly the data leak the redirect is meant
+   * to prevent.
+   */
+  orgId: string;
 }
 
 function forbiddenResponse() {
@@ -326,5 +338,6 @@ export async function requireOrgPermissions(
     permissions,
     serviceClient,
     userClient,
+    orgId,
   };
 }

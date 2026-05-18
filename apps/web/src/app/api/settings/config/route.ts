@@ -869,7 +869,11 @@ async function authorize(
     return { response: auth.response } as const;
   }
 
-  return { actor: auth.actor, serviceClient: auth.serviceClient } as const;
+  return {
+    actor: auth.actor,
+    serviceClient: auth.serviceClient,
+    orgId: auth.orgId,
+  } as const;
 }
 
 async function fetchCertificationsForOrg(
@@ -1954,6 +1958,32 @@ export async function POST(req: NextRequest) {
   const authorized = await authorize(req, orgId, permissionByAction[data.action]);
   if ("response" in authorized) {
     return authorized.response;
+  }
+
+  // Redirect the request body's orgId fields to the effective (possibly
+  // sandbox) org id from auth. This file has 100+ references to
+  // `data.orgId` / `data.X.orgId` in sub-handlers; mutating the parsed
+  // body here means every downstream read/write uses the right org id
+  // without touching each handler. Without this, writes leak to the
+  // real workspace while the user is in sandbox mode.
+  const effectiveOrgId = authorized.orgId;
+  if ("orgId" in data) {
+    (data as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("focusArea" in data && data.focusArea) {
+    (data.focusArea as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("shiftCategory" in data && data.shiftCategory) {
+    (data.shiftCategory as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("job" in data && data.job) {
+    (data.job as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("absenceType" in data && data.absenceType) {
+    (data.absenceType as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("indicatorType" in data && data.indicatorType) {
+    (data.indicatorType as { orgId: string }).orgId = effectiveOrgId;
   }
 
   const { actor, serviceClient } = authorized;
