@@ -735,18 +735,58 @@ export type NotificationType =
   | 'schedule_published'
   | 'shift_request_new'
   | 'shift_request_approved'
-  | 'shift_request_rejected';
+  | 'shift_request_rejected'
+  // schedule (non-publish flows)
+  | 'recurring_shift_updated'
+  | 'shift_series_updated'
+  | 'schedule_note_published'
+  | 'recurring_schedules_applied'
+  // membership lifecycle
+  | 'invitation_received'
+  | 'invitation_accepted'
+  | 'invitation_revoked'
+  | 'invitation_resent'
+  | 'membership_removed'
+  | 'admin_permissions_changed'
+  // employee + org account
+  | 'employee_created'
+  | 'employee_status_changed'
+  | 'employee_profile_changed'
+  | 'org_settings_changed'
+  | 'org_suspended'
+  | 'org_unsuspended'
+  // billing
+  | 'billing_subscription_changed'
+  | 'billing_payment_failed'
+  | 'billing_payment_succeeded'
+  // security
+  | 'security_email_changed'
+  | 'security_password_changed'
+  | 'security_mfa_changed'
+  | 'security_new_device'
+  | 'security_session_revoked';
+
+export type NotificationPriority = 'low' | 'normal' | 'high' | 'critical';
 
 export interface Notification {
   id: string;
   type: NotificationType;
   channel: 'in_app' | 'email';
   category: string | null;
+  priority: NotificationPriority;
   title: string;
   message: string;
   metadata: Record<string, unknown>;
   readAt: string | null;
+  archivedAt: string | null;
   createdAt: string;
+}
+
+export interface NotificationFacets {
+  totalUnread: number;
+  totalArchived: number;
+  byCategory: Record<string, number>;
+  byPriority: Record<NotificationPriority, number>;
 }
 
 export interface NotificationPreferences {

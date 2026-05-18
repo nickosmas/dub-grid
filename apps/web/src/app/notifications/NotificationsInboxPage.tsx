@@ -14,8 +14,10 @@ import {
   Archive,
   ArchiveRestore,
   Bell,
+  Building2,
   Calendar,
   CheckCheck,
+  CreditCard,
   Inbox,
   Mail,
   MailOpen,
@@ -23,12 +25,15 @@ import {
   Shield,
   Trash2,
   UserCog,
+  Users,
   X,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useAuth } from "@/components/AuthProvider";
+import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import {
   archiveNotifications,
   deleteNotifications,
@@ -52,12 +57,24 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 const PAGE_SIZE = 25;
 
 type ReadFilter = "all" | "unread" | "read";
-type CategoryFilter = "all" | "schedule" | "shift_requests" | "system";
+type CategoryFilter =
+  | "all"
+  | "schedule"
+  | "shift_requests"
+  | "membership"
+  | "account"
+  | "billing"
+  | "security"
+  | "system";
 
 const CATEGORY_LABEL: Record<CategoryFilter, string> = {
   all: "All notifications",
   schedule: "Schedule",
   shift_requests: "Shift requests",
+  membership: "Membership",
+  account: "Account",
+  billing: "Billing",
+  security: "Security",
   system: "System",
 };
 
@@ -76,13 +93,65 @@ const PRIORITY_COLOR: Record<NotificationPriority, string> = {
 };
 
 function NotificationIcon({ type }: { type: NotificationType }) {
-  if (type === "schedule_published" || type === "shift_change") {
+  // schedule
+  if (
+    type === "schedule_published" ||
+    type === "shift_change" ||
+    type === "recurring_shift_updated" ||
+    type === "shift_series_updated" ||
+    type === "schedule_note_published" ||
+    type === "recurring_schedules_applied"
+  ) {
     return <Calendar size={16} />;
   }
-  if (type === "shift_request_new" || type === "shift_request_approved" || type === "shift_request_rejected") {
+  // shift requests
+  if (
+    type === "shift_request_new" ||
+    type === "shift_request_approved" ||
+    type === "shift_request_rejected"
+  ) {
     return <UserCog size={16} />;
   }
-  if (type === "impersonation_start" || type === "impersonation_end") {
+  // membership
+  if (
+    type === "invitation_received" ||
+    type === "invitation_accepted" ||
+    type === "invitation_revoked" ||
+    type === "invitation_resent" ||
+    type === "membership_removed" ||
+    type === "admin_permissions_changed"
+  ) {
+    return <Users size={16} />;
+  }
+  // account / org
+  if (
+    type === "employee_created" ||
+    type === "employee_status_changed" ||
+    type === "employee_profile_changed" ||
+    type === "org_settings_changed" ||
+    type === "org_suspended" ||
+    type === "org_unsuspended"
+  ) {
+    return <Building2 size={16} />;
+  }
+  // billing
+  if (
+    type === "billing_subscription_changed" ||
+    type === "billing_payment_failed" ||
+    type === "billing_payment_succeeded"
+  ) {
+    return <CreditCard size={16} />;
+  }
+  // security (including impersonation)
+  if (
+    type === "impersonation_start" ||
+    type === "impersonation_end" ||
+    type === "security_email_changed" ||
+    type === "security_password_changed" ||
+    type === "security_mfa_changed" ||
+    type === "security_new_device" ||
+    type === "security_session_revoked"
+  ) {
     return <Shield size={16} />;
   }
   return <Bell size={16} />;
@@ -145,6 +214,8 @@ function NotificationsInboxPage() {
 }
 
 function InboxView() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -157,7 +228,31 @@ function InboxView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [realtimeTick, setRealtimeTick] = useState(0);
   const requestSeq = useRef(0);
+  const notificationsLengthRef = useRef(0);
+
+  // Track current list length so the realtime handler can decide whether
+  // a full re-fetch would clobber the user's "Load more" history.
+  useEffect(() => {
+    notificationsLengthRef.current = notifications.length;
+  }, [notifications]);
+
+  const handleRealtimeChange = useCallback(() => {
+    // If the user is still on the first page, a full reload is safe and
+    // shows the new notification at the top. If they've loaded more pages,
+    // a full reload would discard everything past page 1 — instead just
+    // refresh facets so the unread count stays accurate.
+    if (notificationsLengthRef.current <= PAGE_SIZE) {
+      setRealtimeTick((tick) => tick + 1);
+    } else {
+      fetchNotificationFacets()
+        .then((next) => setFacets(next))
+        .catch(() => {});
+    }
+  }, []);
+
+  useNotificationsRealtime({ userId, onChange: handleRealtimeChange });
 
   // Debounce search input
   useEffect(() => {
@@ -171,7 +266,7 @@ function InboxView() {
     [filters, debouncedSearch],
   );
 
-  // Reload when filters/search change
+  // Reload when filters/search change, or when a realtime event fires
   useEffect(() => {
     let cancelled = false;
     const seq = ++requestSeq.current;
@@ -203,7 +298,7 @@ function InboxView() {
     return () => {
       cancelled = true;
     };
-  }, [query]);
+  }, [query, realtimeTick]);
 
   const refreshFacets = useCallback(() => {
     fetchNotificationFacets()
@@ -1064,20 +1159,27 @@ function NotificationRow({
           >
             {notification.title}
           </span>
-          {notification.groupCount > 1 && (
-            <span
-              title={`Part of ${notification.groupCount} related notifications`}
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
-                background: "var(--color-bg-secondary)",
-                borderRadius: 999,
-                padding: "1px 8px",
-              }}
-            >
-              ×{notification.groupCount}
-            </span>
-          )}
+          {(() => {
+            const groupCount =
+              typeof notification.metadata?.groupCount === "number"
+                ? (notification.metadata.groupCount as number)
+                : 1;
+            if (groupCount <= 1) return null;
+            return (
+              <span
+                title={`Part of ${groupCount} related notifications`}
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                  background: "var(--color-bg-secondary)",
+                  borderRadius: 999,
+                  padding: "1px 8px",
+                }}
+              >
+                ×{groupCount}
+              </span>
+            );
+          })()}
           {isUnread && (
             <span
               aria-hidden
@@ -1118,16 +1220,27 @@ function NotificationRow({
           flexShrink: 0,
         }}
       >
-        {notification.actionUrl && notification.actionLabel && (
-          <Link
-            href={notification.actionUrl}
-            className="dg-btn dg-btn-secondary"
-            onClick={onClick}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            {notification.actionLabel}
-          </Link>
-        )}
+        {(() => {
+          const actionUrl =
+            typeof notification.metadata?.actionUrl === "string"
+              ? (notification.metadata.actionUrl as string)
+              : null;
+          const actionLabel =
+            typeof notification.metadata?.actionLabel === "string"
+              ? (notification.metadata.actionLabel as string)
+              : null;
+          if (!actionUrl || !actionLabel) return null;
+          return (
+            <Link
+              href={actionUrl}
+              className="dg-btn dg-btn-secondary"
+              onClick={onClick}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {actionLabel}
+            </Link>
+          );
+        })()}
         <button
           type="button"
           aria-label={isUnread ? "Mark as read" : "Mark as unread"}

@@ -630,9 +630,25 @@ CREATE TABLE public.notifications (
   user_id     UUID NOT NULL,
   org_id      UUID,
   type        TEXT NOT NULL CHECK (type IN (
+    -- existing
     'impersonation_start', 'impersonation_end', 'system',
     'shift_change', 'schedule_published', 'shift_request_new',
-    'shift_request_approved', 'shift_request_rejected'
+    'shift_request_approved', 'shift_request_rejected',
+    -- schedule (non-publish flows)
+    'recurring_shift_updated', 'shift_series_updated',
+    'schedule_note_published', 'recurring_schedules_applied',
+    -- membership lifecycle
+    'invitation_received', 'invitation_accepted', 'invitation_revoked',
+    'invitation_resent', 'membership_removed', 'admin_permissions_changed',
+    -- employee + org account
+    'employee_created', 'employee_status_changed', 'employee_profile_changed',
+    'org_settings_changed', 'org_suspended', 'org_unsuspended',
+    -- billing
+    'billing_subscription_changed', 'billing_payment_failed',
+    'billing_payment_succeeded',
+    -- security
+    'security_email_changed', 'security_password_changed',
+    'security_mfa_changed', 'security_new_device', 'security_session_revoked'
   )),
   channel     TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
   category    TEXT,
@@ -644,6 +660,8 @@ CREATE TABLE public.notifications (
   archived_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE ONLY public.notifications REPLICA IDENTITY FULL;
 
 COMMENT ON TABLE public.notifications IS 'In-app and email notifications for users';
 
@@ -1364,3 +1382,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.indicator_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.subscriptions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_log;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.impersonation_sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;

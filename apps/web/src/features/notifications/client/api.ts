@@ -1,11 +1,38 @@
 "use client";
 
-import type { Notification } from "@/types";
+import type {
+  Notification,
+  NotificationFacets,
+  NotificationPriority,
+} from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface NotificationsResponse {
   unreadCount: number;
   notifications?: Notification[];
+}
+
+export interface NotificationCursor {
+  createdAt: string;
+  id: string;
+}
+
+export interface NotificationSearchParams {
+  limit?: number;
+  cursor?: NotificationCursor | null;
+  read?: "unread" | "read" | null;
+  category?: string | null;
+  priority?: NotificationPriority | null;
+  includeArchived?: boolean;
+  search?: string | null;
+  sort?: "asc" | "desc";
+  facets?: boolean;
+}
+
+interface SearchResponse {
+  notifications: Notification[];
+  nextCursor: NotificationCursor | null;
+  facets: NotificationFacets | null;
 }
 
 function resolveClientUrl(path: string): string {
@@ -77,4 +104,50 @@ export async function markAllNotificationsRead(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ markAll: true }),
   });
+}
+
+export async function searchNotifications(
+  params: NotificationSearchParams,
+): Promise<SearchResponse> {
+  return requestNotificationsJson<SearchResponse>("/api/notifications/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+}
+
+export async function fetchNotificationFacets(): Promise<NotificationFacets> {
+  return requestNotificationsJson<NotificationFacets>("/api/notifications/facets");
+}
+
+async function bulkNotificationAction(
+  action: "read" | "unread" | "archive" | "unarchive" | "delete",
+  ids: string[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  await requestNotificationsJson<{ success: true }>("/api/notifications/bulk", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ids }),
+  });
+}
+
+export function markNotificationsRead(ids: string[]): Promise<void> {
+  return bulkNotificationAction("read", ids);
+}
+
+export function markNotificationsUnread(ids: string[]): Promise<void> {
+  return bulkNotificationAction("unread", ids);
+}
+
+export function archiveNotifications(ids: string[]): Promise<void> {
+  return bulkNotificationAction("archive", ids);
+}
+
+export function unarchiveNotifications(ids: string[]): Promise<void> {
+  return bulkNotificationAction("unarchive", ids);
+}
+
+export function deleteNotifications(ids: string[]): Promise<void> {
+  return bulkNotificationAction("delete", ids);
 }

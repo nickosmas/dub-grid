@@ -51,6 +51,13 @@ export const queryKeys = {
     self: (userId: string, orgId: string | null) =>
       ["account", userId, orgId ?? "no-org", "self"] as const,
   },
+  notifications: {
+    all: (userId: string) => ["notifications", userId] as const,
+    unreadCount: (userId: string) => ["notifications", userId, "unreadCount"] as const,
+    recent: (userId: string) => ["notifications", userId, "recent"] as const,
+    search: (userId: string) => ["notifications", userId, "search"] as const,
+    facets: (userId: string) => ["notifications", userId, "facets"] as const,
+  },
   gridmaster: {
     all: () => ["gm"] as const,
     dashboard: () => ["gm", "dashboard"] as const,

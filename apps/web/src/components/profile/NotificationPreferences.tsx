@@ -23,18 +23,30 @@ interface AllPrefs {
 const DEFAULT_PREFS: AllPrefs = {
   schedule: { in_app: true, email: false },
   shift_requests: { in_app: true, email: false },
+  membership: { in_app: true, email: false },
+  account: { in_app: true, email: false },
+  billing: { in_app: true, email: true },
+  security: { in_app: true, email: true },
   system: { in_app: true, email: false },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
   schedule: "Schedule Changes",
   shift_requests: "Shift Requests",
+  membership: "Membership & Invitations",
+  account: "Account & Organization",
+  billing: "Billing & Payments",
+  security: "Security Alerts",
   system: "System Notifications",
 };
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  schedule: "Shift changes, published schedules",
+  schedule: "Shift changes, published schedules, recurring updates",
   shift_requests: "New, approved, or rejected shift requests",
+  membership: "Invitations, role changes, and removal from organizations",
+  account: "Employee record updates and organization settings",
+  billing: "Subscription changes, payment failures, receipts",
+  security: "Password, email, MFA, and new-device alerts",
   system: "Impersonation notices and system updates",
 };
 

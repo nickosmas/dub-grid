@@ -807,14 +807,15 @@ CREATE POLICY "gridmaster_all_notifications"
   USING (public.is_gridmaster())
   WITH CHECK (public.is_gridmaster());
 
--- Block direct INSERT/DELETE — notifications are system-generated via SECURITY DEFINER functions
+-- Block direct INSERT — notifications are system-generated via SECURITY DEFINER functions
 CREATE POLICY "notifications_insert_blocked"
   ON public.notifications FOR INSERT TO authenticated
   WITH CHECK (FALSE);
 
-CREATE POLICY "notifications_delete_blocked"
+-- Users can delete their own notifications from the inbox view
+CREATE POLICY "own_notifications_delete"
   ON public.notifications FOR DELETE TO authenticated
-  USING (FALSE);
+  USING (user_id = auth.uid());
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

@@ -4,7 +4,11 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
-import type { Notification, NotificationType } from "@/types";
+import type {
+  Notification,
+  NotificationPriority,
+  NotificationType,
+} from "@/types";
 
 const searchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -19,16 +23,18 @@ const patchSchema = z.object({
   message: "notificationId or markAll is required",
 });
 
-function mapNotificationRow(row: Record<string, unknown>): Notification {
+export function mapNotificationRow(row: Record<string, unknown>): Notification {
   return {
     id: row.id as string,
     type: row.type as NotificationType,
     channel: (row.channel as "in_app" | "email") ?? "in_app",
     category: (row.category as string | null) ?? null,
+    priority: ((row.priority as string | null) ?? "normal") as NotificationPriority,
     title: row.title as string,
     message: row.message as string,
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     readAt: (row.read_at as string | null) ?? null,
+    archivedAt: (row.archived_at as string | null) ?? null,
     createdAt: row.created_at as string,
   };
 }

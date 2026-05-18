@@ -29,10 +29,28 @@ export class MobilePushDeliveryError extends Error {
 }
 
 const PUSH_ELIGIBLE_TYPES = new Set([
+  // existing
   "schedule_published",
   "shift_request_new",
   "shift_request_approved",
   "shift_request_rejected",
+  // schedule (recurring/series — touch a user's assignments directly)
+  "recurring_shift_updated",
+  "shift_series_updated",
+  // membership — user is removed or has their role/perms changed
+  "membership_removed",
+  // employee — user's own status changes (archived/restored)
+  "employee_status_changed",
+  // org-level — critical org state
+  "org_suspended",
+  // billing — payment failures are time-sensitive
+  "billing_payment_failed",
+  // security — always push so users notice quickly
+  "security_email_changed",
+  "security_password_changed",
+  "security_mfa_changed",
+  "security_new_device",
+  "security_session_revoked",
 ]);
 
 export function isPushEligibleNotificationType(type: string): boolean {

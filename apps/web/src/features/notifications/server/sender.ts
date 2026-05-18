@@ -9,14 +9,60 @@ import { sendResendEmail } from "@/lib/resend";
 import type { NotificationType } from "@/types";
 
 const NOTIFICATION_CATEGORIES: Record<string, string> = {
+  // schedule
   shift_change: "schedule",
   schedule_published: "schedule",
+  recurring_shift_updated: "schedule",
+  shift_series_updated: "schedule",
+  schedule_note_published: "schedule",
+  recurring_schedules_applied: "schedule",
+  // shift_requests
   shift_request_new: "shift_requests",
   shift_request_approved: "shift_requests",
   shift_request_rejected: "shift_requests",
+  // membership
+  invitation_received: "membership",
+  invitation_accepted: "membership",
+  invitation_revoked: "membership",
+  invitation_resent: "membership",
+  membership_removed: "membership",
+  admin_permissions_changed: "membership",
+  // account
+  employee_created: "account",
+  employee_status_changed: "account",
+  employee_profile_changed: "account",
+  org_settings_changed: "account",
+  org_suspended: "account",
+  org_unsuspended: "account",
+  // billing
+  billing_subscription_changed: "billing",
+  billing_payment_failed: "billing",
+  billing_payment_succeeded: "billing",
+  // security
+  security_email_changed: "security",
+  security_password_changed: "security",
+  security_mfa_changed: "security",
+  security_new_device: "security",
+  security_session_revoked: "security",
+  // system
   impersonation_start: "system",
   impersonation_end: "system",
   system: "system",
+};
+
+/**
+ * Default email-channel state per category when a user has no
+ * notification_preferences row yet. In-app is always true by default.
+ * Security and billing default to email-on because they are time-sensitive.
+ */
+const DEFAULT_EMAIL_ENABLED: Record<string, boolean> = {
+  schedule: false,
+  shift_requests: false,
+  membership: false,
+  account: false,
+  billing: true,
+  security: true,
+  system: false,
 };
 
 /** Max emails per user per hour (throttle) */
@@ -83,7 +129,8 @@ export async function sendNotification(
     .maybeSingle();
 
   const userPrefs = prefs?.prefs as Record<string, { in_app?: boolean; email?: boolean }> | null;
-  const emailEnabled = userPrefs?.[category]?.email ?? false; // Default off for email
+  const emailEnabled =
+    userPrefs?.[category]?.email ?? DEFAULT_EMAIL_ENABLED[category] ?? false;
 
   if (!emailEnabled) return;
 
@@ -130,7 +177,11 @@ export async function sendNotification(
       html,
     });
 
-    // Record email notification for throttle tracking
+    // Record email notification for throttle tracking. Mark it as
+    // already-read and archived so it doesn't surface in the bell or
+    // inbox — the throttle query (per-hour count) doesn't filter by
+    // read/archive, so accounting still works.
+    const nowIso = new Date().toISOString();
     await supabase.from("notifications").insert({
       user_id: userId,
       org_id: orgId,
@@ -140,6 +191,8 @@ export async function sendNotification(
       title,
       message,
       metadata: { ...metadata, email_sent: true },
+      read_at: nowIso,
+      archived_at: nowIso,
     });
   } catch (err) {
     logger.error({ error: err, userId, type }, "Failed to send email notification");

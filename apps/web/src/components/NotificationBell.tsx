@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
   markNotificationRead,
   markAllNotificationsRead,
 } from "@/features/notifications/client";
+import { useAuth } from "@/components/AuthProvider";
+import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
+import { queryKeys } from "@/lib/query-keys";
 import type { Notification } from "@/types";
 
 function formatRelativeTime(dateStr: string): string {
@@ -21,25 +26,60 @@ function formatRelativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function NotificationIcon({ type }: { type: string }) {
-  if (type === "impersonation_start" || type === "impersonation_end") {
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    );
-  }
-  if (type === "shift_change" || type === "schedule_published") {
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-      </svg>
-    );
-  }
+function CalendarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
+function CreditCardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <line x1="2" y1="10" x2="22" y2="10" />
+    </svg>
+  );
+}
+
+function BuildingIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="9" y1="22" x2="9" y2="18" />
+      <line x1="15" y1="22" x2="15" y2="18" />
+      <line x1="8" y1="6" x2="10" y2="6" />
+      <line x1="14" y1="6" x2="16" y2="6" />
+      <line x1="8" y1="10" x2="10" y2="10" />
+      <line x1="14" y1="10" x2="16" y2="10" />
+      <line x1="8" y1="14" x2="10" y2="14" />
+      <line x1="14" y1="14" x2="16" y2="14" />
+    </svg>
+  );
+}
+
+function BellIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
@@ -49,25 +89,87 @@ function NotificationIcon({ type }: { type: string }) {
   );
 }
 
+function NotificationIcon({ type }: { type: string }) {
+  if (
+    type === "shift_change" ||
+    type === "schedule_published" ||
+    type === "recurring_shift_updated" ||
+    type === "shift_series_updated" ||
+    type === "schedule_note_published" ||
+    type === "recurring_schedules_applied"
+  ) {
+    return <CalendarIcon />;
+  }
+  if (
+    type === "shift_request_new" ||
+    type === "shift_request_approved" ||
+    type === "shift_request_rejected" ||
+    type === "invitation_received" ||
+    type === "invitation_accepted" ||
+    type === "invitation_revoked" ||
+    type === "invitation_resent" ||
+    type === "membership_removed" ||
+    type === "admin_permissions_changed"
+  ) {
+    return <UserIcon />;
+  }
+  if (
+    type === "billing_subscription_changed" ||
+    type === "billing_payment_failed" ||
+    type === "billing_payment_succeeded"
+  ) {
+    return <CreditCardIcon />;
+  }
+  if (
+    type === "employee_created" ||
+    type === "employee_status_changed" ||
+    type === "employee_profile_changed" ||
+    type === "org_settings_changed" ||
+    type === "org_suspended" ||
+    type === "org_unsuspended"
+  ) {
+    return <BuildingIcon />;
+  }
+  if (
+    type === "impersonation_start" ||
+    type === "impersonation_end" ||
+    type === "security_email_changed" ||
+    type === "security_password_changed" ||
+    type === "security_mfa_changed" ||
+    type === "security_new_device" ||
+    type === "security_session_revoked"
+  ) {
+    return <ShieldIcon />;
+  }
+  return <BellIcon />;
+}
+
 export default function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Poll unread count every 30 seconds
-  useEffect(() => {
-    let cancelled = false;
-    function poll() {
-      fetchUnreadNotificationCount()
-        .then((count) => { if (!cancelled) setUnreadCount(count); })
-        .catch(() => {});
-    }
-    poll();
-    const interval = setInterval(poll, 30000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: userId
+      ? queryKeys.notifications.unreadCount(userId)
+      : ["notifications", "anon", "unreadCount"],
+    queryFn: fetchUnreadNotificationCount,
+    enabled: !!userId,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const { data: notifications = [], isFetching: loading } = useQuery<Notification[]>({
+    queryKey: userId
+      ? queryKeys.notifications.recent(userId)
+      : ["notifications", "anon", "recent"],
+    queryFn: () => fetchNotifications({ limit: 20 }),
+    enabled: open && !!userId,
+  });
+
+  useNotificationsRealtime({ userId });
 
   // Close on outside click or Escape key
   useEffect(() => {
@@ -78,7 +180,6 @@ export default function NotificationBell() {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setOpen(false);
-        // Return focus to bell button
         const btn = ref.current?.querySelector("button");
         btn?.focus();
       }
@@ -91,32 +192,21 @@ export default function NotificationBell() {
     };
   }, [open]);
 
-  // Load notifications when dropdown opens
-  const loadNotifications = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchNotifications({ limit: 20 });
-      setNotifications(data);
-    } catch {
-      // Silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   function handleToggle() {
-    const next = !open;
-    setOpen(next);
-    if (next) loadNotifications();
+    setOpen((prev) => !prev);
   }
+
+  const invalidateAll = useCallback(() => {
+    if (!userId) return;
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.notifications.all(userId),
+    });
+  }, [queryClient, userId]);
 
   async function handleMarkRead(id: string) {
     try {
       await markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => n.id === id ? { ...n, readAt: new Date().toISOString() } : n)
-      );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      invalidateAll();
     } catch {
       // Silently fail
     }
@@ -125,8 +215,7 @@ export default function NotificationBell() {
   async function handleMarkAllRead() {
     try {
       await markAllNotificationsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
-      setUnreadCount(0);
+      invalidateAll();
     } catch {
       // Silently fail
     }
@@ -253,7 +342,7 @@ export default function NotificationBell() {
           </div>
 
           {/* List */}
-          <div style={{ flex: 1, overflowY: "auto" }}>
+          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
             {loading ? (
               <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
                 Loading...
@@ -320,6 +409,27 @@ export default function NotificationBell() {
               })
             )}
           </div>
+
+          {/* Footer: view all */}
+          <Link
+            href="/notifications"
+            onClick={() => setOpen(false)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "10px 16px",
+              borderTop: "1px solid var(--color-border-light)",
+              background: "var(--color-surface)",
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 600,
+              color: "var(--color-link)",
+              textDecoration: "none",
+              fontFamily: "inherit",
+            }}
+          >
+            View all notifications
+          </Link>
         </div>
       )}
     </div>

@@ -2560,24 +2560,28 @@ CREATE OR REPLACE FUNCTION public.get_notifications(
   p_offset INTEGER DEFAULT 0
 )
 RETURNS TABLE (
-  id         UUID,
-  type       TEXT,
-  channel    TEXT,
-  category   TEXT,
-  title      TEXT,
-  message    TEXT,
-  metadata   JSONB,
-  read_at    TIMESTAMPTZ,
-  created_at TIMESTAMPTZ
+  id          UUID,
+  type        TEXT,
+  channel     TEXT,
+  category    TEXT,
+  priority    TEXT,
+  title       TEXT,
+  message     TEXT,
+  metadata    JSONB,
+  read_at     TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT n.id, n.type, n.channel, n.category, n.title, n.message, n.metadata, n.read_at, n.created_at
+  SELECT n.id, n.type, n.channel, n.category, n.priority, n.title, n.message, n.metadata, n.read_at, n.archived_at, n.created_at
   FROM notifications n
   WHERE n.user_id = auth.uid()
+    AND n.archived_at IS NULL
+    AND n.channel = 'in_app'
     AND (n.org_id = public.caller_org_id() OR n.org_id IS NULL)
   ORDER BY n.created_at DESC
   LIMIT p_limit OFFSET p_offset;
@@ -2595,6 +2599,8 @@ AS $$
   SELECT COUNT(*)::INTEGER FROM notifications
   WHERE user_id = auth.uid()
     AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
     AND (org_id = public.caller_org_id() OR org_id IS NULL);
 $$;
 
@@ -2624,11 +2630,55 @@ BEGIN
   UPDATE notifications SET read_at = now()
   WHERE user_id = auth.uid()
     AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
     AND (org_id = public.caller_org_id() OR org_id IS NULL);
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.mark_all_notifications_read() TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.get_notification_facets()
+RETURNS JSONB
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT jsonb_build_object(
+    'totalUnread', (
+      SELECT COUNT(*)::INTEGER FROM notifications
+      WHERE user_id = auth.uid() AND read_at IS NULL AND archived_at IS NULL
+        AND channel = 'in_app'
+    ),
+    'totalArchived', (
+      SELECT COUNT(*)::INTEGER FROM notifications
+      WHERE user_id = auth.uid() AND archived_at IS NOT NULL
+        AND channel = 'in_app'
+    ),
+    'byCategory', COALESCE((
+      SELECT jsonb_object_agg(COALESCE(category, 'uncategorized'), c)
+      FROM (
+        SELECT category, COUNT(*)::INTEGER AS c
+        FROM notifications
+        WHERE user_id = auth.uid() AND archived_at IS NULL
+          AND channel = 'in_app'
+        GROUP BY category
+      ) t
+    ), '{}'::jsonb),
+    'byPriority', COALESCE((
+      SELECT jsonb_object_agg(priority, c)
+      FROM (
+        SELECT priority, COUNT(*)::INTEGER AS c
+        FROM notifications
+        WHERE user_id = auth.uid() AND archived_at IS NULL
+          AND channel = 'in_app'
+        GROUP BY priority
+      ) t
+    ), '{}'::jsonb)
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_notification_facets() TO authenticated;
 
 
 -- ── force_logout_user ─────────────────────────────────────────────────────────
@@ -7525,6 +7575,9 @@ GRANT EXECUTE ON FUNCTION public.delete_schedule_cell_draft(UUID, UUID, DATE, BI
 
 -- Lets any authenticated user mark their own onboarding as completed.
 -- SECURITY DEFINER so it bypasses RLS (users can't UPDATE memberships directly).
+-- Idempotent: if onboarding is already complete (or the user has no row), the
+-- call is a no-op rather than an error, so a stale Skip click never blocks the
+-- user from leaving the wizard.
 CREATE OR REPLACE FUNCTION public.complete_onboarding(p_org_id UUID)
 RETURNS void
 LANGUAGE plpgsql
@@ -7537,10 +7590,6 @@ BEGIN
   WHERE user_id = auth.uid()
     AND org_id = p_org_id
     AND onboarding_completed_at IS NULL;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'No pending onboarding found for this user/org';
-  END IF;
 END;
 $$;
 
