@@ -8,6 +8,7 @@ import {
 } from "@/features/organization/client/api";
 import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { refreshBrowserSession } from "@/features/account/client/auth";
 
 export default function SandboxBanner() {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
@@ -42,6 +43,8 @@ export default function SandboxBanner() {
         setPending(false);
         return;
       }
+      // Flush the stale JWT so the next page load sees the source-org claims.
+      await refreshBrowserSession();
       window.location.assign("/schedule");
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");

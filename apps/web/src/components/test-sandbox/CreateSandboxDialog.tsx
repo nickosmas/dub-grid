@@ -3,6 +3,7 @@
 import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { refreshBrowserSession } from "@/features/account/client/auth";
 
 interface CreateSandboxDialogProps {
   orgName?: string;
@@ -36,6 +37,8 @@ export default function CreateSandboxDialog({
         setIsLoading(false);
         return;
       }
+      // Flush the stale JWT so the next page load sees the sandbox org claims.
+      await refreshBrowserSession();
       window.location.assign("/schedule");
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");
