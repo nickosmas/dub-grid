@@ -9,7 +9,9 @@ import type {
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import {
   requireOrgPermissions,
+  resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/error-handling";
 import {
   fetchAssignmentIdByPairMap,
@@ -469,6 +471,23 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+
+  // Redirect body.orgId to the sandbox if the caller is in sandbox
+  // mode, so every downstream `.eq("org_id", data.orgId)` targets the
+  // sandbox rather than the unrefreshed-JWT-derived real org.
+  {
+    const auth = await requireAuthenticatedUser(req);
+    if (!("response" in auth)) {
+      const effective = await resolveEffectiveOrgId(
+        req,
+        auth.user.id,
+        data.orgId,
+      );
+      if (effective !== data.orgId) {
+        (data as { orgId: string }).orgId = effective;
+      }
+    }
+  }
 
   try {
     switch (data.action) {

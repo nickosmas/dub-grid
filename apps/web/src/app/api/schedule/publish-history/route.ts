@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, published_by, start_date, end_date, change_count, changes, published_at",
       )
-      .eq("org_id", parsed.data.orgId)
+      .eq("org_id", auth.orgId)
       .order("published_at", { ascending: false })
       .range(offset, offset + limit - 1);
     if (error) {

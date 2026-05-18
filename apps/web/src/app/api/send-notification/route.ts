@@ -3,6 +3,7 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import {
   dispatchNotificationEvent,
   type NotificationEvent,
@@ -93,6 +94,14 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+
+  // Sandbox redirect — must run BEFORE the org-isolation check below,
+  // because claims.org_id is the sandbox in sandbox mode while data.orgId
+  // is the unrefreshed-JWT-derived real org id from the client.
+  const effective = await resolveEffectiveOrgId(req, user.id, data.orgId);
+  if (effective !== data.orgId) {
+    (data as { orgId: string }).orgId = effective;
+  }
 
   // ── Org isolation: verify the caller's JWT org_id matches the body orgId ──
   const claimOrgId = typeof claims.org_id === "string" ? claims.org_id : null;

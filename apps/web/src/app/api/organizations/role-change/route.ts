@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
 
@@ -36,13 +37,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
 
+    // Redirect to sandbox if the caller is in sandbox mode, so role
+    // changes inside a sandbox don't leak to the real workspace's
+    // memberships.
+    const effectiveOrgId = parsed.data.orgId
+      ? await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId)
+      : null;
+
     const supabase = createRequestSupabaseClient(req);
     const result = await supabase.rpc("change_user_role", {
       p_target_user_id: parsed.data.targetUserId,
       p_new_role: parsed.data.newRole,
       p_changed_by_id: auth.user.id,
       p_idempotency_key: parsed.data.idempotencyKey,
-      p_org_id: parsed.data.orgId ?? null,
+      p_org_id: effectiveOrgId,
     });
 
     if (result.error) {

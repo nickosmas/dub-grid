@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { DbRecurringShift } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import {
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { rowToRecurringShift } from "@/lib/db/mappers";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
@@ -84,6 +88,21 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+
+  // Sandbox redirect.
+  {
+    const auth = await requireAuthenticatedUser(req);
+    if (!("response" in auth)) {
+      const effective = await resolveEffectiveOrgId(
+        req,
+        auth.user.id,
+        data.orgId,
+      );
+      if (effective !== data.orgId) {
+        (data as { orgId: string }).orgId = effective;
+      }
+    }
+  }
 
   try {
     switch (data.action) {

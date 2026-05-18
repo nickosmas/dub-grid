@@ -3,7 +3,11 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbShiftRequest } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import {
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
@@ -211,6 +215,22 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+
+  // Sandbox redirect: route body.orgId to the user's sandbox when in
+  // sandbox mode, so all downstream queries scope to the right org.
+  {
+    const auth = await requireAuthenticatedUser(req);
+    if (!("response" in auth)) {
+      const effective = await resolveEffectiveOrgId(
+        req,
+        auth.user.id,
+        data.orgId,
+      );
+      if (effective !== data.orgId) {
+        (data as { orgId: string }).orgId = effective;
+      }
+    }
+  }
 
   try {
     switch (data.action) {

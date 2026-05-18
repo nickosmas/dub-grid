@@ -8,7 +8,11 @@ import type {
 } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { Employee } from "@/types";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import {
+  requireOrgPermissions,
+  resolveEffectiveOrgId,
+} from "@/app/api/shared/permissions";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import {
@@ -197,6 +201,25 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
+
+  // Redirect body.orgId to the sandbox if the caller is in sandbox
+  // mode. Without this, the per-case auth checks below validate against
+  // the sandbox while the downstream queries (`.eq("org_id", data.orgId)`,
+  // `employeeToRow(..., data.orgId)`, etc.) target the real workspace —
+  // the same data-leak class fixed in /api/settings/config.
+  {
+    const auth = await requireAuthenticatedUser(req);
+    if (!("response" in auth)) {
+      const effective = await resolveEffectiveOrgId(
+        req,
+        auth.user.id,
+        data.orgId,
+      );
+      if (effective !== data.orgId) {
+        (data as { orgId: string }).orgId = effective;
+      }
+    }
+  }
 
   try {
     switch (data.action) {

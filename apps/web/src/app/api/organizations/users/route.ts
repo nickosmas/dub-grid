@@ -95,7 +95,9 @@ export async function GET(req: NextRequest) {
       return orgAuth.response;
     }
 
-    const users = await fetchOrganizationUserRows(parsed.data.orgId);
+    // Use the auth-effective orgId so sandbox callers see their
+    // sandbox's users, not the real workspace's users.
+    const users = await fetchOrganizationUserRows(orgAuth.orgId);
     return NextResponse.json({ users });
   } catch (error) {
     console.error("organization users GET failed", error);

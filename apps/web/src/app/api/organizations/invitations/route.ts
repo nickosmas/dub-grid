@@ -9,6 +9,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -159,15 +160,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
+  // Sandbox: redirect the read to the sandbox org so sandbox callers
+  // don't see the real workspace's pending invitations.
+  const effectiveOrgId = await resolveEffectiveOrgId(
+    req,
+    auth.user.id,
+    parsed.data.orgId,
+  );
+
   try {
-    const allowed = await requirePrivilegedActor(req, parsed.data.orgId);
+    const allowed = await requirePrivilegedActor(req, effectiveOrgId);
     if (!allowed.ok) return allowed.response;
 
     const serviceClient = getServiceClient();
     const { data, error } = await serviceClient
       .from("invitations")
       .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
-      .eq("org_id", parsed.data.orgId)
+      .eq("org_id", effectiveOrgId)
       .order("created_at", { ascending: false });
     if (error) throw error;
 
@@ -176,9 +185,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     Sentry.captureException(err, {
-      extra: { context: "organizations/invitations:get", orgId: parsed.data.orgId },
+      extra: { context: "organizations/invitations:get", orgId: effectiveOrgId },
     });
-    logger.error({ error: err, orgId: parsed.data.orgId }, "Invitation fetch failed");
+    logger.error({ error: err, orgId: effectiveOrgId }, "Invitation fetch failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

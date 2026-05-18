@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await auth.serviceClient
       .from("publish_history")
       .select("start_date, end_date")
-      .eq("org_id", parsed.data.orgId)
+      .eq("org_id", auth.orgId)
       .lte("start_date", parsed.data.rangeEnd)
       .gte("end_date", parsed.data.rangeStart);
     if (error) {

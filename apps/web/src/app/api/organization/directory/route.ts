@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
 
     const serviceClient = orgAuth.serviceClient;
     const { data, error } = await serviceClient.rpc("get_org_directory", {
-      p_org_id: parsed.data.orgId,
+      // Use the auth-effective orgId — when the caller is in sandbox
+      // mode, this is the sandbox id, not the body's real-org id.
+      p_org_id: orgAuth.orgId,
     });
     if (error) throw error;
 

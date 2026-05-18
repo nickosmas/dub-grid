@@ -219,6 +219,50 @@ async function isOrganizationSetupComplete(
   );
 }
 
+/**
+ * Standalone version of the sandbox-redirect logic that
+ * requireOrgPermissions does internally. Use this in endpoints that
+ * take orgId from the request body and need to ensure all downstream
+ * reads/writes target the user's sandbox (not the body's orgId).
+ *
+ * Returns the effective org id — the sandbox id if the caller has a
+ * valid active sandbox cookie and isn't a gridmaster, otherwise the
+ * requestedOrgId unchanged.
+ *
+ * Mutates nothing. Caller is responsible for using the returned id.
+ */
+export async function resolveEffectiveOrgId(
+  req: NextRequest,
+  userId: string,
+  requestedOrgId: string,
+): Promise<string> {
+  const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  if (!sandboxCookieValue) return requestedOrgId;
+  const sb = getSandboxFromCookie(
+    `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,
+  );
+  if (!sb || sb.userId !== userId || sb.sandboxOrgId === requestedOrgId) {
+    return requestedOrgId;
+  }
+  const svc = getServiceClient();
+  const { data: ownedSandbox } = await svc
+    .from("organizations")
+    .select("id")
+    .eq("id", sb.sandboxOrgId)
+    .eq("workspace_kind", "sandbox")
+    .eq("sandbox_owner_user_id", userId)
+    .is("archived_at", null)
+    .maybeSingle();
+  if (!ownedSandbox) return requestedOrgId;
+  const { data: profile } = await svc
+    .from("profiles")
+    .select("platform_role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profile?.platform_role === "gridmaster") return requestedOrgId;
+  return ownedSandbox.id as string;
+}
+
 export async function requireOrgPermissions(
   req: NextRequest,
   orgId: string,

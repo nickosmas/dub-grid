@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const { count, error } = await serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
-      .eq("org_id", parsed.data.orgId)
+      .eq("org_id", orgAuth.orgId)
       .is("archived_at", null);
 
     if (error) throw error;
