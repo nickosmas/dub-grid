@@ -33,9 +33,10 @@ sequenceDiagram
     SupaAuth->>JWTHook: event { user_id, claims }
     JWTHook->>DB: Check jwt_refresh_locks for active lock
     alt Lock exists (role change in progress)
-        JWTHook-->>SupaAuth: HTTP 403 — "Your session has expired. Please sign in again."
-        SupaAuth-->>LoginPage: Error: session expired
-        LoginPage-->>User: "Your session has expired. Please sign in again."
+        Note over JWTHook: Hook does NOT return HTTP 403 — it issues a<br/>minimal/stripped JWT (no platform_role/org_role/<br/>org_id claims) so the stale role can't be used.
+        JWTHook-->>SupaAuth: Stripped JWT payload (claims omitted)
+        SupaAuth-->>LoginPage: Session with minimal claims
+        LoginPage->>LoginPage: Missing claims → treat as stale,<br/>refreshSession() once lock expires
     else No lock
         JWTHook->>DB: SELECT platform_role, org_role, org_id, org_slug<br/>FROM profiles JOIN organization_memberships JOIN organizations
         DB-->>JWTHook: { platform_role, org_role, org_id, org_slug }
@@ -104,33 +105,35 @@ flowchart TB
     SA -->|"configures permissions for"| AD
     AD -.->|"elevated from"| US
 
-    subgraph PermMatrix["Admin Permission Matrix (JSONB)"]
+    subgraph PermMatrix["Admin Permission Matrix — 25 permissions (JSONB)"]
         direction LR
-        subgraph Schedule["Schedule"]
-            P1["canEditShifts"]
-            P2["canPublishSchedule"]
-            P3["canApplyRecurringSchedule"]
+        subgraph Schedule["Schedule (4)"]
+            P1["canViewSchedule ✓ always<br/>canEditShifts<br/>canPublishSchedule<br/>canApplyRecurringSchedule"]
         end
-        subgraph Staff["Staff"]
-            P4["canViewStaff ✓ always"]
-            P5["canManageEmployees"]
+        subgraph Indicators["Notes & Indicators (3)"]
+            P2["canEditNotes<br/>canEditScheduleIndicators<br/>canManageIndicatorTypes<br/>(+ canViewIndicatorTypes)"]
         end
-        subgraph Config["Configuration"]
-            P6["canManageFocusAreas"]
-            P7["canManageScheduleDefinitions"]
-            P8["canManageIndicatorTypes"]
-            P9["canManageOrgLabels"]
+        subgraph Recurring["Recurring (3)"]
+            P3["canViewRecurringShifts<br/>canManageRecurringShifts<br/>canManageShiftSeries"]
         end
-        subgraph Other["Other"]
-            P10["canEditNotes"]
-            P11["canManageRecurringShifts"]
-            P12["canManageShiftSeries"]
-            P13["canManageCoverageRequirements"]
-            P14["canApproveShiftRequests"]
+        subgraph Staff["Staff (3)"]
+            P4["canViewStaff ✓ always<br/>canViewEmployeeDetails<br/>canManageEmployees"]
+        end
+        subgraph Config["Configuration (8)"]
+            P5["canViewFocusAreas / canManageFocusAreas<br/>canViewScheduleDefinitions / canManageScheduleDefinitions<br/>canViewOrgLabels / canManageOrgLabels<br/>canManageOrgSettings (SA-only)"]
+        end
+        subgraph Coverage["Coverage & Requests (3)"]
+            P6["canViewCoverageRequirements<br/>canManageCoverageRequirements<br/>canApproveShiftRequests"]
+        end
+        subgraph Dashboard["Dashboard (1)"]
+            P7["canViewDashboardAnalytics"]
         end
     end
 
     AD -->|"permissions stored in<br/>organization_memberships.admin_permissions"| PermMatrix
+
+    Note1["25 total perms. canManage* implies canView* (view<br/>implications applied by @dubgrid/authz). canViewSchedule +<br/>canViewStaff always true. Never delegable (super_admin only):<br/>canManageUsers, canConfigureAdminPermissions, canManageOrgSettings.<br/>Management departments define templates; members inherit via union."]
+    PermMatrix -.-> Note1
 
     style GM fill:#dc2626,color:#fff
     style SA fill:#ea580c,color:#fff
@@ -148,7 +151,7 @@ flowchart TB
 flowchart TD
     REQ["Browser Request<br/><i>GET calmhaven.localhost/schedule</i>"]
 
-    subgraph MW["Edge Middleware (middleware.ts)"]
+    subgraph MW["Edge Middleware (apps/web/middleware.ts)"]
         direction TB
         PUB{"Public route?<br/>/login, /api, /,<br/>/accept-invite"}
         SESS["Extract session<br/>from sb-*-auth-token cookies<br/>(multi-chunk reconstruction)"]
@@ -201,7 +204,7 @@ flowchart TD
     EFFROLE --> SUBDOMAIN
     SUBDOMAIN -->|No| REDIR2["Redirect → correct subdomain"]
     SUBDOMAIN -->|Yes| ROUTEGUARD
-    ROUTEGUARD -->|"/staff, /settings<br/>but role < admin"| REDIR3["Redirect → /schedule"]
+    ROUTEGUARD -->|"/people, /settings<br/>but role < admin"| REDIR3["Redirect → /schedule"]
     ROUTEGUARD -->|"/gridmaster<br/>but not gridmaster"| REDIR4["Redirect → /schedule"]
     ROUTEGUARD -->|Allowed| HEADERS
 
@@ -259,7 +262,16 @@ erDiagram
         text certification_label "custom terminology"
         text role_label "custom terminology"
         text timezone
-        timestamptz archived_at "soft delete"
+        timestamptz suspended_at "soft delete / suspension"
+        jsonb feature_overrides "per-org feature flags"
+        text stripe_customer_id "billing"
+        text stripe_subscription_id "billing"
+        text subscription_status "billing state"
+        text workspace_kind "production | sandbox (default production)"
+        uuid sandbox_source_org_id FK "→ organizations (nullable)"
+        uuid sandbox_owner_user_id FK "→ auth.users (nullable)"
+        timestamptz sandbox_expires_at "30-day TTL"
+        text sandbox_template_version
     }
 
     profiles {
@@ -275,7 +287,22 @@ erDiagram
         uuid user_id FK "→ auth.users"
         uuid org_id FK "→ organizations"
         org_role org_role "super_admin | admin | user"
-        jsonb admin_permissions "fine-grained perms"
+        jsonb admin_permissions "fine-grained perms (25)"
+        bigint_arr department_ids "→ departments[]"
+        timestamptz landing_card_dismissed_at "PersonaLandingCard dismissed"
+        jsonb onboarding_step_telemetry "default {}"
+        timestamptz archived_at "soft removal"
+    }
+
+    departments {
+        bigint id PK
+        uuid org_id FK "→ organizations"
+        text type "scheduled | management"
+        text name
+        text abbr
+        bigint parent_department_id FK "→ departments (nullable)"
+        jsonb permissions "management depts: perm template"
+        integer sort_order
     }
 
     employees {
@@ -296,6 +323,7 @@ erDiagram
     focus_areas {
         bigint id PK
         uuid org_id FK "→ organizations"
+        bigint department_id FK "→ departments (scheduled parent)"
         text name
         text color_bg
         text color_text
@@ -518,8 +546,10 @@ erDiagram
 
     organizations ||--o{ organization_memberships : "has members"
     organizations ||--o{ employees : "employs"
+    organizations ||--o{ departments : "has departments"
     organizations ||--o{ focus_areas : "has areas"
     organizations ||--o{ certifications : "has certs"
+    organizations }o--o| organizations : "sandbox source org"
     organizations ||--o{ organization_roles : "has roles"
     organizations ||--o{ shift_categories : "has categories"
     organizations ||--o{ absence_types : "has absence types"
@@ -533,6 +563,10 @@ erDiagram
     organizations ||--o| impersonation_sessions : "target org"
 
     profiles }o--o| organizations : "primary org"
+
+    departments ||--o{ departments : "management → scheduled (parent/child)"
+    departments ||--o{ focus_areas : "scheduled dept → focus areas (children)"
+    departments }o--o{ organization_memberships : "membership department_ids[]"
 
     employees ||--o{ schedule_cells : "assigned schedule cells"
     employees ||--o{ recurring_shifts : "recurring patterns"
@@ -583,7 +617,7 @@ flowchart TD
     subgraph DataScope["Data Scoping"]
         direction TB
         RLS["RLS policies enforce:<br/><code>org_id = caller_org_id()</code>"]
-        TABLES["All org-scoped tables:<br/>employees, shifts, focus_areas,<br/>certifications, schedule_notes,<br/>schedule_cells, etc."]
+        TABLES["All org-scoped tables:<br/>employees, departments, focus_areas,<br/>certifications, schedule_notes,<br/>schedule_cells, etc."]
         ZERO["Zero cross-tenant<br/>data leakage"]
     end
 
@@ -663,10 +697,11 @@ sequenceDiagram
     Hook->>Lock: SELECT * FROM jwt_refresh_locks<br/>WHERE user_id = target AND locked_until > NOW()
 
     alt Lock is active (within 5s window)
-        Hook->>Lock: DELETE expired locks (cleanup)
-        Hook-->>Target: HTTP 403 — "Your session has expired. Please sign in again."
-        Target->>Target: Auth error → redirect to /login
-        Target->>Hook: User re-authenticates (signInWithPassword)
+        Note over Hook: Hook does NOT return HTTP 403. It issues a<br/>minimal/stripped JWT — platform_role / org_role /<br/>org_id / org_slug claims are omitted so the stale<br/>role cannot be acted on.
+        Hook-->>Target: Stripped JWT (no role/org claims)
+        Target->>Target: Missing claims detected →<br/>back off, retry refresh after lock window
+        Target->>Hook: refreshSession() once locked_until passes
+        Hook->>Lock: DELETE expired lock
         Hook->>DB: Resolve fresh claims (new role = admin)
         Hook-->>Target: New JWT with org_role = 'admin'
     else Lock expired (after 5s)
@@ -675,7 +710,7 @@ sequenceDiagram
         Hook-->>Target: New JWT with org_role = 'admin'
     end
 
-    Note over Admin,Target: User now operates with new role
+    Note over Admin,Target: User now operates with new role.<br/>change_user_role() also hard-blocks self-role-change (P0001).
 ```
 
 ---
@@ -779,46 +814,231 @@ sequenceDiagram
 
 ---
 
-## 9. Organization Setup & Onboarding Flow
+## 9. Onboarding Flow (Role-Aware Composite Wizard)
+
+> The old standalone 8-step wizard and the `/setup` route are **deleted**. Onboarding
+> now renders inline via `OnboardingGate`, which wraps the authenticated app and
+> hands off to a role-aware `OnboardingWizard`. Components live in
+> `apps/web/src/components/onboarding/`.
 
 ```mermaid
 flowchart TD
     INVITE["Super Admin sends invitation<br/>(employee_id + email + role)"]
     EMAIL["Invitation email sent<br/>via /api/send-invite-email"]
     ACCEPT["User clicks link →<br/>/accept-invite?token=uuid"]
-    VALIDATE{"Token valid?<br/>Not expired?<br/>Not accepted?"}
+    VALIDATE{"Token valid?<br/>Not expired? Not accepted?"}
     CREATE["Create Supabase auth user<br/>Set employees.user_id<br/>Create organization_membership"]
     VERIFY["Redirect → /verify-email<br/>Wait for email confirmation"]
-    ONBOARD["Redirect → /onboarding<br/>Poll for org assignment<br/>(every 15s, max 5 min)"]
 
-    subgraph SetupGuard["SetupGuard Component"]
-        SETUP_CHECK{"Org setup<br/>complete?"}
-        SETUP["Redirect → /setup<br/>Admin setup wizard"]
-        CHECKLIST["Setup checklist:<br/>✓ Add employees<br/>✓ Configure focus areas<br/>✓ Set up shifts & jobs<br/>✓ Publish schedule"]
-        COMPLETE{"All steps done +<br/>≥1 employee?"}
+    subgraph Gate["OnboardingGate (client gate wrapping the app)"]
+        direction TB
+        BILLING{"Billing lock<br/>active?"}
+        BILLLOCK["Render billing-required gate<br/>(see §11 Stripe flow)"]
+        ONBSTATUS{"Onboarding<br/>complete?<br/>(complete_onboarding, idempotent)"}
+        ORGSETUP{"Org configured?"}
+        PENDING["Non-admin on unconfigured org →<br/>SetupPendingScreen<br/>'Your workspace is being set up'"]
     end
 
-    DASHBOARD["Redirect → /dashboard<br/>Fully operational"]
+    subgraph Wizard["OnboardingWizard — role-aware step lists"]
+        direction TB
+        SHELL["WizardShell — full-screen overlay chrome<br/>(brand gradient, logo, StepperBar)"]
+        SASETUP["super_admin + unconfigured org → SETUP:<br/>welcome → identity → structure →<br/>schedule → invite-team → completion"]
+        SAORIENT["super_admin + configured org → ORIENTATION:<br/>welcome → sa-orientation → completion"]
+        ADMIN["admin →<br/>welcome → orientation → completion"]
+        USER["user →<br/>welcome → completion"]
+        STATE["useOnboardingState — step state machine,<br/>persists step to localStorage;<br/>completeOnboarding() seeds React Query cache"]
+    end
 
-    INVITE --> EMAIL
-    EMAIL --> ACCEPT
-    ACCEPT --> VALIDATE
+    subgraph SetupSteps["Composite SETUP steps (CompositeSection cards)"]
+        direction TB
+        S_IDENTITY["IdentityStep<br/>OrganizationGeneral + OrganizationLabels"]
+        S_STRUCTURE["StructureStep<br/>DepartmentsSettings + roles + certifications<br/>(requires ≥1 department)"]
+        S_SCHEDULE["ScheduleStep<br/>display-mode + ShiftCategories + Jobs<br/>(requires ≥1 category + ≥1 job)"]
+        S_INVITE["InviteTeamStep → points to /people"]
+    end
+
+    DASHBOARD["/dashboard — fully operational<br/>PersonaLandingCard 'Next steps' card<br/>(dismiss persists to<br/>organization_memberships.landing_card_dismissed_at)"]
+
+    INVITE --> EMAIL --> ACCEPT --> VALIDATE
     VALIDATE -->|No| REJECT["Error: Invalid/expired invite"]
-    VALIDATE -->|Yes| CREATE
-    CREATE --> VERIFY
-    VERIFY --> ONBOARD
-    ONBOARD --> SETUP_CHECK
-    SETUP_CHECK -->|"No (admin)"| SETUP
-    SETUP --> CHECKLIST
-    CHECKLIST --> COMPLETE
-    COMPLETE -->|No| CHECKLIST
-    COMPLETE -->|Yes| DASHBOARD
-    SETUP_CHECK -->|Yes| DASHBOARD
-    SETUP_CHECK -->|"No (user)"| WAIT["Show waiting message:<br/>'Your organization is<br/>being set up'"]
+    VALIDATE -->|Yes| CREATE --> VERIFY --> BILLING
+
+    BILLING -->|Yes| BILLLOCK
+    BILLING -->|No| ONBSTATUS
+    ONBSTATUS -->|Yes| ORGSETUP
+    ONBSTATUS -->|No| SHELL
+    ORGSETUP -->|"No + non-admin"| PENDING
+    ORGSETUP -->|Yes| DASHBOARD
+
+    SHELL --> SASETUP
+    SHELL --> SAORIENT
+    SHELL --> ADMIN
+    SHELL --> USER
+    SHELL --- STATE
+
+    SASETUP --> S_IDENTITY --> S_STRUCTURE --> S_SCHEDULE --> S_INVITE
+    S_INVITE --> DASHBOARD
+    SAORIENT --> DASHBOARD
+    ADMIN --> DASHBOARD
+    USER --> DASHBOARD
+
+    NOTE_TEL["Telemetry: apps/web/src/lib/onboarding-telemetry.ts →<br/>PostHog onboarding_started / step_completed / step_skipped /<br/>completed / abandoned, persona_landing_dismissed.<br/>Step telemetry also stored in<br/>organization_memberships.onboarding_step_telemetry."]
+    STATE -.-> NOTE_TEL
 
     style REJECT fill:#fee2e2,stroke:#dc2626
     style DASHBOARD fill:#bbf7d0,stroke:#16a34a
-    style SetupGuard fill:#f0fdf4,stroke:#16a34a
+    style Gate fill:#f0fdf4,stroke:#16a34a
+    style Wizard fill:#dbeafe,stroke:#2563eb
+    style SetupSteps fill:#fef3c7,stroke:#d97706
+    style BILLLOCK fill:#fee2e2,stroke:#dc2626
+```
+
+---
+
+## 10. Monorepo Layout & Package Graph
+
+> npm workspaces (`apps/*`, `packages/*`) orchestrated by **Turborepo**. Node 22.13,
+> npm 10.9.2. Two apps, nine private `0.1.0` ESM packages (built via `tsc` to `dist/`).
+
+```mermaid
+flowchart TD
+    subgraph Apps["apps/"]
+        WEB["@dubgrid/web<br/>Next.js 16 App Router<br/>React 19, Tailwind v4"]
+        MOBILE["@dubgrid/mobile<br/>Expo SDK 54 / React Native<br/>Expo Router"]
+    end
+
+    subgraph Packages["packages/"]
+        DOMAIN["@dubgrid/domain<br/>Platform-neutral types/enums<br/>+ pure logic, self-guard"]
+        CONTRACTS["@dubgrid/contracts<br/>Zod schemas + inferred types<br/>(./mobile subpath)"]
+        DBTYPES["@dubgrid/db-types<br/>DB-row TS types"]
+        AUTHZ["@dubgrid/authz<br/>Permission logic<br/>(ROLE_LEVEL, unionPermissions,<br/>buildPerms, extractJwtClaims)"]
+        SCHEDCORE["@dubgrid/schedule-core<br/>Schedule transform/calc"]
+        DATAACCESS["@dubgrid/data-access<br/>Supabase query + mapping<br/>(shared mobile data layer)"]
+        MOBAPICORE["@dubgrid/mobile-api-core<br/>Framework-neutral mobile<br/>backend orchestration"]
+        APICLIENT["@dubgrid/api-client<br/>Platform-neutral HTTP<br/>client primitives"]
+        TOKENS["@dubgrid/design-tokens<br/>Design values"]
+    end
+
+    WEB --> AUTHZ
+    WEB --> CONTRACTS
+    WEB --> DATAACCESS
+    WEB --> DBTYPES
+    WEB --> TOKENS
+    WEB --> DOMAIN
+    WEB --> MOBAPICORE
+
+    MOBILE --> APICLIENT
+    MOBILE --> CONTRACTS
+    MOBILE --> TOKENS
+    MOBILE --> SCHEDCORE
+
+    CONTRACTS --> DOMAIN_Z["zod"]
+    DBTYPES --> CONTRACTS
+    DBTYPES --> DOMAIN
+    AUTHZ --> DOMAIN
+    SCHEDCORE --> CONTRACTS
+    DATAACCESS --> CONTRACTS
+    DATAACCESS --> DBTYPES
+    DATAACCESS --> DOMAIN
+    MOBAPICORE --> AUTHZ
+    MOBAPICORE --> CONTRACTS
+    MOBAPICORE --> DOMAIN
+    MOBAPICORE --> SCHEDCORE
+
+    style Apps fill:#dbeafe,stroke:#2563eb
+    style Packages fill:#f5f3ff,stroke:#7c3aed
+    style WEB fill:#bfdbfe,stroke:#2563eb
+    style MOBILE fill:#bfdbfe,stroke:#2563eb
+```
+
+---
+
+## 11. Mobile App ↔ `/api/mobile/v1` Data Flow
+
+> `apps/mobile` never touches Supabase data tables directly. All traffic goes through
+> the web app's versioned mobile Route Handlers, which delegate to
+> `@dubgrid/mobile-api-core`.
+
+```mermaid
+flowchart LR
+    subgraph Mobile["apps/mobile (Expo / React Native)"]
+        SCREEN["Feature screen<br/>(auth, schedule, people,<br/>profile, shift-requests, notifications)"]
+        APILIB["src/shared/lib/api.ts<br/>bearer auth, 15s timeout,<br/>onAuthFailure hook"]
+        CLIENT["@dubgrid/api-client<br/>createHeaders, appendQueryParams,<br/>createJsonApiRequest, ApiResponseError"]
+        ZODPARSE["Zod response parsing<br/>via @dubgrid/contracts (./mobile)"]
+    end
+
+    subgraph Web["apps/web — Route Handlers"]
+        ROUTE["/api/mobile/v1/*<br/>(bootstrap, auth/login, auth/workspace,<br/>me/schedule, org/schedule, people,<br/>shift-requests, notifications,<br/>profile, push-tokens, session-presence)"]
+    end
+
+    subgraph Core["@dubgrid/mobile-api-core"]
+        MODULES["Modules: auth, people-status, push,<br/>read, shift-requests, setup, workspace, write<br/>(rejects sandbox workspaces for mobile login)"]
+    end
+
+    SUPA[("Supabase<br/>(auth + Postgres + RLS)")]
+
+    SCREEN --> APILIB
+    APILIB --> CLIENT
+    CLIENT -->|"HTTPS, EXPO_PUBLIC_API_BASE_URL"| ROUTE
+    ROUTE --> MODULES
+    MODULES --> SUPA
+    SUPA --> MODULES
+    MODULES --> ROUTE
+    ROUTE -->|"JSON response"| CLIENT
+    CLIENT --> ZODPARSE
+    ZODPARSE --> SCREEN
+
+    style Mobile fill:#dbeafe,stroke:#2563eb
+    style Web fill:#fef3c7,stroke:#d97706
+    style Core fill:#f5f3ff,stroke:#7c3aed
+    style SUPA fill:#dcfce7,stroke:#16a34a
+```
+
+---
+
+## 12. Stripe Billing & Subscription Flow
+
+```mermaid
+flowchart TD
+    subgraph Checkout["Checkout"]
+        START["Super Admin starts billing<br/>(billing-required gate or settings)"]
+        CREATE["POST /api/stripe/create-checkout<br/>Create Stripe Checkout Session"]
+        STRIPE["Stripe-hosted checkout page<br/>(user enters payment)"]
+        COMPLETE["POST /api/stripe/checkout-complete<br/>Confirm session, return to app"]
+        PORTAL["POST /api/stripe/billing-portal<br/>Manage existing subscription"]
+    end
+
+    subgraph Webhook["Webhook (source of truth)"]
+        HOOK["POST /api/stripe/webhook<br/>Verify signature"]
+        EVENTS["Handle events:<br/>checkout.session.completed,<br/>customer.subscription.updated/deleted,<br/>invoice.payment_succeeded/failed"]
+        UPDATE["Update organizations:<br/>stripe_customer_id,<br/>stripe_subscription_id,<br/>subscription_status"]
+    end
+
+    subgraph Gate["Billing Lock Gate"]
+        CHECK{"Org subscription_status<br/>active / trialing?"}
+        LOCKED["Billing lock active →<br/>OnboardingGate renders<br/>billing-required gate<br/>(route: /billing-required)"]
+        UNLOCKED["App accessible →<br/>continue to onboarding / dashboard"]
+    end
+
+    GM["Gridmaster oversight:<br/>/api/gridmaster/billing,<br/>/subscription, /stripe-sync"]
+
+    START --> CREATE --> STRIPE --> COMPLETE
+    COMPLETE -.->|"async confirmation"| HOOK
+    STRIPE -.->|"Stripe fires events"| HOOK
+    PORTAL -.-> HOOK
+    HOOK --> EVENTS --> UPDATE
+    UPDATE --> CHECK
+    CHECK -->|No| LOCKED
+    CHECK -->|Yes| UNLOCKED
+    LOCKED --> START
+    UPDATE -.-> GM
+
+    style Checkout fill:#dbeafe,stroke:#2563eb
+    style Webhook fill:#fef3c7,stroke:#d97706
+    style Gate fill:#f0fdf4,stroke:#16a34a
+    style LOCKED fill:#fee2e2,stroke:#dc2626
+    style UNLOCKED fill:#bbf7d0,stroke:#16a34a
 ```
 
 ---
@@ -828,7 +1048,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph L1["Layer 1: Edge"]
-        MW["Middleware<br/>Route guards<br/>Subdomain enforcement<br/>JWT verification"]
+        MW["apps/web/middleware.ts<br/>Route guards<br/>Subdomain enforcement<br/>JWT verification"]
     end
 
     subgraph L2["Layer 2: Application"]
@@ -840,7 +1060,7 @@ flowchart LR
     end
 
     subgraph L4["Layer 4: JWT Hook"]
-        HOOK["custom_access_token_hook<br/>Claims injection<br/>Refresh lock enforcement<br/>Archived org filtering"]
+        HOOK["custom_access_token_hook<br/>Claims injection<br/>Refresh lock → stripped JWT (not 403)<br/>Archived org filtering"]
     end
 
     L1 -->|"passes"| L2

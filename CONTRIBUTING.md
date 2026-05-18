@@ -27,7 +27,7 @@ Use clear, imperative-style messages:
 feat: add department permission templates
 fix: prevent cross-org mutation in shift updates
 refactor: extract audit logging into shared utility
-docs: update RBAC permission table to 24 permissions
+docs: update RBAC permission table to 25 permissions
 ```
 
 Prefix with `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, or `chore:`.
@@ -50,14 +50,29 @@ All coding standards (React, Next.js, security) are documented in [CLAUDE.md](CL
 - **Validate inputs at server boundaries** — Zod schemas on all Server Actions and Route Handlers
 - **Never expose secrets** — no `NEXT_PUBLIC_` prefix on server-only variables
 
+## Monorepo & Workspace Conventions
+
+DubGrid is an npm-workspaces monorepo orchestrated by Turborepo. Put code in the right place:
+
+- **`apps/web`** — the Next.js web app (pages, API Route Handlers, web-only components/hooks, server-side `lib/db/`). All former repo-root `src/...` paths now live under `apps/web/src/...`.
+- **`apps/mobile`** — the Expo / React Native app (Expo Router routes, mobile features and shared UI). It talks only to the web app's `/api/mobile/v1/*` API.
+- **`packages/*`** — platform-neutral shared workspaces (`api-client`, `authz`, `contracts`, `data-access`, `db-types`, `design-tokens`, `domain`, `mobile-api-core`, `schedule-core`).
+
+Package boundary rules:
+
+- Shared `packages/*` must stay **platform-neutral** — no Next.js, Expo, React Native, or DOM imports. Keep them pure TypeScript so both apps can consume them.
+- A change to a shared package affects **both** `apps/web` and `apps/mobile` — verify both still build and pass tests.
+- Run tests per-workspace with `npm test` at the root (Turbo runs every workspace) or scope with `npm run test:web` / `npm run test:mobile`.
+- See the `AGENTS.md` files (repo root and per-workspace) for the detailed conventions of each area.
+
 ## Project-Specific Rules
 
 These are critical constraints that break the app if violated:
 
 - **Migrations:** All schema lives in exactly 4 files (`001_schema.sql` through `004_grants.sql`). NEVER create new migration files.
-- **Routes:** All routes must be simple (`src/app/staff/page.tsx`), NOT catch-all. Catch-all routes break static prerendering on Vercel.
+- **Routes:** All routes must be simple (`apps/web/src/app/people/page.tsx`), NOT catch-all. Catch-all routes break static prerendering on Vercel. (Note: the former `/staff` route is now `/people`.)
 - **Naming:** `gridmaster` = platform_role. `admin` = org_role. Never call the gridmaster portal "admin portal."
-- **Cookie Consent:** When adding/removing cookies or changing analytics providers, bump `CONSENT_VERSION` in `src/components/CookieConsent.tsx`.
+- **Cookie Consent:** When adding/removing cookies or changing analytics providers, bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx`.
 
 ## Testing
 

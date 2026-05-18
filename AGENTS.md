@@ -173,7 +173,7 @@ files unless explicitly requested or necessary for correctness.
 - Naming: `gridmaster` is the platform role and route (`/gridmaster`).
   `admin` is an organization role. Do not call the gridmaster portal the
   "admin portal."
-- Routes: use simple route files such as `apps/web/src/app/staff/page.tsx`.
+- Routes: use simple route files such as `apps/web/src/app/people/page.tsx`.
   Do not add catch-all routes unless the user explicitly approves and the Vercel
   static prerendering risk is addressed.
 - Migrations: schema changes stay in the existing four files under

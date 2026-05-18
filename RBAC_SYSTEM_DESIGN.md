@@ -3,9 +3,24 @@
 ## Role-Based Access Control — Full System Design
 
 **Race-Condition-Free Architecture**
-React · Supabase · Vercel
+Next.js · React · React Native (Expo) · Supabase · Vercel · Turborepo
 
-Version 2.0 | Confidential
+Version 2.1 | Updated 2026-05-14 | Confidential
+
+> **Monorepo note:** DubGrid is an npm-workspaces + Turborepo monorepo. Two apps —
+> `@dubgrid/web` (Next.js 16 App Router, `apps/web`) and `@dubgrid/mobile`
+> (Expo SDK 54 / React Native, `apps/mobile`) — sit on top of 9 shared
+> `packages/*` libraries. All RBAC-relevant permission logic now lives in the
+> platform-neutral **`@dubgrid/authz`** package (`ROLE_LEVEL`, `ALL_PERMS` /
+> `READ_ONLY_PERMS`, `applyViewImplications`, `unionPermissions`,
+> `buildPermissionContext` / `buildPerms`, `extractJwtClaims`,
+> `getPermissionsFromSession`), with domain types/enums and the self-action
+> guard (`assertNotSelf` / `isSelfAction` / `SelfActionForbiddenError` in
+> `packages/domain/src/self-guard.ts`) in **`@dubgrid/domain`**. The web app
+> consumes these via `apps/web/src/features/permissions/` (`usePermissions.ts`,
+> `core`, `client`, `shared`, `index`); the mobile backend orchestration in
+> `@dubgrid/mobile-api-core` consumes `@dubgrid/authz` directly. Paths in this
+> document reflect the monorepo layout (`apps/web/...`, `apps/web/middleware.ts`).
 
 ---
 
@@ -36,28 +51,45 @@ Security is enforced at three independent layers. Compromising one layer does no
 
 ### 1.3 Admin Permissions Model
 
-Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins configure these per-user. All default to `false` except canViewSchedule and canViewStaff (always true for all authenticated users).
+Admins (Tier 2) receive a configurable set of permissions stored as JSONB in `organization_memberships.admin_permissions`. Super admins configure these per-user. The canonical `AdminPermissions` interface — **25 permissions** — is defined in `packages/domain/src/permissions.ts` and consumed everywhere through `@dubgrid/authz`.
 
-| Category   | Permission                     | Delegatable | Description                                           |
-| ---------- | ------------------------------ | ----------- | ----------------------------------------------------- |
-| Schedule   | `canViewSchedule`              | Always on   | View the schedule grid (always true)                  |
-| Schedule   | `canEditShifts`                | Yes         | Create, edit, delete shift entries                    |
-| Schedule   | `canPublishSchedule`           | Yes         | Publish draft changes                                 |
-| Schedule   | `canApplyRecurringSchedule`    | Yes         | Apply recurring shift templates                       |
-| Notes      | `canEditNotes`                 | Yes         | Manage schedule notes/indicators                      |
-| Recurring  | `canManageRecurringShifts`     | Yes         | Configure recurring shift templates                   |
-| Recurring  | `canManageShiftSeries`         | Yes         | Manage repeating shift series                         |
-| Staff      | `canViewStaff`                 | Always on   | View staff roster (always true)                       |
-| Staff      | `canManageEmployees`           | Yes         | Add, edit, bench, terminate employees                 |
-| Config     | `canManageFocusAreas`          | Yes         | Manage focus areas / departments                      |
-| Config     | `canManageScheduleDefinitions`          | Yes         | Manage schedule definitions                           |
-| Config     | `canManageIndicatorTypes`      | Yes         | Manage note/indicator type definitions                |
-| Config     | `canManageOrgSettings`         | No          | Edit org name, address, phone, timezone (super_admin only) |
-| Config     | `canManageOrgLabels`           | Yes         | Edit custom terminology labels                        |
-| Coverage   | `canManageCoverageRequirements`| Yes         | Manage staffing minimum requirements                  |
-| Requests   | `canApproveShiftRequests`      | Yes         | Approve or reject shift pickup/swap requests          |
+All permissions default to `false` **except** `canViewSchedule` and `canViewStaff`, which are **always true** for any authenticated user (including Tier 0 `user`). The order below matches the interface definition.
 
-**Super admin-only (never delegatable):** `canManageUsers`, `canConfigureAdminPermissions`, `canManageOrgSettings`
+| #  | Category   | Permission                       | Delegatable | Description                                                    |
+| -- | ---------- | -------------------------------- | ----------- | -------------------------------------------------------------- |
+| 1  | Schedule   | `canViewSchedule`                | Always on   | View the schedule grid (always true for all authed users)      |
+| 2  | Schedule   | `canEditShifts`                  | Yes         | Create, edit, delete schedule cells                            |
+| 3  | Schedule   | `canPublishSchedule`             | Yes         | Publish draft changes                                          |
+| 4  | Schedule   | `canApplyRecurringSchedule`      | Yes         | Apply recurring shift templates onto the grid                  |
+| 5  | Notes      | `canEditNotes`                   | Yes         | Manage schedule notes                                          |
+| 6  | Notes      | `canEditScheduleIndicators`      | Yes         | Manage schedule indicators (gates `schedule_notes` RLS — §4.5) |
+| 7  | Recurring  | `canViewRecurringShifts`         | Yes         | View recurring shift templates                                 |
+| 8  | Recurring  | `canManageRecurringShifts`       | Yes         | Configure recurring shift templates                            |
+| 9  | Recurring  | `canManageShiftSeries`           | Yes         | Manage repeating shift series                                  |
+| 10 | Staff      | `canViewStaff`                   | Always on   | View staff roster (always true for all authed users)           |
+| 11 | Staff      | `canViewEmployeeDetails`         | Yes         | View full employee detail records                              |
+| 12 | Staff      | `canManageEmployees`             | Yes         | Add, edit, bench, terminate employees                          |
+| 13 | Config     | `canViewFocusAreas`              | Yes         | View focus areas                                               |
+| 14 | Config     | `canManageFocusAreas`            | Yes         | Manage focus areas / departments                               |
+| 15 | Config     | `canViewScheduleDefinitions`     | Yes         | View schedule definitions (shift codes, absence types)         |
+| 16 | Config     | `canManageScheduleDefinitions`   | Yes         | Manage schedule definitions                                    |
+| 17 | Config     | `canViewIndicatorTypes`          | Yes         | View note/indicator type definitions                           |
+| 18 | Config     | `canManageIndicatorTypes`        | Yes         | Manage note/indicator type definitions                         |
+| 19 | Config     | `canManageOrgSettings`           | No          | Edit org name, address, phone, timezone (super_admin only)     |
+| 20 | Config     | `canViewOrgLabels`               | Yes         | View custom terminology labels                                 |
+| 21 | Config     | `canManageOrgLabels`             | Yes         | Edit custom terminology labels                                 |
+| 22 | Coverage   | `canViewCoverageRequirements`    | Yes         | View staffing minimum requirements                             |
+| 23 | Coverage   | `canManageCoverageRequirements`  | Yes         | Manage staffing minimum requirements                           |
+| 24 | Requests   | `canApproveShiftRequests`        | Yes         | Approve or reject shift pickup/swap requests                   |
+| 25 | Dashboard  | `canViewDashboardAnalytics`      | Yes         | View dashboard analytics                                       |
+
+**View-implications.** `@dubgrid/authz`'s `applyViewImplications` guarantees that every `canManage*` permission implies its matching `canView*` permission. A membership row only needs to store the `canManage*` flag; the resolved permission set always exposes the corresponding `canView*` as `true`. The view-only baseline (`READ_ONLY_PERMS`) is what a Tier 0 `user` receives.
+
+**Always-true permissions.** `canViewSchedule` and `canViewStaff` are forced to `true` for every authenticated user regardless of role or stored JSONB — Tier 0 users can always see the schedule grid and the staff roster.
+
+**Super admin-only (never delegatable).** `canManageUsers`, `canConfigureAdminPermissions`, and `canManageOrgSettings` can never be granted to an `admin` — they are reserved for `super_admin` (Tier 3) and cannot be set in the `admin_permissions` JSONB. `canConfigureAdminPermissions` is what gates the AdminPermissionsEditor itself.
+
+**Department-template union inheritance.** Management-type departments (`departments.type = 'management'`) define a `permissions` JSONB template. A member who belongs to one or more management departments inherits the **union** of their per-user `admin_permissions` and every department template — most-permissive-wins, computed by `@dubgrid/authz`'s `unionPermissions`. `buildPermissionContext` assembles the final effective set: role baseline → JSONB → department-template union → view-implications.
 
 ---
 
@@ -103,10 +135,26 @@ CREATE TABLE public.organizations (
   theme_config          JSONB DEFAULT '{}'::JSONB,
   landing_page_config   JSONB DEFAULT '{}'::JSONB,
   archived_at           TIMESTAMPTZ,
+  -- Test-sandbox support (migration 001_schema.sql)
+  workspace_kind          TEXT NOT NULL DEFAULT 'production'
+                            CHECK (workspace_kind IN ('production', 'sandbox')),
+  sandbox_source_org_id   UUID REFERENCES organizations(id) ON DELETE SET NULL,
+  sandbox_owner_user_id   UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  sandbox_expires_at      TIMESTAMPTZ,            -- 30-day TTL for sandbox orgs
+  sandbox_template_version TEXT,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+> **Test sandbox.** A `workspace_kind = 'sandbox'` organization is an isolated
+> clone of a production org's config, created via `features/test-sandbox/` +
+> `app/api/test-sandbox/` (a `force-dynamic` POST route with CSRF + rate
+> limiting via `testSandboxLimiter`; actions `create` / `reset` / `archive`).
+> Sandboxes carry a 30-day TTL (`sandbox_expires_at`), are owned by the
+> creating user (`sandbox_owner_user_id`), and are **rejected for mobile
+> login** by `@dubgrid/mobile-api-core`. `get_my_organizations` returns a
+> `workspace_kind` column so callers can distinguish them.
 
 #### organization_memberships (per-org role + admin permissions)
 
@@ -116,6 +164,10 @@ CREATE TABLE public.organization_memberships (
   org_id            UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   org_role          org_role NOT NULL DEFAULT 'user',  -- enum: 'super_admin' | 'admin' | 'user'
   admin_permissions JSONB,                             -- null for non-admin roles
+  department_ids    UUID[],                            -- management/scheduled dept membership
+  archived_at       TIMESTAMPTZ,
+  landing_card_dismissed_at  TIMESTAMPTZ,              -- PersonaLandingCard dismissal (migration 001)
+  onboarding_step_telemetry  JSONB NOT NULL DEFAULT '{}'::JSONB,  -- per-step onboarding telemetry
   joined_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (user_id, org_id)
 );
@@ -177,6 +229,24 @@ CREATE TYPE platform_role AS ENUM ('gridmaster', 'none');
 -- (see Sections 3 and 4)
 ```
 
+### 2.3 RBAC & Lifecycle SQL Functions (migration 002_functions_triggers.sql)
+
+| Function | Notes |
+| -------- | ----- |
+| `change_user_role(p_target_user_id, p_new_role, p_changed_by_id, p_idempotency_key)` | Atomic role change RPC. **Hard-blocks self-role-change** — if `p_target_user_id = auth.uid()` the function raises `P0001`. Org is derived from the target's profile; there is no `p_org_id` parameter (see §3.1). |
+| `complete_onboarding(...)` | Marks an org/membership onboarding complete. Now **idempotent** — re-invoking after completion is a no-op rather than an error, so a double-submit from the wizard cannot fail. |
+| `dismiss_landing_card(p_org_id)` | New `SECURITY DEFINER` function. Sets `organization_memberships.landing_card_dismissed_at = NOW()` for the calling user in the given org — backs the dismissable `PersonaLandingCard`. |
+| `get_my_organizations()` | Return type now includes a `workspace_kind` column and **filters out archived** memberships/orgs, so callers see only live workspaces and can tell sandbox from production. |
+| `custom_access_token_hook(event)` | Auth hook — injects top-level JWT claims (see §5). |
+
+> **Self-action guard (`@dubgrid/domain`).** Beyond the SQL-level `P0001` block,
+> the platform-neutral `packages/domain/src/self-guard.ts` exports
+> `assertNotSelf(actorId, targetId)` (throws `SelfActionForbiddenError`) and the
+> predicate `isSelfAction(actorId, targetId)`. Web Route Handlers and
+> `@dubgrid/mobile-api-core` call these before issuing self-targeting role /
+> permission mutations so the request is rejected at the app boundary as well
+> as at the database — defense in depth for "admin edits their own role".
+
 ---
 
 ## 3. Race Condition Catalog & Mitigations
@@ -215,6 +285,13 @@ BEGIN
   -- 0. Verify caller identity matches auth.uid()
   IF p_changed_by_id <> auth.uid() THEN
     RAISE EXCEPTION 'Caller identity mismatch';
+  END IF;
+
+  -- 0a. HARD BLOCK: no one may change their own role (P0001).
+  -- Mirrors @dubgrid/domain's assertNotSelf() at the app boundary.
+  IF p_target_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'Users cannot change their own role'
+      USING ERRCODE = 'P0001';
   END IF;
 
   -- 1. Advisory lock prevents concurrent role changes for same user
@@ -337,27 +414,32 @@ CREATE TABLE public.schedule_cells (
 
 ### 3.4 Race Condition: Optimistic Lock Violation on Update
 
-When an Admin edits a shift that another Admin just modified, the second write must be rejected — not silently overwrite the first.
+When an Admin edits a schedule cell that another Admin just modified, the second write must be rejected — not silently overwrite the first.
 
 ```ts
 // Frontend React mutation (using React Query)
-const updateShift = async ({ shiftId, changes, expectedVersion }) => {
+const updateScheduleCell = async ({ cellId, changes, expectedVersion }) => {
   const { data, error } = await supabase
-    .from("shifts")
+    .from("schedule_cells")
     .update({ ...changes, version: expectedVersion + 1 })
-    .eq("id", shiftId)
+    .eq("id", cellId)
     .eq("version", expectedVersion) // <-- optimistic lock check
     .select()
     .single();
 
   if (!data) {
     throw new OptimisticLockError(
-      "Shift was modified by another user. Reload and retry.",
+      "Schedule cell was modified by another user. Reload and retry.",
     );
   }
   return data;
 };
 ```
+
+> **Note:** In `apps/web` the browser does not hit `schedule_cells` directly —
+> it calls a feature `client/api.ts` that `fetch()`es a Route Handler, which
+> runs the optimistic-locked write via `apps/web/src/lib/db/schedule`. The
+> `.eq('version', expected)` check shown above is the underlying mechanism.
 
 ### 3.5 Race Condition: Gridmaster Impersonation Token Collision
 
@@ -394,7 +476,10 @@ ALTER TABLE profiles                  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organizations             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_memberships  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employees                 ENABLE ROW LEVEL SECURITY;
-ALTER TABLE shifts                    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule_cells            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule_cell_snapshots   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule_cell_segments    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule_notes            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE role_change_log           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE impersonation_sessions    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invitations               ENABLE ROW LEVEL SECURITY;
@@ -427,25 +512,30 @@ CREATE OR REPLACE FUNCTION is_gridmaster() RETURNS BOOLEAN AS $$
 $$ LANGUAGE sql STABLE;
 ```
 
-### 4.2 Shifts Table Policies
+### 4.2 Schedule Cell Table Policies
+
+Schedule state is **not** a flat `shifts` table. The canonical cell record lives
+in `schedule_cells`; draft/published state lives in `schedule_cell_snapshots`,
+with ordered work segments in `schedule_cell_segments`. The same org-isolation
+pattern is applied to each; `schedule_cells` is shown below.
 
 ```sql
 -- SELECT: users see only their org (or gridmaster sees all)
-CREATE POLICY "shifts_select" ON shifts FOR SELECT
+CREATE POLICY "schedule_cells_select" ON schedule_cells FOR SELECT
   USING (
     is_gridmaster()
     OR org_id = caller_org_id()
   );
 
 -- INSERT: admin with canEditShifts or super_admin in same org
-CREATE POLICY "shifts_insert" ON shifts FOR INSERT
+CREATE POLICY "schedule_cells_insert" ON schedule_cells FOR INSERT
   WITH CHECK (
     org_id = caller_org_id()
     AND caller_org_role() IN ('super_admin', 'admin')
   );
 
 -- UPDATE: admin with canEditShifts or super_admin; row must belong to same org
-CREATE POLICY "shifts_update" ON shifts FOR UPDATE
+CREATE POLICY "schedule_cells_update" ON schedule_cells FOR UPDATE
   USING  (org_id = caller_org_id())
   WITH CHECK (
     org_id = caller_org_id()
@@ -453,7 +543,8 @@ CREATE POLICY "shifts_update" ON shifts FOR UPDATE
   );
 
 -- DELETE: super_admin or gridmaster only
-CREATE POLICY "shifts_delete" ON shifts FOR DELETE
+-- (in practice a "delete" is usually a draft snapshot with state_kind = 'deleted')
+CREATE POLICY "schedule_cells_delete" ON schedule_cells FOR DELETE
   USING (
     is_gridmaster()
     OR (org_id = caller_org_id() AND caller_org_role() = 'super_admin')
@@ -461,6 +552,14 @@ CREATE POLICY "shifts_delete" ON shifts FOR DELETE
 ```
 
 > **Note:** Fine-grained admin permission checks (e.g., `canEditShifts`) are enforced at the application layer in addition to RLS. RLS provides the org-isolation guarantee; the application layer enforces which specific actions an admin can perform within their org.
+
+### 4.2a Schedule Notes Policies
+
+The `schedule_notes` table's `INSERT` / `UPDATE` / `DELETE` policies gate on
+`check_admin_permission('canEditScheduleIndicators')` (migration
+`003_rls_policies.sql`). This **changed** from the older `canEditNotes` gate —
+indicator editing is now its own permission (#6 in §1.3), distinct from
+`canEditNotes` (#5).
 
 ### 4.3 Profiles Table Policies
 
@@ -604,22 +703,30 @@ $$;
 
 ## 6. Vercel Edge Middleware
 
-The middleware runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. It performs JWT verification and subdomain-based role routing.
+The middleware (`apps/web/middleware.ts`) runs at the CDN edge — geographically closest to the user — before any backend compute is invoked. Beyond JWT verification and subdomain-based role routing it also:
+
+- **Org-suspension check** — looks up whether the caller's org is suspended/archived, using a **Redis (Upstash) cache with a ~30 s TTL** to avoid a DB round trip on every request. A suspended org's users are bounced to a billing/suspended screen.
+- **Impersonation cookie handling** — reads the gridmaster impersonation cookie/header and threads the impersonation context through so downstream RLS and Route Handlers see the impersonated identity.
+- **`jwtVerify` → `decodeJwt` fallback** — see the security note below; this fallback is load-bearing and must not be removed.
 
 ### 6.1 Subdomain Routing Logic
 
 | Subdomain                     | Allowed Roles                     | Redirect on Failure        |
 | ----------------------------- | --------------------------------- | -------------------------- |
 | `gridmaster.dubgrid.com`      | gridmaster only                   | Redirect → `/login`        |
-| `{slug}.dubgrid.com/staff`    | admin+, super_admin, gridmaster   | Redirect → `/schedule`     |
+| `{slug}.dubgrid.com/people`   | admin+, super_admin, gridmaster   | Redirect → `/schedule`     |
 | `{slug}.dubgrid.com/settings` | admin+, super_admin, gridmaster   | Redirect → `/schedule`     |
 | `{slug}.dubgrid.com/schedule` | all authenticated org users       | Redirect → `/login`        |
 | `dubgrid.com`                 | unauthenticated (public routes)   | N/A                        |
 
+> The staff roster route is `/people` (`apps/web/src/app/people/page.tsx`,
+> `people/[id]/page.tsx`) — the legacy `/staff` route no longer exists. The
+> staff-configuration settings sub-route is `/settings/staff-config`.
+
 ### 6.2 Middleware Implementation
 
 ```ts
-// middleware.ts (Vercel Edge Runtime)
+// apps/web/middleware.ts (Vercel Edge Runtime)
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
@@ -700,7 +807,7 @@ export async function middleware(req: NextRequest) {
   // Fallback: if claims are missing, resolve from DB
   if (!claims.platform_role || !claims.org_role) {
     // Fetch from profiles + organization_memberships
-    // (see middleware.ts for full implementation)
+    // (see apps/web/middleware.ts for full implementation)
   }
 
   const effectiveRole = calculateEffectiveRole(claims);
@@ -711,7 +818,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (pathname.startsWith("/staff") && level < 2) {
+  if (pathname.startsWith("/people") && level < 2) {
     return NextResponse.redirect(new URL("/schedule", req.url));
   }
 
@@ -749,17 +856,28 @@ export const config = {
 > **Security Note: Middleware is not the last line of defense**
 >
 > The Edge Middleware provides latency-optimized routing and UX-level gating. It is NOT the security layer — that role belongs exclusively to Supabase RLS (Section 4). A sophisticated attacker who bypasses middleware still hits RLS, which cannot be bypassed from the client.
+>
+> **The `jwtVerify` → `decodeJwt` fallback MUST stay.** `jwtVerify` against the
+> remote JWKS can fail in production (key-fetch hiccups, clock skew, transient
+> network errors). When it does, the middleware falls back to the *unverified*
+> `decodeJwt` for **non-gridmaster** users — because RLS, not middleware, is the
+> real security boundary, and locking every admin/user out on a JWKS blip is
+> unacceptable. Gridmaster is the one exception: a `platform_role: 'gridmaster'`
+> claim coming from an unverified token is rejected outright. Removing this
+> fallback has previously broken all admin/user logins — do not "tighten" it.
 
 ---
 
 ## 7. React Frontend Architecture
 
-The React layer enforces role-aware rendering using a single source of truth: the parsed JWT claims combined with admin permissions fetched from the database.
+The React layer enforces role-aware rendering using a single source of truth: the parsed JWT claims combined with admin permissions fetched from the database. The actual permission math — claim extraction, view-implications, department-template unions, role levels — lives in the platform-neutral **`@dubgrid/authz`** package so that both `apps/web` and `apps/mobile`/`@dubgrid/mobile-api-core` resolve permissions identically. The web app's `apps/web/src/features/permissions/` directory (`core`, `client`, `shared`, `index`, `usePermissions.ts`) is a thin wrapper over `@dubgrid/authz`.
 
 ### 7.1 Auth Context & Permission Hook
 
 ```ts
-// hooks/usePermissions.ts
+// apps/web/src/features/permissions/usePermissions.ts
+// Thin wrapper over @dubgrid/authz: getPermissionsFromSession / extractJwtClaims
+// / buildPermissionContext do the heavy lifting; this hook adapts them to React.
 import { decodeJwt } from "jose";
 
 export function usePermissions() {
@@ -833,7 +951,7 @@ export function ScheduleToolbar() {
 ### 7.3 Role Change Mutation (Frontend)
 
 ```ts
-// hooks/useRoleChange.ts
+// apps/web/src/features/permissions/useRoleChange.ts
 import { v4 as uuidv4 } from "uuid";
 import { useMutation } from "@tanstack/react-query";
 
@@ -842,14 +960,15 @@ export function useRoleChange() {
     mutationFn: async (params: {
       targetUserId: string;
       newRole: OrganizationRole;
-      orgId: string;
     }) => {
       const idempotencyKey = uuidv4();
 
+      // NOTE: no p_org_id — the RPC derives the target's org from their
+      // profile (see §3.1). Passing an org would be both redundant and a
+      // cross-org-tampering vector.
       const { data, error } = await supabase.rpc("change_user_role", {
         p_target_user_id: params.targetUserId,
         p_new_role: params.newRole,
-        p_org_id: params.orgId,
         p_changed_by_id: session.user.id,
         p_idempotency_key: idempotencyKey,
       });
@@ -918,11 +1037,11 @@ await supabase.rpc("end_impersonation", { p_session_id: session.session_id });
 | ----------------------------- | --------------------------------------------------- | --------- | ------------------------------------------------------------------ |
 | Stale JWT after role change   | Role demoted but old JWT still valid                | Auth + DB | Force session invalidation via admin API + jwt_refresh_locks       |
 | Concurrent role promotions    | Two super admins promote same user simultaneously   | DB        | `SELECT FOR UPDATE` row lock inside SECURITY DEFINER RPC           |
-| Duplicate shift submission    | Network retry / double-click                        | DB        | UNIQUE `(org_id, idempotency_key)` constraint on shifts table      |
-| Optimistic lock violation     | Two admins edit same shift                          | App + DB  | `.eq('version', expected)` Supabase query + UI error handling      |
+| Duplicate shift submission    | Network retry / double-click                        | DB        | UNIQUE `(org_id, idempotency_key)` + `(emp_id, date)` on `schedule_cells` |
+| Optimistic lock violation     | Two admins edit same schedule cell                  | App + DB  | `.eq('version', expected)` Supabase query + UI error handling      |
 | Impersonation token collision | Gridmaster opens two sessions in parallel           | DB        | UNIQUE `(gridmaster_id, target_user_id)` on impersonation_sessions |
 | Cross-tenant data read        | RLS bypass attempt via URL manipulation             | DB        | RLS `org_id = caller_org_id()` enforced at SQL execution           |
-| Admin self-promotion          | Admin tries to set own role = super_admin           | DB        | SECURITY DEFINER RPC checks caller role before applying change     |
+| Admin self-promotion          | Admin tries to set own role = super_admin           | App + DB  | `change_user_role` raises `P0001` if target = caller; `assertNotSelf` blocks at app boundary; RPC also checks caller role |
 | Privilege escalation via UI   | Frontend hides buttons; API called directly         | DB        | RLS `WITH CHECK` prevents inserts/updates outside role permission  |
 | Audit log tampering           | Admin tries to delete/edit audit record             | DB        | No UPDATE or DELETE RLS policy exists on `role_change_log`         |
 
@@ -967,7 +1086,7 @@ CREATE POLICY "own_sessions_only" ON user_sessions
 ### 10.3 Voluntary Logout: Local Scope Only
 
 ```ts
-// hooks/useLogout.ts
+// apps/web/src/features/auth (logout hook)
 export function useLogout() {
   return async () => {
     // scope: "local" = only clears THIS browser's session
@@ -1065,7 +1184,7 @@ Self-service password reset is fully implemented with security best practices:
    - Confirmation field with match validation
    - 5-second timeout fallback for invalid/expired tokens
    - Automatic local sign-out after successful reset
-3. **Auth components** in `src/components/auth/`: `PasswordInput` (show/hide toggle), `PasswordStrength` (visual meter), `AuthCard` (consistent layout)
+3. **Auth components** in `apps/web/src/components/auth/`: `PasswordInput` (show/hide toggle), `PasswordStrength` (visual meter), `AuthCard` (consistent layout)
 
 ### 12.2 Email Verification
 
@@ -1078,17 +1197,17 @@ New accounts created via invitation acceptance go through email verification:
 
 ### 12.3 Rate Limiting
 
-All public-facing API routes are rate-limited via Upstash Redis (`src/lib/rate-limit.ts`):
+All public-facing API routes are rate-limited via Upstash Redis (`apps/web/src/lib/rate-limit.ts`):
 
 | Limiter | Scope | Applied To |
 | ------- | ----- | ---------- |
 | `apiLimiter` | IP-based | `/api/validate-domain`, `/api/notify-impersonation` |
-| `inviteLimiter` | User-based | `/api/send-invite-email` |
+| `inviteLimiter` | Org-based (`invite:${orgId}`) | `/api/send-invite-email` — 200/h per org, shared across all super-admins in the org |
 | `demoLimiter` | IP-based | `/api/request-demo` |
 
 ### 12.4 Branded Email Templates
 
-Shared email template system in `src/lib/email.ts`:
+Shared email template system in `apps/web/src/lib/email.ts`:
 - `sanitizeHeaderValue()` — Prevents email header injection (strips CRLF, null bytes)
 - `escapeHtml()` — Prevents XSS in email content
 - `emailWrapper()` — Branded HTML template with DubGrid header, card layout, responsive design
@@ -1098,6 +1217,15 @@ Shared email template system in `src/lib/email.ts`:
 
 API routes that accept mutations validate the `Origin` header against `NEXT_PUBLIC_SITE_URL`. Server Actions include built-in CSRF protection via Next.js.
 
+### 12.6 MFA Status Endpoint (Partial)
+
+Multi-factor authentication is **partially implemented**. The
+`/api/account/mfa-status` Route Handler reports whether the current user has
+MFA enrolled (backed by `profiles.mfa_enabled` and Supabase's MFA factors), and
+the mobile profile/security surface and web account screens read it. Full
+enforcement — *requiring* TOTP for gridmaster and super_admin, plus an
+enrollment flow — is still outstanding (see §13.1).
+
 ---
 
 ## 13. Recommended Features Not Yet Implemented
@@ -1106,12 +1234,13 @@ The following features are recommended before a production launch.
 
 ### 13.1 Priority 1 — Security (Implement Before Launch)
 
-#### Multi-Factor Authentication (MFA)
+#### Multi-Factor Authentication (MFA) — Partially Implemented
 
 | Property         | Detail                                                                                                                |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Gap              | Any user whose password is compromised gives an attacker full access. Gridmaster and super admin accounts are high-value targets. |
-| Recommendation   | Enforce TOTP (Supabase MFA) for gridmaster and super_admin. Prompt admin/user roles to enroll optionally.             |
+| Status           | **Partial.** An `/api/account/mfa-status` endpoint exists and surfaces enrollment state to web + mobile (see §12.6). Enrollment flow and role-based *enforcement* are not done. |
+| Gap              | Until enrollment is enforced, any user whose password is compromised gives an attacker full access. Gridmaster and super admin accounts are high-value targets. |
+| Recommendation   | Build the enrollment flow and enforce TOTP (Supabase MFA) for gridmaster and super_admin. Prompt admin/user roles to enroll optionally. |
 | Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challenge()` / `verify()`                                                |
 
 #### Failed Login Attempt Tracking & Account Lockout
@@ -1153,27 +1282,27 @@ The following features are recommended before a production launch.
 | Gap            | When a user is promoted or demoted, they receive no communication.                                                         |
 | Recommendation | Trigger an email and in-app notification from the role change flow.                                                        |
 
-#### GDPR / Data Export Compliance
+#### GDPR / Data Export Compliance — Implemented
 
 | Property       | Detail                                                                                                                     |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Gap            | No mechanism for a user to request all their personal data.                                                                |
-| Recommendation | Add a data export RPC that assembles all user rows into a JSON archive.                                                    |
+| Status         | **Done.** Users can request a full export of their personal data; companion account-deletion / erasure routes also exist (`/api/auth/data-export`, `/api/auth/delete-account`, `/api/auth/gdpr-erase`, plus `/api/account/change-requests`). |
+| Notes          | The export assembles all of a user's rows into a JSON archive. Listed here for completeness — no further work required for the export path itself. |
 
 ### 13.4 Feature Priority Summary
 
-| Priority | Feature                                  | Status     | Risk if Skipped                                      |
-| -------- | ---------------------------------------- | ---------- | ---------------------------------------------------- |
-| P1       | MFA for Gridmaster & Super Admin         | Not done   | Account takeover via password compromise             |
-| P1       | Failed login tracking & lockout          | Not done   | Brute-force attacks succeed silently                 |
-| P1       | IP allowlisting for Gridmaster           | Not done   | Stolen credentials = full platform access            |
-| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done    | ~~Users locked out permanently if password lost~~    |
-| ~~P2~~   | ~~Email verification~~                   | ✅ Done    | ~~Unverified accounts receive org roles~~            |
-| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done    | ~~Abuse of public endpoints~~                        |
-| P2       | Soft delete (users & orgs)               | Not done   | Accidental permanent data loss                       |
-| P3       | Refresh token rotation + reuse detection | Not done   | Stolen tokens usable indefinitely                    |
-| P3       | Role change notifications                | Not done   | Silent UX — confused users after demotion            |
-| P3       | GDPR data export                         | Not done   | Legal compliance gap in EU/UK markets                |
+| Priority | Feature                                  | Status      | Risk if Skipped                                      |
+| -------- | ---------------------------------------- | ----------- | ---------------------------------------------------- |
+| P1       | MFA for Gridmaster & Super Admin         | **Partial** | Status endpoint exists; enrollment + enforcement still missing → account takeover via password compromise |
+| P1       | Failed login tracking & lockout          | Not done    | Brute-force attacks succeed silently                 |
+| P1       | IP allowlisting for Gridmaster           | Not done    | Stolen credentials = full platform access            |
+| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done     | ~~Users locked out permanently if password lost~~    |
+| ~~P2~~   | ~~Email verification~~                   | ✅ Done     | ~~Unverified accounts receive org roles~~            |
+| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done     | ~~Abuse of public endpoints~~                        |
+| P2       | Soft delete (users & orgs)               | Not done    | Accidental permanent data loss                       |
+| P3       | Refresh token rotation + reuse detection | Not done    | Stolen tokens usable indefinitely                    |
+| P3       | Role change notifications                | Not done    | Silent UX — confused users after demotion            |
+| ~~P3~~   | ~~GDPR data export~~                     | ✅ Done     | ~~Legal compliance gap in EU/UK markets~~            |
 
 ---
 
