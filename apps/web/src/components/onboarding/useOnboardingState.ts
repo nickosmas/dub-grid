@@ -43,6 +43,20 @@ export function useOnboardingState(
     return 0;
   });
 
+  // Derive a safe index for this render. If the steps array shrinks mid-flow
+  // (e.g. the wizard transitions from the 6-step config to the 3-step
+  // orientation when org setup completes), the persisted index can exceed
+  // steps.length - 1. Reading steps[currentStepIndex] would be undefined and
+  // crash the consumer on currentStep.id.
+  const safeStepIndex =
+    steps.length === 0 ? 0 : Math.min(currentStepIndex, steps.length - 1);
+
+  // Align the underlying state when it drifts so goNext/goBack work from the
+  // clamped position on the next interaction rather than burning clicks.
+  if (safeStepIndex !== currentStepIndex && steps.length > 0) {
+    setCurrentStepIndex(safeStepIndex);
+  }
+
   // Persist step to localStorage
   useEffect(() => {
     localStorage.setItem(key, String(currentStepIndex));
@@ -75,14 +89,14 @@ export function useOnboardingState(
   }, [userId, orgId, key, queryClient]);
 
   return {
-    currentStepIndex,
-    currentStep: steps[currentStepIndex],
+    currentStepIndex: safeStepIndex,
+    currentStep: steps[safeStepIndex],
     totalSteps: steps.length,
     goNext,
     goBack,
     goTo,
     completeOnboarding,
-    isFirstStep: currentStepIndex === 0,
-    isLastStep: currentStepIndex === steps.length - 1,
+    isFirstStep: safeStepIndex === 0,
+    isLastStep: safeStepIndex === steps.length - 1,
   };
 }

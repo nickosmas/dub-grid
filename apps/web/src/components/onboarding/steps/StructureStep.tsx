@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import StepLayout from "../StepLayout";
 import CompositeSection from "./CompositeSection";
 import DepartmentsSettings from "@/components/settings/DepartmentsSettings";
@@ -13,6 +13,9 @@ import {
   saveOrganizationRoles,
 } from "@/features/settings/client";
 import type { NamedItem } from "@/types";
+import { useWizardEditorCollector } from "../WizardModeContext";
+import { toast } from "sonner";
+import * as Sentry from "@/lib/sentry";
 
 interface StructureStepProps {
   onNext: () => void;
@@ -43,6 +46,40 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
 
   const rolesRef = useRef<NamedItem[]>(orgRoles);
   const certsRef = useRef<NamedItem[]>(certifications);
+  const { Provider, saveAll, hasAnyErrors } = useWizardEditorCollector();
+  const [saving, setSaving] = useState(false);
+
+  // Mirror departments into a ref so handleNext can read the latest value
+  // *after* saveAll resolves (the prop captured at click time is stale by then).
+  const departmentsRef = useRef(departments);
+  departmentsRef.current = departments;
+
+  const hasDepartments = departments.length > 0;
+
+  const handleNext = useCallback(async () => {
+    if (hasAnyErrors()) {
+      toast.error("Fix the highlighted errors before continuing.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveAll();
+      // Re-check the requirement against the post-save state. In wizard mode
+      // the nested editor's only save trigger IS this Continue button, so we
+      // must allow the click even when departments.length === 0 at render
+      // time and instead validate after the save runs.
+      if (departmentsRef.current.length === 0) {
+        toast.error(`Add at least one ${(org?.departmentLabel || "department").toLowerCase().replace(/s$/, "")} to continue.`);
+        return;
+      }
+      onNext();
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("We couldn't save your changes. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, [hasAnyErrors, onNext, org?.departmentLabel, saveAll]);
 
   if (!org) return null;
 
@@ -50,74 +87,86 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
   const certLabel = org.certificationLabel || "Certifications";
   const deptLabel = org.departmentLabel || "Departments";
   const focusLabel = org.focusAreaLabel || "Focus Areas";
-  const hasDepartments = departments.length > 0;
 
   return (
     <StepLayout
       title="Structure"
       description={`Set up your ${deptLabel.toLowerCase()}, the ${roleLabel.toLowerCase()} people carry, and the ${certLabel.toLowerCase()} that gate scheduling decisions.`}
-      onNext={onNext}
+      onNext={handleNext}
       onBack={onBack}
-      nextDisabled={!hasDepartments}
+      nextDisabled={!hasDepartments || saving}
+      nextLoading={saving}
       wide
     >
-      <CompositeSection
-        title={`${deptLabel} & ${focusLabel}`}
-        description={`${deptLabel} appear on the schedule grid. ${focusLabel} live inside them. Management departments are for non-schedule staff like HR or admin.`}
-      >
-        <DepartmentsSettings
-          departments={departments}
-          focusAreas={focusAreas}
-          orgId={org.id}
-          focusAreaLabel={focusLabel}
-          departmentLabel={deptLabel}
-          canManageFocusAreas={true}
-          canManageOrgLabels={true}
-          onDepartmentsChange={setDepartments}
-          onFocusAreasChange={setFocusAreas}
-        />
-      </CompositeSection>
+      <Provider>
+        <CompositeSection
+          title={`${deptLabel} & ${focusLabel}`}
+          description={`${deptLabel} appear on the schedule grid. ${focusLabel} live inside them. Management departments are for non-schedule staff like HR or admin.`}
+        >
+          <DepartmentsSettings
+            departments={departments}
+            focusAreas={focusAreas}
+            orgId={org.id}
+            focusAreaLabel={focusLabel}
+            departmentLabel={deptLabel}
+            canManageFocusAreas={true}
+            canManageOrgLabels={true}
+            onDepartmentsChange={setDepartments}
+            onFocusAreasChange={setFocusAreas}
+          />
+        </CompositeSection>
 
-      <CompositeSection
-        title={roleLabel}
-        description={`Decide which roles are schedule-eligible. Schedule-eligible roles can gate jobs; any others stay as visible titles. You control which is which.`}
-      >
-        <StringListSettings
-          label={roleLabel}
-          items={orgRoles}
-          onSave={async (items) => {
-            const saved = await saveOrganizationRoles(org.id, items, rolesRef.current);
-            rolesRef.current = saved;
-            setOrgRoles(saved);
-          }}
-          placeholder={`Add a ${roleLabel.toLowerCase().replace(/s$/, "")}...`}
-          canEdit={true}
-          initialEditing
-          departments={departments}
-          showScheduleRoleToggle
-          onCheckDependencies={(id) => checkRoleDependencies(id, org.id)}
-        />
-      </CompositeSection>
+        <CompositeSection
+          title={roleLabel}
+          description={`Decide which roles are schedule-eligible. Schedule-eligible roles can gate jobs; any others stay as visible titles. You control which is which.`}
+        >
+          <StringListSettings
+            label={roleLabel}
+            items={orgRoles}
+            onSave={async (items, hardDeleteIds) => {
+              const saved = await saveOrganizationRoles(
+                org.id,
+                items,
+                rolesRef.current,
+                hardDeleteIds,
+              );
+              rolesRef.current = saved;
+              setOrgRoles(saved);
+            }}
+            placeholder={`Add a ${roleLabel.toLowerCase().replace(/s$/, "")}...`}
+            canEdit={true}
+            initialEditing
+            departments={departments}
+            showScheduleRoleToggle
+            onCheckDependencies={(id) => checkRoleDependencies(id, org.id)}
+          />
+        </CompositeSection>
 
-      <CompositeSection
-        title={certLabel}
-        description="Skill levels or certifications your staff hold. These help ensure the right qualifications are scheduled for each shift."
-      >
-        <StringListSettings
-          label={certLabel}
-          items={certifications}
-          onSave={async (updated) => {
-            const saved = await saveCertifications(org.id, updated, certsRef.current);
-            certsRef.current = saved;
-            handleCertificationsChange(saved);
-          }}
-          placeholder={`Add a ${certLabel.toLowerCase().replace(/s$/, "")}...`}
-          canEdit={true}
-          initialEditing
-          hideAbbr
-          onCheckDependencies={(id) => checkCertificationDependencies(id, org.id)}
-        />
-      </CompositeSection>
+        <CompositeSection
+          title={certLabel}
+          description="Skill levels or certifications your staff hold. These help ensure the right qualifications are scheduled for each shift."
+        >
+          <StringListSettings
+            label={certLabel}
+            items={certifications}
+            onSave={async (updated, hardDeleteIds) => {
+              const saved = await saveCertifications(
+                org.id,
+                updated,
+                certsRef.current,
+                hardDeleteIds,
+              );
+              certsRef.current = saved;
+              handleCertificationsChange(saved);
+            }}
+            placeholder={`Add a ${certLabel.toLowerCase().replace(/s$/, "")}...`}
+            canEdit={true}
+            initialEditing
+            hideAbbr
+            onCheckDependencies={(id) => checkCertificationDependencies(id, org.id)}
+          />
+        </CompositeSection>
+      </Provider>
 
       {!hasDepartments && (
         <p

@@ -12,7 +12,6 @@ import WelcomeStep from "./steps/WelcomeStep";
 import IdentityStep from "./steps/IdentityStep";
 import StructureStep from "./steps/StructureStep";
 import ScheduleStep from "./steps/ScheduleStep";
-import InviteTeamStep from "./steps/InviteTeamStep";
 import AdminOrientationStep from "./steps/AdminOrientationStep";
 import SuperAdminOrientationStep from "./steps/SuperAdminOrientationStep";
 import CompletionStep from "./steps/CompletionStep";
@@ -29,7 +28,6 @@ const SUPER_ADMIN_STEPS: StepConfig[] = [
   { id: "identity", label: "Identity" },
   { id: "structure", label: "Structure" },
   { id: "schedule", label: "Schedule" },
-  { id: "invite-team", label: "Team" },
   { id: "completion", label: "Done" },
 ];
 
@@ -99,8 +97,6 @@ export default function OnboardingWizard({
         return <StructureStep onNext={goNext} onBack={goBack} />;
       case "schedule":
         return <ScheduleStep onNext={goNext} onBack={goBack} />;
-      case "invite-team":
-        return <InviteTeamStep onNext={goNext} onBack={goBack} />;
       case "orientation":
         return <AdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "sa-orientation":
@@ -117,15 +113,18 @@ export default function OnboardingWizard({
   const hideStepper =
     currentStep.id === "welcome" || currentStep.id === "completion";
 
+  // Skip only escapes the per-user orientation phase. During org-config
+  // (isOrgSetup === false) the gate re-triggers on reload because the
+  // org-wide completeness check still fails, so the button would loop.
+  const canSkip = isOrgSetup && currentStep.id !== "completion";
+
   return (
     <>
       <WizardShell
         steps={steps}
         currentStepIndex={currentStepIndex}
         hideStepper={hideStepper}
-        onSkip={
-          currentStep.id !== "completion" ? () => setShowSkipConfirm(true) : undefined
-        }
+        onSkip={canSkip ? () => setShowSkipConfirm(true) : undefined}
         skipLoading={skipLoading}
         centerContent={isFirstStep || currentStep.id === "completion"}
       >
@@ -135,11 +134,7 @@ export default function OnboardingWizard({
       {showSkipConfirm && (
         <ConfirmDialog
           title="Skip Setup?"
-          message={
-            role === "super_admin"
-              ? "Skipping will leave your workspace unconfigured. You’ll need to set things up later in Settings before your team can use the app."
-              : "Are you sure you want to skip? You can configure your preferences later in Settings."
-          }
+          message="Are you sure you want to skip? You can configure your preferences later in Settings."
           confirmLabel="Yes, skip"
           cancelLabel="Go back"
           variant="warning"

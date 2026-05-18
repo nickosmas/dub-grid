@@ -48,8 +48,10 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
   async function handleComplete() {
     setLoading(true);
     try {
-      router.push(destination);
+      // Mark onboarding complete first so the destination route's gate sees
+      // the updated status and doesn't briefly re-render the wizard.
       await onComplete();
+      router.push(destination);
     } catch (err) {
       Sentry.captureException(err);
       toast.error("Something went wrong. Please try again.");

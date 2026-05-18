@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
-import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
+import { useOrganizationData, usePermissions } from "@/hooks";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import { useBillingRealtimeInvalidation } from "@/features/billing/useBillingRealtimeInvalidation";
 import { fetchOnboardingStatus } from "@/features/onboarding/client";
@@ -133,9 +133,6 @@ function OnboardingCheck({
     includeAssignmentDefinitionCompatibility: false,
     enabled: shouldCheckWorkspace && billing?.billingAccess.isLocked !== true,
   });
-  const { employees, loading: empLoading } = useEmployees(
-    shouldCheckWorkspace && billing?.billingAccess.isLocked !== true ? orgId : null,
-  );
 
   if (billingLoading) return null;
 
@@ -146,10 +143,19 @@ function OnboardingCheck({
     return <BillingRedirect />;
   }
 
-  if (statusLoading || orgLoading || empLoading) return null;
+  if (statusLoading || orgLoading) return null;
 
-  const isOrgSetupComplete = setupStatus.isComplete && employees.length > 0;
-  const canCompleteSetup = isSuperAdmin || canManageOrg || role === "admin";
+  // Adding employees is a post-wizard task on the People page, so it doesn't
+  // gate org setup completion. setupStatus.isComplete is the configuration
+  // contract (focus areas + schedule definitions + certifications + roles).
+  const isOrgSetupComplete = setupStatus.isComplete;
+  // Only roles that can actually advance org config get the setup wizard.
+  // canManageOrg covers gridmaster (filtered earlier) + super_admin + any
+  // manage-* perm. Admins without a manage-* perm have nothing to do in the
+  // config wizard — they'd loop on the ADMIN_STEPS orientation since
+  // completing it doesn't flip isOrgSetupComplete — so they wait alongside
+  // regular users until super_admin finishes.
+  const canCompleteSetup = canManageOrg;
 
   if (!isOrgSetupComplete) {
     if (!canCompleteSetup) {

@@ -6,8 +6,10 @@ import { useLogout } from "@/hooks";
 
 
 /**
- * Shown to regular users when they log in before the org is fully configured.
- * Blocks access to the app until an admin completes setup.
+ * Shown to authenticated users who can't advance org config — regular users
+ * and admins without any manage-* permission — when they log in before the
+ * org is fully configured. Blocks access to the app until a user with
+ * configuration permissions completes setup.
  */
 export default function SetupPendingScreen() {
   const { signOutLocal } = useLogout();
