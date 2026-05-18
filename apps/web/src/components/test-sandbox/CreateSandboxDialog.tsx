@@ -30,7 +30,7 @@ export default function CreateSandboxDialog({
         setError(
           formatClientErrorMessage(
             body?.error,
-            "We couldn't open the test sandbox right now.",
+            "We couldn't enter sandbox mode right now.",
           ),
         );
         setIsLoading(false);
@@ -43,18 +43,17 @@ export default function CreateSandboxDialog({
     }
   }
 
-  const sourceLabel = orgName ? ` from ${orgName}` : "";
+  const sourceLabel = orgName ? ` ${orgName}` : " your workspace";
   const message = (
     <div>
       <p style={{ margin: "0 0 12px 0" }}>
-        A test sandbox is a temporary copy of your workspace{sourceLabel}. It is
-        seeded with a small set of fake people and shifts so you can try out
-        scheduling, publishing, and other changes without affecting your live
-        data.
+        Sandbox mode gives you a private, fully-isolated copy of{sourceLabel} to
+        experiment in. You can create, edit, publish, and delete anything — none
+        of it touches your real data.
       </p>
       <p style={{ margin: "0 0 12px 0" }}>
-        Sandboxes expire 30 days after creation. You can reset or exit at any
-        time from the banner at the top of the screen.
+        When you&rsquo;re done, exit the sandbox from the banner at the top of
+        the screen and everything is discarded. No cleanup, no leftover copies.
       </p>
       {error ? (
         <div
@@ -77,9 +76,9 @@ export default function CreateSandboxDialog({
 
   return (
     <ConfirmDialog
-      title="Open test sandbox"
+      title="Enter sandbox mode"
       message={message}
-      confirmLabel={isLoading ? "Creating sandbox…" : "Create sandbox"}
+      confirmLabel={isLoading ? "Entering…" : "Enter sandbox"}
       cancelLabel="Cancel"
       variant="info"
       isLoading={isLoading}

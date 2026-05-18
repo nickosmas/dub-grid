@@ -8,10 +8,12 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { checkRateLimit, testSandboxLimiter } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { rowToOrganization } from "@/lib/db/mappers";
+import type { DbOrganization } from "@dubgrid/db-types";
 import {
-  archiveSandboxWorkspace,
   createSandboxWorkspace,
-  resolveSandboxWorkspaceReset,
+  deleteSandboxWorkspace,
+  findActiveSandboxForUser,
 } from "@/features/test-sandbox/server";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,7 @@ const requestSchema = z.discriminatedUnion("action", [
     sourceOrgId: z.string().uuid().optional(),
   }),
   z.object({
-    action: z.literal("reset"),
+    action: z.literal("exit"),
     sandboxOrgId: z.string().uuid(),
   }),
 ]);
@@ -40,6 +42,7 @@ const CLIENT_ERROR_MESSAGES = new Set([
   "Only sandbox workspaces can be reset",
   "Only the sandbox owner can reset this test sandbox",
   "Sandbox source workspace is unavailable",
+  "Choose a source workspace before opening the test sandbox.",
 ]);
 
 export async function POST(req: NextRequest) {
@@ -91,19 +94,38 @@ export async function POST(req: NextRequest) {
   const requestClient = createRequestSupabaseClient(req);
 
   try {
-    const resetTarget =
-      parsed.data.action === "reset" ? parsed.data.sandboxOrgId : null;
-    const sourceOrgId =
-      parsed.data.action === "create"
-        ? parsed.data.sourceOrgId ?? getClaimOrgId(auth.claims)
-        : (
-            await resolveSandboxWorkspaceReset({
-              serviceClient,
-              actor: auth.user,
-              sandboxOrgId: parsed.data.sandboxOrgId,
-            })
-          ).sourceOrgId;
+    if (parsed.data.action === "exit") {
+      await deleteSandboxWorkspace({
+        serviceClient,
+        requestClient,
+        actor: auth.user,
+        sandboxOrgId: parsed.data.sandboxOrgId,
+      });
+      return NextResponse.json({ success: true });
+    }
 
+    // action === "create" — enter sandbox mode.
+    // Singleton: if the user already owns an active sandbox, switch them
+    // into it instead of cloning a new one.
+    const existing = await findActiveSandboxForUser(serviceClient, auth.user.id);
+    if (existing) {
+      const { error: switchError } = await requestClient.rpc("switch_org", {
+        target_org_id: existing.id,
+      });
+      if (switchError) throw switchError;
+      return NextResponse.json({
+        success: true,
+        sandbox: {
+          org: rowToOrganization(existing as DbOrganization),
+          sourceOrgId: existing.sandbox_source_org_id ?? null,
+          employeeCount: 0,
+          reused: true,
+        },
+      });
+    }
+
+    const sourceOrgId =
+      parsed.data.sourceOrgId ?? getClaimOrgId(auth.claims);
     if (!sourceOrgId) {
       return NextResponse.json(
         { error: "Choose a source workspace before opening the test sandbox." },
@@ -124,16 +146,8 @@ export async function POST(req: NextRequest) {
       requestClient,
       actor: auth.user,
       sourceOrgId,
-      archiveExistingActive: parsed.data.action === "create",
+      archiveExistingActive: true,
     });
-
-    if (resetTarget) {
-      await archiveSandboxWorkspace({
-        serviceClient,
-        actor: auth.user,
-        sandboxOrgId: resetTarget,
-      });
-    }
 
     return NextResponse.json({
       success: true,

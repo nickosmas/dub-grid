@@ -1027,3 +1027,50 @@ export async function archiveSandboxWorkspace(input: {
 
   return { sourceOrgId };
 }
+
+export async function findActiveSandboxForUser(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<DbOrganization | null> {
+  const { data, error } = await serviceClient
+    .from("organizations")
+    .select(ORGANIZATION_WITH_BILLING_COLS)
+    .eq("workspace_kind", "sandbox")
+    .eq("sandbox_owner_user_id", userId)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as DbOrganization | null) ?? null;
+}
+
+export async function deleteSandboxWorkspace(input: {
+  serviceClient: SupabaseClient;
+  requestClient: SupabaseClient;
+  actor: User;
+  sandboxOrgId: string;
+}): Promise<{ sourceOrgId: string }> {
+  const { sourceOrgId } = await resolveSandboxWorkspaceReset({
+    serviceClient: input.serviceClient,
+    actor: input.actor,
+    sandboxOrgId: input.sandboxOrgId,
+  });
+
+  // Switch the caller's session back to the source workspace before the
+  // sandbox row disappears so they don't end up authenticated against a
+  // deleted org.
+  const { error: switchError } = await input.requestClient.rpc("switch_org", {
+    target_org_id: sourceOrgId,
+  });
+  if (switchError) throw switchError;
+
+  const { error: deleteError } = await input.serviceClient
+    .from("organizations")
+    .delete()
+    .eq("id", input.sandboxOrgId)
+    .eq("workspace_kind", "sandbox");
+  if (deleteError) throw deleteError;
+
+  return { sourceOrgId };
+}

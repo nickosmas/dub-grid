@@ -7,9 +7,10 @@ const createRequestSupabaseClient = vi.fn();
 const getServiceClient = vi.fn();
 const checkRateLimit = vi.fn();
 const requireOrgPermissions = vi.fn();
-const resolveSandboxWorkspaceReset = vi.fn();
 const createSandboxWorkspace = vi.fn();
-const archiveSandboxWorkspace = vi.fn();
+const deleteSandboxWorkspace = vi.fn();
+const findActiveSandboxForUser = vi.fn();
+const rowToOrganization = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -34,11 +35,15 @@ vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
 }));
 
+vi.mock("@/lib/db/mappers", () => ({
+  rowToOrganization: (...args: unknown[]) => rowToOrganization(...args),
+}));
+
 vi.mock("@/features/test-sandbox/server", () => ({
-  archiveSandboxWorkspace: (...args: unknown[]) => archiveSandboxWorkspace(...args),
   createSandboxWorkspace: (...args: unknown[]) => createSandboxWorkspace(...args),
-  resolveSandboxWorkspaceReset: (...args: unknown[]) =>
-    resolveSandboxWorkspaceReset(...args),
+  deleteSandboxWorkspace: (...args: unknown[]) => deleteSandboxWorkspace(...args),
+  findActiveSandboxForUser: (...args: unknown[]) =>
+    findActiveSandboxForUser(...args),
 }));
 
 import { POST } from "./route";
@@ -60,6 +65,8 @@ function makeRequest(body: unknown) {
 }
 
 describe("POST /api/test-sandbox", () => {
+  let switchRpc: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     validateCsrfOrigin.mockReturnValue(null);
@@ -70,23 +77,29 @@ describe("POST /api/test-sandbox", () => {
         org_role: "super_admin",
       },
     });
-    createRequestSupabaseClient.mockReturnValue({ rpc: vi.fn() });
+    switchRpc = vi.fn().mockResolvedValue({ error: null });
+    createRequestSupabaseClient.mockReturnValue({ rpc: switchRpc });
     getServiceClient.mockReturnValue({ from: vi.fn() });
     checkRateLimit.mockResolvedValue({ limited: false });
     requireOrgPermissions.mockResolvedValue({
       actor: { id: USER_ID },
       permissions: { isSuperAdmin: true },
     });
-    resolveSandboxWorkspaceReset.mockResolvedValue({ sourceOrgId: SOURCE_ORG_ID });
+    findActiveSandboxForUser.mockResolvedValue(null);
     createSandboxWorkspace.mockResolvedValue({
       org: { id: NEW_SANDBOX_ORG_ID, name: "Test Sandbox" },
       sourceOrgId: SOURCE_ORG_ID,
       employeeCount: 6,
     });
-    archiveSandboxWorkspace.mockResolvedValue({ sourceOrgId: SOURCE_ORG_ID });
+    deleteSandboxWorkspace.mockResolvedValue({ sourceOrgId: SOURCE_ORG_ID });
+    rowToOrganization.mockImplementation((row: { id: string; name: string }) => ({
+      id: row.id,
+      name: row.name,
+      workspaceKind: "sandbox",
+    }));
   });
 
-  it("creates a test sandbox from the current workspace with setup and lock bypasses", async () => {
+  it("creates a test sandbox from the current workspace when none exists", async () => {
     const response = await POST(makeRequest({ action: "create" }));
 
     expect(response.status).toBe(200);
@@ -97,6 +110,10 @@ describe("POST /api/test-sandbox", () => {
         employeeCount: 6,
       },
     });
+    expect(findActiveSandboxForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      USER_ID,
+    );
     expect(requireOrgPermissions).toHaveBeenCalledWith(
       expect.any(NextRequest),
       SOURCE_ORG_ID,
@@ -115,49 +132,44 @@ describe("POST /api/test-sandbox", () => {
     );
   });
 
-  it("creates a replacement sandbox before archiving the old sandbox on reset", async () => {
-    const events: string[] = [];
-    createSandboxWorkspace.mockImplementation(async () => {
-      events.push("create");
-      return {
-        org: { id: NEW_SANDBOX_ORG_ID, name: "Test Sandbox" },
-        sourceOrgId: SOURCE_ORG_ID,
-        employeeCount: 6,
-      };
-    });
-    archiveSandboxWorkspace.mockImplementation(async () => {
-      events.push("archive");
-      return { sourceOrgId: SOURCE_ORG_ID };
+  it("reuses the existing sandbox via switch_org when the user already owns one", async () => {
+    findActiveSandboxForUser.mockResolvedValueOnce({
+      id: SANDBOX_ORG_ID,
+      name: "Existing Sandbox",
+      workspace_kind: "sandbox",
+      sandbox_source_org_id: SOURCE_ORG_ID,
     });
 
+    const response = await POST(makeRequest({ action: "create" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      sandbox: {
+        sourceOrgId: SOURCE_ORG_ID,
+        reused: true,
+      },
+    });
+    expect(switchRpc).toHaveBeenCalledWith("switch_org", {
+      target_org_id: SANDBOX_ORG_ID,
+    });
+    expect(createSandboxWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("exits the sandbox by hard-deleting via deleteSandboxWorkspace", async () => {
     const response = await POST(
-      makeRequest({ action: "reset", sandboxOrgId: SANDBOX_ORG_ID }),
+      makeRequest({ action: "exit", sandboxOrgId: SANDBOX_ORG_ID }),
     );
 
     expect(response.status).toBe(200);
-    expect(resolveSandboxWorkspaceReset).toHaveBeenCalledWith({
-      serviceClient: expect.anything(),
-      actor: expect.objectContaining({ id: USER_ID }),
-      sandboxOrgId: SANDBOX_ORG_ID,
-    });
-    expect(createSandboxWorkspace).toHaveBeenCalledWith(
+    await expect(response.json()).resolves.toEqual({ success: true });
+    expect(deleteSandboxWorkspace).toHaveBeenCalledWith(
       expect.objectContaining({
-        archiveExistingActive: false,
+        actor: expect.objectContaining({ id: USER_ID }),
+        sandboxOrgId: SANDBOX_ORG_ID,
       }),
     );
-    expect(events).toEqual(["create", "archive"]);
-  });
-
-  it("does not archive the old sandbox if replacement creation fails", async () => {
-    createSandboxWorkspace.mockRejectedValueOnce(new Error("Seed failed"));
-
-    const response = await POST(
-      makeRequest({ action: "reset", sandboxOrgId: SANDBOX_ORG_ID }),
-    );
-
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "Seed failed" });
-    expect(archiveSandboxWorkspace).not.toHaveBeenCalled();
+    expect(createSandboxWorkspace).not.toHaveBeenCalled();
   });
 
   it("returns authorization responses from the source workspace check", async () => {
