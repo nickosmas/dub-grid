@@ -48,12 +48,6 @@ export const inviteLimiter = createSlidingWindowLimiter(100, "1 h");
 export const demoLimiter = createSlidingWindowLimiter(3, "1 h");
 
 /**
- * Test-sandbox creation rate limiter — 3 requests per hour per user.
- * Sandbox creation is expensive (clones org config + seeds data).
- */
-export const testSandboxLimiter = createSlidingWindowLimiter(3, "1 h");
-
-/**
  * Password reset rate limiter — 5 requests per 15 minutes per key (email hash).
  * Returns `{ success: true }` if Redis is not configured (local dev).
  */

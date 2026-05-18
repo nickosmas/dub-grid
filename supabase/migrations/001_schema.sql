@@ -20,7 +20,6 @@ CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'ap
 CREATE TYPE public.profile_change_request_type AS ENUM ('profile_update', 'account_deletion');
 CREATE TYPE public.profile_change_request_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled');
 CREATE TYPE public.department_type AS ENUM ('scheduled', 'management');
-CREATE TYPE public.workspace_kind AS ENUM ('real', 'sandbox');
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -70,11 +69,6 @@ CREATE TABLE public.organizations (
   archived_at          TIMESTAMPTZ,
   suspended_at                  TIMESTAMPTZ,
   suspended_reason              TEXT,
-  workspace_kind            public.workspace_kind NOT NULL DEFAULT 'real',
-  sandbox_source_org_id     UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
-  sandbox_owner_user_id     UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  sandbox_expires_at        TIMESTAMPTZ,
-  sandbox_template_version  INTEGER,
   enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
   coverage_rule_config JSONB NOT NULL DEFAULT '{"mentoredCoverageCreditPercent":100}'::jsonb,
   feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
