@@ -381,14 +381,14 @@ export async function middleware(req: NextRequest) {
                 // their real-org subdomain and the subdomain redirect at
                 // line 410 is a no-op.
               };
-            } else {
-              // Cookie no longer points to a valid sandbox owned by the
-              // user — clear it.
-              res.cookies.set("dubgrid-sandbox", "", {
-                path: "/",
-                maxAge: 0,
-              });
             }
+            // No row → either the sandbox was deleted server-side or the
+            // verification query transiently failed. Either way, fail open:
+            // do not override here. The /api/organization/bootstrap and
+            // /api/test-sandbox handlers do their own ownership checks via
+            // the service client, so a stale cookie cannot leak data even
+            // if middleware doesn't override. The user clears the cookie
+            // explicitly by clicking Exit, not by us guessing.
           }
         } catch (e) {
           Sentry.captureException(e, {
