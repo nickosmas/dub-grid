@@ -17,6 +17,12 @@ import * as Sentry from "@/lib/sentry";
 import NotificationBell from "@/components/NotificationBell";
 import { MaybeHint } from "@/components/ui/hint";
 import type { OrganizationBillingSummary } from "@/types";
+import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
+import CreateSandboxDialog from "@/components/test-sandbox/CreateSandboxDialog";
+import {
+  fetchOrganizationBootstrap,
+  type OrganizationBootstrap,
+} from "@/features/organization/client/api";
 
 
 const NAV_ITEMS: { id: string; href: string; label: string; icon?: React.ReactNode }[] = [
@@ -343,7 +349,23 @@ export default function Header({ orgName }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [sandboxDialogOpen, setSandboxDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const sandboxBootstrapQuery = useQuery<OrganizationBootstrap>({
+    queryKey: queryKeys.org.bootstrap(null, false),
+    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    staleTime: 60_000,
+    enabled: Boolean(authUser),
+  });
+  const isInSandbox =
+    sandboxBootstrapQuery.data?.org?.workspaceKind === "sandbox";
+  const canOpenSandbox =
+    Boolean(authUser) &&
+    !isImpersonating &&
+    !isUserViewActive &&
+    !isInSandbox &&
+    actualLevel >= 2;
 
   // Hydrate cached name from sessionStorage after mount
   useEffect(() => {
@@ -402,6 +424,13 @@ export default function Header({ orgName }: HeaderProps) {
   if (isMobile) {
     return (
       <>
+        <SandboxBanner />
+        {sandboxDialogOpen && (
+          <CreateSandboxDialog
+            orgName={orgName}
+            onClose={() => setSandboxDialogOpen(false)}
+          />
+        )}
         <div
           style={{
             background: "var(--color-surface)",
@@ -491,7 +520,15 @@ export default function Header({ orgName }: HeaderProps) {
 
   /* ── Desktop / Tablet Header ───────────────────────────── */
   return (
-    <div
+    <>
+      <SandboxBanner />
+      {sandboxDialogOpen && (
+        <CreateSandboxDialog
+          orgName={orgName}
+          onClose={() => setSandboxDialogOpen(false)}
+        />
+      )}
+      <div
       style={{
         background: "var(--color-surface)",
         padding: isTablet ? "0 16px" : "0 24px",
@@ -698,6 +735,17 @@ export default function Header({ orgName }: HeaderProps) {
                 </button>
               </>
             )}
+            {canOpenSandbox && (
+              <button
+                className="dg-menu-item"
+                onClick={() => { setMenuOpen(false); setSandboxDialogOpen(true); }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7h18M5 7v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
+                </svg>
+                Open Test Sandbox
+              </button>
+            )}
             <div className="dg-menu-divider" />
             <button
               className="dg-menu-item dg-menu-item--danger"
@@ -714,5 +762,6 @@ export default function Header({ orgName }: HeaderProps) {
         )}
       </div>
     </div>
+    </>
   );
 }
