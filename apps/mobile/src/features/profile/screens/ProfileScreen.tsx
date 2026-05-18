@@ -410,12 +410,7 @@ export default function ProfileScreen() {
             <ProfileList>
               <ProfileNavRow
                 iconName="id-card-outline"
-                label="Account details"
-                onPress={() => router.push("/(tabs)/profile/account")}
-              />
-              <ProfileNavRow
-                iconName="briefcase-outline"
-                label="Work profile"
+                label="Profile details"
                 onPress={() => router.push("/(tabs)/profile/work")}
               />
               <ProfileNavRow

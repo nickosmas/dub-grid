@@ -16,6 +16,7 @@ const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const updateMobilePerson = vi.fn();
+const updateProfileAccount = vi.fn();
 const pushToast = vi.fn();
 
 vi.mock("react-native", async () =>
@@ -52,7 +53,16 @@ vi.mock("../../../shared/lib/api", () => ({
   createProfileChangeRequest: vi.fn(),
   getProfile: vi.fn(),
   updateMobilePerson,
+  updateProfileAccount,
   updateProfilePhone: vi.fn(),
+}));
+
+vi.mock("../../../shared/lib/supabase", () => ({
+  getSupabaseClient: vi.fn(() => ({
+    auth: {
+      updateUser: vi.fn().mockResolvedValue({ error: null }),
+    },
+  })),
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({
@@ -121,6 +131,7 @@ describe("ProfileWorkScreen", () => {
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     updateMobilePerson.mockReset();
+    updateProfileAccount.mockReset();
     pushToast.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
@@ -163,25 +174,40 @@ describe("ProfileWorkScreen", () => {
       success: true,
       person: profileData.linkedEmployee,
     });
+    updateProfileAccount.mockResolvedValue({ success: true });
   });
 
-  it("saves manager staff edits from the profile work screen", async () => {
+  it("hides the edit panel by default and shows account + staff details", () => {
     render(<ProfileWorkScreen />);
 
-    expect(
-      screen.queryByRole("button", { name: "Edit staff profile" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Edit staff profile")).toBeInTheDocument();
+    expect(screen.getByText("Account")).toBeInTheDocument();
+    expect(screen.getByText("Staff profile")).toBeInTheDocument();
     expect(screen.getByText("Employment")).toBeInTheDocument();
     expect(screen.getAllByText("Supervisor").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("First name")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Last name")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Email")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Phone")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "RN" })).not.toBeInTheDocument();
+  });
+
+  it("disables Save changes and Discard until a field changes, then saves", async () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(screen.getByLabelText("First name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Discard" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
+    expect(
+      screen.getByRole("button", { name: "Save changes" }),
+    ).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Discard" })).not.toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(screen.getByText("Save these changes?")).toBeInTheDocument();
     fireEvent.click(
       within(screen.getByRole("alert")).getByRole("button", { name: "Save" }),
@@ -193,8 +219,6 @@ describe("ProfileWorkScreen", () => {
         "d660d308-4e0d-4daf-84fd-6753405e6740",
         expect.objectContaining({
           expectedVersion: 4,
-          firstName: "Mina",
-          lastName: "Diaz",
           certificationId: 5,
           focusAreaIds: [2],
           roleIds: [3],

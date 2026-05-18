@@ -13,11 +13,11 @@ export default function ProfileLayout() {
       />
       <Stack.Screen
         name="account"
-        options={createDetailStackOptions("Account details")}
+        options={createDetailStackOptions("Profile details")}
       />
       <Stack.Screen
         name="work"
-        options={createDetailStackOptions("Work profile")}
+        options={createDetailStackOptions("Profile details")}
       />
       <Stack.Screen
         name="security"
