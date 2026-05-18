@@ -41,12 +41,20 @@ export interface GooglePostalAddress {
   regionCode?: string;
 }
 
+export interface GoogleLatLngLike {
+  lat?: number | (() => number);
+  lng?: number | (() => number);
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface GooglePlaceResult {
   address_components?: GoogleAddressComponent[];
   addressComponents?: GoogleAddressComponent[];
   formattedAddress?: string;
   displayName?: string | null;
   postalAddress?: GooglePostalAddress;
+  location?: GoogleLatLngLike | null;
 }
 
 export interface GooglePlace extends GooglePlaceResult {
@@ -201,6 +209,23 @@ function getFormattedAddressLine1(formattedAddress?: string): string {
 
 export function getGoogleText(text: GoogleFormattableText | undefined): string {
   return text?.text ?? text?.toString?.() ?? "";
+}
+
+export function readGoogleLatLng(
+  location: GoogleLatLngLike | null | undefined,
+): { latitude: number; longitude: number } | null {
+  if (!location) return null;
+
+  const rawLat = typeof location.lat === "function" ? location.lat() : location.lat;
+  const rawLng = typeof location.lng === "function" ? location.lng() : location.lng;
+
+  const latitude =
+    typeof rawLat === "number" ? rawLat : (location.latitude ?? Number.NaN);
+  const longitude =
+    typeof rawLng === "number" ? rawLng : (location.longitude ?? Number.NaN);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
 }
 
 export function parseGooglePlaceAddress(

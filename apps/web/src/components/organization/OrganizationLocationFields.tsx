@@ -18,11 +18,14 @@ import {
   getGoogleText,
   loadGooglePlacesLibrary,
   parseGooglePlaceAddress,
+  readGoogleLatLng,
   type GoogleAutocompleteSuggestion,
   type GoogleFormattableText,
   type GooglePlacePrediction,
   type GooglePlacesLibrary,
 } from "./google-maps";
+import { getTimezoneForCoords } from "@/lib/timezone-from-coords";
+import { getTimezoneForUsState } from "@/lib/us-state-timezones";
 import TimezoneSelect from "./TimezoneSelect";
 
 export interface OrganizationLocationFormValue
@@ -88,6 +91,10 @@ function HighlightedGoogleText({
   return <>{segments}</>;
 }
 
+type AddressAutofillPatch = Partial<StructuredOrganizationAddress> & {
+  timezone?: string;
+};
+
 function AddressLine1Input({
   id,
   value,
@@ -97,7 +104,7 @@ function AddressLine1Input({
   id: string;
   value: string;
   onChange: (value: string) => void;
-  onAutofill: (patch: Partial<StructuredOrganizationAddress>) => void;
+  onAutofill: (patch: AddressAutofillPatch) => void;
 }) {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -289,17 +296,23 @@ function AddressLine1Input({
           "formattedAddress",
           "displayName",
           "postalAddress",
+          "location",
         ],
       });
 
       const patch = parseGooglePlaceAddress(place);
+      const coords = readGoogleLatLng(place.location);
+      const timezone =
+        getTimezoneForUsState(patch.addressState) ??
+        getTimezoneForCoords(coords?.latitude, coords?.longitude);
+
       skipNextFetchRef.current = true;
       skipNextPanelOpenRef.current = true;
       sessionTokenRef.current = new placesLibrary.AutocompleteSessionToken();
       closePanel(true);
 
       if (patch.addressLine1) onChange(patch.addressLine1);
-      onAutofill(patch);
+      onAutofill(timezone ? { ...patch, timezone } : patch);
     } catch {
       closePanel();
     }

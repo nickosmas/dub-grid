@@ -21,11 +21,14 @@ function LocationFieldsHarness({
   });
 
   return (
-    <OrganizationLocationFields
-      value={value}
-      onChange={(patch) => setValue((prev) => ({ ...prev, ...patch }))}
-      showEmployeeCount={false}
-    />
+    <>
+      <OrganizationLocationFields
+        value={value}
+        onChange={(patch) => setValue((prev) => ({ ...prev, ...patch }))}
+        showEmployeeCount={false}
+      />
+      <output data-testid="tz-value">{value.timezone}</output>
+    </>
   );
 }
 
@@ -239,6 +242,9 @@ describe("OrganizationLocationFields", () => {
     expect(screen.getByLabelText(/state \/ province/i)).toHaveValue("CA");
     expect(screen.getByLabelText(/postal code/i)).toHaveValue("94043");
     expect(screen.getByLabelText(/country/i)).toHaveValue("United States");
+    expect(screen.getByTestId("tz-value")).toHaveTextContent(
+      "America/Los_Angeles",
+    );
   });
 
   it("fills the right address fields after confirming an address recommendation", async () => {
