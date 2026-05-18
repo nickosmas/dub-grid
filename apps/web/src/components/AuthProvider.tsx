@@ -14,6 +14,7 @@ import {
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   signOut: () => Promise<void>;
   isLoading: boolean;
 }
@@ -63,6 +64,7 @@ export function useAuth() {
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -86,17 +88,18 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("session_timeout")), 5000),
         );
-        const session = await Promise.race([sessionPromise, timeoutPromise]);
+        const initialSession = await Promise.race([sessionPromise, timeoutPromise]);
 
         const verifiedUser =
-          session?.access_token ? await getVerifiedBrowserAuthUser() : null;
+          initialSession?.access_token ? await getVerifiedBrowserAuthUser() : null;
+        setSession(verifiedUser ? initialSession : null);
         setUser(verifiedUser);
         setSentryUser(
           verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
         );
 
         // Track existing session on page load (session restored from cookies)
-        if (session?.refresh_token && verifiedUser) {
+        if (initialSession?.refresh_token && verifiedUser) {
           trackSession().catch(() => {});
         }
       } catch (error) {
@@ -105,6 +108,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         if (isRecoverableBrowserAuthFailure(error) || (error instanceof Error && error.message === "session_timeout")) {
           clearBrowserAuthState();
         }
+        setSession(null);
         setUser(null);
         setSentryUser(null);
       } finally {
@@ -117,8 +121,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Listen for auth state changes
     const {
       data: { subscription },
-    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, session: Session | null) => {
-      if (event === "SIGNED_OUT" || !session?.access_token) {
+    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, nextSession: Session | null) => {
+      if (event === "SIGNED_OUT" || !nextSession?.access_token) {
+        setSession(null);
         setUser(null);
         setIsLoading(false);
         setSentryUser(null);
@@ -127,6 +132,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       void (async () => {
         const verifiedUser = await getVerifiedBrowserAuthUser().catch(() => null);
+        setSession(verifiedUser ? nextSession : null);
         setUser(verifiedUser);
         setIsLoading(false);
         setSentryUser(
@@ -137,7 +143,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         // and ProtectedRoute handles session-expiry redirects to /login.
         if (
           (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
-          session.refresh_token &&
+          nextSession.refresh_token &&
           verifiedUser
         ) {
           trackSession().catch(() => {});
@@ -155,8 +161,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const contextValue = useMemo(
-    () => ({ user, signOut, isLoading }),
-    [user, signOut, isLoading],
+    () => ({ user, session, signOut, isLoading }),
+    [user, session, signOut, isLoading],
   );
 
   return (
