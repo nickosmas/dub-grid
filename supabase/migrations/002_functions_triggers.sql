@@ -773,7 +773,9 @@ BEGIN
   IF public.is_gridmaster() THEN
     RETURN QUERY
     SELECT o.id, o.name, o.slug, 'user'::public.org_role, (o.id = v_active_oid)
-    FROM public.organizations o ORDER BY o.name;
+    FROM public.organizations o
+    WHERE o.archived_at IS NULL
+    ORDER BY o.name;
     RETURN;
   END IF;
 
@@ -781,7 +783,10 @@ BEGIN
   SELECT cm.org_id, o.name, o.slug, cm.org_role, (cm.org_id = v_active_oid)
   FROM public.organization_memberships cm
   JOIN public.organizations o ON o.id = cm.org_id
-  WHERE cm.user_id = v_uid ORDER BY o.name;
+  WHERE cm.user_id = v_uid
+    AND cm.archived_at IS NULL
+    AND o.archived_at IS NULL
+  ORDER BY o.name;
 END;
 $$;
 
