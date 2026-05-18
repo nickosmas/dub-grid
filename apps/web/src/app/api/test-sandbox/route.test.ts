@@ -171,19 +171,24 @@ describe("POST /api/test-sandbox", () => {
     expect(createSandboxWorkspace).not.toHaveBeenCalled();
   });
 
-  it("rate limits test sandbox creation by user", async () => {
+  it("rate limits test sandbox creation by user in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
     checkRateLimit.mockResolvedValueOnce({
       limited: true,
       reset: Date.now() + 30_000,
     });
 
-    const response = await POST(makeRequest({ action: "create" }));
+    try {
+      const response = await POST(makeRequest({ action: "create" }));
 
-    expect(response.status).toBe(429);
-    await expect(response.json()).resolves.toEqual({
-      error: "Too many test sandbox requests",
-    });
-    expect(createSandboxWorkspace).not.toHaveBeenCalled();
+      expect(response.status).toBe(429);
+      await expect(response.json()).resolves.toEqual({
+        error: "Too many test sandbox requests",
+      });
+      expect(createSandboxWorkspace).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("returns client errors for invalid source workspace choices", async () => {

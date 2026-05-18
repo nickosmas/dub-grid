@@ -49,28 +49,30 @@ export async function POST(req: NextRequest) {
   const auth = await requireAuthenticatedUserWithClaims(req);
   if ("response" in auth) return auth.response;
 
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    testSandboxLimiter,
-    `test-sandbox:${auth.user.id}`,
-  );
-  if (misconfigured) {
-    return NextResponse.json(
-      { error: "Test sandbox temporarily unavailable" },
-      { status: 503 },
+  if (process.env.NODE_ENV === "production") {
+    const { limited, reset, misconfigured } = await checkRateLimit(
+      testSandboxLimiter,
+      `test-sandbox:${auth.user.id}`,
     );
-  }
-  if (limited) {
-    return NextResponse.json(
-      { error: "Too many test sandbox requests" },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(
-            Math.max(1, Math.ceil(((reset ?? Date.now()) - Date.now()) / 1000)),
-          ),
+    if (misconfigured) {
+      return NextResponse.json(
+        { error: "Test sandbox temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many test sandbox requests" },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              Math.max(1, Math.ceil(((reset ?? Date.now()) - Date.now()) / 1000)),
+            ),
+          },
         },
-      },
-    );
+      );
+    }
   }
 
   let body: unknown;
