@@ -445,9 +445,10 @@ function DepartmentSection({
   // this section). Without this, temp IDs in localDepts would still differ from
   // the server-assigned real IDs and isDirty would stay true — so a retry after
   // a later section's failure would re-run this save with a stale snapshot and
-  // hard-delete the rows we just persisted.
-  const lastDeptsRef = useRef(depts);
-  const lastPropFAsRef = useRef(propFAs);
+  // hard-delete the rows we just persisted. Initialized to null so the first
+  // mount also hydrates localFAs (lazy useState only seeded localDepts).
+  const lastDeptsRef = useRef<Department[] | null>(null);
+  const lastPropFAsRef = useRef<FocusArea[] | null>(null);
   useEffect(() => {
     if (!isWizardMode) return;
     if (lastDeptsRef.current !== depts) {
