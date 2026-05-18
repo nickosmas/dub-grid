@@ -57,7 +57,10 @@ export async function fetchUserSessionsForUser(
     .select(
       "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash",
     )
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    // Filter partial rows created by switch_org before track-session fills in
+    // refresh_token_hash. These are non-revokable transient rows.
+    .not("refresh_token_hash", "is", null);
 
   if (options.activeSince) {
     query = query.gte("last_active_at", options.activeSince);

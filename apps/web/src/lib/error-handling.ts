@@ -1,6 +1,26 @@
+import { NextResponse } from "next/server";
 import { toast } from "sonner";
 import { signOutFromBrowser } from "@/features/account/client";
 import { extractRawErrorMessage, formatClientErrorMessage } from "@/lib/client-facing";
+
+/**
+ * Build a sanitized JSON error response for an API route handler.
+ *
+ * Strips technical content (Zod dumps, Supabase/PostgREST errors, JWT/SQL
+ * internals) and replaces it with the caller's user-facing fallback. The raw
+ * error is logged server-side so observability isn't lost.
+ */
+export function apiErrorResponse(
+  error: unknown,
+  fallback: string,
+  status = 500,
+): NextResponse {
+  console.error("[api]", fallback, error);
+  return NextResponse.json(
+    { error: formatClientErrorMessage(error, fallback) },
+    { status },
+  );
+}
 
 /** Extract a human-readable message from an unknown error value. */
 export function extractErrorMessage(err: unknown, fallback: string): string {

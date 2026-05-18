@@ -6,8 +6,6 @@ import { fetchJobDefinitions, fetchShiftCategories } from "./config";
 import type { DbRecurringShift, DbScheduleNote, RecurringDraft, DbScheduleCell } from "./types";
 import { rowToRecurringShift, generateSeriesDates } from "./mappers";
 import { upsertShift, deleteShift } from "./shifts";
-import type { DraftBreakdown } from "@/lib/draft-utils";
-import { formatClientErrorMessage } from "@/lib/client-facing";
 import {
   joinShiftJobSegmentLabels,
   resolveShiftJobSegments,
@@ -27,44 +25,6 @@ import type {
 } from "@/types";
 
 const SHIFT_SERIES_UPSERT_BATCH_SIZE = 25;
-
-interface ScheduleDraftSummaryResponse {
-  summary?: DraftBreakdown;
-  error?: string;
-  code?: string;
-}
-
-export class ScheduleDraftConflictError extends Error {
-  constructor(public readonly latestSummary: DraftBreakdown) {
-    super("Schedule drafts changed elsewhere.");
-    this.name = "ScheduleDraftConflictError";
-  }
-}
-
-async function parseScheduleSummaryResponse(
-  response: Response,
-): Promise<ScheduleDraftSummaryResponse | null> {
-  try {
-    return (await response.json()) as ScheduleDraftSummaryResponse;
-  } catch {
-    return null;
-  }
-}
-
-function getScheduleDraftSummaryErrorMessage(
-  response: Response,
-  body: ScheduleDraftSummaryResponse | null,
-): string {
-  if (response.status === 429) {
-    return "Too many schedule review requests. Please wait a moment and try again.";
-  }
-
-  if (response.status === 503) {
-    return "Schedule review is temporarily unavailable. Please try again.";
-  }
-
-  return formatClientErrorMessage(body?.error, "Failed to load schedule draft summary");
-}
 
 type CreateShiftSeriesOptions = {
   onProgress?: (progress: number) => void;
@@ -215,61 +175,6 @@ function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
   );
 }
 
-// ── Publish ──────────────────────────────────────────────────────────────────
-
-export async function publishSchedule(
-  orgId: string,
-  startDate: Date,
-  endDate: Date,
-  expectedSummary?: DraftBreakdown,
-): Promise<DraftBreakdown> {
-  const startKey = formatDateKey(startDate);
-  const endKey = formatDateKey(endDate);
-  const response = await fetch("/api/shifts/publish", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      orgId,
-      startDate: startKey,
-      endDate: endKey,
-      expectedSummary,
-    }),
-  });
-
-  const body = await parseScheduleSummaryResponse(response);
-
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
-
-  if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
-  }
-
-  return body.summary;
-}
-
-export async function fetchScheduleDraftSummary(input: {
-  orgId: string;
-  scope?: "all" | "mine";
-  startDate?: string;
-  endDate?: string;
-}): Promise<DraftBreakdown> {
-  const params = new URLSearchParams({ orgId: input.orgId });
-  if (input.scope) params.set("scope", input.scope);
-  if (input.startDate) params.set("startDate", input.startDate);
-  if (input.endDate) params.set("endDate", input.endDate);
-
-  const response = await fetch(`/api/shifts/draft-summary?${params.toString()}`);
-  const body = await parseScheduleSummaryResponse(response);
-
-  if (!response.ok || !body?.summary) {
-    throw new Error(getScheduleDraftSummaryErrorMessage(response, body));
-  }
-
-  return body.summary;
-}
-
 /**
  * Fetch publish history entries since a given timestamp (or last 24 hours as fallback).
  * Returns newest-first. An empty array means nothing was published recently.
@@ -365,34 +270,6 @@ export async function fetchPublishHistory(
     changes: row.changes as PublishChange[],
     publishedAt: row.published_at,
   }));
-}
-
-export async function discardScheduleDrafts(
-  orgId: string,
-  userId?: string,
-  expectedSummary?: DraftBreakdown,
-): Promise<DraftBreakdown> {
-  const response = await fetch("/api/shifts/discard", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      orgId,
-      scope: userId ? "mine" : "all",
-      expectedSummary,
-    }),
-  });
-
-  const body = await parseScheduleSummaryResponse(response);
-
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
-
-  if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
-  }
-
-  return body.summary;
 }
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ export async function fetchUserSessions() {
   const { data, error } = await supabase
     .from("user_sessions")
     .select("id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash")
+    .not("refresh_token_hash", "is", null)
     .order("last_active_at", { ascending: false });
 
   if (error) throw error;
