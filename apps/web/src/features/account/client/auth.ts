@@ -65,15 +65,13 @@ export function isRecoverableBrowserAuthFailure(error: unknown): boolean {
 }
 
 export async function getVerifiedBrowserAuth() {
-  const [session, user] = await Promise.all([
-    getBrowserAuthSession(),
-    getVerifiedBrowserAuthUser(),
-  ]);
-
-  if (!session?.access_token || !user) {
-    return { session: null, user: null };
-  }
-
+  // Sequential, not Promise.all — see lib/browser-auth.ts for why.
+  // Two concurrent auth-lock acquisitions per caller is the root cause of
+  // "Lock stolen" errors in production.
+  const session = await getBrowserAuthSession();
+  if (!session?.access_token) return { session: null, user: null };
+  const user = await getVerifiedBrowserAuthUser();
+  if (!user) return { session: null, user: null };
   return { session, user };
 }
 
