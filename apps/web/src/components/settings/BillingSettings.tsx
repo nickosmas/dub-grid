@@ -24,7 +24,7 @@ import {
   openBillingPortal,
   startBillingCheckout,
 } from "@/features/billing/client";
-import { useIsInSandbox, useLogout } from "@/hooks";
+import { useIsInSandbox, useLogout, useSandboxSourceOrgId } from "@/hooks";
 import {
   describeAction,
   formatDetails,
@@ -556,15 +556,22 @@ export default function BillingSettings({
   const queryClient = useQueryClient();
   const { signOutLocal } = useLogout();
   const isInSandbox = useIsInSandbox();
+  const sandboxSourceOrgId = useSandboxSourceOrgId();
   const searchParams = useSearchParams();
   const handledBillingReturnRef = useRef<string | null>(null);
   const [openingCheckout, setOpeningCheckout] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const billingResult = searchParams.get("billing");
   const checkoutSessionId = searchParams.get("stripe_checkout_session_id");
+  // In sandbox mode the active org is the sandbox clone, which has no
+  // real Stripe state. Display the source workspace's billing instead so
+  // the user can see what's actually billed. Action buttons are still
+  // gated by isInSandbox below, so the source-org data is read-only here.
+  const billingOrgId =
+    isInSandbox && sandboxSourceOrgId ? sandboxSourceOrgId : organization.id;
   const billingQuery = useQuery({
-    queryKey: queryKeys.org.billing(organization.id),
-    queryFn: () => fetchOrganizationBilling(organization.id),
+    queryKey: queryKeys.org.billing(billingOrgId),
+    queryFn: () => fetchOrganizationBilling(billingOrgId),
     staleTime: 30_000,
   });
   const billing = billingQuery.data;

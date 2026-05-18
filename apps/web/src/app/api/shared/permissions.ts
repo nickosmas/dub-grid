@@ -18,6 +18,14 @@ type PermissionContext = ReturnType<typeof buildPermissionContext>;
 interface OrgPermissionOptions {
   allowLockedWorkspace?: boolean;
   allowDuringSetup?: boolean;
+  /**
+   * Opt out of the sandbox-redirect that requireOrgPermissions normally
+   * applies when the caller has an active sandbox cookie. Use this for
+   * endpoints that legitimately need to operate on the user's non-sandbox
+   * org while they're in sandbox mode — for example, the billing read
+   * endpoint, which must show the source workspace's real Stripe state.
+   */
+  ignoreSandbox?: boolean;
 }
 
 export interface AuthorizedOrgRequest {
@@ -223,7 +231,11 @@ export async function requireOrgPermissions(
   // here), route ALL org-scoped checks to their sandbox regardless of
   // the orgId argument. Gridmasters intentionally manage other orgs, so
   // we exempt them — their actions on non-sandbox orgs stay as-is.
-  const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  // Endpoints can also opt out via { ignoreSandbox: true } when they
+  // legitimately need to operate on the real workspace (e.g. billing).
+  const sandboxCookieValue = options?.ignoreSandbox
+    ? null
+    : req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (sandboxCookieValue) {
     const sb = getSandboxFromCookie(
       `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,

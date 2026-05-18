@@ -99,21 +99,25 @@ async function cloneOrgIntoSandbox(
   sourceOrgId: string,
   sandboxOrgId: string,
 ): Promise<void> {
-  // Phase 1 — tables with no inter-table FKs (other than org_id)
-  const [departmentMap, certificationMap, absenceMap, indicatorMap] =
-    await Promise.all([
-      cloneOrgTable(svc, "departments", sourceOrgId, sandboxOrgId),
-      cloneOrgTable(svc, "certifications", sourceOrgId, sandboxOrgId),
-      cloneOrgTable(svc, "absence_types", sourceOrgId, sandboxOrgId),
-      cloneOrgTable(svc, "indicator_types", sourceOrgId, sandboxOrgId),
-    ]);
+  // Phase 1 — truly independent tables (only FK is org_id)
+  const [departmentMap, absenceMap, indicatorMap] = await Promise.all([
+    cloneOrgTable(svc, "departments", sourceOrgId, sandboxOrgId),
+    cloneOrgTable(svc, "absence_types", sourceOrgId, sandboxOrgId),
+    cloneOrgTable(svc, "indicator_types", sourceOrgId, sandboxOrgId),
+  ]);
 
-  // Phase 2 — depend on phase 1
-  const [focusAreaMap, roleMap] = await Promise.all([
+  // Phase 2 — depend on departments. Certifications has a
+  // department_id FK that ON DELETE SET NULLs to source departments if
+  // we forget to remap it — meaning cloned certs end up linked to the
+  // source workspace's departments. Remap fixes that.
+  const [focusAreaMap, roleMap, certificationMap] = await Promise.all([
     cloneOrgTable(svc, "focus_areas", sourceOrgId, sandboxOrgId, [
       { col: "department_id", map: departmentMap },
     ]),
     cloneOrgTable(svc, "organization_roles", sourceOrgId, sandboxOrgId, [
+      { col: "department_id", map: departmentMap },
+    ]),
+    cloneOrgTable(svc, "certifications", sourceOrgId, sandboxOrgId, [
       { col: "department_id", map: departmentMap },
     ]),
   ]);
