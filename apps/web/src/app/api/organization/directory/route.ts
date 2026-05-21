@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
         departmentIds: managementDepartmentIds,
         deptAdminIds: managementDeptAdminIds,
         isManagementUser: hasAppAccess && managementDepartmentIds.length > 0,
+        membershipUpdatedAt: (row.membership_updated_at as string | null) ?? null,
       } satisfies DirectoryPerson;
     });
 

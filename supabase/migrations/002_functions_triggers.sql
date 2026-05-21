@@ -6575,7 +6575,8 @@ RETURNS TABLE (
   scheduled_department_ids BIGINT[],
   scheduled_dept_admin_ids BIGINT[],
   management_department_ids BIGINT[],
-  management_dept_admin_ids BIGINT[]
+  management_dept_admin_ids BIGINT[],
+  membership_updated_at TIMESTAMPTZ
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
@@ -6620,7 +6621,8 @@ BEGIN
     COALESCE(e.department_ids, '{}'::BIGINT[]) AS scheduled_department_ids,
     COALESCE(e.dept_admin_ids, '{}'::BIGINT[]) AS scheduled_dept_admin_ids,
     COALESCE(cm.department_ids, emp_inv.department_ids, '{}'::BIGINT[]) AS management_department_ids,
-    COALESCE(cm.dept_admin_ids, emp_inv.dept_admin_ids, '{}'::BIGINT[]) AS management_dept_admin_ids
+    COALESCE(cm.dept_admin_ids, emp_inv.dept_admin_ids, '{}'::BIGINT[]) AS management_dept_admin_ids,
+    cm.updated_at AS membership_updated_at
   FROM public.employees e
   LEFT JOIN public.organization_memberships cm
     ON cm.user_id = e.user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
@@ -6672,7 +6674,8 @@ BEGIN
     '{}'::BIGINT[] AS scheduled_department_ids,
     '{}'::BIGINT[] AS scheduled_dept_admin_ids,
     cm2.department_ids AS management_department_ids,
-    cm2.dept_admin_ids AS management_dept_admin_ids
+    cm2.dept_admin_ids AS management_dept_admin_ids,
+    cm2.updated_at AS membership_updated_at
   FROM public.organization_memberships cm2
   JOIN public.profiles p ON p.id = cm2.user_id
   JOIN auth.users au2 ON au2.id = cm2.user_id
@@ -6708,7 +6711,8 @@ BEGIN
     '{}'::BIGINT[] AS scheduled_department_ids,
     '{}'::BIGINT[] AS scheduled_dept_admin_ids,
     inv3.department_ids AS management_department_ids,
-    inv3.dept_admin_ids AS management_dept_admin_ids
+    inv3.dept_admin_ids AS management_dept_admin_ids,
+    NULL::TIMESTAMPTZ AS membership_updated_at
   FROM public.invitations inv3
   WHERE inv3.org_id = p_org_id
     AND inv3.employee_id IS NULL

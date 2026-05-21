@@ -650,6 +650,9 @@ export interface DirectoryPerson {
   deptAdminIds: number[];
   /** True when the person is an active org member with at least one management department. */
   isManagementUser: boolean;
+  /** updated_at of the person's org membership, for optimistic-concurrency on
+   *  role/permission edits. Null/undefined for pending invites or unlinked staff. */
+  membershipUpdatedAt?: string | null;
 }
 
 export interface UserSession {
