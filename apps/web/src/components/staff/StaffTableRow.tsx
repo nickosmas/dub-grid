@@ -2,12 +2,13 @@
 
 import { useCallback, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
 import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -24,10 +25,15 @@ interface StaffRowSharedProps {
   isReordering: boolean;
   isDragging: boolean;
   canManageEmployees: boolean;
+  /** Whether the name links to the full /people/[id] details page. Regular
+   *  users get the inline read-only panel instead, so the link is suppressed. */
+  canNavigateToDetailsPage: boolean;
   isSelected: boolean;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
+  /** Access role (org_role) of the linked user, if any. Null for staff with no login. */
+  orgRole?: OrganizationRole | null;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onToggleSelect: (empId: string) => void;
   onRowClick: (empId: string) => void;
@@ -73,10 +79,12 @@ function StaffRowCells({
   isExpanded,
   isReordering,
   canManageEmployees,
+  canNavigateToDetailsPage,
   isSelected,
   focusAreas,
   certifications,
   roles,
+  orgRole,
   pendingInviteByEmployeeId,
   onToggleSelect,
   onRowClick,
@@ -145,15 +153,24 @@ function StaffRowCells({
           </Avatar>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[14px] font-medium text-[var(--color-text-primary)] truncate">
-              <Link
-                href={profileHref}
-                draggable={false}
-                onClick={(e) => e.stopPropagation()}
-                className="hover:underline truncate"
-                style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
-              >
-                {displayName}
-              </Link>
+              {canNavigateToDetailsPage ? (
+                <Link
+                  href={profileHref}
+                  draggable={false}
+                  onClick={(e) => e.stopPropagation()}
+                  className="hover:underline truncate"
+                  style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
+                >
+                  {displayName}
+                </Link>
+              ) : (
+                <span
+                  className="truncate"
+                  style={{ color: isExpanded ? "var(--color-control-active-text)" : "inherit" }}
+                >
+                  {displayName}
+                </span>
+              )}
               {isYou && (
                 <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">You</span>
               )}
@@ -254,6 +271,24 @@ function StaffRowCells({
         )}
       </StaffCell>
 
+      {/* Access role (org_role) */}
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden lg:table-cell py-4"
+        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+      >
+        {orgRole ? (
+          <span
+            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+            style={getOrgRoleBadgeStyle(orgRole)}
+          >
+            {ORG_ROLE_LABELS[orgRole]}
+          </span>
+        ) : (
+          <span className="text-[12px] text-[var(--color-text-muted)]">{"—"}</span>
+        )}
+      </StaffCell>
+
       {/* Chevron */}
       <StaffCell
         variant={variant}
@@ -282,16 +317,15 @@ export function StaffTableRow(props: StaffTableRowProps) {
     isExpanded,
     isReordering,
     isDragging,
-    canManageEmployees,
     onRowClick,
   } = props;
 
   return (
     <TableRow
-      className={`${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${!isReordering && canManageEmployees ? "cursor-pointer" : ""}`}
+      className={`${isExpanded ? "border-b-0 bg-[var(--color-bg)]" : "hover:bg-[var(--color-bg)]"} ${!isReordering ? "cursor-pointer" : ""}`}
       data-dragging={isDragging ? "true" : undefined}
       draggable={false}
-      onClick={!isReordering && canManageEmployees ? () => onRowClick(emp.id) : undefined}
+      onClick={!isReordering ? () => onRowClick(emp.id) : undefined}
       style={{
         borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
         boxShadow: isExpanded ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)" : undefined,

@@ -712,7 +712,7 @@ textarea {
 @media (min-width: 1024px) {
   .dg-staff-directory-header,
   .dg-staff-directory-row {
-    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.8fr) 40px;
+    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 40px;
   }
 }
 
@@ -1051,6 +1051,11 @@ textarea {
   animation: fade-in var(--dg-duration-standard) ease;
 }
 
+/* Variant: keep the sticky app header visible above the overlay. */
+.dg-modal-overlay.is-header-safe {
+  top: var(--app-shell-header-h, 0);
+}
+
 .dg-modal {
   background: var(--color-surface);
   border-radius: var(--dg-radius-xl);
@@ -1305,6 +1310,25 @@ textarea {
 }
 .dg-table-row.expanded:hover {
   background: var(--color-info-bg);
+}
+
+/* Strip the trailing divider from the last row of every <tbody>. :last-child
+   also covers single-row tables (the only row is the last row). !important
+   overrides inline `style={{ borderBottom: ... }}` used by bespoke tables
+   in gridmaster/reports/dashboard surfaces. The `<tr>` rule covers
+   shadcn-style row borders; the cell rules cover inline-styled td/th borders. */
+table tbody > tr:last-child,
+table tbody > tr:last-child > td,
+table tbody > tr:last-child > th {
+  border-bottom: 0 !important;
+}
+
+/* Div-based "table" lists (settings panels: AbsenceTypeRow, CoverageOptionRow,
+   IndicatorRow, JobRow, ActivityLog skeleton). Each row component renders its
+   own outer <div> with inline borderBottom; this strips the divider on the
+   last (or only) row. */
+.dg-list-row:last-child {
+  border-bottom: 0 !important;
 }
 
 .staff-detail-overlay {
@@ -2149,20 +2173,68 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-auth-input {
   width: 100%;
-  padding: 11px 13px;
+  padding: 14px 16px;
   border: 1.5px solid var(--color-border);
-  border-radius: var(--dg-radius-sm);
+  border-radius: var(--dg-radius-md);
   font-size: var(--dg-fs-body);
   outline: none;
   box-sizing: border-box;
   font-family: inherit;
   color: var(--color-text-primary);
   background: var(--color-surface);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.dg-auth-input::placeholder {
+  color: var(--color-text-faint);
 }
 
 .dg-auth-input:focus {
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+
+.dg-auth-input:disabled {
+  background: var(--color-bg);
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.dg-auth-input--error,
+.dg-auth-input--error:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--dg-danger-ring);
+}
+
+/* Icon tile — the 56px circle behind Mail / CheckCircle on status cards */
+.dg-auth-icon-tile {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.dg-auth-icon-tile--success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+/* Workspace pill (slug.basedomain) shown on org login + MFA screens */
+.dg-auth-badge {
+  display: inline-block;
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+  border: 1px solid var(--color-brand-border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .dg-auth-submit {
@@ -2185,6 +2257,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .dg-auth-submit:disabled {
   opacity: 0.85;
   cursor: not-allowed;
+}
+
+/* Secondary auth button — same shape, low-emphasis fill */
+.dg-auth-submit--secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+}
+
+.dg-auth-submit--secondary:disabled {
+  opacity: 0.6;
 }
 
 .dg-auth-link {
@@ -2247,7 +2329,8 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     padding: 32px 20px 28px;
   }
 
-  .dg-standalone-input {
+  .dg-standalone-input,
+  .dg-auth-input {
     font-size: 16px !important;
   }
 

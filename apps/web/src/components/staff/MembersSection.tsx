@@ -46,10 +46,12 @@ import { BulkImportModal } from "./BulkImportModal";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessModal } from "./EmployeeManagementAccessModal";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
+import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
 import { SortIcon } from "./SortIcon";
 import { StaffContextBar } from "./StaffContextBar";
 import { StaffDetailPanel } from "./StaffDetailPanel";
+import { StaffReadOnlyDetailPanel } from "./StaffReadOnlyDetailPanel";
 import { StaffEmptyState } from "./StaffEmptyState";
 import { StaffFilterPopover } from "./StaffFilterPopover";
 import { StaffPagination } from "./StaffPagination";
@@ -471,15 +473,22 @@ export function MembersSection({
   }, [pendingInvitations]);
 
   const { directory } = useDirectory(directoryOrgId);
+  // Access role (org_role) per linked employee, sourced from the directory.
+  // Only populated when the viewer can load directory data; staff with no
+  // linked login simply resolve to null and render an em dash.
+  const orgRoleByEmployeeId = useMemo(() => {
+    const map = new Map<string, NonNullable<DirectoryPerson["orgRole"]>>();
+    for (const person of directory) {
+      if (person.employeeId && person.orgRole) {
+        map.set(person.employeeId, person.orgRole);
+      }
+    }
+    return map;
+  }, [directory]);
   const departmentUsers = useMemo(
     () => directory.filter((person) => person.managementDepartmentIds.length > 0),
     [directory],
   );
-  const activeManagementUsers = useMemo(
-    () => departmentUsers.filter((person) => person.isManagementUser),
-    [departmentUsers],
-  );
-
   const [showManagement, setShowManagement] = useState(false);
   const [deptFilterId, setDeptFilterId] = useState<number | null>(null);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
@@ -653,11 +662,13 @@ export function MembersSection({
     key: "active" | "benched" | "terminated";
     label: string;
     count: number;
-  }[] = [
-    { key: "active", label: "All", count: employees.length },
-    { key: "benched", label: "Benched", count: benchedEmployees.length },
-    { key: "terminated", label: "Terminated", count: terminatedEmployees.length },
-  ];
+  }[] = canManageEmployees
+    ? [
+        { key: "active", label: "All", count: employees.length },
+        { key: "benched", label: "Benched", count: benchedEmployees.length },
+        { key: "terminated", label: "Terminated", count: terminatedEmployees.length },
+      ]
+    : [{ key: "active", label: "All", count: employees.length }];
 
   const selectedEmployee = expandedEmpId
     ? [...employees, ...benchedEmployees, ...terminatedEmployees].find(
@@ -729,7 +740,7 @@ export function MembersSection({
   return (
     <>
       <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-        <div className="mx-auto space-y-8" style={{ maxWidth: 1100 }}>
+        <div className="space-y-8">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
               Directory
@@ -782,7 +793,7 @@ export function MembersSection({
                     },
                     {
                       value: "management",
-                      label: `Management (${activeManagementUsers.length})`,
+                      label: `Management (${departmentUsers.length})`,
                     },
                   ]}
                   onChange={(value) => {
@@ -1167,6 +1178,9 @@ export function MembersSection({
                         <div className="dg-staff-directory-head-cell hidden lg:flex">
                           Account
                         </div>
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">
+                          Access
+                        </div>
                         <div className="dg-staff-directory-head-cell flex pr-6" />
                       </div>
                       <div className="dg-staff-directory-body">
@@ -1188,10 +1202,12 @@ export function MembersSection({
                               isDragging={isDragging}
                               dragPhase={isDragging ? dragPhase ?? undefined : undefined}
                               canManageEmployees={canManageEmployees}
+                              canNavigateToDetailsPage={canManageEmployees}
                               isSelected={selectedIds.has(employee.id)}
                               focusAreas={focusAreas}
                               certifications={certifications}
                               roles={roles}
+                              orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={() => undefined}
@@ -1262,6 +1278,9 @@ export function MembersSection({
                           <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
                             Account
                           </TableHead>
+                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                            Access
+                          </TableHead>
                           <TableHead className="w-[40px] pr-6" />
                         </UITableRow>
                       </TableHeader>
@@ -1279,10 +1298,12 @@ export function MembersSection({
                               isReordering={false}
                               isDragging={false}
                               canManageEmployees={canManageEmployees}
+                              canNavigateToDetailsPage={canManageEmployees}
                               isSelected={selectedIds.has(employee.id)}
                               focusAreas={focusAreas}
                               certifications={certifications}
                               roles={roles}
+                              orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={(employeeId) =>
@@ -1328,6 +1349,11 @@ export function MembersSection({
                       {!isMobile && !isTablet && (
                         <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
                           {managementDepartmentLabel}
+                        </TableHead>
+                      )}
+                      {!isMobile && !isTablet && (
+                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                          Role
                         </TableHead>
                       )}
                       {!isMobile && !isTablet && (
@@ -1449,6 +1475,23 @@ export function MembersSection({
                                   ? personDepts.map((department) => department.name).join(", ")
                                   : "\u2014"}
                               </span>
+                            </TableCell>
+                          )}
+
+                          {!isMobile && !isTablet && (
+                            <TableCell className="py-4">
+                              {person.orgRole ? (
+                                <span
+                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                  style={getOrgRoleBadgeStyle(person.orgRole)}
+                                >
+                                  {ORG_ROLE_LABELS[person.orgRole]}
+                                </span>
+                              ) : (
+                                <span className="text-[13px] text-[var(--color-text-muted)]">
+                                  {"\u2014"}
+                                </span>
+                              )}
                             </TableCell>
                           )}
 
@@ -1579,7 +1622,22 @@ export function MembersSection({
         />
       )}
 
-      {selectedEmployee && canViewEmployeeDetails && (
+      {selectedEmployee && !canManageEmployees && selectedEmployee.status === "active" && (
+        <StaffReadOnlyDetailPanel
+          employee={selectedEmployee}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={roles}
+          roleLabel={roleLabel}
+          focusAreaLabel={focusAreaLabel}
+          certificationLabel={certificationLabel}
+          departments={departmentItems}
+          departmentLabel={departmentLabel}
+          onClose={() => setExpandedEmpId(null)}
+        />
+      )}
+
+      {selectedEmployee && canManageEmployees && (
         <StaffDetailPanel
           employee={selectedEmployee}
           focusAreas={focusAreas}

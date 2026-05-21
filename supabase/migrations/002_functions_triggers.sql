@@ -19,25 +19,41 @@ AS $$
 $$;
 
 
+-- Per-session org context: prefer the org_id claim baked into this device's
+-- JWT (written by custom_access_token_hook from user_sessions.active_org_id)
+-- so each device stays isolated. Falls back to profiles.org_id only when the
+-- claim is absent (legacy tokens issued before the hook started writing it).
+-- Reading profiles.org_id directly here would leak a sibling device's
+-- switch_org into this session, hiding/showing rows it shouldn't.
 CREATE OR REPLACE FUNCTION public.caller_org_id()
 RETURNS UUID
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT org_id FROM public.profiles WHERE id = auth.uid();
+  SELECT COALESCE(
+    NULLIF(auth.jwt() ->> 'org_id', '')::UUID,
+    (SELECT org_id FROM public.profiles WHERE id = auth.uid())
+  );
 $$;
 
 
+-- Joins memberships on caller_org_id() (now JWT-sourced) rather than
+-- profiles.org_id, so the role reflects this session's active org and not
+-- whatever org another device most recently switched to.
 CREATE OR REPLACE FUNCTION public.caller_org_role()
 RETURNS public.org_role
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT COALESCE(cm.org_role, 'user'::public.org_role)
-  FROM public.profiles p
-  LEFT JOIN public.organization_memberships cm
-    ON cm.user_id = p.id AND cm.org_id = p.org_id AND cm.archived_at IS NULL
-  WHERE p.id = auth.uid();
+  SELECT COALESCE(
+    (SELECT cm.org_role
+       FROM public.organization_memberships cm
+      WHERE cm.user_id = auth.uid()
+        AND cm.org_id = public.caller_org_id()
+        AND cm.archived_at IS NULL
+      LIMIT 1),
+    'user'::public.org_role
+  );
 $$;
 
 
@@ -173,7 +189,8 @@ BEGIN
     COALESCE(v_effective_org, p.org_id) AS org_id,
     p.platform_role::TEXT               AS platform_role,
     cm.org_role::TEXT                   AS org_role,
-    o.slug                              AS org_slug
+    o.slug                              AS org_slug,
+    o.name                              AS org_name
   INTO user_profile
   FROM public.profiles p
   LEFT JOIN public.organization_memberships cm
@@ -197,12 +214,13 @@ BEGIN
       claims := jsonb_set(claims, '{org_role}',  to_jsonb(user_profile.org_role));
       claims := jsonb_set(claims, '{org_id}',    to_jsonb(user_profile.org_id::TEXT));
       claims := jsonb_set(claims, '{org_slug}',  to_jsonb(user_profile.org_slug));
+      claims := jsonb_set(claims, '{org_name}',  to_jsonb(COALESCE(user_profile.org_name, '')));
     ELSE
       -- No membership, no org, or archived org → strip org context.
       -- Explicit removal prevents stale org_id/org_slug from persisting
       -- if the auth server carries forward claims from the previous token.
       claims := jsonb_set(claims, '{org_role}', '"user"');
-      claims := claims - 'org_id' - 'org_slug';
+      claims := claims - 'org_id' - 'org_slug' - 'org_name';
     END IF;
     -- Track last sign-in (debounced to avoid writes on every token refresh)
     UPDATE public.profiles
@@ -212,7 +230,7 @@ BEGIN
   ELSE
     claims := jsonb_set(claims, '{platform_role}', '"none"');
     claims := jsonb_set(claims, '{org_role}',      '"user"');
-    claims := claims - 'org_id' - 'org_slug';
+    claims := claims - 'org_id' - 'org_slug' - 'org_name';
   END IF;
 
   RETURN jsonb_build_object('claims', claims);
@@ -2645,15 +2663,23 @@ LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
   SELECT jsonb_build_object(
+    'totalInbox', (
+      SELECT COUNT(*)::INTEGER FROM notifications
+      WHERE user_id = auth.uid() AND archived_at IS NULL
+        AND channel = 'in_app'
+        AND (org_id = public.caller_org_id() OR org_id IS NULL)
+    ),
     'totalUnread', (
       SELECT COUNT(*)::INTEGER FROM notifications
       WHERE user_id = auth.uid() AND read_at IS NULL AND archived_at IS NULL
         AND channel = 'in_app'
+        AND (org_id = public.caller_org_id() OR org_id IS NULL)
     ),
     'totalArchived', (
       SELECT COUNT(*)::INTEGER FROM notifications
       WHERE user_id = auth.uid() AND archived_at IS NOT NULL
         AND channel = 'in_app'
+        AND (org_id = public.caller_org_id() OR org_id IS NULL)
     ),
     'byCategory', COALESCE((
       SELECT jsonb_object_agg(COALESCE(category, 'uncategorized'), c)
@@ -2662,6 +2688,7 @@ AS $$
         FROM notifications
         WHERE user_id = auth.uid() AND archived_at IS NULL
           AND channel = 'in_app'
+          AND (org_id = public.caller_org_id() OR org_id IS NULL)
         GROUP BY category
       ) t
     ), '{}'::jsonb),
@@ -2672,6 +2699,7 @@ AS $$
         FROM notifications
         WHERE user_id = auth.uid() AND archived_at IS NULL
           AND channel = 'in_app'
+          AND (org_id = public.caller_org_id() OR org_id IS NULL)
         GROUP BY priority
       ) t
     ), '{}'::jsonb)
@@ -6554,7 +6582,12 @@ SET search_path = 'public'
 AS $$
 BEGIN
   IF NOT (
-    public.is_gridmaster()
+    -- Trusted backend path: API routes authorize the caller via
+    -- requireOrgPermissions, then invoke this through the service-role client
+    -- (where auth.uid()/JWT org claims are absent). Direct authenticated callers
+    -- must still be a gridmaster or a super_admin/admin of the target org.
+    (auth.jwt() ->> 'role') = 'service_role'
+    OR public.is_gridmaster()
     OR (
       public.caller_org_id() = p_org_id
       AND public.caller_org_role() IN ('super_admin', 'admin')

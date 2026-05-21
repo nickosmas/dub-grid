@@ -2074,6 +2074,28 @@ async function main() {
     `SELECT id FROM public.organizations ORDER BY name`
   );
 
+  // Ensure a "Tech" management department exists in every org, then assign the
+  // seeded logins to it below. Members surface as management users in the People
+  // directory. For `user`-role members the department's permission template
+  // drives their effective permissions (it replaces admin_permissions; see
+  // resolveManagementDepartmentPermissions), so Tech carries the same view-only
+  // set the `user` account already had. Nobody's access changes: the `user`
+  // account stays read-only, and super_admin is unaffected because its access is
+  // role-based, not template-driven.
+  const techDeptPermissions = JSON.stringify(userViewPermsObj);
+  await db.query(`
+    INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
+    SELECT o.id, 'Tech', 'TECH', 'management',
+           (SELECT COALESCE(MAX(d.sort_order), 0) + 1 FROM public.departments d WHERE d.org_id = o.id),
+           '${techDeptPermissions}'::jsonb
+    FROM public.organizations o
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.departments d
+      WHERE d.org_id = o.id AND d.name = 'Tech' AND d.type = 'management'
+    )
+  `);
+  console.log(`    ✓ Tech management department ensured in ${allOrgs.length} organizations`);
+
   const memberUsers = TEST_USERS.filter((u) => u.platform_role !== "gridmaster");
 
   const membershipSeeds: Array<{
@@ -2099,8 +2121,15 @@ async function main() {
 
   if (membershipSeeds.length > 0) {
     await db.query(
-      `INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions)
-       SELECT p.id, m.org_id, m.org_role::org_role, m.admin_permissions
+      `INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions, department_ids)
+       SELECT p.id, m.org_id, m.org_role::org_role, m.admin_permissions,
+              COALESCE(
+                ARRAY(
+                  SELECT d.id FROM public.departments d
+                  WHERE d.org_id = m.org_id AND d.name = 'Tech' AND d.type = 'management'
+                ),
+                '{}'::bigint[]
+              )
        FROM jsonb_to_recordset($1::jsonb) AS m(
          email text, org_id uuid, org_role text, admin_permissions jsonb
        )
@@ -2108,7 +2137,8 @@ async function main() {
        JOIN public.profiles p ON p.id = a.id
        ON CONFLICT (user_id, org_id) DO UPDATE
          SET org_role          = EXCLUDED.org_role,
-             admin_permissions = EXCLUDED.admin_permissions`,
+             admin_permissions = EXCLUDED.admin_permissions,
+             department_ids    = EXCLUDED.department_ids`,
       [JSON.stringify(membershipSeeds)],
     );
   }
