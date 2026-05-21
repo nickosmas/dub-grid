@@ -1722,6 +1722,29 @@ export function MembersSection({
                 }
               : undefined
           }
+          onPermissionsChange={
+            canManageManagementAccess &&
+            selectedPerson.userId &&
+            selectedPerson.membershipUpdatedAt
+              ? async (perms) => {
+                  const userId = selectedPerson.userId;
+                  const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
+                  if (!orgId || !userId || !expectedUpdatedAt) return;
+                  await updateOrganizationMembershipGuarded({
+                    orgId,
+                    userId,
+                    expectedUpdatedAt,
+                    adminPermissions: perms,
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.directory(orgId),
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.users(orgId),
+                  });
+                }
+              : undefined
+          }
           onClose={() => setExpandedPersonId(null)}
           onSave={async (data) => {
             if (!orgId) return;

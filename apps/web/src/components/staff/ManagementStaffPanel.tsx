@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
+import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
@@ -15,6 +15,7 @@ import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import PermissionsEditor from "@/components/PermissionsEditor";
 import { toast } from "sonner";
 
 function hashCode(s: string): number {
@@ -81,6 +82,9 @@ interface ManagementStaffPanelProps {
   /** Change the linked member's org role. Provided only when the viewer may
    *  manage access and the person has an editable membership. */
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  /** Save the admin member's permission matrix. Provided only when the viewer
+   *  may manage access and the person has an editable membership. */
+  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
   onAddToSchedule?: (person: DirectoryPerson) => void;
   onBench?: (empId: string, note?: string) => void;
   onActivate?: (empId: string) => void;
@@ -98,6 +102,7 @@ export function ManagementStaffPanel({
   onRevokeInvitation,
   onResendInvitation,
   onRoleChange,
+  onPermissionsChange,
   onAddToSchedule,
   onBench,
   onActivate,
@@ -120,6 +125,7 @@ export function ManagementStaffPanel({
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
+  const [showPermissions, setShowPermissions] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const personDraft = useMemo(() => normalizeManagementStaffDraft({
     firstName: person.firstName,
@@ -980,6 +986,44 @@ export function ManagementStaffPanel({
                           >
                             {ROLE_LABELS[person.orgRole] ?? person.orgRole}
                           </span>
+                        )}
+                      </div>
+                    )}
+
+                    {onPermissionsChange && person.orgRole === "admin" && (
+                      <div>
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontWeight: 600,
+                            color: "var(--color-text-muted)",
+                            textTransform: "uppercase" as const,
+                            letterSpacing: "0.04em",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Permissions
+                        </div>
+                        <button
+                          type="button"
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                          onClick={() => setShowPermissions(true)}
+                        >
+                          Manage permissions
+                        </button>
+                        {showPermissions && (
+                          <PermissionsEditor
+                            title="Edit permissions"
+                            subtitle="Choose what this admin can view and manage."
+                            initialPermissions={person.adminPermissions}
+                            showPermissionCounter
+                            lockedFalse={["canManageOrgSettings"]}
+                            onSave={async (perms) => {
+                              await onPermissionsChange(perms);
+                              setShowPermissions(false);
+                            }}
+                            onClose={() => setShowPermissions(false)}
+                          />
                         )}
                       </div>
                     )}
