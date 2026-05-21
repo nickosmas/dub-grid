@@ -1689,6 +1689,54 @@ export function MembersSection({
                 }
               : undefined
           }
+          orgRole={selectedEmployeeDirectoryPerson?.orgRole ?? null}
+          adminPermissions={selectedEmployeeDirectoryPerson?.adminPermissions ?? null}
+          onRoleChange={
+            canManageManagementAccess &&
+            selectedEmployeeDirectoryPerson?.userId &&
+            selectedEmployeeDirectoryPerson?.membershipUpdatedAt
+              ? async (newRole) => {
+                  const person = selectedEmployeeDirectoryPerson;
+                  if (!orgId || !person?.userId || !person?.membershipUpdatedAt)
+                    return;
+                  await updateOrganizationMembershipGuarded({
+                    orgId,
+                    userId: person.userId,
+                    expectedUpdatedAt: person.membershipUpdatedAt,
+                    orgRole: newRole,
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.directory(orgId),
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.users(orgId),
+                  });
+                }
+              : undefined
+          }
+          onPermissionsChange={
+            canManageManagementAccess &&
+            selectedEmployeeDirectoryPerson?.userId &&
+            selectedEmployeeDirectoryPerson?.membershipUpdatedAt
+              ? async (perms) => {
+                  const person = selectedEmployeeDirectoryPerson;
+                  if (!orgId || !person?.userId || !person?.membershipUpdatedAt)
+                    return;
+                  await updateOrganizationMembershipGuarded({
+                    orgId,
+                    userId: person.userId,
+                    expectedUpdatedAt: person.membershipUpdatedAt,
+                    adminPermissions: perms,
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.directory(orgId),
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.users(orgId),
+                  });
+                }
+              : undefined
+          }
         />
       )}
 

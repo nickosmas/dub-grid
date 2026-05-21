@@ -13,10 +13,7 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import CustomSelect from "@/components/CustomSelect";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import PermissionsEditor from "@/components/PermissionsEditor";
-import { toast } from "sonner";
+import { MemberAccessControls } from "./MemberAccessControls";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -123,9 +120,6 @@ export function ManagementStaffPanel({
   const [revoking, setRevoking] = useState(false);
   const [resending, setResending] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
-  const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
-  const [changingRole, setChangingRole] = useState(false);
-  const [showPermissions, setShowPermissions] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const personDraft = useMemo(() => normalizeManagementStaffDraft({
     firstName: person.firstName,
@@ -365,86 +359,17 @@ export function ManagementStaffPanel({
     outline: "none",
   };
 
-  // Access controls (role + permission matrix), shared by the employee-linked
-  // and non-employee manager branches. Self-gates on the callbacks, which the
-  // parent passes only to super_admins/gridmasters.
-  const accessControls =
-    onRoleChange || onPermissionsChange ? (
-      <>
-        {onRoleChange && person.orgRole && (
-          <div>
-            <label style={labelStyle}>Role</label>
-            <CustomSelect
-              value={person.orgRole}
-              disabled={changingRole}
-              onChange={(value) => {
-                if (value !== person.orgRole) setPendingRole(value);
-              }}
-              options={[
-                { value: "user", label: "Member" },
-                { value: "admin", label: "Admin" },
-                { value: "super_admin", label: "Super Admin" },
-              ]}
-            />
-            {pendingRole && (
-              <ConfirmDialog
-                title="Change role"
-                message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
-                confirmLabel="Change role"
-                variant="warning"
-                onCancel={() => setPendingRole(null)}
-                onConfirm={() => {
-                  const next = pendingRole;
-                  setChangingRole(true);
-                  void (async () => {
-                    try {
-                      await onRoleChange(next);
-                      setPendingRole(null);
-                    } catch (error) {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not change the role.",
-                      );
-                    } finally {
-                      setChangingRole(false);
-                    }
-                  })();
-                }}
-              />
-            )}
-          </div>
-        )}
-        {onPermissionsChange && person.orgRole === "admin" && (
-          <div>
-            <label style={labelStyle}>Permissions</label>
-            <div>
-              <button
-                type="button"
-                className="dg-btn dg-btn-secondary dg-btn-sm"
-                onClick={() => setShowPermissions(true)}
-              >
-                Manage permissions
-              </button>
-            </div>
-            {showPermissions && (
-              <PermissionsEditor
-                title="Edit permissions"
-                subtitle="Choose what this admin can view and manage."
-                initialPermissions={person.adminPermissions}
-                showPermissionCounter
-                lockedFalse={["canManageOrgSettings"]}
-                onSave={async (perms) => {
-                  await onPermissionsChange(perms);
-                  setShowPermissions(false);
-                }}
-                onClose={() => setShowPermissions(false)}
-              />
-            )}
-          </div>
-        )}
-      </>
-    ) : null;
+  // Role + permission controls, shared with the on-schedule staff panel.
+  // Self-gates on the callbacks, which the parent passes only to managers.
+  const accessControls = (
+    <MemberAccessControls
+      orgRole={person.orgRole}
+      adminPermissions={person.adminPermissions}
+      onRoleChange={onRoleChange}
+      onPermissionsChange={onPermissionsChange}
+      labelStyle={labelStyle}
+    />
+  );
 
   return createPortal(
     <>

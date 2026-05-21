@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole, AdminPermissions } from "@/types";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
@@ -12,6 +12,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { MemberAccessControls } from "./MemberAccessControls";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -46,6 +47,10 @@ interface StaffDetailPanelProps {
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onRevokeAccess?: (userId: string) => void;
+  orgRole?: OrganizationRole | null;
+  adminPermissions?: AdminPermissions | null;
+  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
 }
 
 export function StaffDetailPanel({
@@ -73,6 +78,10 @@ export function StaffDetailPanel({
   onManageManagementAccess,
   onRevoke,
   onRevokeAccess,
+  orgRole,
+  adminPermissions,
+  onRoleChange,
+  onPermissionsChange,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
   const hue = hashCode(employee.id) % 360;
@@ -420,6 +429,12 @@ export function StaffDetailPanel({
                   {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Add to Management"}
                 </button>
               )}
+              <MemberAccessControls
+                orgRole={orgRole}
+                adminPermissions={adminPermissions}
+                onRoleChange={onRoleChange}
+                onPermissionsChange={onPermissionsChange}
+              />
             </div>
           )}
         </div>
