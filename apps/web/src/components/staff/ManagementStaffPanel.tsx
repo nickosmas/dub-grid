@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { DirectoryPerson, NamedItem } from "@/types";
+import { DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
@@ -13,6 +13,9 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import CustomSelect from "@/components/CustomSelect";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { toast } from "sonner";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -75,6 +78,9 @@ interface ManagementStaffPanelProps {
   }) => Promise<void>;
   onRevokeInvitation?: (invitationId: string) => Promise<void>;
   onResendInvitation?: (invitationId: string) => Promise<void>;
+  /** Change the linked member's org role. Provided only when the viewer may
+   *  manage access and the person has an editable membership. */
+  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
   onAddToSchedule?: (person: DirectoryPerson) => void;
   onBench?: (empId: string, note?: string) => void;
   onActivate?: (empId: string) => void;
@@ -91,6 +97,7 @@ export function ManagementStaffPanel({
   onSave,
   onRevokeInvitation,
   onResendInvitation,
+  onRoleChange,
   onAddToSchedule,
   onBench,
   onActivate,
@@ -111,6 +118,8 @@ export function ManagementStaffPanel({
   const [revoking, setRevoking] = useState(false);
   const [resending, setResending] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
+  const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const personDraft = useMemo(() => normalizeManagementStaffDraft({
     firstName: person.firstName,
@@ -911,23 +920,67 @@ export function ManagementStaffPanel({
                         >
                           Role
                         </div>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            padding: "3px 10px",
-                            borderRadius: 999,
-                            fontSize: "var(--dg-fs-caption)",
-                            fontWeight: 600,
-                            background:
-                              ROLE_COLORS[person.orgRole]?.bg ??
-                              "var(--color-border-light)",
-                            color:
-                              ROLE_COLORS[person.orgRole]?.text ??
-                              "var(--color-text-muted)",
-                          }}
-                        >
-                          {ROLE_LABELS[person.orgRole] ?? person.orgRole}
-                        </span>
+                        {onRoleChange ? (
+                          <div style={{ maxWidth: 220 }}>
+                            <CustomSelect
+                              value={person.orgRole}
+                              disabled={changingRole}
+                              onChange={(value) => {
+                                if (value !== person.orgRole) setPendingRole(value);
+                              }}
+                              options={[
+                                { value: "user", label: "Member" },
+                                { value: "admin", label: "Admin" },
+                                { value: "super_admin", label: "Super Admin" },
+                              ]}
+                            />
+                            {pendingRole && (
+                              <ConfirmDialog
+                                title="Change role"
+                                message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
+                                confirmLabel="Change role"
+                                variant="warning"
+                                onCancel={() => setPendingRole(null)}
+                                onConfirm={() => {
+                                  const next = pendingRole;
+                                  setChangingRole(true);
+                                  void (async () => {
+                                    try {
+                                      await onRoleChange(next);
+                                      setPendingRole(null);
+                                    } catch (error) {
+                                      toast.error(
+                                        error instanceof Error
+                                          ? error.message
+                                          : "Could not change the role.",
+                                      );
+                                    } finally {
+                                      setChangingRole(false);
+                                    }
+                                  })();
+                                }}
+                              />
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              padding: "3px 10px",
+                              borderRadius: 999,
+                              fontSize: "var(--dg-fs-caption)",
+                              fontWeight: 600,
+                              background:
+                                ROLE_COLORS[person.orgRole]?.bg ??
+                                "var(--color-border-light)",
+                              color:
+                                ROLE_COLORS[person.orgRole]?.text ??
+                                "var(--color-text-muted)",
+                            }}
+                          >
+                            {ROLE_LABELS[person.orgRole] ?? person.orgRole}
+                          </span>
+                        )}
                       </div>
                     )}
 

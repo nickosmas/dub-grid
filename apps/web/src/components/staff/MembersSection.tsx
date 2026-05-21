@@ -47,6 +47,7 @@ import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessModal } from "./EmployeeManagementAccessModal";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
 import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
+import { updateOrganizationMembershipGuarded } from "@/features/organization/client/access";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
 import { SortIcon } from "./SortIcon";
 import { StaffContextBar } from "./StaffContextBar";
@@ -1698,6 +1699,29 @@ export function MembersSection({
           departmentLabel={managementDepartmentLabel}
           canManageScheduleEmployees={canManageEmployees}
           canManageManagementAccess={canManageManagementAccess}
+          onRoleChange={
+            canManageManagementAccess &&
+            selectedPerson.userId &&
+            selectedPerson.membershipUpdatedAt
+              ? async (newRole) => {
+                  const userId = selectedPerson.userId;
+                  const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
+                  if (!orgId || !userId || !expectedUpdatedAt) return;
+                  await updateOrganizationMembershipGuarded({
+                    orgId,
+                    userId,
+                    expectedUpdatedAt,
+                    orgRole: newRole,
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.directory(orgId),
+                  });
+                  await queryClient.invalidateQueries({
+                    queryKey: queryKeys.org.users(orgId),
+                  });
+                }
+              : undefined
+          }
           onClose={() => setExpandedPersonId(null)}
           onSave={async (data) => {
             if (!orgId) return;
