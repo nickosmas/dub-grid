@@ -30,6 +30,11 @@ export async function GET(req: NextRequest) {
     }
 
     const serviceClient = orgAuth.serviceClient;
+    // Only super_admins/gridmasters may edit (and therefore see) the per-user
+    // permission matrix; redact it for everyone else even though the directory
+    // itself is visible to canViewStaff.
+    const canSeePermissions =
+      orgAuth.permissions.isSuperAdmin || orgAuth.permissions.isGridmaster;
     const { data, error } = await serviceClient.rpc("get_org_directory", {
       // Use the auth-effective orgId — when the caller is in sandbox
       // mode, this is the sandbox id, not the body's real-org id.
@@ -82,8 +87,9 @@ export async function GET(req: NextRequest) {
         deptAdminIds: managementDeptAdminIds,
         isManagementUser: hasAppAccess && managementDepartmentIds.length > 0,
         membershipUpdatedAt: (row.membership_updated_at as string | null) ?? null,
-        adminPermissions:
-          (row.membership_admin_permissions as AdminPermissions | null) ?? null,
+        adminPermissions: canSeePermissions
+          ? ((row.membership_admin_permissions as AdminPermissions | null) ?? null)
+          : null,
       } satisfies DirectoryPerson;
     });
 

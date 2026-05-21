@@ -926,7 +926,7 @@ export function ManagementStaffPanel({
                         >
                           Role
                         </div>
-                        {onRoleChange ? (
+                        {onRoleChange && person.orgRole !== "super_admin" ? (
                           <div style={{ maxWidth: 220 }}>
                             <CustomSelect
                               value={person.orgRole}
