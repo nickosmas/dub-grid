@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import type { DirectoryPerson, EmployeeStatus, OrganizationRole } from "@/types";
+import type { AdminPermissions, DirectoryPerson, EmployeeStatus, OrganizationRole } from "@/types";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -82,6 +82,8 @@ export async function GET(req: NextRequest) {
         deptAdminIds: managementDeptAdminIds,
         isManagementUser: hasAppAccess && managementDepartmentIds.length > 0,
         membershipUpdatedAt: (row.membership_updated_at as string | null) ?? null,
+        adminPermissions:
+          (row.membership_admin_permissions as AdminPermissions | null) ?? null,
       } satisfies DirectoryPerson;
     });
 

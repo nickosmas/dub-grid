@@ -653,6 +653,9 @@ export interface DirectoryPerson {
   /** updated_at of the person's org membership, for optimistic-concurrency on
    *  role/permission edits. Null/undefined for pending invites or unlinked staff. */
   membershipUpdatedAt?: string | null;
+  /** The member's stored admin_permissions, for the in-directory permission
+   *  matrix. Null for super_admin/user roles or pending invites. */
+  adminPermissions?: AdminPermissions | null;
 }
 
 export interface UserSession {
