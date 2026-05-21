@@ -365,6 +365,87 @@ export function ManagementStaffPanel({
     outline: "none",
   };
 
+  // Access controls (role + permission matrix), shared by the employee-linked
+  // and non-employee manager branches. Self-gates on the callbacks, which the
+  // parent passes only to super_admins/gridmasters.
+  const accessControls =
+    onRoleChange || onPermissionsChange ? (
+      <>
+        {onRoleChange && person.orgRole && person.orgRole !== "super_admin" && (
+          <div>
+            <label style={labelStyle}>Role</label>
+            <CustomSelect
+              value={person.orgRole}
+              disabled={changingRole}
+              onChange={(value) => {
+                if (value !== person.orgRole) setPendingRole(value);
+              }}
+              options={[
+                { value: "user", label: "Member" },
+                { value: "admin", label: "Admin" },
+                { value: "super_admin", label: "Super Admin" },
+              ]}
+            />
+            {pendingRole && (
+              <ConfirmDialog
+                title="Change role"
+                message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
+                confirmLabel="Change role"
+                variant="warning"
+                onCancel={() => setPendingRole(null)}
+                onConfirm={() => {
+                  const next = pendingRole;
+                  setChangingRole(true);
+                  void (async () => {
+                    try {
+                      await onRoleChange(next);
+                      setPendingRole(null);
+                    } catch (error) {
+                      toast.error(
+                        error instanceof Error
+                          ? error.message
+                          : "Could not change the role.",
+                      );
+                    } finally {
+                      setChangingRole(false);
+                    }
+                  })();
+                }}
+              />
+            )}
+          </div>
+        )}
+        {onPermissionsChange && person.orgRole === "admin" && (
+          <div>
+            <label style={labelStyle}>Permissions</label>
+            <div>
+              <button
+                type="button"
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={() => setShowPermissions(true)}
+              >
+                Manage permissions
+              </button>
+            </div>
+            {showPermissions && (
+              <PermissionsEditor
+                title="Edit permissions"
+                subtitle="Choose what this admin can view and manage."
+                initialPermissions={person.adminPermissions}
+                showPermissionCounter
+                lockedFalse={["canManageOrgSettings"]}
+                onSave={async (perms) => {
+                  await onPermissionsChange(perms);
+                  setShowPermissions(false);
+                }}
+                onClose={() => setShowPermissions(false)}
+              />
+            )}
+          </div>
+        )}
+      </>
+    ) : null;
+
   return createPortal(
     <>
       <div
@@ -597,6 +678,7 @@ export function ManagementStaffPanel({
                   )}
                 </div>
               )}
+              {accessControls}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                 {person.managementDepartmentIds.length > 0 && deptIds.length > 0 && (
                   <button
@@ -767,79 +849,7 @@ export function ManagementStaffPanel({
                 </div>
               )}
 
-              {onRoleChange && person.orgRole && person.orgRole !== "super_admin" && (
-                <div>
-                  <label style={labelStyle}>Role</label>
-                  <CustomSelect
-                    value={person.orgRole}
-                    disabled={changingRole}
-                    onChange={(value) => {
-                      if (value !== person.orgRole) setPendingRole(value);
-                    }}
-                    options={[
-                      { value: "user", label: "Member" },
-                      { value: "admin", label: "Admin" },
-                      { value: "super_admin", label: "Super Admin" },
-                    ]}
-                  />
-                  {pendingRole && (
-                    <ConfirmDialog
-                      title="Change role"
-                      message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
-                      confirmLabel="Change role"
-                      variant="warning"
-                      onCancel={() => setPendingRole(null)}
-                      onConfirm={() => {
-                        const next = pendingRole;
-                        setChangingRole(true);
-                        void (async () => {
-                          try {
-                            await onRoleChange(next);
-                            setPendingRole(null);
-                          } catch (error) {
-                            toast.error(
-                              error instanceof Error
-                                ? error.message
-                                : "Could not change the role.",
-                            );
-                          } finally {
-                            setChangingRole(false);
-                          }
-                        })();
-                      }}
-                    />
-                  )}
-                </div>
-              )}
-
-              {onPermissionsChange && person.orgRole === "admin" && (
-                <div>
-                  <label style={labelStyle}>Permissions</label>
-                  <div>
-                    <button
-                      type="button"
-                      className="dg-btn dg-btn-secondary dg-btn-sm"
-                      onClick={() => setShowPermissions(true)}
-                    >
-                      Manage permissions
-                    </button>
-                  </div>
-                  {showPermissions && (
-                    <PermissionsEditor
-                      title="Edit permissions"
-                      subtitle="Choose what this admin can view and manage."
-                      initialPermissions={person.adminPermissions}
-                      showPermissionCounter
-                      lockedFalse={["canManageOrgSettings"]}
-                      onSave={async (perms) => {
-                        await onPermissionsChange(perms);
-                        setShowPermissions(false);
-                      }}
-                      onClose={() => setShowPermissions(false)}
-                    />
-                  )}
-                </div>
-              )}
+              {accessControls}
 
               <EditorActionRow
                 secondaryAction={(

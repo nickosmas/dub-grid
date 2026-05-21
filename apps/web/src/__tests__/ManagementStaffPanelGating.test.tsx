@@ -76,4 +76,23 @@ describe("ManagementStaffPanel access gating", () => {
       screen.getByRole("button", { name: /manage permissions/i }),
     ).toBeTruthy();
   });
+
+  it("offers access controls for an employee-linked admin too", () => {
+    render(
+      <ManagementStaffPanel
+        {...baseProps}
+        person={makePerson({
+          source: "employee",
+          employeeId: "emp-1",
+          orgRole: "admin",
+        })}
+        canManageManagementAccess
+        onRoleChange={vi.fn(async () => {})}
+        onPermissionsChange={vi.fn(async () => {})}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /manage permissions/i }),
+    ).toBeTruthy();
+  });
 });
