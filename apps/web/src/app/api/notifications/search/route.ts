@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import type { NotificationFacets } from "@/types";
 import { mapNotificationRow } from "../route";
 
@@ -27,6 +28,9 @@ const searchBodySchema = z.object({
 const SAFE_SEARCH = /[^a-zA-Z0-9 .,_'-]/g;
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) return auth.response;

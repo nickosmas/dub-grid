@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const bulkSchema = z.object({
   action: z.enum(["read", "unread", "archive", "unarchive"]),
@@ -11,6 +12,9 @@ const bulkSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) return auth.response;

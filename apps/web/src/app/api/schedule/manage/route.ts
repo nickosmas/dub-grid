@@ -12,6 +12,7 @@ import {
   resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
 import {
   fetchAssignmentIdByPairMap,
@@ -459,6 +460,9 @@ function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   let body: unknown;
   try {
     body = await req.json();

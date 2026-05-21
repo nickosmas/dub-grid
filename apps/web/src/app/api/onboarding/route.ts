@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -54,6 +55,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) {

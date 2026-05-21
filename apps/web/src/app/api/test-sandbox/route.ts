@@ -120,7 +120,10 @@ export async function POST(req: NextRequest) {
       }),
       {
         path: "/",
-        httpOnly: false,
+        // Server-only: the cookie is set, read (middleware + api-auth), and
+        // cleared (action: "exit") entirely server-side. No client JS reads it,
+        // so HttpOnly closes the JS-readability gap with no functional cost.
+        httpOnly: true,
         sameSite: "lax",
         secure: process.env.NODE_ENV === "production",
         maxAge: SANDBOX_COOKIE_MAX_AGE_SECONDS,

@@ -5,6 +5,7 @@ import {
   revokeUserSessionForUser,
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const revokeSessionSchema = z.object({
   refreshTokenHash: z.string().min(1),
@@ -30,6 +31,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) {

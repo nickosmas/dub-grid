@@ -5,6 +5,7 @@ import {
   saveNotificationPreferences,
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const channelsSchema = z.object({
   in_app: z.boolean(),
@@ -35,6 +36,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) {

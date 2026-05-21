@@ -4,6 +4,7 @@ import {
   createRequestSupabaseClient,
   requireAuthenticatedSession,
 } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const switchOrganizationSchema = z.object({
   targetOrgId: z.string().uuid(),
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedSession(req);
     if ("response" in auth) {

@@ -4,6 +4,7 @@ import {
   updateSelfProfileDetails,
 } from "@/features/account/server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { extractJwtClaims } from "@/features/permissions/shared";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
@@ -20,6 +21,9 @@ const accountProfileUpdateSchema = z.object({
 });
 
 export async function PATCH(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {
