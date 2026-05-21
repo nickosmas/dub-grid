@@ -19,6 +19,7 @@ vi.mock("../../../shared/components/Screen", async () =>
 
 const routerPush = vi.fn();
 const useQuery = vi.fn();
+const useMutation = vi.fn();
 const useAccessToken = vi.fn();
 const getSupabaseClient = vi.fn();
 const registerPushToken = vi.fn();
@@ -38,6 +39,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   return {
     ...actual,
     useQuery,
+    useMutation,
   };
 });
 
@@ -52,6 +54,8 @@ vi.mock("../../../shared/lib/supabase", () => ({
 vi.mock("../../../shared/lib/api", () => ({
   getBootstrap: vi.fn(),
   getProfile: vi.fn(),
+  getProfileChangeRequests: vi.fn(),
+  updateProfileChangeRequest: vi.fn(),
   registerPushToken,
 }));
 
@@ -61,7 +65,7 @@ vi.mock("../../../shared/lib/auth-reset", () => ({
 
 vi.mock("../../../shared/lib/session", () => ({
   loadStoredPushDevice,
-  saveLastWorkspaceSlug: vi.fn(),
+  saveLastOrgSlug: vi.fn(),
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({
@@ -191,6 +195,7 @@ beforeAll(async () => {
 describe("ProfileScreen", () => {
   beforeEach(() => {
     useQuery.mockReset();
+    useMutation.mockReset();
     useAccessToken.mockReset();
     getSupabaseClient.mockReset();
     registerPushToken.mockReset();
@@ -201,8 +206,21 @@ describe("ProfileScreen", () => {
 
     useAccessToken.mockReturnValue("token-123");
     loadStoredPushDevice.mockResolvedValue(null);
+    useMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      variables: undefined,
+    });
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
+      if (key.includes("change-requests")) {
+        return {
+          data: { requests: [] },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
       if (key.includes("profile")) {
         return {
           data: profileData,
@@ -264,12 +282,26 @@ describe("ProfileScreen", () => {
   it("shows pending profile change request review state", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
-      if (key.includes("profile")) {
+      if (key.includes("change-requests")) {
         return {
           data: {
-            ...profileData,
-            pendingProfileChangeRequest: true,
+            requests: [
+              {
+                id: "11111111-1111-1111-1111-111111111111",
+                type: "profile_update",
+                status: "pending",
+                createdAt: "2024-02-01T15:30:00.000Z",
+              },
+            ],
           },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+      if (key.includes("profile")) {
+        return {
+          data: profileData,
           error: null,
           isLoading: false,
           refetch: vi.fn(),
@@ -286,20 +318,33 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(
-      screen.getByText("A profile change request is pending admin review."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("1 pending request")).toBeInTheDocument();
+    expect(screen.getByText("Name change")).toBeInTheDocument();
   });
 
   it("shows pending account deletion request review state", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
-      if (key.includes("profile")) {
+      if (key.includes("change-requests")) {
         return {
           data: {
-            ...profileData,
-            pendingAccountDeletionRequest: true,
+            requests: [
+              {
+                id: "22222222-2222-2222-2222-222222222222",
+                type: "account_deletion",
+                status: "pending",
+                createdAt: "2024-02-01T15:30:00.000Z",
+              },
+            ],
           },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+      if (key.includes("profile")) {
+        return {
+          data: profileData,
           error: null,
           isLoading: false,
           refetch: vi.fn(),
@@ -316,9 +361,8 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(
-      screen.getByText("An account deletion request is pending admin review."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("1 pending request")).toBeInTheDocument();
+    expect(screen.getByText("Account deletion")).toBeInTheDocument();
   });
 
   it("opens detail screens from tappable rows", () => {

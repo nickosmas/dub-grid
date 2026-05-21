@@ -129,6 +129,8 @@ COMMENT ON COLUMN public.profiles.version IS 'Optimistic lock version counter fo
 COMMENT ON COLUMN public.profiles.role_locked IS 'Flag indicating if role is currently locked during a change operation';
 COMMENT ON CONSTRAINT gridmaster_no_org ON public.profiles IS 'Gridmasters cannot belong to an organization — they have global scope';
 
+ALTER TABLE ONLY public.profiles REPLICA IDENTITY FULL;
+
 
 -- ── organization_memberships ──────────────────────────────────────────────────
 
@@ -498,6 +500,8 @@ CREATE TABLE public.recurring_shifts (
   CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until)
 );
 
+ALTER TABLE ONLY public.recurring_shifts REPLICA IDENTITY FULL;
+
 
 -- ── shift_series ──────────────────────────────────────────────────────────────
 
@@ -720,6 +724,8 @@ CREATE TABLE public.notification_preferences (
 
 COMMENT ON TABLE public.notification_preferences IS 'Per-user notification channel preferences (in_app/email toggles per category)';
 
+ALTER TABLE ONLY public.notification_preferences REPLICA IDENTITY FULL;
+
 
 -- ── mobile_device_tokens ────────────────────────────────────────────────────
 
@@ -765,6 +771,8 @@ COMMENT ON COLUMN public.user_sessions.device_label IS 'User-friendly device ide
 COMMENT ON COLUMN public.user_sessions.ip_address IS 'IP address of the device at session creation';
 COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification. UNIQUE prevents duplicates; NULL allowed for rows created by switch_org before the client first calls track-session';
 
+ALTER TABLE ONLY public.user_sessions REPLICA IDENTITY FULL;
+
 
 -- ── schedule_draft_sessions ───────────────────────────────────────────────────
 
@@ -794,6 +802,8 @@ CREATE TABLE public.publish_history (
 );
 
 CREATE INDEX idx_publish_history_org_date ON public.publish_history(org_id, published_at DESC);
+
+ALTER TABLE ONLY public.publish_history REPLICA IDENTITY FULL;
 
 
 -- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
@@ -1383,3 +1393,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.subscriptions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_log;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.impersonation_sessions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.user_sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.recurring_shifts;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.publish_history;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notification_preferences;

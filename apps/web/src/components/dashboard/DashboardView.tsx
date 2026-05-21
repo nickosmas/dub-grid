@@ -2,8 +2,10 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { queryKeys } from "@/lib/query-keys";
 
 import type { Permissions } from "@/hooks";
 import type {
@@ -116,34 +118,13 @@ interface DashboardViewProps {
 }
 
 export function hasDashboardAdminCapability(
-  permissions: Pick<
-    Permissions,
-    | "level"
-    | "canManageOrg"
-    | "canEditShifts"
-    | "canManageEmployees"
-    | "canViewDashboardAnalytics"
-  >,
+  permissions: Pick<Permissions, "level">,
 ): boolean {
-  return (
-    permissions.level >= 2 ||
-    permissions.canManageOrg ||
-    permissions.canEditShifts ||
-    permissions.canManageEmployees ||
-    permissions.canViewDashboardAnalytics
-  );
+  return permissions.level >= 2;
 }
 
 export function getDashboardRoleVariant(
-  permissions: Pick<
-    Permissions,
-    | "level"
-    | "isUserViewActive"
-    | "canManageOrg"
-    | "canEditShifts"
-    | "canManageEmployees"
-    | "canViewDashboardAnalytics"
-  >,
+  permissions: Pick<Permissions, "level" | "isUserViewActive">,
 ): DashboardRoleVariant {
   if (permissions.isUserViewActive) {
     return "user";
@@ -153,7 +134,11 @@ export function getDashboardRoleVariant(
     return "super-admin";
   }
 
-  return hasDashboardAdminCapability(permissions) ? "admin" : "user";
+  if (permissions.level >= 2) {
+    return "admin";
+  }
+
+  return "user";
 }
 
 export function getDashboardPeriodLabel(viewMode: ViewMode): string {
@@ -321,7 +306,6 @@ export default function DashboardView({
   const [activityPublishHistory, setActivityPublishHistory] = useState<
     PublishHistoryEntryWithName[]
   >([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [activityRequests, setActivityRequests] = useState<ShiftRequest[]>([]);
   const [shiftsLoading, setShiftsLoading] = useState(true);
   const [publishedDateRanges, setPublishedDateRanges] = useState<
@@ -330,6 +314,12 @@ export default function DashboardView({
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
+
+  const invitationsQuery = useQuery<Invitation[]>({
+    queryKey: queryKeys.org.invitations(orgId),
+    queryFn: () => fetchOrganizationInvitations(orgId),
+  });
+  const invitations = invitationsQuery.data ?? [];
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
@@ -363,23 +353,15 @@ export default function DashboardView({
         () => [],
       ),
       fetchPublishHistory(orgId, 20, 0).catch(() => []),
-      fetchOrganizationInvitations(orgId).catch(() => []),
       fetchShiftRequests(orgId, assignmentLabelMapRef.current).catch(() => []),
     ])
       .then(
-        ([
-          shifts,
-          publishedRanges,
-          publishRows,
-          invitationRows,
-          requestRows,
-        ]) => {
+        ([shifts, publishedRanges, publishRows, requestRows]) => {
           if (cancelled) return;
           setAllShifts(shifts);
           setPublishedDateRanges(publishedRanges);
           setPublishHistory(publishRows[0] ?? null);
           setActivityPublishHistory(publishRows);
-          setInvitations(invitationRows);
           setActivityRequests(requestRows);
           setShiftsLoading(false);
         },
@@ -1069,7 +1051,7 @@ export default function DashboardView({
         {/* Users see a "setup in progress" message if no employee record */}
         {employees.length === 0 && !isUserDashboardMode && !hasAdminCapability && (
           <EmptyState
-            heading="Your workspace is being set up"
+            heading="Your organization is being set up"
             description="Your administrator is configuring the organization. Check back soon."
           />
         )}

@@ -1,0 +1,442 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import {
+  Award,
+  Briefcase,
+  Building2,
+  Calendar,
+  Layers,
+  Mail,
+  Phone,
+  Tag,
+  UserCircle,
+} from "lucide-react";
+import type { Employee, FocusArea, NamedItem } from "@/types";
+import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
+
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+interface StaffReadOnlyDetailPanelProps {
+  employee: Employee;
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
+  roleLabel: string;
+  focusAreaLabel: string;
+  certificationLabel: string;
+  departments?: NamedItem[];
+  departmentLabel?: string;
+  onClose: () => void;
+}
+
+function formatList(ids: number[], map: Map<number, string>): string {
+  const names = ids.map((id) => map.get(id)).filter((v): v is string => Boolean(v));
+  return names.length > 0 ? names.join(", ") : "—";
+}
+
+function deriveScheduledDepartmentIds(
+  focusAreaIds: number[],
+  focusAreas: FocusArea[],
+): number[] {
+  const selected = new Set(focusAreaIds);
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const fa of focusAreas) {
+    if (!selected.has(fa.id) || fa.departmentId == null) continue;
+    if (seen.has(fa.departmentId)) continue;
+    seen.add(fa.departmentId);
+    out.push(fa.departmentId);
+  }
+  return out;
+}
+
+export function StaffReadOnlyDetailPanel({
+  employee,
+  focusAreas,
+  certifications,
+  roles,
+  roleLabel,
+  focusAreaLabel,
+  certificationLabel,
+  departments,
+  departmentLabel,
+  onClose,
+}: StaffReadOnlyDetailPanelProps) {
+  const hue = hashCode(employee.id) % 360;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [closing, setClosing] = useState(false);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
+  const closePanel = useCallback(() => {
+    setClosing(true);
+    setTimeout(() => {
+      setClosing(false);
+      onCloseRef.current();
+    }, 200);
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closePanel();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [closePanel]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = 0;
+  }, [employee.id]);
+
+  const focusAreaMap = new Map(focusAreas.map((fa) => [fa.id, fa.name]));
+  const roleMap = new Map(roles.map((r) => [r.id, r.name]));
+  const certMap = new Map(certifications.map((c) => [c.id, c.name]));
+  const deptMap = new Map((departments ?? []).map((d) => [d.id, d.name]));
+
+  const focusAreaNames = formatList(employee.focusAreaIds, focusAreaMap);
+  const roleNames = formatList(employee.roleIds, roleMap);
+  const departmentIds = deriveScheduledDepartmentIds(employee.focusAreaIds, focusAreas);
+  const departmentNames = formatList(departmentIds, deptMap);
+  const certificationName =
+    employee.certificationId != null
+      ? (certMap.get(employee.certificationId) ?? "Unknown")
+      : "—";
+  const employmentLabel =
+    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const displayName = getEmployeeDisplayName(employee);
+  const initials = getInitials(displayName);
+
+  return createPortal(
+    <>
+      <div
+        className={`staff-detail-overlay${closing ? " closing" : ""}`}
+        onClick={closePanel}
+      />
+      <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
+        {/* Header */}
+        <div
+          className="staff-detail-header"
+          style={{
+            background: `linear-gradient(180deg, hsl(${hue}, 70%, 97%) 0%, var(--color-surface) 100%)`,
+            borderBottom: "1px solid var(--color-border)",
+          }}
+        >
+          <button
+            className="staff-detail-close"
+            onClick={closePanel}
+            aria-label="Close detail panel"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: `hsl(${hue}, 65%, 92%)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+                fontWeight: 800,
+                color: `hsl(${hue}, 60%, 35%)`,
+                flexShrink: 0,
+                border: `2px solid hsl(${hue}, 55%, 82%)`,
+                boxShadow: `0 2px 8px hsla(${hue}, 60%, 50%, 0.15)`,
+              }}
+            >
+              {initials}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  minWidth: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 18,
+                    color: "var(--color-text-primary)",
+                    letterSpacing: "-0.01em",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    lineHeight: 1.2,
+                    minWidth: 0,
+                  }}
+                >
+                  {displayName}
+                </span>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    padding: "3px 9px",
+                    borderRadius: 20,
+                    background: "var(--color-bg-secondary)",
+                    color: "var(--color-text-muted)",
+                    border: "1px solid var(--color-border)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {employmentLabel}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "20px 24px 32px" }}>
+          {/* Quick action */}
+          {employee.email && (
+            <a
+              href={`mailto:${employee.email}`}
+              className="dg-btn dg-btn-secondary"
+              style={{
+                display: "flex",
+                width: "100%",
+                textDecoration: "none",
+                marginBottom: 22,
+              }}
+            >
+              <Mail size={15} strokeWidth={2.2} />
+              Email
+            </a>
+          )}
+
+          <ReadOnlySection title="Staff Profile">
+            <ReadOnlyRow
+              icon={<UserCircle size={15} strokeWidth={1.8} />}
+              label="Name"
+              value={displayName}
+            />
+            <ReadOnlyRow
+              icon={<Briefcase size={15} strokeWidth={1.8} />}
+              label="Employment"
+              value={employmentLabel}
+            />
+            <ReadOnlyRow
+              icon={<Tag size={15} strokeWidth={1.8} />}
+              label={roleLabel}
+              value={roleNames}
+            />
+            <ReadOnlyRow
+              icon={<Award size={15} strokeWidth={1.8} />}
+              label={certificationLabel}
+              value={certificationName}
+            />
+            <ReadOnlyRow
+              icon={<Layers size={15} strokeWidth={1.8} />}
+              label={focusAreaLabel}
+              value={focusAreaNames}
+              isLast
+            />
+          </ReadOnlySection>
+
+          <ReadOnlySection title="Contact">
+            <ReadOnlyRow
+              icon={<Mail size={15} strokeWidth={1.8} />}
+              label="Email"
+              value={
+                employee.email ? (
+                  <a
+                    href={`mailto:${employee.email}`}
+                    style={{
+                      color: "var(--color-link)",
+                      textDecoration: "none",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {employee.email}
+                  </a>
+                ) : (
+                  <span style={{ color: "var(--color-text-faint)" }}>—</span>
+                )
+              }
+            />
+            <ReadOnlyRow
+              icon={<Phone size={15} strokeWidth={1.8} />}
+              label="Phone"
+              value={
+                employee.phone ? (
+                  <a
+                    href={`tel:${employee.phone}`}
+                    style={{
+                      color: "var(--color-link)",
+                      textDecoration: "none",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {employee.phone}
+                  </a>
+                ) : (
+                  <span style={{ color: "var(--color-text-faint)" }}>—</span>
+                )
+              }
+              isLast
+            />
+          </ReadOnlySection>
+
+          {departments && departments.length > 0 && departmentIds.length > 0 && (
+            <ReadOnlySection title={departmentLabel ?? "Departments"}>
+              <ReadOnlyRow
+                icon={<Building2 size={15} strokeWidth={1.8} />}
+                label={departmentLabel ?? "Departments"}
+                value={departmentNames}
+                isLast
+              />
+            </ReadOnlySection>
+          )}
+
+          {employee.statusChangedAt && (
+            <div
+              style={{
+                marginTop: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-text-faint)",
+              }}
+            >
+              <Calendar size={12} strokeWidth={2} />
+              <span>
+                On staff since {new Date(employee.statusChangedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}
+
+function ReadOnlySection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section style={{ marginBottom: 22 }}>
+      <h3
+        style={{
+          margin: "0 0 10px 2px",
+          fontSize: "var(--dg-fs-footnote)",
+          fontWeight: 700,
+          color: "var(--color-text-subtle)",
+          letterSpacing: "0.07em",
+          textTransform: "uppercase",
+        }}
+      >
+        {title}
+      </h3>
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--dg-radius-lg)",
+          overflow: "hidden",
+        }}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function ReadOnlyRow({
+  icon,
+  label,
+  value,
+  isLast = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  isLast?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        padding: "12px 14px",
+        borderBottom: isLast ? "none" : "1px solid var(--color-border)",
+      }}
+    >
+      <span
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--color-bg-secondary)",
+          color: "var(--color-text-muted)",
+          flexShrink: 0,
+        }}
+      >
+        {icon}
+      </span>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          color: "var(--color-text-muted)",
+          fontWeight: 500,
+          flexShrink: 0,
+          width: 110,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-body)",
+          color: "var(--color-text-primary)",
+          fontWeight: 500,
+          flex: 1,
+          minWidth: 0,
+          textAlign: "right",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}

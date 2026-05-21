@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       req,
       orgId,
       (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true },
     );
     if ("response" in auth) return auth.response;
     const supabase = auth.serviceClient;

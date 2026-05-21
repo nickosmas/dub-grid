@@ -121,7 +121,7 @@ export async function fetchNotificationFacets(): Promise<NotificationFacets> {
 }
 
 async function bulkNotificationAction(
-  action: "read" | "unread" | "archive" | "unarchive" | "delete",
+  action: "read" | "unread" | "archive" | "unarchive",
   ids: string[],
 ): Promise<void> {
   if (ids.length === 0) return;
@@ -146,8 +146,4 @@ export function archiveNotifications(ids: string[]): Promise<void> {
 
 export function unarchiveNotifications(ids: string[]): Promise<void> {
   return bulkNotificationAction("unarchive", ids);
-}
-
-export function deleteNotifications(ids: string[]): Promise<void> {
-  return bulkNotificationAction("delete", ids);
 }

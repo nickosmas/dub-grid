@@ -23,7 +23,6 @@ import {
   MailOpen,
   Search,
   Shield,
-  Trash2,
   UserCog,
   Users,
   X,
@@ -32,11 +31,15 @@ import { ProtectedRoute } from "@/components/RouteGuards";
 import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Modal from "@/components/Modal";
 import { useAuth } from "@/components/AuthProvider";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import {
+  extractNotificationAction,
+  formatNotificationMetadata,
+} from "@dubgrid/domain";
+import {
   archiveNotifications,
-  deleteNotifications,
   fetchNotificationFacets,
   markAllNotificationsRead,
   markNotificationsRead,
@@ -191,6 +194,36 @@ const DEFAULT_FILTERS: FilterState = {
   sort: "desc",
 };
 
+// The page heading mirrors the active Status filter so the user always sees
+// which section ("Inbox", "Unread", "Archived"...) they're looking at.
+function activeViewMeta(filters: FilterState): {
+  title: string;
+  description: string;
+} {
+  if (filters.includeArchived) {
+    return {
+      title: "Archived",
+      description: "Notifications you've archived. Restore any to send it back to your inbox.",
+    };
+  }
+  if (filters.read === "unread") {
+    return {
+      title: "Unread",
+      description: "Notifications you haven't opened yet.",
+    };
+  }
+  if (filters.read === "read") {
+    return {
+      title: "Read",
+      description: "Notifications you've already opened.",
+    };
+  }
+  return {
+    title: "Inbox",
+    description: "Search, filter, and review every notification you've received.",
+  };
+}
+
 function filtersToQuery(filters: FilterState): NotificationSearchParams {
   return {
     limit: PAGE_SIZE,
@@ -226,8 +259,8 @@ function InboxView() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
   const [realtimeTick, setRealtimeTick] = useState(0);
   const requestSeq = useRef(0);
   const notificationsLengthRef = useRef(0);
@@ -392,6 +425,15 @@ function InboxView() {
         }
         setSelectedIds(new Set());
         refreshFacets();
+        const successMessage =
+          action === "read"
+            ? "Marked as read"
+            : action === "unread"
+              ? "Marked as unread"
+              : action === "archive"
+                ? "Archived"
+                : "Restored";
+        toast.success(successMessage);
       } catch (err) {
         toast.error(formatClientErrorMessage(err, "Action failed"));
       } finally {
@@ -400,28 +442,6 @@ function InboxView() {
     },
     [applyOptimistic, filters.includeArchived, refreshFacets, removeFromList],
   );
-
-  const handleConfirmDelete = useCallback(async () => {
-    const ids = [...selectedIds];
-    if (!ids.length) return;
-    setBusy(true);
-    try {
-      await deleteNotifications(ids);
-      removeFromList(ids);
-      setSelectedIds(new Set());
-      refreshFacets();
-      toast.success(
-        ids.length === 1
-          ? "Notification deleted"
-          : `${ids.length} notifications deleted`,
-      );
-    } catch (err) {
-      toast.error(formatClientErrorMessage(err, "Delete failed"));
-    } finally {
-      setBusy(false);
-      setConfirmingDelete(false);
-    }
-  }, [refreshFacets, removeFromList, selectedIds]);
 
   const handleMarkAllRead = useCallback(async () => {
     setBusy(true);
@@ -437,23 +457,30 @@ function InboxView() {
       toast.error(formatClientErrorMessage(err, "Action failed"));
     } finally {
       setBusy(false);
+      setConfirmingMarkAllRead(false);
     }
   }, [refreshFacets]);
 
+  const [detailNotification, setDetailNotification] =
+    useState<Notification | null>(null);
+
   const handleRowClick = useCallback(
     async (n: Notification) => {
+      setDetailNotification(n);
       if (!n.readAt) {
         try {
           await markNotificationsRead([n.id]);
           applyOptimistic([n.id], { readAt: new Date().toISOString() });
           refreshFacets();
         } catch {
-          // best-effort; continue to navigate
+          // best-effort; the detail panel still opens
         }
       }
     },
     [applyOptimistic, refreshFacets],
   );
+
+  const activeView = activeViewMeta(filters);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -467,15 +494,26 @@ function InboxView() {
         }}
       >
         <div>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 700,
+              color: "var(--color-text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+            }}
+          >
+            Notifications
+          </div>
           <h1
             style={{
-              margin: 0,
+              margin: "2px 0 0",
               fontSize: "var(--dg-fs-page-title)",
               fontWeight: 700,
               color: "var(--color-text-primary)",
             }}
           >
-            Notifications
+            {activeView.title}
           </h1>
           <p
             style={{
@@ -484,13 +522,13 @@ function InboxView() {
               fontSize: "var(--dg-fs-label)",
             }}
           >
-            Search, filter, and review every notification you've received.
+            {activeView.description}
           </p>
         </div>
         <button
           type="button"
           className="dg-btn dg-btn-secondary"
-          onClick={handleMarkAllRead}
+          onClick={() => setConfirmingMarkAllRead(true)}
           disabled={busy || (facets?.totalUnread ?? 0) === 0}
         >
           <CheckCheck size={14} style={{ marginRight: 6 }} />
@@ -528,7 +566,6 @@ function InboxView() {
             }
             onToggleSelectAll={handleToggleSelectAll}
             onBulk={handleBulk}
-            onDelete={() => setConfirmingDelete(true)}
             selectedIds={[...selectedIds]}
           />
 
@@ -600,22 +637,151 @@ function InboxView() {
         </main>
       </div>
 
-      {confirmingDelete && (
+      {detailNotification && (
+        <NotificationDetailModal
+          notification={detailNotification}
+          onClose={() => setDetailNotification(null)}
+        />
+      )}
+
+      {confirmingMarkAllRead && (
         <ConfirmDialog
-          title={
-            selectedIds.size === 1
-              ? "Delete notification?"
-              : `Delete ${selectedIds.size} notifications?`
+          title="Mark all read?"
+          message={
+            (facets?.totalUnread ?? 0) === 1
+              ? "This marks your one unread notification as read."
+              : `This marks all ${facets?.totalUnread ?? 0} unread notifications as read.`
           }
-          message="Deleted notifications can't be recovered. To hide without losing them, archive instead."
-          confirmLabel="Delete"
-          onConfirm={handleConfirmDelete}
-          onCancel={() => setConfirmingDelete(false)}
+          confirmLabel="Mark all read"
+          variant="info"
+          onConfirm={handleMarkAllRead}
+          onCancel={() => setConfirmingMarkAllRead(false)}
           isLoading={busy}
-          variant="danger"
         />
       )}
     </div>
+  );
+}
+
+interface NotificationDetailModalProps {
+  notification: Notification;
+  onClose: () => void;
+}
+
+function formatFullTimestamp(value: string): string {
+  return new Date(value).toLocaleString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function NotificationDetailModal({
+  notification,
+  onClose,
+}: NotificationDetailModalProps) {
+  const entries = useMemo(
+    () => formatNotificationMetadata(notification.metadata),
+    [notification.metadata],
+  );
+  const action = useMemo(
+    () => extractNotificationAction(notification.metadata),
+    [notification.metadata],
+  );
+
+  return (
+    <Modal title={notification.title} onClose={onClose} headerSafe>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <span
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-muted)",
+          }}
+        >
+          {formatFullTimestamp(notification.createdAt)}
+          {notification.channel === "email" ? " • Sent via email" : ""}
+        </span>
+        <p
+          style={{
+            margin: 0,
+            color: "var(--color-text-primary)",
+            fontSize: "var(--dg-fs-body)",
+            lineHeight: 1.5,
+          }}
+        >
+          {notification.message}
+        </p>
+
+        {entries.length > 0 && (
+          <div
+            style={{
+              border: "1px solid var(--color-border-light)",
+              borderRadius: "var(--dg-radius-md)",
+              padding: 12,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              background: "var(--color-bg-secondary)",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: 0.4,
+              }}
+            >
+              Details
+            </span>
+            {entries.map((entry) => (
+              <div
+                key={entry.label}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr)",
+                  gap: 12,
+                  alignItems: "baseline",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
+                  {entry.label}
+                </span>
+                <span
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--color-text-primary)",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {entry.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {action && (
+          <Link
+            href={action.href}
+            className="dg-btn dg-btn-primary"
+            onClick={onClose}
+            style={{ alignSelf: "flex-start" }}
+          >
+            {action.label}
+          </Link>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -626,13 +792,15 @@ interface FilterSidebarProps {
 }
 
 function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
-  const setRead = (read: ReadFilter) => onChange({ ...filters, read });
+  // Status chips must set `read` and `includeArchived` in a single update.
+  // Calling two setters that each spread the same stale `filters` closure
+  // makes the second overwrite the first, silently dropping one field.
+  const setStatus = (read: ReadFilter, includeArchived: boolean) =>
+    onChange({ ...filters, read, includeArchived });
   const setCategory = (category: CategoryFilter) =>
     onChange({ ...filters, category });
   const setPriority = (priority: NotificationPriority | "all") =>
     onChange({ ...filters, priority });
-  const setIncludeArchived = (includeArchived: boolean) =>
-    onChange({ ...filters, includeArchived });
 
   const totalUnread = facets?.totalUnread ?? 0;
   const totalArchived = facets?.totalArchived ?? 0;
@@ -643,7 +811,9 @@ function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
         width: 220,
         flexShrink: 0,
         position: "sticky",
-        top: 16,
+        // Park below the sticky app header instead of scrolling under it,
+        // which would hide the top status links.
+        top: "calc(var(--app-shell-header-h, 0px) + 16px)",
         display: "flex",
         flexDirection: "column",
         gap: 18,
@@ -652,38 +822,26 @@ function FilterSidebar({ filters, facets, onChange }: FilterSidebarProps) {
       <FilterGroup label="Status">
         <FilterChip
           active={filters.read === "all" && !filters.includeArchived}
-          onClick={() => {
-            setIncludeArchived(false);
-            setRead("all");
-          }}
+          onClick={() => setStatus("all", false)}
           icon={<Inbox size={14} />}
           label="Inbox"
         />
         <FilterChip
           active={filters.read === "unread" && !filters.includeArchived}
-          onClick={() => {
-            setIncludeArchived(false);
-            setRead("unread");
-          }}
+          onClick={() => setStatus("unread", false)}
           icon={<Mail size={14} />}
           label="Unread"
           count={totalUnread || undefined}
         />
         <FilterChip
           active={filters.read === "read" && !filters.includeArchived}
-          onClick={() => {
-            setIncludeArchived(false);
-            setRead("read");
-          }}
+          onClick={() => setStatus("read", false)}
           icon={<MailOpen size={14} />}
           label="Read"
         />
         <FilterChip
           active={filters.includeArchived}
-          onClick={() => {
-            setIncludeArchived(true);
-            setRead("all");
-          }}
+          onClick={() => setStatus("all", true)}
           icon={<Archive size={14} />}
           label="Archived"
           count={totalArchived || undefined}
@@ -839,7 +997,6 @@ interface ToolbarProps {
     action: "read" | "unread" | "archive" | "unarchive",
     ids: string[],
   ) => void;
-  onDelete: () => void;
 }
 
 function Toolbar({
@@ -856,7 +1013,6 @@ function Toolbar({
   onSortToggle,
   onToggleSelectAll,
   onBulk,
-  onDelete,
 }: ToolbarProps) {
   return (
     <div
@@ -957,7 +1113,6 @@ function Toolbar({
           busy={busy}
           includeArchived={includeArchived}
           onBulk={onBulk}
-          onDelete={onDelete}
         />
       )}
     </div>
@@ -969,7 +1124,6 @@ function BulkActions({
   busy,
   includeArchived,
   onBulk,
-  onDelete,
 }: {
   selectedIds: string[];
   busy: boolean;
@@ -978,7 +1132,6 @@ function BulkActions({
     action: "read" | "unread" | "archive" | "unarchive",
     ids: string[],
   ) => void;
-  onDelete: () => void;
 }) {
   const buttonStyle: CSSProperties = { gap: 4 };
   return (
@@ -1033,15 +1186,6 @@ function BulkActions({
           <Archive size={14} /> Archive
         </button>
       )}
-      <button
-        type="button"
-        className="dg-btn dg-btn-danger"
-        onClick={onDelete}
-        disabled={busy}
-        style={buttonStyle}
-      >
-        <Trash2 size={14} /> Delete
-      </button>
     </div>
   );
 }

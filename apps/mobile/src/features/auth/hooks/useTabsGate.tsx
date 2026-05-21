@@ -3,11 +3,11 @@ import { Redirect } from "expo-router";
 import { AppState } from "react-native";
 import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { useBootstrap } from "./useBootstrap";
-import { WorkspaceLockedScreen } from "../screens/WorkspaceLockedScreen";
+import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
 import { usePushResponseHandler } from "../../notifications/hooks/usePushResponseHandler";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
-import { getWorkspaceUnavailableMessage } from "../../../shared/lib/errors";
+import { getOrgUnavailableMessage } from "../../../shared/lib/errors";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 
 export type TabsGateResult =
@@ -17,7 +17,7 @@ export type TabsGateResult =
 export function useTabsGate(): TabsGateResult {
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
-  const lockedMessage = getWorkspaceUnavailableMessage(bootstrapQuery.error);
+  const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);
   usePushRegistration(
     accessToken,
     lockedMessage ? null : bootstrapQuery.data?.currentOrg.id,
@@ -45,7 +45,7 @@ export function useTabsGate(): TabsGateResult {
       kind: "blocked",
       element: (
         <LoadingScreen
-          title="Loading your workspace"
+          title="Loading your organization"
           body="Getting your schedule and mobile tools ready."
         />
       ),
@@ -60,7 +60,7 @@ export function useTabsGate(): TabsGateResult {
     return {
       kind: "blocked",
       element: (
-        <WorkspaceLockedScreen
+        <OrganizationLockedScreen
           isRetrying={bootstrapQuery.isFetching}
           message={lockedMessage}
           onRetry={() => {

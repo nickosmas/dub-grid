@@ -70,7 +70,7 @@ All nine packages are private, versioned `0.1.0`, ESM, and build with `tsc` to `
 | `@dubgrid/authz` | Permission logic: `ROLE_LEVEL`, `ALL_PERMS` / `READ_ONLY_PERMS`, `applyViewImplications`, `unionPermissions`, `buildPermissionContext` / `buildPerms`, `extractJwtClaims`, `getPermissionsFromSession`. | `domain`, `@supabase/supabase-js` |
 | `@dubgrid/schedule-core` | Schedule transformation / calculation logic. | `contracts` |
 | `@dubgrid/data-access` | Supabase query + data-mapping layer; currently powers the shared mobile data layer. | `contracts`, `db-types`, `domain`, `@supabase/supabase-js` |
-| `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes. Modules: `auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `workspace`, `write`. Rejects sandbox workspaces for mobile login. | `authz`, `contracts`, `domain`, `schedule-core`, `@supabase/supabase-js` |
+| `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes. Modules: `auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`. Rejects sandbox organizations for mobile login. | `authz`, `contracts`, `domain`, `schedule-core`, `@supabase/supabase-js` |
 | `@dubgrid/api-client` | Platform-neutral HTTP client primitives: `createHeaders`, `appendQueryParams`, `createJsonApiRequest`, `ApiResponseError`. | none |
 | `@dubgrid/design-tokens` | Shared design values. | none |
 
@@ -400,13 +400,13 @@ mobile screen
         → @dubgrid/data-access → Supabase (RLS-enforced)
 ```
 
-`src/shared/lib/api.ts` provides a 15-second timeout, bearer-token auth, Zod response parsing via `@dubgrid/contracts`, and an `onAuthFailure` hook. `@dubgrid/mobile-api-core` rejects sandbox workspaces for mobile login.
+`src/shared/lib/api.ts` provides a 15-second timeout, bearer-token auth, Zod response parsing via `@dubgrid/contracts`, and an `onAuthFailure` hook. `@dubgrid/mobile-api-core` rejects sandbox organizations for mobile login.
 
 ### Mobile API Surface (`/api/mobile/v1/*`)
 
 The mobile API exposes its own Route Handlers under `apps/web/src/app/api/mobile/v1/`, including:
 
-- **Bootstrap & auth:** `/bootstrap`, `/auth/login`, `/auth/workspace`
+- **Bootstrap & auth:** `/bootstrap`, `/auth/login`, `/auth/organization`
 - **Schedule:** `/me/schedule`, `/org/schedule`
 - **People:** `/people`, `/people/[id]`, `/people/[id]/status`, `/people/[id]/invitation`
 - **Profile:** `/profile`, `/profile/phone`, `/profile/account`, `/profile/sessions`, `/profile/change-requests`, `/profile/change-requests/[id]`, `/profile/notification-preferences`

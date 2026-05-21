@@ -53,7 +53,7 @@ export default function CreateSandboxDialog({
     }
   }
 
-  const sourceLabel = orgName ? ` ${orgName}` : " your workspace";
+  const sourceLabel = orgName ? ` ${orgName}` : " your organization";
   const message = (
     <div>
       <p style={{ margin: "0 0 12px 0" }}>

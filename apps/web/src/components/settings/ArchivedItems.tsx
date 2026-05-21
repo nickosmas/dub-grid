@@ -105,7 +105,7 @@ export default function ArchivedItems({ orgId }: { orgId: string }) {
   }
 
   if (groups.length === 0) {
-    return <EmptyState compact title="No archived items" />;
+    return <EmptyState size="compact" title="No archived items" />;
   }
 
   return (

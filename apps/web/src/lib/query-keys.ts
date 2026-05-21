@@ -25,6 +25,10 @@ export const queryKeys = {
     users: (orgId: string) => ["org", orgId, "users"] as const,
     directory: (orgId: string) => ["org", orgId, "directory"] as const,
     invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
+    peopleChangeRequests: (orgId: string, status: string) =>
+      ["org", orgId, "peopleChangeRequests", status] as const,
+    publishHistory: (orgId: string) => ["org", orgId, "publishHistory"] as const,
+    auditLog: (orgId: string) => ["org", orgId, "auditLog"] as const,
   },
   employees: {
     all: (orgId: string) => ["employees", orgId] as const,
@@ -50,6 +54,9 @@ export const queryKeys = {
   account: {
     self: (userId: string, orgId: string | null) =>
       ["account", userId, orgId ?? "no-org", "self"] as const,
+    sessions: (userId: string) => ["account", userId, "sessions"] as const,
+    notificationPrefs: (userId: string) =>
+      ["account", userId, "notificationPrefs"] as const,
   },
   notifications: {
     all: (userId: string) => ["notifications", userId] as const,

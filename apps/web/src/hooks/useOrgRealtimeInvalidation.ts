@@ -28,7 +28,12 @@ type OrgRealtimeTable =
   | "schedule_cells"
   | "schedule_cell_snapshots"
   | "schedule_cell_segments"
-  | "schedule_notes";
+  | "schedule_notes"
+  | "profile_change_requests"
+  | "invitations"
+  | "recurring_shifts"
+  | "publish_history"
+  | "audit_log";
 
 const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "focus_areas",
@@ -48,6 +53,11 @@ const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "schedule_cell_segments",
   "schedule_notes",
   "subscriptions",
+  "profile_change_requests",
+  "invitations",
+  "recurring_shifts",
+  "publish_history",
+  "audit_log",
 ];
 
 function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][] {
@@ -150,6 +160,29 @@ export function getOrgRealtimeInvalidationKeys(
       ]);
     case "schedule_notes":
       return uniqueKeys([queryKeys.shifts.all(orgId)]);
+    case "profile_change_requests":
+      return uniqueKeys([
+        queryKeys.org.peopleChangeRequests(orgId, "pending"),
+      ]);
+    case "invitations":
+      return uniqueKeys([
+        queryKeys.org.invitations(orgId),
+        queryKeys.org.directory(orgId),
+        queryKeys.org.users(orgId),
+        queryKeys.org.employeeCount(orgId),
+      ]);
+    case "recurring_shifts":
+      return uniqueKeys([
+        queryKeys.recurringShifts.all(orgId),
+        queryKeys.shifts.all(orgId),
+      ]);
+    case "publish_history":
+      return uniqueKeys([
+        queryKeys.org.publishHistory(orgId),
+        queryKeys.shifts.all(orgId),
+      ]);
+    case "audit_log":
+      return uniqueKeys([queryKeys.org.auditLog(orgId)]);
   }
 }
 

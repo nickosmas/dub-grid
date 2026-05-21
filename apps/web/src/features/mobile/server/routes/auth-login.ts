@@ -5,10 +5,10 @@ import {
 } from "@dubgrid/contracts";
 import {
   createMobileEphemeralAuthClient,
-  isValidMobileWorkspaceSlug,
+  isValidMobileOrgSlug,
   loginMobileUser,
   MobileApiRequestError,
-  normalizeMobileWorkspaceSlug,
+  normalizeMobileOrgSlug,
 } from "@dubgrid/mobile-api-core";
 import { checkRateLimit, loginLimiter } from "@/lib/rate-limit";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -48,16 +48,16 @@ export async function POST(req: NextRequest) {
   }
 
   const parsed = mobileAuthLoginBodySchema.safeParse(body);
-  const normalizedWorkspaceSlug = parsed.success
-    ? normalizeMobileWorkspaceSlug(parsed.data.workspaceSlug)
+  const normalizedOrgSlug = parsed.success
+    ? normalizeMobileOrgSlug(parsed.data.orgSlug)
     : "";
 
   if (
     !parsed.success ||
-    !isValidMobileWorkspaceSlug(normalizedWorkspaceSlug, RESERVED_SUBDOMAINS)
+    !isValidMobileOrgSlug(normalizedOrgSlug, RESERVED_SUBDOMAINS)
   ) {
     return json(
-      { error: "Enter a valid workspace slug, email, and password." },
+      { error: "Enter a valid organization slug, email, and password." },
       { status: 400 },
     );
   }
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await loginMobileUser(serviceClient, sessionClient, {
       ...parsed.data,
-      workspaceSlug: normalizedWorkspaceSlug,
+      orgSlug: normalizedOrgSlug,
     });
 
     return json(mobileAuthLoginResponseSchema.parse(payload));

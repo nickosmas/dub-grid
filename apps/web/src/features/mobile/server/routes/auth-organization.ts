@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { mobileWorkspaceLookupResponseSchema } from "@dubgrid/contracts";
+import { mobileOrganizationLookupResponseSchema } from "@dubgrid/contracts";
 import {
-  findMobileWorkspaceBySlug,
-  isValidMobileWorkspaceSlug,
-  normalizeMobileWorkspaceSlug,
+  findMobileOrganizationBySlug,
+  isValidMobileOrgSlug,
+  normalizeMobileOrgSlug,
 } from "@dubgrid/mobile-api-core";
 import { getServiceClient } from "@/lib/supabase-service";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
@@ -17,36 +17,36 @@ export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
 export async function GET(req: NextRequest) {
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
-  const slug = normalizeMobileWorkspaceSlug(
+  const slug = normalizeMobileOrgSlug(
     req.nextUrl.searchParams.get("slug"),
   );
 
-  if (!isValidMobileWorkspaceSlug(slug, RESERVED_SUBDOMAINS)) {
+  if (!isValidMobileOrgSlug(slug, RESERVED_SUBDOMAINS)) {
     return json(
-      { error: "Enter a valid workspace slug." },
+      { error: "Enter a valid organization slug." },
       { status: 400 },
     );
   }
 
   const serviceClient = getServiceClient();
   try {
-    const workspace = await findMobileWorkspaceBySlug(serviceClient, slug);
+    const organization = await findMobileOrganizationBySlug(serviceClient, slug);
 
-    if (!workspace) {
+    if (!organization) {
       return json(
-        { error: "No workspace matched that slug." },
+        { error: "No organization matched that slug." },
         { status: 404 },
       );
     }
 
     return json(
-      mobileWorkspaceLookupResponseSchema.parse({
-        workspace,
+      mobileOrganizationLookupResponseSchema.parse({
+        organization,
       }),
     );
   } catch {
     return json(
-      { error: "We could not verify that workspace right now." },
+      { error: "We could not verify that organization right now." },
       { status: 503 },
     );
   }

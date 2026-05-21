@@ -6,7 +6,7 @@ import {
 } from "@/lib/api-auth";
 
 const bulkSchema = z.object({
-  action: z.enum(["read", "unread", "archive", "unarchive", "delete"]),
+  action: z.enum(["read", "unread", "archive", "unarchive"]),
   ids: z.array(z.string().uuid()).min(1).max(500),
 });
 
@@ -56,12 +56,6 @@ export async function POST(req: NextRequest) {
         ({ error } = await supabase
           .from("notifications")
           .update({ archived_at: null })
-          .in("id", ids));
-        break;
-      case "delete":
-        ({ error } = await supabase
-          .from("notifications")
-          .delete()
           .in("id", ids));
         break;
     }

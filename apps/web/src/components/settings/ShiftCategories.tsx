@@ -670,7 +670,7 @@ function ShiftCategoriesSettings({
 
       {focusAreas.length === 0 && (
         <EmptyState
-          compact
+          size="compact"
           title="No focus areas yet"
           description="Create focus areas first, then add shifts to each one."
         />
@@ -715,7 +715,7 @@ function ShiftCategoriesSettings({
               </div>
             ) : (
               <EmptyState
-                compact
+                size="compact"
                 title="No shifts yet"
                 action={canManageScheduleDefinitions ? (
                   <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">

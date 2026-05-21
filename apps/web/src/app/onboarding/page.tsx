@@ -127,7 +127,7 @@ export default function OnboardingPage() {
         >
           Your account has been successfully created, but you haven&apos;t been
           assigned to an organization yet. Please contact your administrator and
-          ask them to invite you to their workspace.
+          ask them to invite you to their organization.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

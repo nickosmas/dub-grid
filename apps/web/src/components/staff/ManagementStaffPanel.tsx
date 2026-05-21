@@ -577,7 +577,7 @@ export function ManagementStaffPanel({
                         color: "var(--color-text-muted)",
                       }}
                     >
-                      Saving now will remove them from the Management roster and keep them on the schedule.
+                      Saving now removes their management access. They'll stay on the schedule.
                     </div>
                   )}
                 </div>

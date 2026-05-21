@@ -14,7 +14,7 @@ import {
   getErrorMessage,
   isAuthorizationError,
   isNetworkConnectionError,
-  getWorkspaceUnavailableMessage,
+  getOrgUnavailableMessage,
 } from "@dubgrid/client-errors";
 import type { ToastInput } from "../providers/ToastProvider";
 import { isLoopbackHost, isPrivateIpv4Host } from "./env";
@@ -23,7 +23,7 @@ export {
   getErrorMessage,
   isAuthorizationError,
   isNetworkConnectionError,
-  getWorkspaceUnavailableMessage,
+  getOrgUnavailableMessage,
 };
 
 const GENERIC_INLINE_NETWORK_ERROR_MESSAGE =

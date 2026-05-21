@@ -1,4 +1,4 @@
-export { GET as getMobileAuthWorkspace } from "./auth-workspace";
+export { GET as getMobileAuthOrganization } from "./auth-organization";
 export { POST as postMobileAuthLogin } from "./auth-login";
 export { GET as getMobileBootstrap } from "./bootstrap";
 export { GET as getMobileMeSchedule } from "./me-schedule";

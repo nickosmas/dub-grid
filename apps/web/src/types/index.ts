@@ -783,6 +783,7 @@ export interface Notification {
 }
 
 export interface NotificationFacets {
+  totalInbox: number;
   totalUnread: number;
   totalArchived: number;
   byCategory: Record<string, number>;

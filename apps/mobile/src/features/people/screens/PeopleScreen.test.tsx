@@ -153,7 +153,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Directory unavailable")).toBeInTheDocument();
   });
 
-  it("shows the empty state when the workspace has no teammates yet", () => {
+  it("shows the empty state when the organization has no teammates yet", () => {
     useQuery.mockReturnValue({
       data: {
         people: [],

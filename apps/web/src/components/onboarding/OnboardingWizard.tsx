@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useOnboardingState, type StepConfig } from "./useOnboardingState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { toast } from "sonner";
@@ -54,13 +54,21 @@ export default function OnboardingWizard({
   userId,
   isOrgSetup,
 }: OnboardingWizardProps) {
+  // Freeze the variant at mount: as the user fills in shifts/jobs during
+  // ScheduleStep, setupStatus.isComplete can flip true, which would otherwise
+  // re-render the wizard from the 5-step config flow into the 3-step
+  // orientation flow and clamp the user from Schedule directly to Completion.
+  // Capturing this once keeps the wizard stable until they actually finish.
+  const isOrgSetupAtMountRef = useRef(isOrgSetup);
+  const effectiveIsOrgSetup = isOrgSetupAtMountRef.current;
+
   const steps = useMemo(() => {
     if (role === "super_admin") {
-      return isOrgSetup ? SA_ORIENTATION_STEPS : SUPER_ADMIN_STEPS;
+      return effectiveIsOrgSetup ? SA_ORIENTATION_STEPS : SUPER_ADMIN_STEPS;
     }
     if (role === "admin") return ADMIN_STEPS;
     return USER_STEPS;
-  }, [role, isOrgSetup]);
+  }, [role, effectiveIsOrgSetup]);
   const {
     currentStepIndex,
     currentStep,
@@ -90,7 +98,7 @@ export default function OnboardingWizard({
 
     switch (id) {
       case "welcome":
-        return <WelcomeStep role={role} onNext={goNext} isOrgSetup={isOrgSetup} />;
+        return <WelcomeStep role={role} onNext={goNext} isOrgSetup={effectiveIsOrgSetup} />;
       case "identity":
         return <IdentityStep onNext={goNext} onBack={goBack} />;
       case "structure":
@@ -103,7 +111,7 @@ export default function OnboardingWizard({
         return <SuperAdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "completion":
         return (
-          <CompletionStep role={role} onComplete={completeOnboarding} isOrgSetup={isOrgSetup} />
+          <CompletionStep role={role} onComplete={completeOnboarding} isOrgSetup={effectiveIsOrgSetup} />
         );
       default:
         return null;
@@ -116,7 +124,7 @@ export default function OnboardingWizard({
   // Skip only escapes the per-user orientation phase. During org-config
   // (isOrgSetup === false) the gate re-triggers on reload because the
   // org-wide completeness check still fails, so the button would loop.
-  const canSkip = isOrgSetup && currentStep.id !== "completion";
+  const canSkip = effectiveIsOrgSetup && currentStep.id !== "completion";
 
   return (
     <>

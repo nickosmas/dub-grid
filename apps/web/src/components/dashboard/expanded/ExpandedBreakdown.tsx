@@ -20,7 +20,7 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
         {/* Grid of focus area donuts */}
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {breakdown.byFocusArea.length === 0 ? (
-            <EmptyState compact heading="No shifts this week" />
+            <EmptyState size="compact" heading="No shifts this week" />
           ) : (
             <div
               style={{

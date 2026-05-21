@@ -18,7 +18,7 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 
 function createServiceClientMock(input?: {
-  workspace?: {
+  organization?: {
     id: string;
     name: string;
     slug: string;
@@ -75,8 +75,8 @@ function createServiceClientMock(input?: {
             table === "organizations"
               ? {
                   data:
-                    input && "workspace" in input
-                      ? (input.workspace ?? null)
+                    input && "organization" in input
+                      ? (input.organization ?? null)
                       : {
                           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
                           name: "DubGrid Health",
@@ -182,7 +182,7 @@ describe("mobile auth login route", () => {
       new Request("http://localhost/api/mobile/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          workspaceSlug: "dubgrid-health",
+          orgSlug: "dubgrid-health",
           email: "manager@dubgrid.com",
           password: "super-secret",
         }),
@@ -195,7 +195,7 @@ describe("mobile auth login route", () => {
     });
   });
 
-  it("returns 403 when the signed-in user is not a member of the requested workspace", async () => {
+  it("returns 403 when the signed-in user is not a member of the requested organization", async () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     getServiceClient.mockReturnValue(createServiceClientMock());
     createClient.mockReturnValue(
@@ -216,7 +216,7 @@ describe("mobile auth login route", () => {
       new Request("http://localhost/api/mobile/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          workspaceSlug: "dubgrid-health",
+          orgSlug: "dubgrid-health",
           email: "manager@dubgrid.com",
           password: "super-secret",
         }),
@@ -225,7 +225,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "Your account is not associated with that workspace.",
+      error: "Your account is not associated with that organization.",
     });
   });
 
@@ -233,7 +233,7 @@ describe("mobile auth login route", () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     getServiceClient.mockReturnValue(
       createServiceClientMock({
-        workspace: {
+        organization: {
           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
           name: "DubGrid Health",
           slug: "dubgrid-health",
@@ -262,7 +262,7 @@ describe("mobile auth login route", () => {
       new Request("http://localhost/api/mobile/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          workspaceSlug: "dubgrid-health",
+          orgSlug: "dubgrid-health",
           email: "manager@dubgrid.com",
           password: "super-secret",
         }),
@@ -271,11 +271,11 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+      error: "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
     });
   });
 
-  it("switches org context before returning the mobile session when the target workspace is inactive", async () => {
+  it("switches org context before returning the mobile session when the target organization is inactive", async () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     getServiceClient.mockReturnValue(createServiceClientMock());
     const sessionClient = createSessionClientMock({
@@ -295,7 +295,7 @@ describe("mobile auth login route", () => {
       new Request("http://localhost/api/mobile/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          workspaceSlug: "dubgrid-health",
+          orgSlug: "dubgrid-health",
           email: "manager@dubgrid.com",
           password: "super-secret",
         }),
@@ -312,7 +312,7 @@ describe("mobile auth login route", () => {
         accessToken: "switched-access-token",
         refreshToken: "switched-refresh-token",
       },
-      workspace: {
+      organization: {
         slug: "dubgrid-health",
       },
       user: {
@@ -342,7 +342,7 @@ describe("mobile auth login route", () => {
       new Request("http://localhost/api/mobile/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          workspaceSlug: "dubgrid-health",
+          orgSlug: "dubgrid-health",
           email: "manager@dubgrid.com",
           password: "super-secret",
         }),
@@ -361,17 +361,17 @@ describe("mobile auth login route", () => {
         factorId: "factor-123",
         friendlyName: "DubGrid Authenticator",
       },
-      workspace: {
+      organization: {
         slug: "dubgrid-health",
       },
     });
   });
 
-  it("returns 404 when the requested workspace slug does not exist", async () => {
+  it("returns 404 when the requested organization slug does not exist", async () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     getServiceClient.mockReturnValue(
       createServiceClientMock({
-        workspace: null,
+        organization: null,
       }),
     );
 
@@ -380,7 +380,7 @@ describe("mobile auth login route", () => {
       new Request("http://localhost/api/mobile/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({
-          workspaceSlug: "missing-org",
+          orgSlug: "missing-org",
           email: "manager@dubgrid.com",
           password: "super-secret",
         }),
@@ -389,7 +389,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      error: "No workspace matched that slug.",
+      error: "No organization matched that slug.",
     });
   });
 });

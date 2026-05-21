@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 const BADGE_STYLES: Record<
   OpenShift["urgency"],
@@ -75,7 +75,7 @@ export default function OpenShiftsCard({
 
       <div className="dg-card-body">
         {openShifts.length === 0 ? (
-          <DashboardEmptyState
+          <EmptyState
             title={
               isUnpublished
                 ? "Not published yet"
@@ -90,7 +90,7 @@ export default function OpenShiftsCard({
                   ? "Only published dates are counted here."
                   : undefined
             }
-            variant="inline"
+            size="inline"
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

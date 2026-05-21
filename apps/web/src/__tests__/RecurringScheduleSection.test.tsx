@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
 import type {
   Employee,

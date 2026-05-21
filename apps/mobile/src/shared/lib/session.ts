@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
 const SESSION_KEY = "dubgrid-mobile-session";
-const LAST_WORKSPACE_KEY = "dubgrid-mobile-last-workspace";
+const LAST_ORG_KEY = "dubgrid-mobile-last-org";
 const PUSH_DEVICE_KEY = "dubgrid-mobile-push-device";
 const HAS_SEEN_ONBOARDING_KEY = "dubgrid-mobile-has-seen-onboarding";
 
@@ -98,18 +98,18 @@ export async function loadSession(): Promise<Session | null> {
   return loadJsonValue<Session>(SESSION_KEY);
 }
 
-export async function saveLastWorkspaceSlug(slug: string | null): Promise<void> {
+export async function saveLastOrgSlug(slug: string | null): Promise<void> {
   const normalized = slug?.trim().toLowerCase() ?? null;
   if (!normalized) {
-    await removeStoredValue(LAST_WORKSPACE_KEY);
+    await removeStoredValue(LAST_ORG_KEY);
     return;
   }
 
-  await setStoredValue(LAST_WORKSPACE_KEY, normalized);
+  await setStoredValue(LAST_ORG_KEY, normalized);
 }
 
-export async function loadLastWorkspaceSlug(): Promise<string | null> {
-  return getStoredValue(LAST_WORKSPACE_KEY);
+export async function loadLastOrgSlug(): Promise<string | null> {
+  return getStoredValue(LAST_ORG_KEY);
 }
 
 export async function saveStoredPushDevice(

@@ -175,7 +175,7 @@ describe("POST /api/stripe/create-checkout", () => {
       expect.any(NextRequest),
       ORG_ID,
       expect.any(Function),
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true },
     );
     const isAllowed = requireOrgPermissions.mock.calls[0][2];
     expect(isAllowed({ isGridmaster: false, isSuperAdmin: true })).toBe(true);

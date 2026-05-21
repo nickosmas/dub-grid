@@ -1,28 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { openConsentPreferences } from "@/components/CookieConsent";
 
 export function PageShell({
   children,
-  footerCenteredOnly,
 }: {
   children: React.ReactNode;
-  footerCenteredOnly?: boolean;
 }) {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-surface)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        padding: "24px 16px",
-      }}
-    >
+    <div className="dg-auth-shell">
       {children}
 
       <footer
@@ -32,7 +19,7 @@ export function PageShell({
           maxWidth: "860px",
           display: "flex",
           alignItems: "center",
-          justifyContent: footerCenteredOnly ? "center" : "space-between",
+          justifyContent: "center",
           padding: "0 8px",
           fontSize: "var(--dg-fs-label)",
           color: "var(--color-text-faint)",
@@ -56,13 +43,23 @@ export function PageShell({
           >
             Terms of Service
           </Link>
+          <span style={{ margin: "0 4px" }}>·</span>
+          <button
+            type="button"
+            onClick={openConsentPreferences}
+            style={{
+              color: "var(--color-text-faint)",
+              textDecoration: "none",
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            Cookie preferences
+          </button>
         </div>
-        {!footerCenteredOnly && (
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <DubGridLogo size={20} />
-            <DubGridWordmark fontSize={14} color="var(--color-text-subtle)" />
-          </div>
-        )}
       </footer>
     </div>
   );

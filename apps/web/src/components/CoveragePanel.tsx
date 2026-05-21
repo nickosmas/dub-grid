@@ -5,7 +5,7 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
-import DashboardEmptyState from "@/components/dashboard/DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 interface CoveragePanelProps {
   gaps: CoverageGap[];
@@ -163,9 +163,9 @@ export default function CoveragePanel({
       {/* Body */}
       <div style={{ flex: 1, overflow: "auto", padding: "12px 20px" }}>
         {isUnpublished ? (
-          <DashboardEmptyState
-            variant="panel"
-            minHeight={260}
+          <EmptyState
+            size="compact"
+            style={{ minHeight: 260 }}
             title="Not published yet"
             description="Coverage details will appear after this period is published for the first time."
           />

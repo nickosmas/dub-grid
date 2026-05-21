@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
+import { indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import { EditModalState, AssignmentDefinition, ShiftCategory, JobDefinition, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode, Employee, ScheduleCellInput, ShiftJobSegment } from "@/types";
 import CustomSelect from "./CustomSelect";
@@ -1840,7 +1841,7 @@ export default function ShiftEditPanel({
             : pendingRequestConfirmation.kind === "targeted_pickup"
               ? `Ask ${pendingRequestConfirmation.targetName} to pick up your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} while you use ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}?`
             : pendingRequestConfirmation.kind === "calloff"
-              ? `Submit a ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
+              ? `Submit ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
               : `Swap your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
         }
         confirmLabel={

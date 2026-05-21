@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
 import { makeEmployee } from "@/__tests__/factories";
 import {
@@ -38,11 +39,10 @@ vi.mock("@/hooks", () => ({
   useDirectory: () => mockUseDirectory(),
 }));
 
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
-  }),
-}));
+// Note: we no longer mock @tanstack/react-query; `renderWithQuery` provides a
+// real QueryClient so `useQuery` + `useQueryClient` work as in production.
+// `mockInvalidateQueries` is retained for compatibility but is unused.
+void mockInvalidateQueries;
 
 vi.mock("@/features/employees/client", () => ({
   fetchEmployeeById: vi.fn(),

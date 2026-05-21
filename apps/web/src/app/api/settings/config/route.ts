@@ -1965,7 +1965,7 @@ export async function POST(req: NextRequest) {
   // `data.orgId` / `data.X.orgId` in sub-handlers; mutating the parsed
   // body here means every downstream read/write uses the right org id
   // without touching each handler. Without this, writes leak to the
-  // real workspace while the user is in sandbox mode.
+  // real organization while the user is in sandbox mode.
   const effectiveOrgId = authorized.orgId;
   if ("orgId" in data) {
     (data as { orgId: string }).orgId = effectiveOrgId;

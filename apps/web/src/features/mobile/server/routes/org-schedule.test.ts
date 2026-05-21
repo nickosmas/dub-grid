@@ -41,7 +41,7 @@ describe("mobile org-schedule route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "You don't have permission to view the workspace schedule.",
+      error: "You don't have permission to view the organization schedule.",
     });
   });
 

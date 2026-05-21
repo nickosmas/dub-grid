@@ -115,7 +115,7 @@ export default function ExpandedActivity({
         {/* Feed list */}
         <div style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {filtered.length === 0 ? (
-            <EmptyState compact heading="No activity matching filter" />
+            <EmptyState size="compact" heading="No activity matching filter" />
           ) : (
             filtered.map((item, i) => (
               <Link

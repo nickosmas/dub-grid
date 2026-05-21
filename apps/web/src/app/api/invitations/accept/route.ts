@@ -5,6 +5,7 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/error-handling";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 const postSchema = z.object({
   token: z.string().trim().min(1),
@@ -16,7 +17,6 @@ export async function POST(req: NextRequest) {
     if ("response" in auth) {
       return auth.response;
     }
-    void auth;
 
     let body: unknown;
     try {
@@ -36,9 +36,19 @@ export async function POST(req: NextRequest) {
     });
     if (error) throw error;
 
+    const orgId = data.org_id as string;
+    if (orgId) {
+      void dispatchNotificationEvent(auth.user.id, {
+        action: "invitation_accepted",
+        orgId,
+        acceptedUserId: auth.user.id,
+        invitationId: (data.invitation_id as string | null | undefined) ?? null,
+      });
+    }
+
     return NextResponse.json({
       status: data.status as string,
-      orgId: data.org_id as string,
+      orgId,
       role: data.role as string,
       orgSlug: (data.org_slug as string | null) ?? null,
     });

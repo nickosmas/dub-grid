@@ -1,12 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -15,10 +8,10 @@ import type {
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
+import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ModalHeader } from "../../../shared/components/ModalHeader";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
@@ -223,6 +216,7 @@ export default function PeopleScreen() {
     (sortMode === "alphabetical" ? 1 : 0);
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
+  const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const contentState = getMobileQueryContentState({
     hasData: peopleQuery.data !== undefined,
     isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
@@ -237,94 +231,81 @@ export default function PeopleScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      <Modal
-        animationType="slide"
-        allowSwipeDismissal
-        onRequestClose={() => setIsFilterModalVisible(false)}
-        presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
+      <BottomSheetModal
+        onDismiss={() => setIsFilterModalVisible(false)}
+        scrollable
         visible={isFilterModalVisible}
       >
-        <Screen
-          bottomPaddingMode="modal"
-          stickyHeader={
-            <ModalHeader
-              title="Filter directory"
-              onClose={() => setIsFilterModalVisible(false)}
+        <Text style={styles.sheetTitle}>Filter directory</Text>
+
+        <SelectionSection label="Focus area">
+          <SelectionRow
+            label="All focus areas"
+            onPress={() => setFocusFilterId("all")}
+            selected={focusFilterId === "all"}
+          />
+          {focusAreas.map((focusArea) => (
+            <SelectionRow
+              key={focusArea.id}
+              label={focusArea.name}
+              onPress={() => setFocusFilterId(focusArea.id)}
+              selected={focusFilterId === focusArea.id}
             />
-          }
-          stickyHeaderTopPadding={15}
-        >
-          <View style={styles.modalContent}>
-            <SelectionSection label="Focus area">
-              <SelectionRow
-                label="All focus areas"
-                onPress={() => setFocusFilterId("all")}
-                selected={focusFilterId === "all"}
-              />
-              {focusAreas.map((focusArea) => (
-                <SelectionRow
-                  key={focusArea.id}
-                  label={focusArea.name}
-                  onPress={() => setFocusFilterId(focusArea.id)}
-                  selected={focusFilterId === focusArea.id}
-                />
-              ))}
-            </SelectionSection>
+          ))}
+        </SelectionSection>
 
-            {canManageEmployees && managementDepartments.length > 0 ? (
-              <SelectionSection label="Management departments">
-                <SelectionRow
-                  label="All management departments"
-                  onPress={() => setManagementDepartmentFilterId("all")}
-                  selected={managementDepartmentFilterId === "all"}
-                />
-                {managementDepartments.map((department) => (
-                  <SelectionRow
-                    key={department.id}
-                    detail={`${countPeopleInManagementDepartment(
-                      visiblePeople,
-                      department.id,
-                    )} people`}
-                    label={department.name}
-                    onPress={() => setManagementDepartmentFilterId(department.id)}
-                    selected={managementDepartmentFilterId === department.id}
-                  />
-                ))}
-              </SelectionSection>
-            ) : null}
-
-            {canManageEmployees ? (
-              <SelectionSection label="Status">
-                <SelectionRow
-                  detail={`${activeCount} people`}
-                  label="Active staff"
-                  onPress={() => setStatusFilter("active")}
-                  selected={statusFilter === "active"}
-                />
-                <SelectionRow
-                  detail={`${inactiveCount} people`}
-                  label="Inactive staff"
-                  onPress={() => setStatusFilter("inactive")}
-                  selected={statusFilter === "inactive"}
-                />
-              </SelectionSection>
-            ) : null}
-
-            <SelectionSection label="Sort by">
+        {canManageEmployees && managementDepartments.length > 0 ? (
+          <SelectionSection label="Management departments">
+            <SelectionRow
+              label="All management departments"
+              onPress={() => setManagementDepartmentFilterId("all")}
+              selected={managementDepartmentFilterId === "all"}
+            />
+            {managementDepartments.map((department) => (
               <SelectionRow
-                label="Seniority"
-                onPress={() => setSortMode("seniority")}
-                selected={sortMode === "seniority"}
+                key={department.id}
+                detail={`${countPeopleInManagementDepartment(
+                  visiblePeople,
+                  department.id,
+                )} people`}
+                label={department.name}
+                onPress={() => setManagementDepartmentFilterId(department.id)}
+                selected={managementDepartmentFilterId === department.id}
               />
-              <SelectionRow
-                label="Alphabetical"
-                onPress={() => setSortMode("alphabetical")}
-                selected={sortMode === "alphabetical"}
-              />
-            </SelectionSection>
-          </View>
-        </Screen>
-      </Modal>
+            ))}
+          </SelectionSection>
+        ) : null}
+
+        {canManageEmployees ? (
+          <SelectionSection label="Status">
+            <SelectionRow
+              detail={`${activeCount} people`}
+              label="Active staff"
+              onPress={() => setStatusFilter("active")}
+              selected={statusFilter === "active"}
+            />
+            <SelectionRow
+              detail={`${inactiveCount} people`}
+              label="Inactive staff"
+              onPress={() => setStatusFilter("inactive")}
+              selected={statusFilter === "inactive"}
+            />
+          </SelectionSection>
+        ) : null}
+
+        <SelectionSection label="Sort by">
+          <SelectionRow
+            label="Seniority"
+            onPress={() => setSortMode("seniority")}
+            selected={sortMode === "seniority"}
+          />
+          <SelectionRow
+            label="Alphabetical"
+            onPress={() => setSortMode("alphabetical")}
+            selected={sortMode === "alphabetical"}
+          />
+        </SelectionSection>
+      </BottomSheetModal>
 
       <View style={styles.section}>
         <View style={styles.searchBarRow}>
@@ -426,7 +407,7 @@ export default function PeopleScreen() {
       ) : contentState.kind === "error" &&
         contentState.reason === "unauthorized" ? (
         <StatusBanner
-          body="Your current role does not include mobile staff visibility for this workspace."
+          body="Your current role does not include mobile staff visibility for this organization."
           fillScreen
           tone="warning"
           title="Directory unavailable"
@@ -446,7 +427,7 @@ export default function PeopleScreen() {
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
-          body="Teammates will appear here once they're added to your workspace."
+          body="Teammates will appear here once they're added to your organization."
           iconName="people-outline"
           title="No teammates yet"
         />
@@ -484,11 +465,12 @@ export default function PeopleScreen() {
                   name={getFullName(person)}
                   orgRole={person.orgRole}
                   onPress={() => {
-                    const isSelf = Boolean(
-                      currentUserId &&
-                        person.userId &&
-                        person.userId === currentUserId,
-                    );
+                    const isSelf =
+                      (currentEmployeeId !== null &&
+                        person.id === currentEmployeeId) ||
+                      (currentUserId !== null &&
+                        person.userId !== null &&
+                        person.userId === currentUserId);
                     if (isSelf) {
                       router.push("/(tabs)/profile");
                       return;
@@ -708,9 +690,9 @@ const styles = StyleSheet.create({
     color: mobileColors.textSubtle,
     textTransform: "uppercase",
   },
-  modalContent: {
-    gap: 16,
-    paddingBottom: 12,
+  sheetTitle: {
+    ...mobileText.heroMetric,
+    color: mobileColors.textPrimary,
   },
   searchBarRow: {
     alignItems: "center",

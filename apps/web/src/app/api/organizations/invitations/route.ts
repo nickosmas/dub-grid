@@ -21,6 +21,7 @@ import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrors,
 } from "@/lib/staff-validation";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 export const dynamic = "force-dynamic";
 
@@ -161,7 +162,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Sandbox: redirect the read to the sandbox org so sandbox callers
-  // don't see the real workspace's pending invitations.
+  // don't see the real organization's pending invitations.
   const effectiveOrgId = await resolveEffectiveOrgId(
     req,
     auth.user.id,
@@ -410,6 +411,13 @@ export async function DELETE(req: NextRequest) {
       req,
     });
 
+    void dispatchNotificationEvent(user.id, {
+      action: "invitation_revoked",
+      orgId,
+      invitationId,
+      inviteeEmail: latestInvitation.email,
+    });
+
     return NextResponse.json({ success: true, invitation: latestInvitation });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
@@ -512,6 +520,13 @@ export async function POST(req: NextRequest) {
         },
       ],
       req,
+    });
+
+    void dispatchNotificationEvent(user.id, {
+      action: "invitation_resent",
+      orgId,
+      invitationId,
+      inviteeEmail: latestInvitation.email,
     });
 
     return NextResponse.json({

@@ -808,7 +808,7 @@ function DepartmentSection({
       {/* Content */}
       {displayList.length === 0 && !isEditing ? (
         <EmptyState
-          compact
+          size="compact"
           title={emptyTitle}
           style={{ border: "none", borderRadius: 0 }}
           action={canEdit ? (

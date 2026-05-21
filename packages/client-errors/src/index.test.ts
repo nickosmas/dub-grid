@@ -4,7 +4,7 @@ import {
   NETWORK_ERROR_MESSAGE,
   formatClientErrorMessage,
   getErrorMessage,
-  getWorkspaceUnavailableMessage,
+  getOrgUnavailableMessage,
   isAuthorizationError,
   isNetworkConnectionError,
   isTechnicalErrorMessage,
@@ -159,12 +159,12 @@ describe("formatClientErrorMessage", () => {
     ).toBe("fallback");
   });
 
-  it("preserves intentional workspace-unavailable gate copy", () => {
+  it("preserves intentional organization-unavailable gate copy", () => {
     const error = new Error(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
     expect(formatClientErrorMessage(error, "fallback")).toBe(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
   });
 });
@@ -206,19 +206,19 @@ describe("isAuthorizationError", () => {
   });
 });
 
-describe("getWorkspaceUnavailableMessage", () => {
-  it("returns the verbatim message for workspace-unavailable gates", () => {
+describe("getOrgUnavailableMessage", () => {
+  it("returns the verbatim message for organization-unavailable gates", () => {
     const error = new Error(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
-    expect(getWorkspaceUnavailableMessage(error)).toBe(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+    expect(getOrgUnavailableMessage(error)).toBe(
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
   });
 
   it("returns null for any other error", () => {
-    expect(getWorkspaceUnavailableMessage(new Error("boom"))).toBeNull();
-    expect(getWorkspaceUnavailableMessage(null)).toBeNull();
+    expect(getOrgUnavailableMessage(new Error("boom"))).toBeNull();
+    expect(getOrgUnavailableMessage(null)).toBeNull();
   });
 });
 

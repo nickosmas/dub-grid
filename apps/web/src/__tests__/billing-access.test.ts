@@ -32,7 +32,7 @@ describe("evaluateOrganizationBillingAccess", () => {
     });
   });
 
-  it("keeps the workspace open during the three-day trial grace period", () => {
+  it("keeps the organization open during the three-day trial grace period", () => {
     expect(
       evaluateOrganizationBillingAccess({
         subscriptionStatus: "trialing",
@@ -46,7 +46,7 @@ describe("evaluateOrganizationBillingAccess", () => {
     });
   });
 
-  it("locks the workspace after trial expiration plus grace", () => {
+  it("locks the organization after trial expiration plus grace", () => {
     expect(
       evaluateOrganizationBillingAccess({
         subscriptionStatus: "trialing",

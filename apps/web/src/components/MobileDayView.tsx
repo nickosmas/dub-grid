@@ -18,6 +18,8 @@ import {
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
 import { MaybeHint } from "@/components/ui/hint";
+import { CalendarOff } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -738,57 +740,16 @@ export default function MobileDayView({
 
       {/* Empty state */}
       {!hasAnySectionContent && (
-        <div
-          style={{
-            padding: "40px 16px",
-            textAlign: "center",
-            color: "var(--color-text-muted)",
-          }}
-        >
-          <div
-            style={{
-              color: "var(--color-text-faint)",
-              background: "var(--color-bg)",
-              padding: 12,
-              borderRadius: "50%",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 12,
-            }}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
-          </div>
-          <div
-            style={{
-              fontSize: "var(--dg-fs-body)",
-              fontWeight: 600,
-              marginBottom: 4,
-            }}
-          >
-            No shifts found for this period
-          </div>
-          <div style={{ fontSize: "var(--dg-fs-label)" }}>
-            {isCellInteractive
+        <EmptyState
+          size="compact"
+          icon={<CalendarOff size={22} />}
+          title="No shifts found for this period"
+          description={
+            isCellInteractive
               ? "No employees are assigned to this focus area. Add employees in the Staff view."
-              : "No shifts have been published for this period yet."}
-          </div>
-        </div>
+              : "No shifts have been published for this period yet."
+          }
+        />
       )}
     </div>
   );

@@ -125,16 +125,21 @@ export function ProfileHeroMeta({
 
 export function ProfileSection({
   title,
+  description,
   children,
   style,
 }: {
   title?: string;
+  description?: string;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
     <View style={[styles.section, style]}>
       {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
+      {description ? (
+        <Text style={styles.sectionDescription}>{description}</Text>
+      ) : null}
       {children}
     </View>
   );
@@ -495,6 +500,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
+  sectionDescription: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
+    marginTop: -4,
+  },
   panel: {
     backgroundColor: mobileColors.surface,
     borderColor: mobileColors.borderSubtle,
@@ -563,13 +573,18 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   input: {
-    ...mobileText.sectionTitle,
+    // Explicit regular weight — don't spread a `mobileText.*` token that
+    // carries a bold `fontFamily`, since the named family overrides
+    // `fontWeight: "400"`. Omitting `fontFamily` also avoids the Android
+    // EditText non-interactive bug when DM Sans hasn't loaded.
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "400",
     backgroundColor: mobileColors.surfaceSecondary,
     borderColor: mobileColors.borderSubtle,
     borderRadius: mobileRadii.control,
     borderWidth: 1,
     color: mobileColors.textPrimary,
-    fontWeight: "400",
     minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 12,

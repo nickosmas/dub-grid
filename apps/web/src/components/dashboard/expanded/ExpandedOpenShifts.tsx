@@ -73,7 +73,7 @@ export default function ExpandedOpenShifts({
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {isUnpublished ? (
           <EmptyState
-            compact
+            size="compact"
             heading="Nothing to show yet"
             description="This period has not been published yet. Open shifts will appear after the first publish."
           />
@@ -156,7 +156,7 @@ export default function ExpandedOpenShifts({
             >
               {filtered.length === 0 ? (
                 <EmptyState
-                  compact
+                  size="compact"
                   heading={
                     isPartial
                       ? "No open shifts on published dates"

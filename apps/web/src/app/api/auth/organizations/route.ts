@@ -5,7 +5,7 @@ import {
   requireAuthenticatedSession,
 } from "@/lib/api-auth";
 
-const switchWorkspaceSchema = z.object({
+const switchOrganizationSchema = z.object({
   targetOrgId: z.string().uuid(),
 });
 
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const result = await supabase.rpc("get_my_organizations");
     if (result.error) {
       return NextResponse.json(
-        { error: "Unable to verify workspace access." },
+        { error: "Unable to verify organization access." },
         { status: 403 },
       );
     }
@@ -30,9 +30,9 @@ export async function GET(req: NextRequest) {
       organizations: result.data ?? [],
     });
   } catch (error) {
-    console.error("auth workspaces GET failed", error);
+    console.error("auth organizations GET failed", error);
     return NextResponse.json(
-      { error: "Failed to load workspaces" },
+      { error: "Failed to load organizations" },
       { status: 500 },
     );
   }
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const parsed = switchWorkspaceSchema.safeParse(body);
+    const parsed = switchOrganizationSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
     }
@@ -65,16 +65,16 @@ export async function POST(req: NextRequest) {
 
     if (result.error) {
       return NextResponse.json(
-        { error: "Failed to switch workspace." },
+        { error: "Failed to switch organization." },
         { status: 400 },
       );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("auth workspaces POST failed", error);
+    console.error("auth organizations POST failed", error);
     return NextResponse.json(
-      { error: "Failed to switch workspace" },
+      { error: "Failed to switch organization" },
       { status: 500 },
     );
   }

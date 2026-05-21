@@ -14,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
+import { EmptyState } from "@/components/EmptyState";
 import { formatDateKey } from "@/lib/dashboard-stats";
 import { getAvatarInitials } from "@/lib/utils";
 import {
@@ -281,10 +282,11 @@ export default function UserDashboard(props: DashboardContentProps) {
           </div>
         </div>
         <div className="dg-card-body" style={{ padding: "18px" }}>
-          <EmptyPanel
+          <EmptyState
+            size="inline"
             icon={<UserRound size={22} />}
             title="Schedule unavailable"
-            body="Ask an administrator to link this account to a staff profile."
+            description="Ask an administrator to link this account to a staff profile."
           />
         </div>
       </section>
@@ -1472,53 +1474,18 @@ function ScheduleEmptyState({
   style?: CSSProperties;
 }) {
   return (
-    <section
+    <EmptyState
       data-testid="user-dashboard-empty-schedule"
+      icon={<CalendarDays size={24} />}
+      title="Nothing scheduled this week"
+      description="When shifts get published, they'll show up right here."
       style={{
-        alignItems: "center",
-        border: "1px dashed var(--color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        boxSizing: "border-box",
-        color: "var(--color-text-secondary)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        justifyContent: "center",
         minHeight: isMobile ? 260 : 360,
-        padding: isMobile ? "28px 18px" : "48px 24px",
-        textAlign: "center",
         width: "100%",
+        boxSizing: "border-box",
         ...style,
       }}
-    >
-      <span
-        aria-hidden
-        style={{
-          alignItems: "center",
-          background: "var(--color-bg-secondary)",
-          border: "1px solid var(--color-border-light)",
-          borderRadius: 14,
-          color: "var(--color-text-muted)",
-          display: "inline-flex",
-          height: 48,
-          justifyContent: "center",
-          width: 48,
-        }}
-      >
-        <CalendarDays size={24} />
-      </span>
-      <div
-        style={{
-          color: "var(--color-text-primary)",
-          fontSize: isMobile ? 20 : 24,
-          fontWeight: 760,
-          letterSpacing: 0,
-          lineHeight: 1.15,
-        }}
-      >
-        Nothing scheduled this week
-      </div>
-    </section>
+    />
   );
 }
 
@@ -1887,11 +1854,11 @@ function CoverRequestsSection({
         style={{ flex: 1, padding: "4px 18px 16px" }}
       >
         {requests.length === 0 ? (
-          <EmptyPanel
+          <EmptyState
+            size="inline"
             icon={<Check size={20} />}
             title="All caught up"
-            body="Requests for your shifts will appear here."
-            compact
+            description="Requests for your shifts will appear here."
           />
         ) : (
           <SummaryMetricPanel
@@ -1945,11 +1912,11 @@ function AvailableShiftsSection({
         style={{ flex: 1, padding: "4px 18px 16px" }}
       >
         {items.length === 0 ? (
-          <EmptyPanel
+          <EmptyState
+            size="inline"
             icon={<CalendarDays size={20} />}
             title="No open shifts"
-            body="Available pickups and coverage gaps will appear here."
-            compact
+            description="Available pickups and coverage gaps will appear here."
           />
         ) : (
           <SummaryMetricPanel
@@ -2006,20 +1973,12 @@ function ActionCarouselSection({
         </div>
       </div>
       {items.length === 0 ? (
-        <div
-          style={{
-            border: "1px dashed var(--color-border)",
-            borderRadius: "var(--dg-radius-lg)",
-            padding: 18,
-          }}
-        >
-          <EmptyPanel
-            icon={<Check size={20} />}
-            title="All caught up"
-            body="Open shifts and cover requests will appear here."
-            compact
-          />
-        </div>
+        <EmptyState
+          size="inline"
+          icon={<Check size={20} />}
+          title="All caught up"
+          description="Open shifts and cover requests will appear here."
+        />
       ) : (
         <div
           aria-label="Upcoming open shifts and requests"
@@ -2637,60 +2596,6 @@ function DashedDivider() {
         margin: "0 0 12px",
       }}
     />
-  );
-}
-
-function EmptyPanel({
-  body,
-  compact = false,
-  icon,
-  title,
-}: {
-  body: string;
-  compact?: boolean;
-  icon: ReactNode;
-  title: string;
-}) {
-  return (
-    <div
-      style={{
-        alignItems: "center",
-        border: "1px dashed var(--color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        color: "var(--color-text-muted)",
-        display: "flex",
-        gap: 12,
-        padding: compact ? "12px" : "16px",
-      }}
-    >
-      <span
-        style={{
-          alignItems: "center",
-          background: "var(--color-bg-secondary)",
-          borderRadius: 10,
-          color: "var(--color-text-secondary)",
-          display: "inline-flex",
-          flexShrink: 0,
-          height: 38,
-          justifyContent: "center",
-          width: 38,
-        }}
-      >
-        {icon}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            color: "var(--color-text-primary)",
-            fontSize: 13,
-            fontWeight: 750,
-          }}
-        >
-          {title}
-        </div>
-        <div style={{ fontSize: 12, lineHeight: 1.4, marginTop: 2 }}>{body}</div>
-      </div>
-    </div>
   );
 }
 

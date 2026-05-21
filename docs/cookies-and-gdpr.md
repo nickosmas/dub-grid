@@ -14,8 +14,9 @@ This document covers DubGrid's cookie implementation, consent management, analyt
 6. [Sidebar State Cookie](#sidebar-state-cookie)
 7. [Cookie Security](#cookie-security)
 8. [GDPR Compliance](#gdpr-compliance)
-9. [Data Flow](#data-flow)
-10. [Developer Guide](#developer-guide)
+9. [Mobile App](#mobile-app)
+10. [Data Flow](#data-flow)
+11. [Developer Guide](#developer-guide)
 
 ---
 
@@ -29,6 +30,7 @@ This document covers DubGrid's cookie implementation, consent management, analyt
 | `sidebar_state` | Essential | Remembers sidebar open/collapsed state | 7 days | Client JS |
 | PostHog cookies | Analytics | Product analytics session tracking | Varies | PostHog SDK |
 | Vercel Analytics | Analytics | Web performance metrics (Core Web Vitals) | Varies | Vercel SDK |
+| Sentry Session Replay | Analytics | Privacy-masked session replay for bug reproduction (consent-gated; error monitoring is separate and always on) | Varies | Sentry SDK |
 
 ---
 
@@ -40,9 +42,12 @@ DubGrid uses a two-tier consent model: **essential** (always on) and **analytics
 
 ### Components
 
-- **`apps/web/src/components/CookieConsent.tsx`** — Consent banner + settings button
+- **`apps/web/src/components/CookieConsent.tsx`** — Consent banner (summary + inline "Customize" view) and the shared `setCookieConsent()` / `openConsentPreferences()` helpers
+- **`apps/web/src/app/cookie-policy/CookiePreferencesManager.tsx`** — On-page preference toggle (reuses `setCookieConsent`)
 - **`apps/web/src/app/api/consent/route.ts`** — Server-side consent recording endpoint
 - **`cookie_consents` table** — Append-only audit trail in the database
+
+The footers (landing page, auth flows, request-demo) and the Profile → Privacy & data card expose a **Cookie preferences** control that dispatches the `dubgrid:open-consent` event, re-opening the banner in its Customize view from anywhere.
 
 ### Cookie Format
 
@@ -50,7 +55,7 @@ DubGrid uses a two-tier consent model: **essential** (always on) and **analytics
 {
   "essential": true,
   "analytics": true,
-  "version": "1.0"
+  "version": "1.1"
 }
 ```
 
@@ -63,23 +68,25 @@ User visits app
   → CookieConsent.tsx mounts
   → Reads dubgrid-cookie-consent cookie
   → Missing OR version !== CONSENT_VERSION?
-      → Show banner ("Essential only" / "Accept all")
-  → User clicks a button:
-      1. setStoredConsent() — writes cookie with version
+      → Show banner ("Customize" / "Essential only" / "Accept all")
+      → "Customize" reveals per-category toggles + "Save preferences"
+  → User chooses:
+      1. setCookieConsent(analytics) — writes cookie + localStorage with version
       2. syncConsentToServer() — POSTs to /api/consent (fire-and-forget)
-      3. If analytics toggled: page reloads to init/tear down analytics
+      3. Dispatches CONSENT_CHANGED_EVENT — live consumers react (PostHog,
+         Sentry Session Replay, the on-page preferences manager) without a reload
   → Consent exists and version is current?
-      → Show small cookie icon (bottom-left) for re-opening preferences
+      → Banner hidden; re-open via any "Cookie preferences" link
+        (footers + Profile → Privacy & data) which fires dubgrid:open-consent
 ```
 
 ### Consent Withdrawal
 
-Users can change their preference at any time via the cookie settings button (small cookie icon, fixed bottom-left, 60% opacity). Switching from "Accept all" to "Essential only":
+Users can change their preference at any time via any **Cookie preferences** control (footers + Profile → Privacy & data) or the on-page manager at `/cookie-policy`. Switching from "Accept all" to "Essential only":
 
-1. Updates the cookie
+1. Updates the cookie + localStorage
 2. Records the change server-side
-3. Calls `resetPostHog()` to clear analytics state
-4. Reloads the page to tear down Vercel Analytics
+3. Fires `CONSENT_CHANGED_EVENT`; analytics consumers tear down in place (no reload required)
 
 ### Server-Side Audit Trail
 
@@ -115,10 +122,12 @@ When the cookie or privacy policy changes, bump `CONSENT_VERSION` in `apps/web/s
 ```typescript
 // IMPORTANT: Bump this version when cookies, analytics providers, or the
 // cookie/privacy policy change. A new version re-prompts all users to re-consent.
-const CONSENT_VERSION = "1.0";
+const CONSENT_VERSION = "1.1";
 ```
 
-All users with the old version in their cookie will see the consent banner on their next page load. The re-prompt is automatic once the version is bumped.
+All users with the old version in their cookie will see the consent banner on their next page load. The re-prompt is automatic once the version is bumped. Keep the mobile constant (`apps/mobile/src/features/consent/lib/consent.ts`) in lockstep so both platforms re-prompt together.
+
+> Version `1.1` introduced consent-gating for Sentry Session Replay.
 
 ---
 
@@ -163,11 +172,14 @@ export default function ConsentGatedAnalytics() {
 
 Uses a lazy `useState` initializer to read consent once on mount. No consent = no `<Analytics />` component rendered = no scripts loaded.
 
-### Sentry (Not Consent-Gated)
+### Sentry (Error Monitoring always-on; Session Replay consent-gated)
 
-Sentry runs as an essential/operational service for error monitoring. It is **not** gated behind consent because it's necessary for application reliability.
+Sentry has two distinct features with different consent treatment:
 
-**Key safety measure:** `sendDefaultPii: false` in `apps/web/src/instrumentation-client.ts`. No emails, IPs, or user identifiers are sent to Sentry — only stack traces and request metadata.
+- **Error monitoring** runs as an essential/operational service. It is **not** gated behind consent because it's necessary for application reliability. Client, server, and edge runtimes all initialize unconditionally.
+- **Session Replay** records user sessions, so it **is** gated behind analytics consent. In `apps/web/src/instrumentation-client.ts` the client SDK initializes with the replay integration only when analytics consent already exists; otherwise it starts in error-only mode and attaches replay lazily via `Sentry.addIntegration(replayIntegration())` the moment the user opts in (listening on `CONSENT_CHANGED_EVENT`), with no page reload.
+
+**Key safety measure:** `sendDefaultPii: false` across all Sentry configs. No emails, IPs, or user identifiers are sent to Sentry — only stack traces and request metadata.
 
 ### Layout Integration
 
@@ -400,6 +412,22 @@ Inactive accounts are handled by two SQL functions:
 - **Cookie Policy:** `apps/web/src/app/cookie-policy/page.tsx` — full cookie inventory with names, purposes, durations, and categories (essential vs analytics)
 
 Both are linked from the consent banner.
+
+---
+
+## Mobile App
+
+The Expo app (`apps/mobile`) ships **no analytics or tracking SDKs today** and uses native Supabase tokens rather than browser cookies, so there is nothing to track until a telemetry SDK is added. The consent surface is in place anticipatorily and mirrors the web model.
+
+### Consent gate
+
+- **`apps/mobile/src/features/consent/lib/consent.ts`** — `getStoredConsent()` / `setStoredConsent()` persist `{ essential, analytics, version }` to `expo-secure-store` under the same `dubgrid-cookie-consent` key and `CONSENT_VERSION` as web. `syncConsentToServer()` POSTs to the web `/api/consent` endpoint (fire-and-forget). Because that route authenticates via cookies and is CSRF-origin protected, the native request sends an `Origin` header on the same root domain and is recorded as an anonymous row tagged with the mobile user-agent.
+- **`apps/mobile/src/features/consent/components/ConsentGate.tsx`** — a non-dismissable first-launch sheet (Accept all / Essential only) wrapped around the app in `app/_layout.tsx`. Re-prompts only when the stored version is stale.
+- **Profile → Privacy & data** (`ProfileScreen.tsx` section + `ProfilePrivacyScreen.tsx`) links out to the web Privacy / Terms / Cookie pages and exposes an analytics toggle that reuses `setStoredConsent()`.
+
+### App Tracking Transparency (ATT)
+
+`expo-tracking-transparency` is installed and configured (`NSUserTrackingUsageDescription` + plugin in `app.json`). `requestTrackingPermissionIfNeeded()` in `consent.ts` is **scaffolding only — not yet called**, because no SDK uses the IDFA today. When PostHog/Sentry (or any tracking SDK) ships on mobile, call it on iOS 14.5+ immediately before initializing that SDK, gated on the user's analytics consent.
 
 ---
 

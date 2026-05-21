@@ -68,6 +68,16 @@
   Catch-all routes break static prerendering on Vercel
 - **Naming**: `gridmaster` = platform_role (route: `/gridmaster`). `admin` = org_role.
   Never call the gridmaster portal "admin portal"
+- **Tenant terminology**: The customer tenant is an **"Organization"** in ALL user-facing
+  copy (web + mobile, authed + public). Do NOT use "workspace" in copy. In code it's the
+  `org`/`organization` convention: DB `organizations` + `org_*` columns, JWT `org_*` claims,
+  `x-dubgrid-org-*` headers, TS `Organization` types + short `orgId`/`orgSlug` vars/fields.
+  The URL identifier is the **"subdomain"** in user-facing copy (e.g. "Enter your subdomain"),
+  which equals `organizations.slug` (`org_slug`); never call it a "domain" in copy. Two
+  deliberate exceptions keep "workspace": the DB column `organizations.workspace_kind`
+  (+ its `WorkspaceKind`/`workspaceKind` TS mapping — the real-vs-sandbox flavor; renaming
+  needs a migration) and the marketing landing line. The generic word for a UI area
+  (e.g. "the People section") is not the tenant — reword, don't call it "organization".
 - **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
 - **Cookie consent version**: When adding/removing cookies, changing analytics providers,
   or updating the cookie/privacy policy, bump `CONSENT_VERSION` in
@@ -102,7 +112,11 @@ Shared primitives to reach for before inventing a layout:
   settings panel; the primary button always sits on the right.
 - `<SectionCard>` (`components/settings/shared.tsx`) — bordered/padded card
   for single-section settings panels.
-- `<EmptyState>` — single empty-state look for any list/table panel.
+- `<EmptyState>` — the only empty-state primitive. Use the `size` prop:
+  `"default"` for full-page/hero empties, `"compact"` for cards and settings
+  panels, `"inline"` for tight dashboard tiles. Never hand-roll an empty
+  state with raw divs or a parallel component (the old `DashboardEmptyState`
+  fork was removed in favor of `size="inline"` / `size="compact"`).
 - `<ConfirmDialog>` — destructive-action confirmation (Cancel left, primary
   right, danger-filled by default). `<Modal>` is for info dialogs only.
 - `<ErrorBoundary>` and `<NotFoundBoundary>` (`components/RouteBoundary.tsx`)

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { openConsentPreferences } from "@/components/CookieConsent";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import {
@@ -462,6 +463,22 @@ export default function RequestDemoPage() {
         >
           Terms of Service
         </Link>
+        <span style={{ margin: "0 4px" }}>·</span>
+        <button
+          type="button"
+          onClick={openConsentPreferences}
+          style={{
+            color: "var(--color-text-faint)",
+            textDecoration: "none",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            font: "inherit",
+          }}
+        >
+          Cookie preferences
+        </button>
       </footer>
     </div>
   );

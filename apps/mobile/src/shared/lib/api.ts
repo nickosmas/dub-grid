@@ -13,6 +13,7 @@ import {
   mobileProfileSessionRevokeResponseSchema,
   mobileProfileSessionsResponseSchema,
   mobileNotificationBulkResponseSchema,
+  mobileNotificationFacetsSchema,
   mobileNotificationReadResponseSchema,
   mobileNotificationsResponseSchema,
   mobileOrgScheduleResponseSchema,
@@ -25,7 +26,7 @@ import {
   mobileShiftRequestsResponseSchema,
   mobileShiftSwapOptionsResponseSchema,
   mobileUpdateShiftRequestResponseSchema,
-  mobileWorkspaceLookupResponseSchema,
+  mobileOrganizationLookupResponseSchema,
   type MobileAuthSession,
   type MobileAuthLoginResponse,
   type MobileCreateShiftRequestBody,
@@ -444,16 +445,16 @@ export function revokeProfileSession(
   );
 }
 
-export function lookupWorkspace(workspaceSlug: string) {
+export function lookupOrganization(orgSlug: string) {
   return mobilePublicApiRequest(
-    `/api/mobile/v1/auth/workspace?slug=${encodeURIComponent(workspaceSlug.trim().toLowerCase())}`,
+    `/api/mobile/v1/auth/organization?slug=${encodeURIComponent(orgSlug.trim().toLowerCase())}`,
     { method: "GET" },
-    (value) => mobileWorkspaceLookupResponseSchema.parse(value),
+    (value) => mobileOrganizationLookupResponseSchema.parse(value),
   );
 }
 
-export function loginToWorkspace(input: {
-  workspaceSlug: string;
+export function loginToOrganization(input: {
+  orgSlug: string;
   email: string;
   password: string;
 }): Promise<MobileAuthLoginResponse> {
@@ -654,7 +655,7 @@ export type MobileNotificationsListParams = {
   priority?: "low" | "normal" | "high" | "critical";
   read?: "unread" | "read";
   search?: string;
-  includeArchived?: boolean;
+  archived?: "inbox" | "archived" | "any";
   sort?: "asc" | "desc";
 };
 
@@ -671,7 +672,7 @@ export function getNotifications(
     priority: params.priority,
     read: params.read,
     search: params.search,
-    includeArchived: params.includeArchived ? "1" : undefined,
+    archived: params.archived,
     sort: params.sort,
   };
   return mobileApiRequest(
@@ -703,11 +704,20 @@ export function markAllNotificationsRead(accessToken: string) {
   );
 }
 
+export function getNotificationFacets(accessToken: string) {
+  return mobileApiRequest(
+    "/api/mobile/v1/notifications/facets",
+    accessToken,
+    { method: "GET" },
+    (value) => mobileNotificationFacetsSchema.parse(value),
+  );
+}
+
 export function bulkUpdateNotifications(
   accessToken: string,
   body: {
     ids: string[];
-    action: "read" | "unread" | "archive" | "unarchive" | "delete";
+    action: "read" | "unread" | "archive" | "unarchive";
   },
 ) {
   return mobileApiRequest(

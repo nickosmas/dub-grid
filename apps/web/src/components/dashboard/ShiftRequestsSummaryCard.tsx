@@ -223,7 +223,7 @@ export default function ShiftRequestsSummaryCard({
         </div>
         <div className="dg-card-body" style={{ padding: "4px 18px 14px" }}>
           {pendingApproval.length === 0 ? (
-            <EmptyState compact heading="No pending requests" />
+            <EmptyState size="compact" heading="No pending requests" />
           ) : (
             pendingApproval.slice(0, 5).map((req) => (
               <RequestRow
@@ -306,7 +306,7 @@ export default function ShiftRequestsSummaryCard({
               ))}
           </div>
         ) : (
-          <EmptyState compact heading="You have no active requests" />
+          <EmptyState size="compact" heading="You have no active requests" />
         )}
 
         {/* Available pickups */}

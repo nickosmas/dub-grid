@@ -969,7 +969,7 @@ flowchart LR
     end
 
     subgraph Web["apps/web — Route Handlers"]
-        ROUTE["/api/mobile/v1/*<br/>(bootstrap, auth/login, auth/workspace,<br/>me/schedule, org/schedule, people,<br/>shift-requests, notifications,<br/>profile, push-tokens, session-presence)"]
+        ROUTE["/api/mobile/v1/*<br/>(bootstrap, auth/login, auth/organization,<br/>me/schedule, org/schedule, people,<br/>shift-requests, notifications,<br/>profile, push-tokens, session-presence)"]
     end
 
     subgraph Core["@dubgrid/mobile-api-core"]

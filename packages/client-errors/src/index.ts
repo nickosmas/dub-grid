@@ -110,9 +110,9 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   },
   {
     pattern:
-      /workspace.*not found|organization.*not found|could not find workspace|no workspace matched that slug/i,
+      /organization.*not found|could not find organization|no organization matched that slug/i,
     message:
-      "We couldn't find that workspace. Check the subdomain and try again.",
+      "We couldn't find that organization. Check the subdomain and try again.",
   },
   {
     pattern: /email not confirmed/i,
@@ -217,14 +217,14 @@ export function isAuthorizationError(error: unknown): boolean {
 }
 
 /**
- * When the error is an intentional "Workspace unavailable." gate message, return
- * it verbatim (it is already user-facing copy). Otherwise return `null`.
+ * When the error is an intentional "Organization unavailable." gate message,
+ * return it verbatim (it is already user-facing copy). Otherwise return `null`.
  */
-export function getWorkspaceUnavailableMessage(
+export function getOrgUnavailableMessage(
   error: unknown,
 ): string | null {
   const message = getErrorMessage(error);
-  if (!message || !/^workspace unavailable\./i.test(message)) {
+  if (!message || !/^organization unavailable\./i.test(message)) {
     return null;
   }
   return message;
@@ -252,7 +252,7 @@ export function isTechnicalErrorMessage(rawMessage: string): boolean {
  * Translate an unknown error into a message safe to show a user.
  *
  * Pipeline: connectivity failure → canonical network copy; intentional
- * "Workspace unavailable." gate → verbatim; known friendly pattern → friendly
+ * "Organization unavailable." gate → verbatim; known friendly pattern → friendly
  * copy; technical/backend leak → caller's fallback; otherwise → the raw message
  * (it is plain enough to surface).
  */
@@ -267,8 +267,8 @@ export function formatClientErrorMessage(
   const rawMessage = getErrorMessage(error);
   if (!rawMessage) return fallback;
 
-  const workspaceUnavailable = getWorkspaceUnavailableMessage(rawMessage);
-  if (workspaceUnavailable) return workspaceUnavailable;
+  const orgUnavailable = getOrgUnavailableMessage(rawMessage);
+  if (orgUnavailable) return orgUnavailable;
 
   const friendly = translateErrorMessage(rawMessage);
   if (friendly) return friendly;

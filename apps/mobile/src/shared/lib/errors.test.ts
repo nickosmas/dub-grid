@@ -3,7 +3,7 @@ import {
   createNetworkErrorToast,
   getClientFriendlyErrorMessage,
   getInlineErrorMessageOrToast,
-  getWorkspaceUnavailableMessage,
+  getOrgUnavailableMessage,
   isNetworkConnectionError,
 } from "./errors";
 
@@ -53,17 +53,17 @@ describe("mobile error helpers", () => {
     ).toBe(true);
   });
 
-  it("preserves workspace unavailable messages for mobile gates and login errors", () => {
+  it("preserves organization unavailable messages for mobile gates and login errors", () => {
     const error = new Error(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
 
-    expect(getWorkspaceUnavailableMessage(error)).toBe(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+    expect(getOrgUnavailableMessage(error)).toBe(
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
     expect(
       getClientFriendlyErrorMessage(error, "Fallback message"),
-    ).toBe("Workspace unavailable. Sign in on the web to finish workspace setup.");
+    ).toBe("Organization unavailable. Sign in on the web to finish organization setup.");
   });
 
   it("uses a persistent network toast instead of inline copy", () => {

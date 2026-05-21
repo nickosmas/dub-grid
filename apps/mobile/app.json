@@ -24,11 +24,20 @@
           "backgroundColor": "#F8FAFC",
           "resizeMode": "contain"
         }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "We use this only if you opt in to analytics. It helps us understand how people use DubGrid so we can make it better. You can change this any time in Profile, Privacy & data."
+        }
       ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dubgrid.mobile"
+      "bundleIdentifier": "com.dubgrid.mobile",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "We use this only if you opt in to analytics. It helps us understand how people use DubGrid so we can make it better. You can change this any time in Profile, Privacy & data."
+      }
     },
     "android": {
       "package": "com.dubgrid.mobile",

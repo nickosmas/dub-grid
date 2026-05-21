@@ -3,7 +3,7 @@ import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { getAvatarInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 interface StaffHoursCardProps {
   employeeHours: EmployeeHours[];
@@ -57,9 +57,9 @@ export default function StaffHoursCard({
 
       {visible.length === 0 ? (
         <div className="dg-card-body" style={{ display: "flex", flex: 1 }}>
-          <DashboardEmptyState
+          <EmptyState
             title={emptyMessage}
-            variant="inline"
+            size="inline"
             style={{ flex: 1 }}
           />
         </div>

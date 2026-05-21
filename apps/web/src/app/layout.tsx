@@ -23,16 +23,16 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com",
   ),
   title: "DubGrid",
-  description: "Smart staff scheduling for care facilities",
+  description: "Staff scheduling, built for care teams.",
   openGraph: {
     title: "DubGrid",
-    description: "Smart staff scheduling for care facilities",
+    description: "Staff scheduling, built for care teams.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "DubGrid",
-    description: "Smart staff scheduling for care facilities",
+    description: "Staff scheduling, built for care teams.",
   },
 };
 

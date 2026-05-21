@@ -13,7 +13,7 @@ import {
 
 export const mobilePlatformSchema = z.enum(["ios", "android"]);
 export const mobileRoleSchema = z.enum(["super_admin", "admin", "user"]);
-export const mobileWorkspaceSlugSchema = z
+export const mobileOrgSlugSchema = z
   .string()
   .trim()
   .toLowerCase()
@@ -39,14 +39,14 @@ export const mobileUserSchema = z.object({
   lastName: z.string().nullable(),
 });
 
-export const mobileWorkspaceSchema = z.object({
+export const mobileOrganizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  slug: mobileWorkspaceSlugSchema,
+  slug: mobileOrgSlugSchema,
 });
 
-export const mobileWorkspaceLookupResponseSchema = z.object({
-  workspace: mobileWorkspaceSchema,
+export const mobileOrganizationLookupResponseSchema = z.object({
+  organization: mobileOrganizationSchema,
 });
 
 export const mobileAuthSessionSchema = z.object({
@@ -57,14 +57,14 @@ export const mobileAuthSessionSchema = z.object({
 });
 
 export const mobileAuthLoginBodySchema = z.object({
-  workspaceSlug: mobileWorkspaceSlugSchema,
+  orgSlug: mobileOrgSlugSchema,
   email: z.string().email(),
   password: z.string().min(1),
 });
 
 export const mobileAuthLoginResponseSchema = z.object({
   session: mobileAuthSessionSchema,
-  workspace: mobileWorkspaceSchema,
+  organization: mobileOrganizationSchema,
   user: mobileUserSchema,
   mfaRequired: z.boolean().default(false),
   mfa: z
@@ -742,6 +742,13 @@ export const mobilePersonInvitationResponseSchema = z.object({
   person: mobilePersonSchema,
 });
 
+export const mobileNotificationPrioritySchema = z.enum([
+  "low",
+  "normal",
+  "high",
+  "critical",
+]);
+
 export const mobileNotificationSchema = z.object({
   id: z.string().uuid(),
   type: z.enum([
@@ -753,29 +760,95 @@ export const mobileNotificationSchema = z.object({
     "shift_request_new",
     "shift_request_approved",
     "shift_request_rejected",
+    "recurring_shift_updated",
+    "shift_series_updated",
+    "schedule_note_published",
+    "recurring_schedules_applied",
+    "invitation_received",
+    "invitation_accepted",
+    "invitation_revoked",
+    "invitation_resent",
+    "membership_removed",
+    "admin_permissions_changed",
+    "employee_created",
+    "employee_status_changed",
+    "employee_profile_changed",
+    "org_settings_changed",
+    "org_suspended",
+    "org_unsuspended",
+    "billing_subscription_changed",
+    "billing_payment_failed",
+    "billing_payment_succeeded",
+    "security_email_changed",
+    "security_password_changed",
+    "security_mfa_changed",
+    "security_new_device",
+    "security_session_revoked",
   ]),
   channel: z.enum(["in_app", "email"]),
   category: z.string().nullable(),
+  priority: mobileNotificationPrioritySchema,
   title: z.string(),
   message: z.string(),
   metadata: z.record(z.unknown()),
   readAt: z.string().nullable(),
+  archivedAt: z.string().nullable(),
   createdAt: z.string(),
+});
+
+export const mobileNotificationsCursorSchema = z.object({
+  createdAt: z.string(),
+  id: z.string().uuid(),
 });
 
 export const mobileNotificationsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
-  offset: z.coerce.number().int().nonnegative().optional(),
+  cursorCreatedAt: z.string().optional(),
+  cursorId: z.string().uuid().optional(),
+  category: z.string().min(1).max(64).optional(),
+  type: z.string().min(1).max(64).optional(),
+  priority: mobileNotificationPrioritySchema.optional(),
+  read: z.enum(["read", "unread"]).optional(),
+  search: z.string().min(1).max(200).optional(),
+  archived: z.enum(["inbox", "archived", "any"]).optional(),
+  sort: z.enum(["asc", "desc"]).optional(),
 });
 
 export const mobileNotificationsResponseSchema = z.object({
   unreadCount: z.number().int().nonnegative(),
   notifications: z.array(mobileNotificationSchema),
+  nextCursor: mobileNotificationsCursorSchema.nullable(),
 });
 
 export const mobileNotificationReadResponseSchema = z.object({
   success: z.literal(true),
   unreadCount: z.number().int().nonnegative(),
+});
+
+export const mobileNotificationBulkActionSchema = z.enum([
+  "read",
+  "unread",
+  "archive",
+  "unarchive",
+]);
+
+export const mobileNotificationBulkBodySchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+  action: mobileNotificationBulkActionSchema,
+});
+
+export const mobileNotificationBulkResponseSchema = z.object({
+  success: z.literal(true),
+  unreadCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
+});
+
+export const mobileNotificationFacetsSchema = z.object({
+  totalInbox: z.number().int().nonnegative(),
+  totalUnread: z.number().int().nonnegative(),
+  totalArchived: z.number().int().nonnegative(),
+  byCategory: z.record(z.string(), z.number().int().nonnegative()),
+  byPriority: z.record(z.string(), z.number().int().nonnegative()),
 });
 
 export const mobilePushTokenBodySchema = z.object({
@@ -830,6 +903,30 @@ export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
+export type MobileNotificationPriority = z.infer<
+  typeof mobileNotificationPrioritySchema
+>;
+export type MobileNotificationsQuery = z.infer<
+  typeof mobileNotificationsQuerySchema
+>;
+export type MobileNotificationsCursor = z.infer<
+  typeof mobileNotificationsCursorSchema
+>;
+export type MobileNotificationsResponse = z.infer<
+  typeof mobileNotificationsResponseSchema
+>;
+export type MobileNotificationBulkAction = z.infer<
+  typeof mobileNotificationBulkActionSchema
+>;
+export type MobileNotificationBulkBody = z.infer<
+  typeof mobileNotificationBulkBodySchema
+>;
+export type MobileNotificationBulkResponse = z.infer<
+  typeof mobileNotificationBulkResponseSchema
+>;
+export type MobileNotificationFacets = z.infer<
+  typeof mobileNotificationFacetsSchema
+>;
 export type MobilePerson = z.infer<typeof mobilePersonSchema>;
 export type MobilePersonUpdateBody = z.infer<
   typeof mobilePersonUpdateBodySchema

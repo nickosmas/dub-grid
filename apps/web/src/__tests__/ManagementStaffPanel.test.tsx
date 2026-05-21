@@ -177,7 +177,7 @@ describe("ManagementStaffPanel", () => {
     await user.click(
       screen.getByRole("button", { name: /remove from management/i }),
     );
-    expect(screen.getByText(/keep them on the schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/stay on the schedule/i)).toBeInTheDocument();
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeEnabled();

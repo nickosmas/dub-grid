@@ -5,6 +5,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { OrganizationBadge } from "@/components/auth/OrganizationBadge";
 import { ShieldCheck } from "lucide-react";
 import {
   listBrowserMfaFactors,
@@ -73,7 +74,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
   }
 
   return (
-    <PageShell footerCenteredOnly>
+    <PageShell>
       <Card>
         <div className="dg-auth-logo-block" style={{ marginBottom: 24 }}>
           <DubGridLogo size={52} />
@@ -81,20 +82,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
         </div>
 
         {orgSlug && baseDomain && (
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <span style={{
-              display: "inline-block",
-              background: "var(--color-brand-bg)",
-              color: "var(--color-brand)",
-              border: "1px solid var(--color-brand-border)",
-              borderRadius: 999,
-              padding: "4px 14px",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 600,
-            }}>
-              {orgSlug}.{baseDomain}
-            </span>
-          </div>
+          <OrganizationBadge slug={orgSlug} baseDomain={baseDomain} style={{ marginBottom: 20 }} />
         )}
 
         <div

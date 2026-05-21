@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { fetchOrganizationInvitations } from "@/features/organization/client";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { EmptyState } from "@/components/EmptyState";
-import type { Invitation } from "@/types";
+import { queryKeys } from "@/lib/query-keys";
 
 interface InvitationStatusCardProps {
   orgId: string;
@@ -19,21 +19,12 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function InvitationStatusCard({ orgId }: InvitationStatusCardProps) {
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchOrganizationInvitations(orgId)
-      .then((data) => {
-        if (!cancelled) setInvitations(data);
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [orgId]);
+  const invitationsQuery = useQuery({
+    queryKey: queryKeys.org.invitations(orgId),
+    queryFn: () => fetchOrganizationInvitations(orgId),
+  });
+  const invitations = invitationsQuery.data ?? [];
+  const loading = invitationsQuery.isPending;
 
   const pending = invitations.filter(
     (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
@@ -94,7 +85,7 @@ export default function InvitationStatusCard({ orgId }: InvitationStatusCardProp
       </div>
       <div className="dg-card-body" style={{ padding: "4px 18px 14px" }}>
         {pending.length === 0 && recentlyAccepted.length === 0 ? (
-          <EmptyState compact heading="No active invitations" />
+          <EmptyState size="compact" heading="No active invitations" />
         ) : (
           <>
             {/* Pending */}

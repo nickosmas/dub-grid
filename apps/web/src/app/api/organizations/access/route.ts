@@ -11,6 +11,7 @@ import { buildMembershipAccessChanges, buildMembershipRemovalChanges } from "@/l
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 export const dynamic = "force-dynamic";
 
@@ -277,6 +278,18 @@ export async function PATCH(req: NextRequest) {
       req,
     });
 
+    if (permissionsChanged) {
+      void dispatchNotificationEvent(user.id, {
+        action: "admin_permissions_changed",
+        orgId,
+        targetUserId: userId,
+        before: (currentUser.adminPermissions ?? null) as
+          | Record<string, boolean>
+          | null,
+        after: (nextPermissions ?? null) as Record<string, boolean> | null,
+      });
+    }
+
     return NextResponse.json({ success: true, user: latestUser });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "organizations/access", orgId, userId } });
@@ -378,6 +391,12 @@ export async function DELETE(req: NextRequest) {
       action: "user.removed_from_org",
       changes: buildMembershipRemovalChanges(currentUser),
       req,
+    });
+
+    void dispatchNotificationEvent(user.id, {
+      action: "membership_removed",
+      orgId,
+      removedUserId: userId,
     });
 
     return NextResponse.json({ success: true });

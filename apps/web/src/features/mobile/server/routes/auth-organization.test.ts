@@ -6,12 +6,12 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient,
 }));
 
-describe("mobile auth workspace route", () => {
+describe("mobile auth organization route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns the workspace summary for a valid slug", async () => {
+  it("returns the organization summary for a valid slug", async () => {
     getServiceClient.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
@@ -29,16 +29,16 @@ describe("mobile auth workspace route", () => {
       })),
     });
 
-    const { GET } = await import("./auth-workspace");
+    const { GET } = await import("./auth-organization");
     const response = await GET({
       nextUrl: new URL(
-        "http://localhost/api/mobile/v1/auth/workspace?slug=dubgrid-health",
+        "http://localhost/api/mobile/v1/auth/organization?slug=dubgrid-health",
       ),
     } as never);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      workspace: {
+      organization: {
         id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
         name: "DubGrid Health",
         slug: "dubgrid-health",
@@ -46,7 +46,7 @@ describe("mobile auth workspace route", () => {
     });
   });
 
-  it("adds dev CORS headers for browser workspace lookups", async () => {
+  it("adds dev CORS headers for browser organization lookups", async () => {
     getServiceClient.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
@@ -64,13 +64,13 @@ describe("mobile auth workspace route", () => {
       })),
     });
 
-    const { GET, OPTIONS } = await import("./auth-workspace");
+    const { GET, OPTIONS } = await import("./auth-organization");
     const response = await GET({
       headers: new Headers({
         origin: "http://localhost:8081",
       }),
       nextUrl: new URL(
-        "http://localhost/api/mobile/v1/auth/workspace?slug=dubgrid-health",
+        "http://localhost/api/mobile/v1/auth/organization?slug=dubgrid-health",
       ),
     } as never);
 
@@ -79,7 +79,7 @@ describe("mobile auth workspace route", () => {
     );
 
     const preflightResponse = await OPTIONS(
-      new Request("http://localhost/api/mobile/v1/auth/workspace", {
+      new Request("http://localhost/api/mobile/v1/auth/organization", {
         method: "OPTIONS",
         headers: {
           Origin: "http://localhost:8081",
@@ -97,7 +97,7 @@ describe("mobile auth workspace route", () => {
     );
   });
 
-  it("returns 404 for unknown workspaces", async () => {
+  it("returns 404 for unknown organizations", async () => {
     getServiceClient.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
@@ -111,14 +111,14 @@ describe("mobile auth workspace route", () => {
       })),
     });
 
-    const { GET } = await import("./auth-workspace");
+    const { GET } = await import("./auth-organization");
     const response = await GET({
-      nextUrl: new URL("http://localhost/api/mobile/v1/auth/workspace?slug=missing"),
+      nextUrl: new URL("http://localhost/api/mobile/v1/auth/organization?slug=missing"),
     } as never);
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      error: "No workspace matched that slug.",
+      error: "No organization matched that slug.",
     });
   });
 });

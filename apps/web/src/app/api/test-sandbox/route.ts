@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       (profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims);
     if (!sourceOrgId) {
       return NextResponse.json(
-        { error: "Pick a workspace before entering sandbox mode." },
+        { error: "Pick an organization before entering sandbox mode." },
         { status: 400 },
       );
     }

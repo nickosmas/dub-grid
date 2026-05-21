@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Department, FocusArea, NamedItem } from "@/types";
 import {
@@ -11,6 +12,7 @@ import {
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { queryKeys } from "@/lib/query-keys";
 import { Inbox } from "lucide-react";
 
 interface ReferenceItem {
@@ -191,7 +193,7 @@ function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) 
         Account deletion request
       </div>
       <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--color-danger-text)]">
-        Approval will run the account deletion safeguards before removing the user&apos;s account.
+        Approving will permanently delete this user&apos;s account and remove them from your organization. This can&apos;t be undone.
       </p>
     </div>
   );
@@ -204,48 +206,58 @@ export function ProfileChangeRequestQueue({
   roles,
   departments,
 }: ProfileChangeRequestQueueProps) {
-  const [requests, setRequests] = useState<ProfileChangeRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [pendingResolution, setPendingResolution] = useState<{
     request: ProfileChangeRequest;
     action: "approve" | "reject";
   } | null>(null);
   const references = { focusAreas, certifications, roles, departments };
 
-  async function loadRequests() {
-    setLoading(true);
-    try {
+  const requestsQuery = useQuery({
+    queryKey: queryKeys.org.peopleChangeRequests(orgId, "pending"),
+    queryFn: async () => {
       const result = await fetchPeopleProfileChangeRequests(orgId, "pending");
-      setRequests(result.requests);
-    } catch (error) {
-      toast.error(extractErrorMessage(error, "Failed to load profile requests."));
-    } finally {
-      setLoading(false);
-    }
-  }
+      return result.requests;
+    },
+  });
 
   useEffect(() => {
-    void loadRequests();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId]);
-
-  async function resolveRequest(
-    requestId: string,
-    action: "approve" | "reject",
-  ) {
-    setResolvingId(requestId);
-    try {
-      await resolvePeopleProfileChangeRequest({ orgId, requestId, action });
-      setRequests((current) => current.filter((request) => request.id !== requestId));
-      setPendingResolution(null);
-      toast.success(action === "approve" ? "Request approved." : "Request rejected.");
-    } catch (error) {
-      toast.error(extractErrorMessage(error, "Failed to resolve request."));
-    } finally {
-      setResolvingId(null);
+    if (requestsQuery.isError) {
+      toast.error(
+        extractErrorMessage(requestsQuery.error, "Failed to load profile requests."),
+      );
     }
-  }
+  }, [requestsQuery.isError, requestsQuery.error]);
+
+  const requests = requestsQuery.data ?? [];
+  const loading = requestsQuery.isPending;
+
+  const resolveMutation = useMutation({
+    mutationFn: (input: { requestId: string; action: "approve" | "reject" }) =>
+      resolvePeopleProfileChangeRequest({
+        orgId,
+        requestId: input.requestId,
+        action: input.action,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<ProfileChangeRequest[]>(
+        queryKeys.org.peopleChangeRequests(orgId, "pending"),
+        (current) =>
+          (current ?? []).filter((request) => request.id !== variables.requestId),
+      );
+      setPendingResolution(null);
+      toast.success(
+        variables.action === "approve" ? "Request approved." : "Request rejected.",
+      );
+    },
+    onError: (error) => {
+      toast.error(extractErrorMessage(error, "Failed to resolve request."));
+    },
+  });
+
+  const resolvingId = resolveMutation.isPending
+    ? resolveMutation.variables?.requestId ?? null
+    : null;
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4">
@@ -354,7 +366,7 @@ export function ProfileChangeRequestQueue({
           message={
             pendingResolution.request.type === "account_deletion" &&
             pendingResolution.action === "approve"
-              ? "Approving this request will run account deletion safeguards and remove the user's account."
+              ? "Permanently delete this user's account and remove them from your organization? This can't be undone."
               : pendingResolution.action === "approve"
                 ? "Approve this profile change request and apply the requested updates?"
                 : "Reject this request? The requester will not receive the requested changes."
@@ -368,7 +380,10 @@ export function ProfileChangeRequestQueue({
           }
           isLoading={resolvingId === pendingResolution.request.id}
           onConfirm={() => {
-            void resolveRequest(pendingResolution.request.id, pendingResolution.action);
+            resolveMutation.mutate({
+              requestId: pendingResolution.request.id,
+              action: pendingResolution.action,
+            });
           }}
           onCancel={() => {
             if (!resolvingId) setPendingResolution(null);

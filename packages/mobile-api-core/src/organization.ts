@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type MobileWorkspaceLookup = {
+export type MobileOrganizationLookup = {
   id: string;
   name: string;
   slug: string;
@@ -9,13 +9,13 @@ export type MobileWorkspaceLookup = {
   trialEndsAt: string | null;
 };
 
-export function normalizeMobileWorkspaceSlug(
+export function normalizeMobileOrgSlug(
   slug: string | null | undefined,
 ): string {
   return slug?.trim().toLowerCase() ?? "";
 }
 
-export function isValidMobileWorkspaceSlug(
+export function isValidMobileOrgSlug(
   slug: string,
   reservedSlugs: ReadonlySet<string>,
 ): boolean {
@@ -26,10 +26,10 @@ export function isValidMobileWorkspaceSlug(
   );
 }
 
-export async function findMobileWorkspaceBySlug(
+export async function findMobileOrganizationBySlug(
   serviceClient: SupabaseClient,
   slug: string,
-): Promise<MobileWorkspaceLookup | null> {
+): Promise<MobileOrganizationLookup | null> {
   const { data, error } = await serviceClient
     .from("organizations")
     .select("id, name, slug, suspended_at, subscription_status, trial_ends_at")

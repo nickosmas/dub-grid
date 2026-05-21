@@ -16,6 +16,7 @@ import {
   type MobileScheduleEntrySegment,
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
+import { indefiniteArticle } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -1606,7 +1607,7 @@ export default function ShiftDetailScreen() {
       body:
         type === "pickup"
           ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
-          : `A ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
+          : `${indefiniteArticle(options?.absenceTypeLabel ?? "selected") === "an" ? "An" : "A"} ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
       confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
       confirmTone: type === "calloff" ? "dangerFilled" : "primary",
       onConfirm: () =>

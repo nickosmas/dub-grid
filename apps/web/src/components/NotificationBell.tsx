@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -11,6 +13,8 @@ import {
 } from "@/features/notifications/client";
 import { useAuth } from "@/components/AuthProvider";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
+import { useAccountRealtimeInvalidation } from "@/hooks/useAccountRealtimeInvalidation";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import type { Notification } from "@/types";
 
@@ -149,6 +153,8 @@ export default function NotificationBell() {
   const userId = user?.id ?? null;
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const { data: unreadCount = 0 } = useQuery({
@@ -170,6 +176,7 @@ export default function NotificationBell() {
   });
 
   useNotificationsRealtime({ userId });
+  useAccountRealtimeInvalidation({ userId, queryClient });
 
   // Close on outside click or Escape key
   useEffect(() => {
@@ -207,22 +214,27 @@ export default function NotificationBell() {
     try {
       await markNotificationRead(id);
       invalidateAll();
-    } catch {
-      // Silently fail
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "Couldn't update notification"));
     }
   }
 
-  async function handleMarkAllRead() {
+  async function handleConfirmMarkAllRead() {
+    setMarkingAllRead(true);
     try {
       await markAllNotificationsRead();
       invalidateAll();
-    } catch {
-      // Silently fail
+      toast.success("All notifications marked as read");
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "Couldn't mark all read"));
+    } finally {
+      setMarkingAllRead(false);
+      setConfirmingMarkAllRead(false);
     }
   }
 
-  const unreadCountLabel = unreadCount > 99 ? "99+" : String(unreadCount);
-  const unreadCountFontSize = unreadCount > 99 ? 6 : unreadCount > 9 ? 8 : 9;
+  const unreadCountLabel = unreadCount > 9 ? "9+" : String(unreadCount);
+  const unreadCountFontSize = unreadCount > 9 ? 8 : 9;
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>
@@ -323,7 +335,7 @@ export default function NotificationBell() {
             </span>
             {unreadCount > 0 && (
               <button
-                onClick={handleMarkAllRead}
+                onClick={() => setConfirmingMarkAllRead(true)}
                 aria-label="Mark all notifications as read"
                 style={{
                   background: "none",
@@ -431,6 +443,21 @@ export default function NotificationBell() {
             View all notifications
           </Link>
         </div>
+      )}
+      {confirmingMarkAllRead && (
+        <ConfirmDialog
+          title="Mark all read?"
+          message={
+            unreadCount === 1
+              ? "This marks your one unread notification as read."
+              : `This marks all ${unreadCount} unread notifications as read.`
+          }
+          confirmLabel="Mark all read"
+          variant="info"
+          onConfirm={handleConfirmMarkAllRead}
+          onCancel={() => setConfirmingMarkAllRead(false)}
+          isLoading={markingAllRead}
+        />
       )}
     </div>
   );

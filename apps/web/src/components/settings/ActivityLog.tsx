@@ -288,6 +288,7 @@ function SkeletonTable() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
+          className="dg-list-row"
           style={{
             display: "flex",
             gap: 16,

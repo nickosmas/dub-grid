@@ -19,7 +19,13 @@ export type MobileRealtimeTable =
   | "schedule_cells"
   | "schedule_cell_snapshots"
   | "schedule_cell_segments"
-  | "schedule_notes";
+  | "schedule_notes"
+  | "profile_change_requests"
+  | "notifications"
+  | "recurring_shifts"
+  | "publish_history"
+  | "audit_log"
+  | "impersonation_sessions";
 
 export function getMobileRealtimeInvalidationKeys(
   accessToken: string,
@@ -31,6 +37,16 @@ export function getMobileRealtimeInvalidationKeys(
   const person = ["mobile", "person", accessToken] as const;
   const schedule = ["mobile", "schedule"] as const;
   const requests = ["mobile", "requests"] as const;
+  const profileChangeRequests = [
+    "mobile",
+    "profile-change-requests",
+  ] as const;
+  const notifications = ["mobile", "notifications-infinite"] as const;
+  const notificationFacets = [
+    "mobile",
+    "notification-facets",
+    accessToken,
+  ] as const;
 
   switch (table) {
     case "organizations":
@@ -58,6 +74,17 @@ export function getMobileRealtimeInvalidationKeys(
       return [schedule, requests];
     case "schedule_notes":
       return [schedule];
+    case "profile_change_requests":
+      return [profileChangeRequests];
+    case "notifications":
+      return [notifications, bootstrap, notificationFacets];
+    case "recurring_shifts":
+      return [schedule, requests];
+    case "publish_history":
+      return [schedule];
+    case "audit_log":
+    case "impersonation_sessions":
+      return [bootstrap, profile];
   }
 }
 

@@ -7,7 +7,7 @@ import {
   type TextInputProps,
   View,
 } from "react-native";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { mobileColors, mobileRadii } from "../theme/tokens";
 
 const DEFAULT_DEBOUNCE_MS = 300;
 
@@ -97,7 +97,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   input: {
-    ...mobileText.sectionTitle,
+    // Explicit regular weight — don't spread `mobileText.sectionTitle`,
+    // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
+    // Omitting `fontFamily` also avoids the Android EditText
+    // non-interactive bug when DM Sans hasn't loaded.
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: "400",
     color: mobileColors.textPrimary,
     flex: 1,

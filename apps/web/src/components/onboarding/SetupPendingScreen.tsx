@@ -72,7 +72,7 @@ export default function SetupPendingScreen() {
             marginRight: "auto",
           }}
         >
-          Your administrator is still configuring the workspace.
+          Your administrator is still configuring the organization.
           You&apos;ll be able to access the app once setup is complete.
           This page refreshes automatically.
         </p>

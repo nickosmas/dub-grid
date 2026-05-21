@@ -28,6 +28,7 @@ import {
   iterateDateRange,
 } from "@/lib/utils";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import type {
   GridOpenShift,
   ScheduleCellInput,
@@ -1052,6 +1053,14 @@ export async function POST(req: NextRequest) {
           updatedAt: now,
         };
 
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_series_changed",
+          orgId: data.orgId,
+          seriesId: id,
+          mode: "create",
+          empIds: [data.employeeId],
+        });
+
         return NextResponse.json({ series });
       }
 
@@ -1091,6 +1100,13 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_series_changed",
+          orgId: data.orgId,
+          seriesId: data.seriesId,
+          mode: "update_all",
+        });
+
         return NextResponse.json({ success: true });
       }
 
@@ -1117,6 +1133,13 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "shift_series_changed",
+          orgId: data.orgId,
+          seriesId: data.seriesId,
+          mode: "delete",
+        });
 
         return NextResponse.json({
           deletedCount: Number(deletedCount ?? 0),
@@ -1277,6 +1300,19 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        const affectedEmpIds = Array.from(
+          new Set(generated.map((entry) => entry.empId)),
+        );
+        if (affectedEmpIds.length > 0) {
+          void dispatchNotificationEvent(auth.actor.id, {
+            action: "recurring_schedules_applied",
+            orgId: data.orgId,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            affectedEmpIds,
+          });
+        }
+
         return NextResponse.json({ generated });
       }
 
@@ -1308,6 +1344,15 @@ export async function POST(req: NextRequest) {
         if (error) {
           throw error;
         }
+
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "schedule_note_changed",
+          orgId: data.orgId,
+          empId: data.employeeId,
+          date: data.date,
+          mode: "upsert",
+          status,
+        });
 
         return NextResponse.json({ success: true });
       }
@@ -1350,6 +1395,17 @@ export async function POST(req: NextRequest) {
             throw error;
           }
         }
+
+        // Only fire when removing a previously-published note — draft
+        // deletes are editor-only state changes.
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "schedule_note_changed",
+          orgId: data.orgId,
+          empId: data.employeeId,
+          date: data.date,
+          mode: "delete",
+          status: data.existingStatus === "draft" ? "draft" : "published",
+        });
 
         return NextResponse.json({ success: true });
       }

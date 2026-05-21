@@ -2,7 +2,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
   success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
@@ -58,9 +58,9 @@ function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
 
 function EmptyActivityState() {
   return (
-    <DashboardEmptyState
-      variant="panel"
-      minHeight={134}
+    <EmptyState
+      size="compact"
+      style={{ minHeight: 134 }}
       title="No recent activity"
       description="Published updates, shift changes, requests, and new user sign-ups will appear here."
     />

@@ -165,7 +165,7 @@ export function AddManagementUserToScheduleModal({
     setSaving(true);
     try {
       const employee = await createEmployeeFromOrgUser(buildInput());
-      toast.success("Management user added to the schedule");
+      toast.success("Added to the schedule");
       onAdded(employee);
       onClose();
     } catch (err) {
@@ -173,7 +173,7 @@ export function AddManagementUserToScheduleModal({
         setNameMismatch(err.details);
         return;
       }
-      toast.error(formatClientErrorMessage(err, "We couldn't add that management user to the schedule."));
+      toast.error(formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."));
     } finally {
       setSaving(false);
     }
@@ -185,11 +185,11 @@ export function AddManagementUserToScheduleModal({
     setSaving(true);
     try {
       const employee = await reconcileEmployeeFromOrgUser(buildInput());
-      toast.success("Management user added to the schedule");
+      toast.success("Added to the schedule");
       onAdded(employee);
       onClose();
     } catch (err) {
-      toast.error(formatClientErrorMessage(err, "We couldn't add that management user to the schedule."));
+      toast.error(formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."));
     } finally {
       setSaving(false);
     }
@@ -207,7 +207,7 @@ export function AddManagementUserToScheduleModal({
         <AccountNameMismatchPanel
           details={nameMismatch}
           title="Name mismatch found"
-          description="The schedule record you entered does not match this user account name. If the account name is correct, you can use it for the employee record and continue."
+          description="The name you entered doesn't match this person's account. If the account name is right, use it and continue."
           confirmLabel="Use Account Name and Add to Schedule"
           dismissLabel={EDITOR_ACTION_LABELS.close}
           onCancel={handleRequestClose}
@@ -225,8 +225,8 @@ export function AddManagementUserToScheduleModal({
             fontSize: "var(--dg-fs-label)",
           }}
         >
-          Create a schedule employee for <strong>{person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}</strong>.
-          This keeps their existing app account linked and does not copy management departments onto the employee record.
+          Put <strong>{person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}</strong> on the schedule so you can assign them shifts.
+          They'll keep their login and management access.
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

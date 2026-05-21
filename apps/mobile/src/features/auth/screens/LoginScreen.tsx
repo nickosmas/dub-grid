@@ -23,16 +23,16 @@ import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import {
-  loginToWorkspace,
-  lookupWorkspace,
+  loginToOrganization,
+  lookupOrganization,
   registerMobileSessionPresence,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import {
-  loadLastWorkspaceSlug,
-  saveLastWorkspaceSlug,
+  loadLastOrgSlug,
+  saveLastOrgSlug,
 } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -43,7 +43,7 @@ import {
   mobileText,
 } from "../../../shared/theme/tokens";
 
-type Stage = "workspace" | "credentials" | "mfa";
+type Stage = "organization" | "credentials" | "mfa";
 
 type PendingMfaLogin = MobileAuthLoginResponse & {
   mfaRequired: true;
@@ -58,7 +58,7 @@ function isValidEmail(value: string): boolean {
   return EMAIL_REGEX.test(value.trim());
 }
 
-function getWorkspaceSuffixLabel(apiBaseUrl: string) {
+function getOrgSuffixLabel(apiBaseUrl: string) {
   try {
     const hostname = new URL(apiBaseUrl).hostname.replace(/^www\./, "");
     if (
@@ -72,7 +72,7 @@ function getWorkspaceSuffixLabel(apiBaseUrl: string) {
     // Fall back to a generic suffix below.
   }
 
-  return ".workspace";
+  return ".dubgrid.com";
 }
 
 function InlineError({ message }: { message: string }) {
@@ -117,9 +117,9 @@ export default function LoginScreen() {
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const mfaInputRef = useRef<TextInput>(null);
-  const [workspaceSlug, setWorkspaceSlug] = useState("");
-  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
-  const [stage, setStage] = useState<Stage>("workspace");
+  const [orgSlug, setOrgSlug] = useState("");
+  const [orgName, setOrgName] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("organization");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
@@ -127,37 +127,37 @@ export default function LoginScreen() {
     useState<PendingMfaLogin | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showWorkspaceHelp, setShowWorkspaceHelp] = useState(false);
-  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [showOrgHelp, setShowOrgHelp] = useState(false);
+  const [orgLoading, setOrgLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [focusedField, setFocusedField] = useState<
-    "workspace" | "email" | "password" | null
+    "organization" | "email" | "password" | null
   >(null);
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
-  const workspaceSuffix = getWorkspaceSuffixLabel(apiBaseUrl);
+  const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
 
   useEffect(() => {
     let active = true;
 
     void (async () => {
-      const storedSlug = await loadLastWorkspaceSlug();
+      const storedSlug = await loadLastOrgSlug();
       if (!active || !storedSlug) {
         return;
       }
 
       // Take the user straight to the credentials step — the saved slug is
       // enough to attempt sign-in. The lookup below is purely cosmetic
-      // (friendly workspace name in the subtitle); if it fails we leave the
+      // (friendly organization name in the subtitle); if it fails we leave the
       // user on the credentials step with the slug as the label.
-      setWorkspaceSlug(storedSlug);
+      setOrgSlug(storedSlug);
       setStage("credentials");
       setTimeout(() => emailInputRef.current?.focus(), 0);
       try {
-        const result = await lookupWorkspace(storedSlug);
+        const result = await lookupOrganization(storedSlug);
         if (!active) return;
-        setWorkspaceName(result.workspace.name);
-        setWorkspaceSlug(result.workspace.slug);
+        setOrgName(result.organization.name);
+        setOrgSlug(result.organization.slug);
       } catch {
         // Ignore — fall back to displaying the slug.
       }
@@ -185,7 +185,7 @@ export default function LoginScreen() {
     response: MobileAuthLoginResponse,
     session = response.session,
   ) {
-    await saveLastWorkspaceSlug(response.workspace.slug);
+    await saveLastOrgSlug(response.organization.slug);
 
     const { error: sessionError } = await withSessionHandoffTimeout(
       getSupabaseClient().auth.setSession({
@@ -207,46 +207,46 @@ export default function LoginScreen() {
     router.replace("/(tabs)/home");
   }
 
-  async function handleWorkspaceContinue() {
-    if (workspaceLoading) return;
+  async function handleOrganizationContinue() {
+    if (orgLoading) return;
 
-    const normalizedSlug = workspaceSlug.trim().toLowerCase();
+    const normalizedSlug = orgSlug.trim().toLowerCase();
     if (!normalizedSlug) {
-      setError("Enter your workspace to continue.");
+      setError("Enter your organization to continue.");
       return;
     }
 
-    setWorkspaceLoading(true);
+    setOrgLoading(true);
     setError(null);
 
     try {
-      const result = await lookupWorkspace(normalizedSlug);
-      await saveLastWorkspaceSlug(result.workspace.slug);
-      setWorkspaceSlug(result.workspace.slug);
-      setWorkspaceName(result.workspace.name);
+      const result = await lookupOrganization(normalizedSlug);
+      await saveLastOrgSlug(result.organization.slug);
+      setOrgSlug(result.organization.slug);
+      setOrgName(result.organization.name);
       setStage("credentials");
       setTimeout(() => emailInputRef.current?.focus(), 0);
-    } catch (workspaceError) {
+    } catch (organizationError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
-        error: workspaceError,
+        error: organizationError,
         fallbackMessage:
-          "We couldn't find that workspace. Check the subdomain and try again.",
+          "We couldn't find that organization. Check the subdomain and try again.",
         preferInlineNetworkError: true,
       });
       setError(nextError);
     } finally {
-      setWorkspaceLoading(false);
+      setOrgLoading(false);
     }
   }
 
   async function handleLogin() {
-    if (submitting || !workspaceSlug || !email || !password) return;
+    if (submitting || !orgSlug || !email || !password) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      const response = await loginToWorkspace({
-        workspaceSlug: workspaceSlug.trim().toLowerCase(),
+      const response = await loginToOrganization({
+        orgSlug: orgSlug.trim().toLowerCase(),
         email: email.trim(),
         password,
       });
@@ -300,17 +300,17 @@ export default function LoginScreen() {
     }
   }
 
-  function switchWorkspace() {
-    setStage("workspace");
+  function switchOrganization() {
+    setStage("organization");
     setError(null);
     setPendingMfaLogin(null);
     setMfaCode("");
     setEmail("");
     setPassword("");
-    setWorkspaceName(null);
+    setOrgName(null);
   }
 
-  const workspaceLabel = workspaceName ?? workspaceSlug;
+  const orgLabel = orgName ?? orgSlug;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -338,7 +338,7 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.column}>
-            {stage === "workspace" ? (
+            {stage === "organization" ? (
               <View style={styles.stage}>
                 <View style={styles.header}>
                   <Text style={styles.title}>Sign in</Text>
@@ -351,33 +351,33 @@ export default function LoginScreen() {
                   <View
                     style={[
                       styles.inputRow,
-                      focusedField === "workspace" && styles.inputRowFocused,
+                      focusedField === "organization" && styles.inputRowFocused,
                       error ? styles.inputRowError : null,
                     ]}
                   >
                     <TextInput
-                      accessibilityLabel="Workspace"
+                      accessibilityLabel="Organization"
                       autoCapitalize="none"
                       autoCorrect={false}
                       placeholder="yourorg"
                       placeholderTextColor={mobileColors.placeholderText}
                       returnKeyType="go"
                       style={[styles.input, styles.inputFlex]}
-                      value={workspaceSlug}
+                      value={orgSlug}
                       onBlur={() => setFocusedField(null)}
                       onChangeText={(value) => {
-                        setWorkspaceSlug(
+                        setOrgSlug(
                           value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
                         );
                         setError(null);
                       }}
                       onSubmitEditing={() => {
-                        void handleWorkspaceContinue();
+                        void handleOrganizationContinue();
                       }}
-                      onFocus={() => setFocusedField("workspace")}
+                      onFocus={() => setFocusedField("organization")}
                     />
                     <View style={styles.suffix}>
-                      <Text style={styles.suffixText}>{workspaceSuffix}</Text>
+                      <Text style={styles.suffixText}>{orgSuffix}</Text>
                     </View>
                   </View>
 
@@ -386,21 +386,21 @@ export default function LoginScreen() {
 
                 <View style={styles.actions}>
                   <Button
-                    disabled={workspaceLoading || !workspaceSlug.trim()}
+                    disabled={orgLoading || !orgSlug.trim()}
                     label="Continue"
-                    loading={workspaceLoading}
+                    loading={orgLoading}
                     onPress={() => {
-                      void handleWorkspaceContinue();
+                      void handleOrganizationContinue();
                     }}
                   />
 
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityState={{ expanded: showWorkspaceHelp }}
+                    accessibilityState={{ expanded: showOrgHelp }}
                     android_ripple={{ color: mobileColors.rippleNeutral }}
                     style={styles.link}
                     onPress={() =>
-                      setShowWorkspaceHelp((current) => !current)
+                      setShowOrgHelp((current) => !current)
                     }
                   >
                     <Text style={styles.linkText}>
@@ -408,13 +408,13 @@ export default function LoginScreen() {
                     </Text>
                   </Pressable>
 
-                  {showWorkspaceHelp ? (
+                  {showOrgHelp ? (
                     <Text style={styles.helperText}>
-                      Your subdomain is the first part of your workspace URL -
+                      Your subdomain is the first part of your organization URL -
                       for example, the{" "}
                       <Text style={styles.helperStrong}>yourorg</Text> in{" "}
                       <Text style={styles.helperStrong}>
-                        yourorg{workspaceSuffix}
+                        yourorg{orgSuffix}
                       </Text>
                       .
                     </Text>
@@ -427,7 +427,7 @@ export default function LoginScreen() {
                   <Text style={styles.title}>Welcome back</Text>
                   <Text style={styles.subtitle}>
                     Continue to{" "}
-                    <Text style={styles.subtitleStrong}>{workspaceLabel}</Text>
+                    <Text style={styles.subtitleStrong}>{orgLabel}</Text>
                     .
                   </Text>
                 </View>
@@ -523,9 +523,9 @@ export default function LoginScreen() {
                       accessibilityRole="button"
                       android_ripple={{ color: mobileColors.rippleNeutral }}
                       style={styles.link}
-                      onPress={switchWorkspace}
+                      onPress={switchOrganization}
                     >
-                      <Text style={styles.linkText}>Switch workspace</Text>
+                      <Text style={styles.linkText}>Switch organization</Text>
                     </Pressable>
                     <Text style={styles.linkSeparator}>·</Text>
                     <Pressable
@@ -627,11 +627,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    // `justifyContent: "center"` causes the centered column to re-center
+    // as the keyboard opens — the available height shrinks and content
+    // jumps upward. Pin to the top with a generous offset so the layout
+    // is stable on focus.
     flexGrow: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 8,
+    paddingTop: 72,
   },
   column: {
     width: "100%",
@@ -692,7 +696,11 @@ const styles = StyleSheet.create({
     minHeight: 62,
   },
   input: {
-    ...mobileText.sectionTitle,
+    // No fontFamily: an explicit DM Sans family on TextInput breaks
+    // Android EditText interactivity when the font hasn't loaded yet.
+    // System font keeps the input safe; surrounding Text stays DM Sans.
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: "400",
     color: mobileColors.textPrimary,
     paddingHorizontal: 16,

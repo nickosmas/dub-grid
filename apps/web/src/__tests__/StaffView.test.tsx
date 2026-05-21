@@ -635,7 +635,7 @@ describe("StaffView", () => {
       );
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
-      expect(screen.getAllByRole("gridcell")[0]).toHaveAttribute("tabindex", "-1");
+      expect((await screen.findAllByRole("gridcell"))[0]).toHaveAttribute("tabindex", "-1");
       expect(screen.queryByRole("button", { name: "Save Draft" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
     });
@@ -676,7 +676,7 @@ describe("StaffView", () => {
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
 
-      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click((await screen.findAllByRole("gridcell"))[0]);
       await user.click(screen.getByRole("button", { name: "pick-D" }));
       await user.click(screen.getByRole("button", { name: "Save Changes" }));
       const confirmDialog = await screen.findByRole("dialog", {
@@ -745,7 +745,7 @@ describe("StaffView", () => {
       );
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
-      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click((await screen.findAllByRole("gridcell"))[0]);
 
       expect(mockShiftPickerRender).toHaveBeenCalled();
       const lastCall = mockShiftPickerRender.mock.calls.at(-1)?.[0] as {
@@ -793,7 +793,7 @@ describe("StaffView", () => {
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
 
-      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click((await screen.findAllByRole("gridcell"))[0]);
       expect(screen.getByRole("button", { name: "pick-D" })).toBeInTheDocument();
 
       act(() => {
@@ -917,6 +917,8 @@ describe("Property-based tests", () => {
               onBench={vi.fn()}
               onActivate={vi.fn()}
               onAdd={vi.fn()}
+              canViewEmployeeDetails
+              canManageEmployees
             />,
           );
 

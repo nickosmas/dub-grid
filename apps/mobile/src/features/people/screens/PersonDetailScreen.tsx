@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Linking,
-  Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -30,10 +28,10 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
+import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ModalHeader } from "../../../shared/components/ModalHeader";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -879,89 +877,76 @@ function AccountLinkChallengeModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  if (!challenge) {
-    return null;
-  }
+  const [displayed, setDisplayed] = useState(challenge);
+
+  useEffect(() => {
+    if (challenge) setDisplayed(challenge);
+  }, [challenge]);
+
+  if (!displayed) return null;
 
   const accountName =
-    `${challenge.details.accountFirstName} ${challenge.details.accountLastName}`.trim() ||
+    `${displayed.details.accountFirstName} ${displayed.details.accountLastName}`.trim() ||
     "this account";
   const employeeName =
-    `${challenge.details.employeeFirstName} ${challenge.details.employeeLastName}`.trim() ||
+    `${displayed.details.employeeFirstName} ${displayed.details.employeeLastName}`.trim() ||
     "this staff profile";
-  const isMismatch = challenge.kind === "name_mismatch";
+  const isMismatch = displayed.kind === "name_mismatch";
   const title = isMismatch ? "Name mismatch found" : "Account found";
+  const subtitle = isMismatch
+    ? "Review the existing account before linking it."
+    : "Confirm that this is the right app account.";
 
   return (
-    <Modal
-      animationType="slide"
-      allowSwipeDismissal
-      onRequestClose={() => {
-        if (!isPending) {
-          onCancel();
-        }
-      }}
-      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
-      visible
+    <BottomSheetModal
+      dismissDisabled={isPending}
+      onDismiss={onCancel}
+      visible={challenge != null}
     >
-      <Screen
-        bottomPaddingMode="modal"
-        stickyHeader={
-          <ModalHeader
-            closeDisabled={isPending}
-            subtitle={
-              isMismatch
-                ? "Review the existing account before linking it."
-                : "Confirm that this is the right app account."
-            }
-            title={title}
-            onClose={onCancel}
-          />
-        }
-        stickyHeaderTopPadding={15}
-      >
-        <View style={styles.modalBody}>
-          <View style={styles.modalInfoPanel}>
-            <Text style={styles.modalInfoTitle}>
-              {isMismatch
-                ? "The account name is different"
-                : "Existing app account found"}
-            </Text>
-            <Text style={styles.modalInfoText}>
-              {isMismatch
-                ? `The existing account is under ${accountName}. Link it and update ${employeeName} to match that account name?`
-                : `An existing app account under ${accountName} matches this staff profile. Link it instead of sending a new invitation?`}
-            </Text>
-          </View>
+      <View style={styles.sheetHeader}>
+        <Text style={styles.sheetTitle}>{title}</Text>
+        <Text style={styles.sheetSubtitle}>{subtitle}</Text>
+      </View>
 
-          <ProfileList>
-            <ProfileInfoRow label="Staff profile" value={employeeName} />
-            <ProfileInfoRow isLast label="Account name" value={accountName} />
-          </ProfileList>
+      <View style={styles.modalInfoPanel}>
+        <Text style={styles.modalInfoTitle}>
+          {isMismatch
+            ? "The account name is different"
+            : "Existing app account found"}
+        </Text>
+        <Text style={styles.modalInfoText}>
+          {isMismatch
+            ? `The existing account is under ${accountName}. Link it and update ${employeeName} to match that account name?`
+            : `An existing app account under ${accountName} matches this staff profile. Link it instead of sending a new invitation?`}
+        </Text>
+      </View>
 
-          <View style={styles.modalActionStack}>
-            <Button
-              disabled={isPending}
-              label={
-                isPending
-                  ? "Linking..."
-                  : isMismatch
-                    ? "Use Account Name"
-                    : "Link Existing Account"
-              }
-              onPress={onConfirm}
-              tone="secondary"
-            />
-            <Button
-              disabled={isPending}
-              label="Cancel"
-              onPress={onCancel}
-              tone="neutral"
-            />
-          </View>
-        </View>
-      </Screen>
-    </Modal>
+      <ProfileList>
+        <ProfileInfoRow label="Staff profile" value={employeeName} />
+        <ProfileInfoRow isLast label="Account name" value={accountName} />
+      </ProfileList>
+
+      <View style={styles.modalActionStack}>
+        <Button
+          disabled={isPending}
+          label={
+            isPending
+              ? "Linking..."
+              : isMismatch
+                ? "Use Account Name"
+                : "Link Existing Account"
+          }
+          onPress={onConfirm}
+          tone="secondary"
+        />
+        <Button
+          disabled={isPending}
+          label="Cancel"
+          onPress={onCancel}
+          tone="neutral"
+        />
+      </View>
+    </BottomSheetModal>
   );
 }
 
@@ -1290,7 +1275,12 @@ const styles = StyleSheet.create({
     color: mobileColors.textSecondary,
   },
   input: {
-    ...mobileText.sectionTitle,
+    // Explicit regular weight — don't spread `mobileText.sectionTitle`,
+    // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
+    // Omitting `fontFamily` also avoids the Android EditText
+    // non-interactive bug when DM Sans hasn't loaded.
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: "400",
     backgroundColor: mobileColors.surfaceSecondary,
     borderColor: mobileColors.borderSubtle,
@@ -1309,8 +1299,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
   },
-  modalBody: {
-    gap: 16,
+  sheetHeader: {
+    gap: 4,
+  },
+  sheetTitle: {
+    ...mobileText.heroMetric,
+    color: mobileColors.textPrimary,
+  },
+  sheetSubtitle: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
   },
   modalInfoPanel: {
     backgroundColor: mobileColors.surfaceSecondary,

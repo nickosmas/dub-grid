@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabase
     .from("organizations")
-    .select("id")
+    .select("id, name")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -60,5 +60,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ valid: false }, { status: 503, headers: cacheHeaders });
   }
 
-  return NextResponse.json({ valid: !!data }, { headers: cacheHeaders });
+  return NextResponse.json(
+    { valid: !!data, name: data?.name ?? null },
+    { headers: cacheHeaders },
+  );
 }

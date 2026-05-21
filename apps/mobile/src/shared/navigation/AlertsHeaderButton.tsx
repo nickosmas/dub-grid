@@ -30,7 +30,7 @@ export function AlertsHeaderButton() {
       {unreadCount > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>
-            {unreadCount > 99 ? "99+" : unreadCount}
+            {unreadCount > 9 ? "9+" : unreadCount}
           </Text>
         </View>
       ) : null}

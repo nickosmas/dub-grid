@@ -459,7 +459,7 @@ export default function StringListSettings({
       {/* Table */}
       {displayList.length === 0 && !isEditing ? (
         <EmptyState
-          compact
+          size="compact"
           title={`No ${label.toLowerCase()} defined yet`}
           action={canEdit ? (
             <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>

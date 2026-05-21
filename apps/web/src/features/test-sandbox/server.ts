@@ -109,7 +109,7 @@ async function cloneOrgIntoSandbox(
   // Phase 2 — depend on departments. Certifications has a
   // department_id FK that ON DELETE SET NULLs to source departments if
   // we forget to remap it — meaning cloned certs end up linked to the
-  // source workspace's departments. Remap fixes that.
+  // source organization's departments. Remap fixes that.
   const [focusAreaMap, roleMap, certificationMap] = await Promise.all([
     cloneOrgTable(svc, "focus_areas", sourceOrgId, sandboxOrgId, [
       { col: "department_id", map: departmentMap },
@@ -187,7 +187,7 @@ export async function findActiveSandboxForUser(
 }
 
 /**
- * Create a fresh sandbox workspace owned by `actor`, seeded with a clone
+ * Create a fresh sandbox organization owned by `actor`, seeded with a clone
  * of the source org's config (focus areas, departments, jobs, shift
  * categories, certifications, roles, absence types, indicator types) and
  * its employees. Returns the new sandbox's id + slug.
@@ -200,7 +200,7 @@ export async function createSandboxForUser(input: {
   const { serviceClient, actor, sourceOrgId } = input;
 
   // Copy as much of the source org row as we can so the sandbox feels
-  // identical to the real workspace. Anything Stripe-, suspension-, or
+  // identical to the real organization. Anything Stripe-, suspension-, or
   // sandbox-specific is replaced below.
   const { data: sourceOrg, error: sourceErr } = await serviceClient
     .from("organizations")
@@ -221,7 +221,7 @@ export async function createSandboxForUser(input: {
       .insert({
         name: sourceOrg?.name
           ? `${sourceOrg.name} — Sandbox`
-          : "Sandbox workspace",
+          : "Sandbox organization",
         slug,
         workspace_kind: "sandbox",
         sandbox_owner_user_id: actor.id,
@@ -276,12 +276,12 @@ export async function createSandboxForUser(input: {
     }
   }
   if (!createdOrgId || !createdSlug) {
-    throw lastError ?? new Error("Could not allocate a sandbox workspace.");
+    throw lastError ?? new Error("Could not allocate a sandbox organization.");
   }
 
   try {
     // Add the actor as super_admin so RLS lets them touch the sandbox
-    // like any workspace they belong to.
+    // like any organization they belong to.
     const { error: membershipErr } = await serviceClient
       .from("organization_memberships")
       .insert({

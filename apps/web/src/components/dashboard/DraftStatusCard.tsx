@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Check } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 
 interface DraftStatusCardProps {
   newCount: number;
@@ -22,10 +24,12 @@ export default function DraftStatusCard({
             <div className="dg-card-subtitle">Schedule changes</div>
           </div>
         </div>
-        <div className="dg-card-body" style={{ textAlign: "center", padding: "24px 18px" }}>
-          <div style={{ fontSize: 12, color: "var(--color-text-subtle)" }}>
-            No unpublished changes
-          </div>
+        <div className="dg-card-body">
+          <EmptyState
+            size="inline"
+            icon={<Check size={18} />}
+            title="No unpublished changes"
+          />
         </div>
       </div>
     );

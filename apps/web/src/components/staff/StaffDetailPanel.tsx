@@ -417,7 +417,7 @@ export function StaffDetailPanel({
                   className="dg-btn dg-btn-secondary"
                   style={{ width: "100%" }}
                 >
-                  {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Grant Management Access"}
+                  {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Add to Management"}
                 </button>
               )}
             </div>

@@ -4,23 +4,24 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { PublicRoute } from "@/components/RouteGuards";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
-
 import Link from "next/link";
+
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
+import { SubdomainField } from "@/components/auth/SubdomainField";
 import Modal from "@/components/Modal";
-import { Eye, EyeOff } from "lucide-react";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
-  fetchAccessibleWorkspaces,
+  fetchAccessibleOrganizations,
   getBrowserAuthSession,
   refreshBrowserSession,
   setBrowserSession,
   signOutFromBrowser,
-  switchBrowserWorkspace,
+  switchBrowserOrganization,
 } from "@/features/account/client";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,24 @@ function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
   const parsed = parseHost(window.location.host);
   return parsed.subdomain;
+}
+
+/**
+ * Surfaces a toast when the middleware redirected back with
+ * ?error=session_invalid (JWKS-based jwtVerify failed, e.g. token expired or
+ * the JWKS endpoint was unreachable). Runs on both the org and gridmaster
+ * login flows.
+ */
+function useSessionInvalidToast() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "session_invalid") {
+      toast.error("Your session could not be verified. Please sign in again.");
+      // Clean the URL so a refresh doesn't re-show the toast
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 }
 
 // ── Step 1: Domain selector (root domain) ─────────────────────────────────────
@@ -45,7 +64,6 @@ function DomainSelector() {
 
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const baseDomain = parsed?.rootDomain ?? "localhost";
-  const suffix = `.${baseDomain}`;
 
   // Hidden gridmaster entry — 5 taps on logo within 3s
   const tapCountRef = useRef(0);
@@ -67,39 +85,46 @@ function DomainSelector() {
 
   async function handleContinue(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const trimmed = slug
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "");
-    if (!trimmed) {
-      setError("Please enter your domain name.");
+    const normalized = slug.trim().toLowerCase();
+    if (!normalized) {
+      setError("Please enter your subdomain.");
+      return;
+    }
+    // Reject anything that isn't a valid subdomain rather than silently
+    // stripping it — a space or symbol means the user typed the wrong thing.
+    if (!/^[a-z0-9-]+$/.test(normalized)) {
+      setError("Use letters, numbers, and hyphens only.");
       return;
     }
 
     setLoading(true);
     setError("");
 
+    let orgName: string | null = null;
     try {
-      const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(trimmed)}`);
-      const { valid } = await res.json();
+      const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(normalized)}`);
+      const { valid, name } = await res.json();
       if (!valid) {
-        showToast("No workspace found for that domain. Please check and try again.");
+        showToast("No organization found for that subdomain. Please check and try again.");
         setLoading(false);
         return;
       }
+      orgName = typeof name === "string" ? name : null;
     } catch {
-      showToast("Unable to verify domain. Please try again.");
+      showToast("Unable to verify that subdomain. Please try again.");
       setLoading(false);
       return;
     }
 
     const { protocol, port } = window.location;
     const portStr = getValidPort(port);
-    window.location.href = `${protocol}//${trimmed}.${baseDomain}${portStr}/login?verified=1`;
+    // Forward the resolved name so the org login heading renders it instantly.
+    const nameParam = orgName ? `&name=${encodeURIComponent(orgName)}` : "";
+    window.location.href = `${protocol}//${normalized}.${baseDomain}${portStr}/login?verified=1${nameParam}`;
   }
 
   return (
-    <PageShell footerCenteredOnly>
+    <PageShell>
       <Card>
         {/* Logo — links to landing page; hidden gridmaster entry on 5 rapid taps */}
         <Link
@@ -125,69 +150,21 @@ function DomainSelector() {
             fontWeight: 500,
           }}
         >
-          Enter your subdomain to log in.
+          Enter your organization&apos;s subdomain to sign in.
         </p>
 
         <form onSubmit={handleContinue}>
-          {/* Domain input with inline suffix */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              border: `2px solid ${error ? "var(--color-danger)" : "var(--color-brand)"}`,
-              borderRadius: "10px",
-              overflow: "hidden",
-              marginBottom: error ? "8px" : "24px",
-              background: "var(--color-surface)",
+          <SubdomainField
+            value={slug}
+            onChange={(v) => {
+              setSlug(v);
+              setError("");
             }}
-          >
-            <input
-              type="text"
-              autoFocus
-              className="dg-standalone-input"
-              value={slug}
-              onChange={(e) => {
-                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-                setError("");
-              }}
-              placeholder="yourorg"
-              style={{
-                flex: 1,
-                padding: "13px 14px 13px 16px",
-                border: "none",
-                outline: "none",
-                fontSize: "var(--dg-fs-body)",
-                color: "var(--color-text-primary)",
-                background: "transparent",
-                minWidth: 0,
-              }}
-            />
-            <span
-              style={{
-                padding: "13px 16px",
-                fontSize: "var(--dg-fs-body)",
-                color: "var(--color-text-subtle)",
-                background: "var(--color-bg)",
-                borderLeft: "1px solid var(--color-border-light)",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-            >
-              {suffix}
-            </span>
-          </div>
-
-          {error && (
-            <p
-              style={{
-                color: "var(--color-danger)",
-                fontSize: "var(--dg-fs-label)",
-                marginBottom: "16px",
-              }}
-            >
-              {error}
-            </p>
-          )}
+            baseDomain={baseDomain}
+            error={error || null}
+            autoFocus
+            disabled={loading}
+          />
 
           <div
             style={{
@@ -219,7 +196,7 @@ function DomainSelector() {
                 fontSize: "var(--dg-fs-body-sm)",
               }}
             >
-              Need help with your subdomain?
+              Need help finding your subdomain?
             </button>
           </div>
         </form>
@@ -239,7 +216,7 @@ function DomainSelector() {
               color: "var(--color-text-secondary)",
             }}
           >
-            Your subdomain is the first part of your workspace URL (e.g.{" "}
+            Your organization subdomain is the first part of your URL (e.g.{" "}
             <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know
             it, contact your organization administrator.
           </p>
@@ -263,25 +240,13 @@ function DomainSelector() {
 function GridmasterLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
 
+  useSessionInvalidToast();
+
   const parsed = typeof window !== "undefined" ? parseHost(window.location.host) : null;
   const landingUrl = `${typeof window !== "undefined" ? window.location.protocol : "https:"}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/`;
-
-  // Show an error toast if the middleware redirected back with ?error=session_invalid
-  // (happens when JWKS-based jwtVerify fails, e.g. token expired or JWKS endpoint unreachable).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("error") === "session_invalid") {
-      toast.error("Your session could not be verified. Please sign in again.");
-      // Clean the URL so a refresh doesn't re-show the toast
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, "", cleanUrl);
-    }
-  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -369,7 +334,7 @@ function GridmasterLogin() {
   }
 
   return (
-    <PageShell footerCenteredOnly>
+    <PageShell>
       <Card>
         <a
           href={landingUrl}
@@ -393,86 +358,16 @@ function GridmasterLogin() {
           Platform Admin Sign In
         </h1>
 
-        <form
+        <EmailPasswordForm
+          email={email}
+          setEmail={setEmail}
+          password={password}
+          setPassword={setPassword}
+          loading={loading}
           onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-        >
-          <div>
-            <label className="dg-auth-field-label">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              className="dg-auth-input dg-standalone-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="dg-auth-field-label">
-              Password
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                autoComplete="current-password"
-                className="dg-auth-input dg-standalone-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  padding: "11px 40px 11px 13px",
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                style={{
-                  position: "absolute",
-                  right: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "2px",
-                  color: "var(--color-text-subtle)",
-                  fontSize: "var(--dg-fs-body)",
-                  lineHeight: 1,
-                }}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          <div style={{ textAlign: "right", marginTop: "2px" }}>
-            <a
-              href="/forgot-password"
-              className="dg-auth-link"
-              style={{
-                color: "var(--color-text-subtle)",
-              }}
-            >
-              Forgot password?
-            </a>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="dg-auth-submit"
-            style={{
-              marginTop: "4px",
-            }}
-          >
-            <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Access Portal</ButtonLoading>
-          </button>
-        </form>
+          submitLabel="Access Portal"
+          forgotPasswordHref="/forgot-password"
+        />
 
         {/* Navigation links */}
         <div
@@ -507,34 +402,36 @@ function GridmasterLogin() {
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
-  // Validate subdomain in the background — never block form render.
-  // DomainSelector already validates before redirecting here (?verified=1),
-  // and the post-login JWT check catches org mismatches regardless.
-  const alreadyVerified = typeof window !== "undefined"
-    && new URLSearchParams(window.location.search).get("verified") === "1";
+  // Seed from the ?name= param forwarded by the domain selector so the heading
+  // renders the real org name on first paint (no "organization" flash). Falls back
+  // to the slug for direct visits, then the fetch below corrects it.
+  const [orgName, setOrgName] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const n = new URLSearchParams(window.location.search).get("name");
+    return n && n.trim() ? n : null;
+  });
 
+  useSessionInvalidToast();
+
+  // Resolve the authoritative display name for direct visits (no ?name= param)
+  // and to correct any stale value. Best-effort; validate-domain is cached.
   useEffect(() => {
-    if (alreadyVerified) return;
     let cancelled = false;
-    async function validate() {
-      try {
-        const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`);
-        const { valid } = await res.json();
-        if (!cancelled && !valid) {
-          const parsed = parseHost(window.location.host);
-          const { protocol } = window.location;
-          window.location.replace(`${protocol}//${parsed.rootDomain}${parsed.port}/login`);
-        }
-      } catch {
-        // Network error — allow login attempt; JWT check catches mismatches
-      }
-    }
-    validate();
+    fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`)
+      .then((r) => r.json())
+      .then((d: { name?: string | null }) => {
+        if (!cancelled && d?.name) setOrgName(d.name);
+      })
+      .catch(() => { /* best-effort */ });
     return () => { cancelled = true; };
-  }, [orgSlug, alreadyVerified]);
+  }, [orgSlug]);
+
+  // Note: we no longer validate the subdomain on mount and redirect mid-read —
+  // that yanked users out of the form. DomainSelector validates before
+  // redirecting here, and the post-login membership check below catches any
+  // mismatch and shows a clear message.
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -592,11 +489,11 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
         if (userSlug !== orgSlug) {
           // Slug mismatch — check membership
-          const { organizations: orgs } = await fetchAccessibleWorkspaces();
+          const { organizations: orgs } = await fetchAccessibleOrganizations();
 
           if (!orgs) {
             await signOutFromBrowser("local");
-            toast.error("Unable to verify workspace access. Please try again.");
+            toast.error("Unable to verify organization access. Please try again.");
             setLoading(false);
             return;
           }
@@ -605,17 +502,17 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
           if (targetOrg) {
             try {
-              await switchBrowserWorkspace(targetOrg.org_id);
+              await switchBrowserOrganization(targetOrg.org_id);
               await refreshBrowserSession();
             } catch {
               await signOutFromBrowser("local");
-              toast.error("Failed to switch workspace. Please try again.");
+              toast.error("Failed to switch organization. Please try again.");
               setLoading(false);
               return;
             }
           } else {
             await signOutFromBrowser("local");
-            toast.error("Your account is not associated with this workspace.");
+            toast.error("Your account is not associated with this organization.");
             setLoading(false);
             return;
           }
@@ -656,27 +553,27 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         if (!isGridmaster) {
           const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
           if (userSlug !== orgSlug) {
-            const { organizations: orgs } = await fetchAccessibleWorkspaces();
+            const { organizations: orgs } = await fetchAccessibleOrganizations();
             if (!orgs) {
               await signOutFromBrowser("local");
-              toast.error("Unable to verify workspace access. Please try again.");
+              toast.error("Unable to verify organization access. Please try again.");
               setMfaRequired(false);
               return;
             }
             const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
             if (targetOrg) {
               try {
-                await switchBrowserWorkspace(targetOrg.org_id);
+                await switchBrowserOrganization(targetOrg.org_id);
                 await refreshBrowserSession();
               } catch {
                 await signOutFromBrowser("local");
-                toast.error("Failed to switch workspace.");
+                toast.error("Failed to switch organization.");
                 setMfaRequired(false);
                 return;
               }
             } else {
               await signOutFromBrowser("local");
-              toast.error("Your account is not associated with this workspace.");
+              toast.error("Your account is not associated with this organization.");
               setMfaRequired(false);
               return;
             }
@@ -719,114 +616,37 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         <a
           href={`${typeof window !== "undefined" ? window.location.protocol : "https:"}//${baseDomain}${parsed?.port ?? ""}/`}
           className="dg-auth-logo-block"
+          style={{ marginBottom: "32px" }}
         >
           <DubGridLogo size={52} />
           <DubGridWordmark />
         </a>
 
-        {/* Organization badge */}
-        <div style={{ textAlign: "center", marginBottom: "28px" }}>
-          <span
-            style={{
-              display: "inline-block",
-              background: "var(--color-brand-bg)",
-              color: "var(--color-brand)",
-              border: "1px solid var(--color-brand-border)",
-              borderRadius: "999px",
-              padding: "4px 14px",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 600,
-              letterSpacing: "0.01em",
-            }}
-          >
-            {orgSlug}.{baseDomain}
-          </span>
-        </div>
-
+        <p
+          style={{
+            textAlign: "center",
+            fontSize: "var(--dg-fs-body)",
+            color: "var(--color-text-secondary)",
+            fontWeight: 500,
+            margin: "0 0 4px",
+          }}
+        >
+          Sign in to
+        </p>
         <h1 className="dg-auth-heading">
-          Sign in to your workspace
+          {orgName ?? orgSlug}
         </h1>
 
-        <form
+        <EmailPasswordForm
+          email={email}
+          setEmail={setEmail}
+          password={password}
+          setPassword={setPassword}
+          loading={loading}
           onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-        >
-          <div>
-            <label className="dg-auth-field-label">
-              Email
-            </label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              className="dg-auth-input dg-standalone-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="dg-auth-field-label">
-              Password
-            </label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={showPassword ? "text" : "password"}
-                required
-                autoComplete="current-password"
-                className="dg-auth-input dg-standalone-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  padding: "11px 40px 11px 13px",
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                style={{
-                  position: "absolute",
-                  right: "10px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: "2px",
-                  color: "var(--color-text-subtle)",
-                  fontSize: "var(--dg-fs-body)",
-                  lineHeight: 1,
-                }}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-          </div>
-
-          <div style={{ textAlign: "right", marginTop: "2px" }}>
-            <a
-              href="/forgot-password"
-              className="dg-auth-link"
-              style={{
-                color: "var(--color-text-subtle)",
-              }}
-            >
-              Forgot password?
-            </a>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="dg-auth-submit"
-            style={{
-              marginTop: "4px",
-            }}
-          >
-            <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Sign In</ButtonLoading>
-          </button>
-        </form>
+          submitLabel="Sign In"
+          forgotPasswordHref="/forgot-password"
+        />
 
         <div
           style={{
@@ -847,7 +667,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             }}
             className="dg-auth-link"
           >
-            &larr; Use a different domain
+            &larr; Use a different organization
           </button>
         </div>
       </Card>
@@ -863,7 +683,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     const slug = getOrgSlug();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrgSlug(slug);
     setMounted(true);
   }, []);

@@ -3,6 +3,7 @@
 import { Eye, EyeOff } from "lucide-react";
 
 interface PasswordInputProps {
+  id?: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
@@ -12,29 +13,19 @@ interface PasswordInputProps {
   autoComplete?: string;
   minLength?: number;
   disabled?: boolean;
+  autoFocus?: boolean;
+  inputRef?: React.Ref<HTMLInputElement>;
   style?: React.CSSProperties;
   /**
-   * When set, replaces the default large auth-card styling with the
-   * supplied class (e.g. "dg-input" for in-app form fields).
-   * `dg-standalone-input` is still applied for iOS zoom prevention.
+   * Overrides the default `dg-auth-input` styling with the supplied class
+   * (e.g. "dg-input" for in-app form fields). `dg-standalone-input` is still
+   * applied for iOS zoom prevention when overriding.
    */
   className?: string;
 }
 
-const defaultInputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "14px 16px",
-  background: "var(--color-bg)",
-  border: "1px solid var(--color-border-light)",
-  borderRadius: "12px",
-  fontSize: "var(--dg-fs-body)",
-  color: "var(--color-text-primary)",
-  outline: "none",
-  transition: "border-color 150ms ease",
-  boxSizing: "border-box",
-};
-
 export function PasswordInput({
+  id,
   placeholder,
   value,
   onChange,
@@ -44,26 +35,28 @@ export function PasswordInput({
   autoComplete = "new-password",
   minLength = 10,
   disabled,
+  autoFocus,
+  inputRef,
   style,
   className,
 }: PasswordInputProps) {
-  const usingClass = Boolean(className);
-  const mergedStyle = usingClass
-    ? { ...style, paddingRight: 48 }
-    : { ...defaultInputStyle, ...style, paddingRight: 48 };
+  const mergedStyle = { ...style, paddingRight: 48 };
 
   return (
     <div style={{ position: "relative" }}>
       <input
+        id={id}
+        ref={inputRef}
         type={showPassword ? "text" : "password"}
         placeholder={placeholder}
-        className={className ? `${className} dg-standalone-input` : "dg-standalone-input"}
+        className={className ? `${className} dg-standalone-input` : "dg-auth-input"}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         required
         minLength={minLength}
         autoComplete={autoComplete}
         disabled={disabled}
+        autoFocus={autoFocus}
         aria-describedby={ariaDescribedBy}
         style={mergedStyle}
       />

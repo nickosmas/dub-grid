@@ -26,7 +26,9 @@ import { MFASetup } from "@/components/profile/MFASetup";
 import { NotificationPreferences } from "@/components/profile/NotificationPreferences";
 import { SessionList } from "@/components/profile/SessionList";
 import { ProfileHeroCard } from "@/components/profile/ProfileHeroCard";
+import { PendingRequestsCard } from "@/components/profile/PendingRequestsCard";
 import { ProfileSectionTabs } from "@/components/profile/ProfileSectionTabs";
+import { openConsentPreferences } from "@/components/CookieConsent";
 import {
   SelfWorkOverview,
   SelfWorkSchedule,
@@ -36,6 +38,7 @@ import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { getAvatarInitials } from "@/lib/utils";
 import {
+  cancelOwnProfileChangeRequest,
   createOwnProfileChangeRequest,
   fetchOwnProfileChangeRequests,
   signInBrowserWithPassword,
@@ -138,6 +141,9 @@ export function ProfilePageContent() {
   const [requestNote, setRequestNote] = useState("");
   const [submittingChangeRequest, setSubmittingChangeRequest] = useState(false);
   const [requestingDeletion, setRequestingDeletion] = useState(false);
+  const [cancellingChangeRequestId, setCancellingChangeRequestId] = useState<
+    string | null
+  >(null);
   const [pendingConfirmation, setPendingConfirmation] =
     useState<ProfileConfirmation | null>(null);
 
@@ -287,13 +293,14 @@ export function ProfilePageContent() {
     };
   }, [canEditProfileDirectly, orgId]);
 
-  const pendingProfileRequest = changeRequests.find(
-    (request) =>
-      request.type === "profile_update" && request.status === "pending",
+  const pendingRequests = changeRequests.filter(
+    (request) => request.status === "pending",
   );
-  const pendingDeletionRequest = changeRequests.find(
-    (request) =>
-      request.type === "account_deletion" && request.status === "pending",
+  const pendingProfileRequest = pendingRequests.find(
+    (request) => request.type === "profile_update",
+  );
+  const pendingDeletionRequest = pendingRequests.find(
+    (request) => request.type === "account_deletion",
   );
 
   function startEditingAccountDetails() {
@@ -468,6 +475,29 @@ export function ProfilePageContent() {
     if (!orgId || requestingDeletion || pendingDeletionRequest) return;
 
     setPendingConfirmation("account-deletion");
+  }
+
+  async function cancelChangeRequest(request: ProfileChangeRequest) {
+    if (cancellingChangeRequestId) return;
+
+    setCancellingChangeRequestId(request.id);
+    try {
+      const result = await cancelOwnProfileChangeRequest(request.id);
+      setChangeRequests((current) =>
+        current.map((existing) =>
+          existing.id === result.request.id ? result.request : existing,
+        ),
+      );
+      toast.success(
+        request.type === "account_deletion"
+          ? "Account deletion request cancelled."
+          : "Name change request cancelled.",
+      );
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to cancel that request."));
+    } finally {
+      setCancellingChangeRequestId(null);
+    }
   }
 
   async function sendAccountDeletionRequest() {
@@ -744,6 +774,12 @@ export function ProfilePageContent() {
                 </div>
               </div>
             )}
+
+            <PendingRequestsCard
+              requests={pendingRequests}
+              cancellingId={cancellingChangeRequestId}
+              onCancel={cancelChangeRequest}
+            />
 
             <section className="space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1238,6 +1274,53 @@ export function ProfilePageContent() {
                           <SessionList />
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="dg-card h-full">
+                    <div className="dg-card-header">
+                      <div>
+                        <div className="dg-card-title">Privacy &amp; data</div>
+                        <div className="dg-card-subtitle">
+                          Review our policies and manage cookie preferences.
+                        </div>
+                      </div>
+                    </div>
+                    <div className="dg-card-body flex flex-col gap-3">
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="dg-btn dg-btn-secondary"
+                        >
+                          Privacy policy
+                        </a>
+                        <a
+                          href="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="dg-btn dg-btn-secondary"
+                        >
+                          Terms of service
+                        </a>
+                        <a
+                          href="/cookie-policy"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="dg-btn dg-btn-secondary"
+                        >
+                          Cookie policy
+                        </a>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={openConsentPreferences}
+                        className="dg-btn dg-btn-primary"
+                        style={{ alignSelf: "flex-start" }}
+                      >
+                        Manage cookie preferences
+                      </button>
                     </div>
                   </div>
 

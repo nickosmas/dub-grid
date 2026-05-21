@@ -19,7 +19,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
-import { UserPen } from "lucide-react";
+import { Users, UserPen } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey } from "@/lib/utils";
@@ -1151,18 +1152,7 @@ const SectionBlock = memo(function SectionBlock({
         >
           {sectionName}
         </div>
-        <div
-          style={{
-            padding: "24px 16px",
-            textAlign: "center",
-            border: "1px dashed var(--color-border)",
-            borderRadius: "var(--dg-radius-md)",
-            color: "var(--color-text-muted)",
-            fontSize: "var(--dg-fs-body-sm)",
-          }}
-        >
-          No staff assigned to this area.
-        </div>
+        <EmptyState size="inline" title="No staff assigned to this area." />
       </div>
     );
   }
@@ -3835,97 +3825,26 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
       }
     >
       {!hasAnySections ? (
-        <div
-          style={{
-            padding: "48px 20px",
-            textAlign: "center",
-            background: "var(--color-surface)",
-            borderRadius: "var(--dg-radius-md)",
-            border: "1px dashed var(--color-border)",
-            color: "var(--color-text-muted)",
-            marginTop: 34,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              color: "var(--color-text-faint)",
-              background: "var(--color-bg)",
-              padding: "12px",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {allEmployees.length === 0 ? (
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2" />
-                <circle cx="8.5" cy="7" r="4" />
-                <line x1="20" y1="8" x2="20" y2="14" />
-                <line x1="23" y1="11" x2="17" y2="11" />
-              </svg>
-            ) : (
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-                <line x1="1" y1="1" x2="23" y2="23" />
-              </svg>
-            )}
-          </div>
-          <div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-title)",
-                fontWeight: 600,
-                marginBottom: 4,
-              }}
-            >
-              {allEmployees.length === 0
-                ? "No staff added yet"
-                : filteredEmployees.length === 0
-                  ? "No matching employees"
-                  : "No shifts found for this period"}
-            </div>
-            <div
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                color: "var(--color-text-faint)",
-              }}
-            >
-              {allEmployees.length === 0
-                ? "Add employees on the Staff page to start building your schedule."
-                : filteredEmployees.length === 0
-                  ? "Try clearing your search or focus area filter."
-                  : isCellInteractive
-                    ? "No employees are assigned to this focus area. Add employees in the Staff view."
-                    : "No shifts have been published for this period yet."}
-            </div>
-          </div>
-        </div>
+        <EmptyState
+          icon={<Users size={24} />}
+          title={
+            allEmployees.length === 0
+              ? "No staff added yet"
+              : filteredEmployees.length === 0
+                ? "No matching employees"
+                : "No shifts found for this period"
+          }
+          description={
+            allEmployees.length === 0
+              ? "Add employees on the Staff page to start building your schedule."
+              : filteredEmployees.length === 0
+                ? "Try clearing your search or focus area filter."
+                : isCellInteractive
+                  ? "No employees are assigned to this focus area. Add employees in the Staff view."
+                  : "No shifts have been published for this period yet."
+          }
+          style={{ marginTop: 34 }}
+        />
       ) : (
         <>
           {/* Flat FA sections — departments provide ordering but don't appear visually */}

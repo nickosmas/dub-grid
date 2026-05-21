@@ -109,6 +109,7 @@ function makeSelectMaybeSingleBuilder(row: Record<string, unknown>) {
         eq: vi.fn(() => ({
           maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
         })),
+        maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
       })),
     })),
   };
@@ -288,12 +289,15 @@ describe("createProfileChangeRequest", () => {
         user_id: "66666666-6666-4666-8666-666666666666",
         org_id: ORG_ID,
         type: "system",
-        title: "Profile change request",
-        message: "Alex Old submitted a profile change request.",
+        title: "Name change request",
+        message:
+          'Alex Old requested name change: "Alex Old" → "Alexandra Old".',
         metadata: expect.objectContaining({
-          requestId: REQUEST_ID,
-          requestType: "profile_update",
-          href: "/people?section=requests",
+          requestedBy: "Alex Old",
+          Name: "Alex Old → Alexandra Old",
+          note: "Please update my legal name.",
+          actionUrl: "/people?section=requests",
+          actionLabel: "Review request",
         }),
       }),
       expect.objectContaining({
@@ -332,7 +336,14 @@ describe("resolveProfileChangeRequest", () => {
     const employeeFrom = vi.fn()
       .mockReturnValueOnce(makeSelectMaybeSingleBuilder(makeEmployeeRow()))
       .mockReturnValueOnce(employeeUpdate);
-    const profileFrom = vi.fn().mockReturnValue(profileUpdate);
+    // profiles is called twice: an UPDATE in syncLinkedProfileName, then a
+    // SELECT to look up the resolver's display name for the notification.
+    const profileFrom = vi
+      .fn()
+      .mockReturnValueOnce(profileUpdate)
+      .mockReturnValueOnce(
+        makeSelectMaybeSingleBuilder({ first_name: "Sam", last_name: "Reed" }),
+      );
 
     const serviceClient = {
       from: vi.fn((table: string) => {

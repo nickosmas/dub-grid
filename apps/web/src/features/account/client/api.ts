@@ -89,7 +89,7 @@ export interface AccountPermissionsResponse {
   permissions: Permissions;
 }
 
-export interface AccessibleWorkspace {
+export interface AccessibleOrganization {
   org_id: string;
   org_name: string;
   org_slug: string | null;
@@ -285,16 +285,16 @@ export function revokeAccountSession(
   });
 }
 
-export function fetchAccessibleWorkspaces(): Promise<{
-  organizations: AccessibleWorkspace[];
+export function fetchAccessibleOrganizations(): Promise<{
+  organizations: AccessibleOrganization[];
 }> {
-  return requestJson("/api/auth/workspaces");
+  return requestJson("/api/auth/organizations");
 }
 
-export function switchBrowserWorkspace(
+export function switchBrowserOrganization(
   targetOrgId: string,
 ): Promise<{ success: true }> {
-  return requestJson("/api/auth/workspaces", {
+  return requestJson("/api/auth/organizations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ targetOrgId }),

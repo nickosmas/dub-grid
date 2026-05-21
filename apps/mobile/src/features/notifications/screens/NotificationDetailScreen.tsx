@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
+import {
+  extractNotificationAction,
+  formatNotificationMetadata,
+} from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
@@ -21,6 +25,7 @@ import {
   mobileText,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
+import { openNotificationAction } from "../lib/openNotificationAction";
 
 function formatFullTimestamp(value: string): string {
   return new Date(value).toLocaleString("en-US", {
@@ -51,21 +56,15 @@ function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
 }
 
 function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
-  const entries = Object.entries(metadata).filter(
-    ([key]) => key !== "email_sent" && key !== "publishedBy",
-  );
+  const entries = formatNotificationMetadata(metadata);
   if (!entries.length) return null;
   return (
     <View style={styles.metadataCard}>
       <Text style={styles.metadataTitle}>Details</Text>
-      {entries.map(([key, value]) => (
-        <View key={key} style={styles.metadataRow}>
-          <Text style={styles.metadataKey}>{key}</Text>
-          <Text style={styles.metadataValue}>
-            {typeof value === "string" || typeof value === "number"
-              ? String(value)
-              : JSON.stringify(value)}
-          </Text>
+      {entries.map((entry) => (
+        <View key={entry.label} style={styles.metadataRow}>
+          <Text style={styles.metadataKey}>{entry.label}</Text>
+          <Text style={styles.metadataValue}>{entry.value}</Text>
         </View>
       ))}
     </View>
@@ -98,7 +97,7 @@ export default function NotificationDetailScreen() {
     queryFn: async () => {
       const page = await getNotifications(accessToken!, {
         limit: 100,
-        includeArchived: true,
+        archived: "any",
       });
       return page.notifications.find((n) => n.id === id) ?? null;
     },
@@ -123,7 +122,7 @@ export default function NotificationDetailScreen() {
   }, [handleMarkRead, notification]);
 
   const performAction = useCallback(
-    async (action: "archive" | "unarchive" | "unread" | "delete") => {
+    async (action: "archive" | "unarchive" | "unread") => {
       if (!accessToken || !notification || busy) return;
       setBusy(true);
       try {
@@ -134,7 +133,14 @@ export default function NotificationDetailScreen() {
         await queryClient.invalidateQueries({
           queryKey: ["mobile", "notifications-infinite"],
         });
-        if (action === "delete" || action === "archive") {
+        const successMessage =
+          action === "archive"
+            ? "Archived"
+            : action === "unarchive"
+              ? "Restored"
+              : "Marked as unread";
+        pushToast({ tone: "success", message: successMessage });
+        if (action === "archive") {
           router.back();
         } else {
           await queryClient.invalidateQueries({
@@ -154,22 +160,15 @@ export default function NotificationDetailScreen() {
     [accessToken, busy, notification, pushToast, queryClient],
   );
 
+  const action = useMemo(
+    () => extractNotificationAction(notification?.metadata ?? null),
+    [notification?.metadata],
+  );
+
   const handleOpenAction = useCallback(() => {
-    if (!notification?.actionUrl) return;
-    // Web-style routes (e.g. "/requests?id=...") are passed through to the mobile
-    // tabs equivalent. Anything else (absolute URL) opens externally.
-    if (/^https?:\/\//i.test(notification.actionUrl)) {
-      void Linking.openURL(notification.actionUrl);
-      return;
-    }
-    if (notification.actionUrl.startsWith("/requests")) {
-      router.push("/(tabs)/requests");
-    } else if (notification.actionUrl.startsWith("/schedule")) {
-      router.push("/(tabs)/home");
-    } else if (notification.actionUrl.startsWith("/profile")) {
-      router.push("/(tabs)/profile");
-    }
-  }, [notification?.actionUrl]);
+    if (!action) return;
+    openNotificationAction(action.href);
+  }, [action]);
 
   if (!id) {
     return (
@@ -199,7 +198,7 @@ export default function NotificationDetailScreen() {
           fillScreen
           iconName="notifications-off-outline"
           title="Alert not available"
-          body="That alert may have been deleted or is no longer accessible."
+          body="That alert is no longer accessible."
         />
       </Screen>
     );
@@ -239,12 +238,8 @@ export default function NotificationDetailScreen() {
         </Text>
         <Text style={styles.message}>{notification.message}</Text>
 
-        {notification.actionUrl && notification.actionLabel ? (
-          <Button
-            tone="primary"
-            label={notification.actionLabel}
-            onPress={handleOpenAction}
-          />
+        {action ? (
+          <Button tone="primary" label={action.label} onPress={handleOpenAction} />
         ) : null}
 
         <MetadataList metadata={notification.metadata} />
@@ -282,24 +277,6 @@ export default function NotificationDetailScreen() {
             />
             <Text style={styles.actionLabel}>
               {isArchived ? "Restore" : "Archive"}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              void performAction("delete");
-            }}
-            style={[styles.actionButton, styles.actionButtonDanger]}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel="Delete"
-          >
-            <Ionicons
-              name="trash-outline"
-              size={18}
-              color={mobileColors.danger}
-            />
-            <Text style={[styles.actionLabel, styles.actionLabelDanger]}>
-              Delete
             </Text>
           </Pressable>
         </View>
@@ -401,16 +378,9 @@ const styles = StyleSheet.create({
     borderColor: mobileColors.border,
     backgroundColor: mobileColors.surface,
   },
-  actionButtonDanger: {
-    borderColor: mobileColors.dangerBorder,
-    backgroundColor: mobileColors.dangerSoft,
-  },
   actionLabel: {
     ...mobileText.label,
     color: mobileColors.textPrimary,
     fontWeight: "600",
-  },
-  actionLabelDanger: {
-    color: mobileColors.danger,
   },
 });

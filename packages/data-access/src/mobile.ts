@@ -1,4 +1,9 @@
-import type { MobileNotification, ScheduleCellState } from "@dubgrid/contracts";
+import type {
+  MobileNotification,
+  MobileNotificationPriority,
+  MobileNotificationsCursor,
+  ScheduleCellState,
+} from "@dubgrid/contracts";
 import type {
   AdminPermissions,
   PlatformRole,
@@ -1186,38 +1191,153 @@ export async function fetchMobileUnreadNotificationCount(
   return (data as number) ?? 0;
 }
 
+export async function fetchMobileNotificationFacets(
+  userClient: SupabaseClient,
+): Promise<{
+  totalInbox: number;
+  totalUnread: number;
+  totalArchived: number;
+  byCategory: Record<string, number>;
+  byPriority: Record<string, number>;
+}> {
+  const { data, error } = await userClient.rpc("get_notification_facets");
+
+  if (error) throw error;
+
+  const raw = (data ?? {}) as {
+    totalInbox?: number;
+    totalUnread?: number;
+    totalArchived?: number;
+    byCategory?: Record<string, number>;
+    byPriority?: Record<string, number>;
+  };
+
+  return {
+    totalInbox: raw.totalInbox ?? 0,
+    totalUnread: raw.totalUnread ?? 0,
+    totalArchived: raw.totalArchived ?? 0,
+    byCategory: raw.byCategory ?? {},
+    byPriority: raw.byPriority ?? {},
+  };
+}
+
+export type FetchMobileNotificationsInput = {
+  limit: number;
+  cursor?: MobileNotificationsCursor | null;
+  category?: string;
+  type?: string;
+  priority?: MobileNotificationPriority;
+  read?: "read" | "unread";
+  search?: string;
+  archived?: "inbox" | "archived" | "any";
+  sort?: "asc" | "desc";
+};
+
+const MOBILE_NOTIFICATION_COLUMNS =
+  "id, type, channel, category, priority, title, message, metadata, read_at, archived_at, created_at";
+
 export async function fetchMobileNotificationsPage(
   userClient: SupabaseClient,
-  input: { limit: number; offset: number },
-): Promise<{ unreadCount: number; notifications: MobileNotification[] }> {
+  input: FetchMobileNotificationsInput,
+): Promise<{
+  unreadCount: number;
+  notifications: MobileNotification[];
+  nextCursor: MobileNotificationsCursor | null;
+}> {
+  const limit = Math.max(1, Math.min(input.limit, 100));
+  const sort = input.sort ?? "desc";
+  const ascending = sort === "asc";
+
+  let query = userClient
+    .from("notifications")
+    .select(MOBILE_NOTIFICATION_COLUMNS)
+    .eq("channel", "in_app")
+    .order("created_at", { ascending })
+    .order("id", { ascending })
+    .limit(limit + 1);
+
+  const archived = input.archived ?? "inbox";
+  if (archived === "archived") {
+    query = query.not("archived_at", "is", null);
+  } else if (archived === "inbox") {
+    query = query.is("archived_at", null);
+  }
+
+  if (input.read === "unread") {
+    query = query.is("read_at", null);
+  } else if (input.read === "read") {
+    query = query.not("read_at", "is", null);
+  }
+
+  if (input.category) {
+    query = query.eq("category", input.category);
+  }
+
+  if (input.type) {
+    query = query.eq("type", input.type);
+  }
+
+  if (input.priority) {
+    query = query.eq("priority", input.priority);
+  }
+
+  if (input.search) {
+    const term = input.search.replace(/[%,]/g, " ").trim();
+    if (term) {
+      const pattern = `%${term}%`;
+      query = query.or(`title.ilike.${pattern},message.ilike.${pattern}`);
+    }
+  }
+
+  if (input.cursor) {
+    const cmp = ascending ? "gt" : "lt";
+    // Keyset on (created_at, id) tuple. Postgres row-value compare is exposed
+    // via PostgREST's `or` with explicit equality on the tiebreaker.
+    query = query.or(
+      [
+        `created_at.${cmp}.${input.cursor.createdAt}`,
+        `and(created_at.eq.${input.cursor.createdAt},id.${cmp}.${input.cursor.id})`,
+      ].join(","),
+    );
+  }
+
   const [
-    { data: notifications, error: notificationError },
+    { data: rows, error: notificationError },
     { data: unreadCount, error: unreadError },
   ] = await Promise.all([
-    userClient.rpc("get_notifications", {
-      p_limit: input.limit,
-      p_offset: input.offset,
-    }),
+    query,
     userClient.rpc("get_unread_notification_count"),
   ]);
 
   if (notificationError) throw notificationError;
   if (unreadError) throw unreadError;
 
+  const fetched = (rows ?? []) as Array<Record<string, unknown>>;
+  const hasMore = fetched.length > limit;
+  const page = hasMore ? fetched.slice(0, limit) : fetched;
+
+  const notifications: MobileNotification[] = page.map((row) => ({
+    id: row.id as string,
+    type: row.type as MobileNotification["type"],
+    channel: (row.channel as "in_app" | "email") ?? "in_app",
+    category: (row.category as string | null) ?? null,
+    priority: (row.priority as MobileNotificationPriority) ?? "normal",
+    title: row.title as string,
+    message: row.message as string,
+    metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    readAt: (row.read_at as string | null) ?? null,
+    archivedAt: (row.archived_at as string | null) ?? null,
+    createdAt: row.created_at as string,
+  }));
+
+  const last = hasMore ? notifications[notifications.length - 1] : null;
+  const nextCursor: MobileNotificationsCursor | null = last
+    ? { createdAt: last.createdAt, id: last.id }
+    : null;
+
   return {
     unreadCount: (unreadCount as number) ?? 0,
-    notifications: (notifications ?? []).map(
-      (row: Record<string, unknown>) => ({
-        id: row.id as string,
-        type: row.type as MobileNotification["type"],
-        channel: (row.channel as "in_app" | "email") ?? "in_app",
-        category: (row.category as string | null) ?? null,
-        title: row.title as string,
-        message: row.message as string,
-        metadata: (row.metadata ?? {}) as Record<string, unknown>,
-        readAt: (row.read_at as string | null) ?? null,
-        createdAt: row.created_at as string,
-      }),
-    ),
+    notifications,
+    nextCursor,
   };
 }

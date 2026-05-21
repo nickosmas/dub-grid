@@ -46,7 +46,7 @@ export default function IdentityStep({ onNext, onBack }: IdentityStepProps) {
   return (
     <StepLayout
       title="Identity"
-      description="Name your workspace and tailor the words your team will see throughout the app. You can edit any of this later in Settings."
+      description="Name your organization and tailor the words your team will see throughout the app. You can edit any of this later in Settings."
       onNext={handleNext}
       onBack={onBack}
       showBack={!!onBack}

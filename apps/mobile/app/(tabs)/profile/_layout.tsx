@@ -27,6 +27,10 @@ export default function ProfileLayout() {
         name="notifications"
         options={createDetailStackOptions("Notifications")}
       />
+      <Stack.Screen
+        name="privacy"
+        options={createDetailStackOptions("Privacy & data")}
+      />
     </Stack>
   );
 }

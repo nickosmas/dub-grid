@@ -2,7 +2,7 @@ import React from "react";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
@@ -56,8 +56,8 @@ export default function CoverageBySectionCard({
           </div>
         </div>
         <div className="dg-card-body">
-          <DashboardEmptyState
-            variant="inline"
+          <EmptyState
+            size="inline"
             title={
               !hasRequirements
                 ? undefined

@@ -25,11 +25,11 @@ export async function GET(req: NextRequest) {
     parsed.data.orgId,
     (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
     // ignoreSandbox: billing is read-only and intentionally surfaces
-    // the source workspace's real Stripe state even when the caller is
+    // the source organization's real Stripe state even when the caller is
     // in sandbox mode. Without this, the sandbox-redirect would route
     // the check to the (subscription_status='active') sandbox clone and
     // hide all the real billing details.
-    { allowLockedWorkspace: true, ignoreSandbox: true },
+    { allowLockedOrganization: true, ignoreSandbox: true },
   );
   if ("response" in auth) {
     return auth.response;

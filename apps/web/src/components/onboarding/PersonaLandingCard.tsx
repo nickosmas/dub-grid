@@ -21,7 +21,7 @@ interface PersonaItem {
 }
 
 /**
- * Completion signals for the workspace. When provided, the card filters out
+ * Completion signals for the organization. When provided, the card filters out
  * recommendations that are already done — so a super_admin who has added staff
  * no longer sees "Add staff". Undefined fields mean "unknown" → the item is
  * shown (we never hide a recommendation we can't confirm is complete).
@@ -42,7 +42,7 @@ interface PersonaLandingCardProps {
  * Dismissable; persists across reloads via the
  * organization_memberships.landing_card_dismissed_at column.
  *
- * Recommendations are completion-aware: items the workspace has already
+ * Recommendations are completion-aware: items the organization has already
  * accomplished are filtered out, and once nothing is left to recommend the
  * card stops rendering entirely.
  */
@@ -264,7 +264,7 @@ function buildContentForRole(
     const hasPublished = signals?.hasPublishedSchedule === true;
     return {
       heading: hasPublished
-        ? "Finish setting up your workspace"
+        ? "Finish setting up your organization"
         : "Build your first schedule",
       subheading: hasPublished
         ? "A few more steps to round out your setup."

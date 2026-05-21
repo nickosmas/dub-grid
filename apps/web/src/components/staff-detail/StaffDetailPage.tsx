@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
@@ -83,7 +83,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [roleHistory, setRoleHistory] = useState<AuditLogEntry[]>([]);
   const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +97,18 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const orgId = perms.orgId ?? org?.id ?? null;
   const { directory } = useDirectory(orgId);
   const queryClient = useQueryClient();
+
+  // Employee-scoped invitation list. Key is a sub-prefix of
+  // `queryKeys.org.invitations(orgId)` so realtime invalidation of the
+  // org-level prefix automatically refreshes this query too.
+  const invitationsQuery = useQuery<Invitation[]>({
+    queryKey: orgId
+      ? [...queryKeys.org.invitations(orgId), employeeId]
+      : ["org", "anon", "invitations", employeeId],
+    queryFn: () => fetchEmployeeInvitations(orgId!, employeeId),
+    enabled: !!orgId,
+  });
+  const invitations = invitationsQuery.data ?? [];
 
   useEffect(() => {
     if (perms.isLoading) return;
@@ -151,19 +162,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setEmployee(emp);
 
         // Fetch the rest in parallel
-        const [empShifts, recShifts, empInvitations, empRequests] = await Promise.all([
+        const [empShifts, recShifts, empRequests] = await Promise.all([
           fetchEmployeeShifts(employeeId, orgId, assignmentLabelMap, absenceTypeMap),
           perms.canViewRecurringShifts
             ? fetchRecurringShifts(orgId, employeeId, assignmentLabelMap, false, absenceTypeMap)
             : Promise.resolve([]),
-          fetchEmployeeInvitations(orgId, employeeId),
           fetchShiftRequests(orgId, assignmentLabelMap, { empId: employeeId }),
         ]);
 
         if (cancelled) return;
         setShifts(empShifts);
         setRecurringShifts(recShifts);
-        setInvitations(empInvitations);
         setShiftRequests(empRequests);
 
         if (emp.userId && perms.isGridmaster) {
@@ -205,13 +214,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
   const refreshInvitations = useCallback(async () => {
     if (!orgId) return;
-    try {
-      const refreshed = await fetchEmployeeInvitations(orgId, employeeId);
-      setInvitations(refreshed);
-    } catch {
-      // Non-critical refresh path for invite-related UI
-    }
-  }, [employeeId, orgId]);
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.org.invitations(orgId),
+    });
+  }, [orgId, queryClient]);
 
   const refreshDirectory = useCallback(() => {
     if (!orgId) return;
@@ -511,7 +517,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         >
                           {directoryPerson?.isManagementUser || hasPendingManagementInvite
                             ? "Edit Management Access"
-                            : "Grant Management Access"}
+                            : "Add to Management"}
                         </button>
                       )}
                     </div>
@@ -574,7 +580,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     Profile sections
                   </h2>
                   <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
-                    Move between overview, schedule, and activity without leaving the People workspace.
+                    Move between overview, schedule, and activity without leaving People.
                   </p>
                 </div>
 

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       req,
       parsed.data.orgId,
       (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true },
     );
     if ("response" in auth) return auth.response;
 

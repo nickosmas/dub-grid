@@ -233,7 +233,7 @@ export async function PUT(req: NextRequest) {
     // requireOrgPermissions may have redirected the orgId to the user's
     // sandbox. Every read/write below uses the effective orgId, not the
     // body's — otherwise the validation lands on sandbox while writes
-    // hit the real workspace.
+    // hit the real organization.
     const orgId = orgAuth.orgId;
     const serviceClient = orgAuth.serviceClient;
 

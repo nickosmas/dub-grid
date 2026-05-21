@@ -155,36 +155,6 @@ export async function updateDepartmentPermissions(
   void logAudit("department_permissions.updated", "department", String(departmentId), {}, orgId);
 }
 
-/** Fetch department-based permissions for a user (union of templates from depts where they're an admin). */
-export async function fetchUserDepartmentPermissions(
-  userId: string,
-  orgId: string,
-): Promise<AdminPermissions | null> {
-  const { data: membership } = await supabase
-    .from("organization_memberships")
-    .select("dept_admin_ids")
-    .eq("user_id", userId)
-    .eq("org_id", orgId)
-    .single();
-
-  // Only union templates from departments where the user is a dept admin
-  const deptIds: number[] = (membership?.dept_admin_ids as number[]) ?? [];
-  if (deptIds.length === 0) return null;
-
-  const { data: depts } = await supabase
-    .from("departments")
-    .select("permissions")
-    .in("id", deptIds)
-    .eq("type", "management")
-    .not("permissions", "is", null);
-
-  if (!depts || depts.length === 0) return null;
-
-  // Union: most permissive wins per boolean field
-  const { unionPermissions } = await import("@/features/permissions");
-  return unionPermissions(depts.map((d: { permissions: unknown }) => d.permissions as AdminPermissions));
-}
-
 // ── Employees ────────────────────────────────────────────────────────────────
 
 export async function fetchEmployees(

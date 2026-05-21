@@ -82,6 +82,18 @@ export const replayIntegration: (...args: any[]) => any = _sdk
   ? (...args) => _sdk!.replayIntegration(...args)
   : () => ({});
 
+// addIntegration — lets us attach replay lazily once analytics consent is granted
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const addIntegration: (integration: any) => void = _sdk
+  ? (integration) => { _sdk!.addIntegration(integration); }
+  : noop;
+
+// getClient — used to detect whether replay was already attached
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const getClient: () => any = _sdk
+  ? () => _sdk!.getClient()
+  : () => undefined;
+
 // captureRouterTransitionStart — exported from instrumentation-client.ts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const captureRouterTransitionStart: (...args: any[]) => any = _sdk

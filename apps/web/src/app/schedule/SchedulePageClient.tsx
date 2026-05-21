@@ -10,6 +10,7 @@ import ScheduleGrid, {
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
 import MonthView from "@/components/MonthView";
+import { EmptyState } from "@/components/EmptyState";
 import PrintLegend from "@/components/PrintLegend";
 import type { PrintConfig } from "@/components/PrintOptionsModal";
 import ChangeLegend from "@/components/ChangeLegend";
@@ -1586,6 +1587,15 @@ function SchedulerContent() {
     if (coverageRequirements.length === 0 || dates.length === 0) return dates;
     return filterPublishedDates(dates, publishedDateSet);
   }, [coverageRequirements.length, dates, publishedDateSet]);
+  // Use the raw publish state (ignoring the coverage-requirements shortcut that
+  // forces publishedWindowState to "published") so non-editors see the empty
+  // state whenever the visible window genuinely has no published dates.
+  const rawPublishedWindowState = useMemo(
+    () => getPublishedWindowState(dates, publishedDateSet),
+    [dates, publishedDateSet],
+  );
+  const hideGridForUnpublishedViewer =
+    !isScheduleEditor && rawPublishedWindowState === "unpublished";
 
   const filteredEmployees = useMemo(
     () => filterAndSortEmployees(employees, activeFocusArea),
@@ -5306,7 +5316,7 @@ function SchedulerContent() {
               letterSpacing: "-0.02em",
             }}
           >
-            Workspace Setup Required
+            Organization Setup Required
           </h1>
           <p
             style={{
@@ -5316,7 +5326,7 @@ function SchedulerContent() {
               marginBottom: 32,
             }}
           >
-            Your account is active, but it looks like your workspace hasn&apos;t
+            Your account is active, but it looks like your organization hasn&apos;t
             been initialized yet. Once your administrator completes the setup,
             you&apos;ll be able to access the schedule.
           </p>
@@ -5742,8 +5752,15 @@ function SchedulerContent() {
           </div>
 
           <div style={{ padding: isMobile ? "8px 0" : "16px 16px" }}>
+            {hideGridForUnpublishedViewer && (
+              <EmptyState
+                heading="This period has not been published yet"
+                description="Your schedule will appear here once your manager publishes it."
+              />
+            )}
+
             {/* Mobile Day View */}
-            {spanWeeks !== "month" && isMobile && (
+            {spanWeeks !== "month" && isMobile && !hideGridForUnpublishedViewer && (
               <MobileDayView
                 filteredEmployees={filteredEmployees}
                 allEmployees={employees}
@@ -5774,7 +5791,7 @@ function SchedulerContent() {
             )}
 
             {/* Desktop/Tablet Grid */}
-            {spanWeeks !== "month" && !isMobile && (
+            {spanWeeks !== "month" && !isMobile && !hideGridForUnpublishedViewer && (
               <div data-tour="schedule-grid">
                 <ScheduleGrid
                   model={scheduleGridModel}
@@ -6171,7 +6188,7 @@ function SchedulerContent() {
               />
             )}
 
-            {spanWeeks === "month" && (
+            {spanWeeks === "month" && !hideGridForUnpublishedViewer && (
               <MonthView
                 monthStart={monthStart}
                 filteredEmployees={filteredEmployees}

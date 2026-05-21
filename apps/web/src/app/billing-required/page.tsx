@@ -30,7 +30,7 @@ export default function BillingRequiredPage() {
             color: "var(--color-text-primary)",
           }}
         >
-          Workspace unavailable
+          Organization unavailable
         </h1>
         <p
           style={{
@@ -41,7 +41,7 @@ export default function BillingRequiredPage() {
             fontWeight: 600,
           }}
         >
-          Your workspace will be available once your organization administrator
+          Your organization will be available once your organization administrator
           finishes setup.
         </p>
       </section>

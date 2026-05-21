@@ -106,7 +106,7 @@ export function forbidIfSandboxCookie(req: NextRequest): NextResponse | null {
   return NextResponse.json(
     {
       error:
-        "This action isn't available in sandbox mode. Exit the sandbox to perform it on your real workspace.",
+        "This action isn't available in sandbox mode. Exit the sandbox to perform it on your real organization.",
     },
     { status: 403 },
   );
@@ -140,7 +140,7 @@ export async function requireAuthenticatedUserWithClaims(
   // When the caller has a valid sandbox cookie, rewrite claims.org_id to
   // the sandbox so every downstream endpoint that reads auth.claims.org_id
   // (the universal pattern in this codebase) routes its query/write to the
-  // sandbox copy, not the user's real workspace. Without this rewrite,
+  // sandbox copy, not the user's real organization. Without this rewrite,
   // any mutating endpoint that reads claims.org_id directly will write to
   // the real org while the user thinks they're in the sandbox.
   //

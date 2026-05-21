@@ -11,13 +11,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
+import { extractNotificationAction } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
+import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useNotificationFacets } from "../hooks/useNotificationFacets";
+import { openNotificationAction } from "../lib/openNotificationAction";
 import {
   bulkUpdateNotifications,
   getNotifications,
@@ -69,7 +73,7 @@ function chipToParams(filter: FilterKey): Partial<MobileNotificationsListParams>
     case "system":
       return { category: "system" };
     case "archived":
-      return { includeArchived: true };
+      return { archived: "archived" };
     default:
       return {};
   }
@@ -122,6 +126,19 @@ export default function NotificationsScreen() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
+
+  const facetsQuery = useNotificationFacets(accessToken);
+  const facets = facetsQuery.data;
+
+  const chipCounts: Record<FilterKey, number> = {
+    all: facets?.totalInbox ?? 0,
+    unread: facets?.totalUnread ?? 0,
+    schedule: facets?.byCategory?.schedule ?? 0,
+    shift_requests: facets?.byCategory?.shift_requests ?? 0,
+    system: facets?.byCategory?.system ?? 0,
+    archived: facets?.totalArchived ?? 0,
+  };
 
   const queryKey = getNotificationsQueryKey(accessToken, filter, debouncedSearch);
 
@@ -209,7 +226,14 @@ export default function NotificationsScreen() {
           action,
         });
         syncBootstrapUnread(response.unreadCount);
-        await notificationsQuery.refetch();
+        await Promise.all([
+          notificationsQuery.refetch(),
+          facetsQuery.refetch(),
+        ]);
+        pushToast({
+          tone: "success",
+          message: action === "archive" ? "Archived" : "Restored",
+        });
       } catch (error) {
         pushClientFriendlyErrorToast(pushToast, {
           error,
@@ -220,7 +244,7 @@ export default function NotificationsScreen() {
         setBusy(false);
       }
     },
-    [accessToken, busy, notificationsQuery, pushToast],
+    [accessToken, busy, facetsQuery, notificationsQuery, pushToast],
   );
 
   const handleMarkAllRead = useCallback(async () => {
@@ -229,7 +253,11 @@ export default function NotificationsScreen() {
     try {
       const response = await markAllNotificationsRead(accessToken);
       syncBootstrapUnread(response.unreadCount);
-      await notificationsQuery.refetch();
+      await Promise.all([
+        notificationsQuery.refetch(),
+        facetsQuery.refetch(),
+      ]);
+      pushToast({ tone: "success", message: "All alerts marked read" });
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
@@ -238,8 +266,16 @@ export default function NotificationsScreen() {
       });
     } finally {
       setBusy(false);
+      setConfirmingMarkAllRead(false);
     }
-  }, [accessToken, busy, notificationsQuery, pushToast, unreadCount]);
+  }, [
+    accessToken,
+    busy,
+    facetsQuery,
+    notificationsQuery,
+    pushToast,
+    unreadCount,
+  ]);
 
   return (
     <Screen
@@ -266,6 +302,7 @@ export default function NotificationsScreen() {
         >
           {FILTER_CHIPS.map((chip) => {
             const active = filter === chip.key;
+            const count = chipCounts[chip.key];
             return (
               <Pressable
                 key={chip.key}
@@ -279,7 +316,7 @@ export default function NotificationsScreen() {
                 >
                   {chip.label}
                 </Text>
-                {chip.key === "unread" && unreadCount > 0 && (
+                {count > 0 ? (
                   <View
                     style={[
                       styles.chipBadge,
@@ -292,10 +329,10 @@ export default function NotificationsScreen() {
                         active && styles.chipBadgeTextActive,
                       ]}
                     >
-                      {unreadCount}
+                      {count > 9 ? "9+" : count}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </Pressable>
             );
           })}
@@ -308,9 +345,7 @@ export default function NotificationsScreen() {
             compact
             disabled={busy}
             label={busy ? "Updating..." : "Mark all read"}
-            onPress={() => {
-              void handleMarkAllRead();
-            }}
+            onPress={() => setConfirmingMarkAllRead(true)}
             tone="secondary"
           />
         </View>
@@ -380,6 +415,23 @@ export default function NotificationsScreen() {
           ) : null}
         </View>
       )}
+      <ConfirmationModal
+        body={
+          unreadCount === 1
+            ? "Mark your one unread alert as read?"
+            : `Mark all ${unreadCount} unread alerts as read?`
+        }
+        cancelLabel="Cancel"
+        confirmLabel="Mark all read"
+        confirmTone="primary"
+        loading={busy}
+        onCancel={() => setConfirmingMarkAllRead(false)}
+        onConfirm={() => {
+          void handleMarkAllRead();
+        }}
+        title="Mark all read"
+        visible={confirmingMarkAllRead}
+      />
     </Screen>
   );
 }
@@ -397,6 +449,7 @@ function NotificationCard({
 }: NotificationCardProps) {
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
+  const action = extractNotificationAction(notification.metadata);
 
   return (
     <Pressable
@@ -439,9 +492,10 @@ function NotificationCard({
               >
                 {notification.title}
               </Text>
-              {notification.groupCount > 1 ? (
+              {typeof notification.metadata?.groupCount === "number" &&
+              notification.metadata.groupCount > 1 ? (
                 <Text style={styles.groupBadge}>
-                  ×{notification.groupCount}
+                  ×{notification.metadata.groupCount as number}
                 </Text>
               ) : null}
             </View>
@@ -454,8 +508,26 @@ function NotificationCard({
         {isUnread ? <View style={styles.unreadDot} /> : null}
       </View>
       <View style={styles.cardActions}>
-        {notification.actionUrl && notification.actionLabel ? (
-          <Text style={styles.ctaLabel}>{notification.actionLabel} ›</Text>
+        {action ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            onPress={(event) => {
+              event.stopPropagation?.();
+              openNotificationAction(action.href);
+            }}
+            style={({ pressed }) => [
+              styles.ctaPill,
+              pressed && styles.ctaPillPressed,
+            ]}
+          >
+            <Text style={styles.ctaPillLabel}>{action.label}</Text>
+            <Ionicons
+              name="arrow-forward"
+              size={14}
+              color={mobileColors.brand}
+            />
+          </Pressable>
         ) : (
           <View />
         )}
@@ -466,11 +538,15 @@ function NotificationCard({
             event.stopPropagation?.();
             onArchive();
           }}
-          hitSlop={8}
+          style={({ pressed }) => [
+            styles.archiveButton,
+            pressed && styles.archiveButtonPressed,
+          ]}
+          hitSlop={6}
         >
           <Ionicons
             name={isArchived ? "archive" : "archive-outline"}
-            size={18}
+            size={16}
             color={mobileColors.textMuted}
           />
         </Pressable>
@@ -643,10 +719,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    marginLeft: 42,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: mobileColors.borderSubtle,
   },
-  ctaLabel: {
+  ctaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: mobileRadii.pill,
+    backgroundColor: mobileColors.brandSoft,
+  },
+  ctaPillPressed: {
+    backgroundColor: mobileColors.brandBorder,
+  },
+  ctaPillLabel: {
     ...mobileText.label,
     color: mobileColors.brand,
     fontWeight: "600",
+  },
+  archiveButton: {
+    width: 36,
+    height: 36,
+    borderRadius: mobileRadii.control,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  archiveButtonPressed: {
+    backgroundColor: mobileColors.surfaceSecondary,
   },
 });

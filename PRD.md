@@ -525,7 +525,7 @@ Everything for the web app lives under `apps/web/`. UI features are organized in
 | `packages/domain/src/`                        | Domain types + `permissions.ts` (`AdminPermissions`, 25 perms), role enums, billing types, `self-guard.ts` |
 | `packages/authz/src/`                         | Permission logic — `ROLE_LEVEL`, view implications, permission unions, JWT claim extraction |
 | `packages/contracts/src/`                     | Zod API contract schemas (`schedule`, `mobile`, `staff`)  |
-| `packages/mobile-api-core/src/`               | Mobile backend orchestration (`auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `workspace`, `write`) |
+| `packages/mobile-api-core/src/`               | Mobile backend orchestration (`auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`) |
 | `apps/mobile/app/`                            | Expo Router routes (`index.tsx`, `(auth)/*`, `(tabs)/*`, `shift/[employeeId]/[date].tsx`) |
 | `apps/mobile/src/features/`                   | Mobile features — `auth`, `schedule`, `people`, `profile`, `shift-requests`, `notifications`, `onboarding` |
 | `apps/mobile/src/shared/lib/api.ts`           | Mobile API client built on `@dubgrid/api-client`          |
@@ -777,14 +777,14 @@ The web app exposes roughly **110 Route Handlers** under `apps/web/src/app/api/`
 | Area                  | Representative Endpoints                                                                 | Auth          |
 | --------------------- | ---------------------------------------------------------------------------------------- | ------------- |
 | Public / unauth       | `/api/health`, `/api/validate-domain`, `/api/request-demo`, `/api/consent`, `/api/invitations/lookup`, `/api/invitations/accept`, `/api/notify-impersonation` | Public        |
-| Auth & account        | `/api/auth/login`, `/api/auth/workspaces`, `/api/auth/data-export`, `/api/auth/delete-account`, `/api/auth/gdpr-erase`, `/api/account/identity`, `/api/account/profile`, `/api/account/sessions`, `/api/account/mfa-status`, `/api/account/notification-preferences`, `/api/account/change-requests` | Authenticated |
+| Auth & account        | `/api/auth/login`, `/api/auth/organizations`, `/api/auth/data-export`, `/api/auth/delete-account`, `/api/auth/gdpr-erase`, `/api/account/identity`, `/api/account/profile`, `/api/account/sessions`, `/api/account/mfa-status`, `/api/account/notification-preferences`, `/api/account/change-requests` | Authenticated |
 | Organization & onboarding | `/api/onboarding`, `/api/organization/bootstrap`, `/api/organization/directory`, `/api/organizations/settings`, `/api/organizations/users`, `/api/organizations/role-change`, `/api/organizations/invitations` | Authenticated |
 | Schedule & shifts     | `/api/schedule/manage`, `/api/schedule/recurring`, `/api/schedule/requests`, `/api/schedule/publish-history`, `/api/shifts/draft-summary`, `/api/shifts/publish`, `/api/shifts/discard` | Authenticated |
 | Employees & people    | `/api/employees/manage`, `/api/employees/status`, `/api/employees/link-user`, `/api/import/employees`, `/api/people/change-requests` | Authenticated |
 | Settings / reports / dashboard | `/api/settings/config`, `/api/reports/operations`, `/api/reports/operations/export`, `/api/dashboard/analytics`, `/api/notifications`, `/api/calendar`, `/api/export`, `/api/test-sandbox`, `/api/billing` | Authenticated |
 | Stripe billing        | `/api/stripe/create-checkout`, `/api/stripe/checkout-complete`, `/api/stripe/billing-portal`, `/api/stripe/webhook` | Mixed (webhook is signature-verified) |
 | Gridmaster            | `/api/gridmaster/dashboard`, `/api/gridmaster/accounts`, `/api/gridmaster/users`, `/api/gridmaster/organizations/manage`, `/api/gridmaster/audit-log`, `/api/gridmaster/impersonation`, `/api/gridmaster/billing`, `/api/gridmaster/security` | Gridmaster    |
-| Mobile API (`/api/mobile/v1`) | `/bootstrap`, `/auth/login`, `/auth/workspace`, `/me/schedule`, `/org/schedule`, `/people`, `/people/[id]/status`, `/profile`, `/notifications`, `/shift-requests`, `/shift-requests/swap-options`, `/push-tokens`, `/session-presence` | Bearer token  |
+| Mobile API (`/api/mobile/v1`) | `/bootstrap`, `/auth/login`, `/auth/organization`, `/me/schedule`, `/org/schedule`, `/people`, `/people/[id]/status`, `/profile`, `/notifications`, `/shift-requests`, `/shift-requests/swap-options`, `/push-tokens`, `/session-presence` | Bearer token  |
 
 All API routes include:
 - **Input validation** via Zod schemas (cross-app contracts in `@dubgrid/contracts`)

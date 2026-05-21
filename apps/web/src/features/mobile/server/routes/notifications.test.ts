@@ -40,30 +40,72 @@ describe("mobile notifications route", () => {
           type: "schedule_published",
           channel: "in_app",
           category: null,
+          priority: "normal",
           title: "Schedule published",
           message: "The new week is ready.",
           metadata: {},
           readAt: null,
+          archivedAt: null,
           createdAt: "2026-04-16T10:00:00.000Z",
         },
       ],
+      nextCursor: null,
     });
 
     const { GET } = await import("./notifications");
     const response = await GET({
       nextUrl: new URL(
-        "http://localhost/api/mobile/v1/notifications?limit=20&offset=0",
+        "http://localhost/api/mobile/v1/notifications?limit=20&category=schedule&read=unread",
       ),
     } as never);
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(fetchMobileNotifications).toHaveBeenCalledWith({}, {
-      limit: 20,
-      offset: 0,
-    });
+    expect(fetchMobileNotifications).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        limit: 20,
+        category: "schedule",
+        read: "unread",
+        cursor: null,
+      }),
+    );
     expect(payload.unreadCount).toBe(3);
     expect(payload.notifications).toHaveLength(1);
+    expect(payload.nextCursor).toBeNull();
+  });
+
+  it("forwards cursor pagination to the loader", async () => {
+    requireMobileAuth.mockResolvedValue({
+      userClient: {},
+    });
+    fetchMobileNotifications.mockResolvedValue({
+      unreadCount: 0,
+      notifications: [],
+      nextCursor: null,
+    });
+
+    const { GET } = await import("./notifications");
+    const response = await GET({
+      nextUrl: new URL(
+        "http://localhost/api/mobile/v1/notifications" +
+          "?cursorCreatedAt=2026-04-16T10:00:00.000Z" +
+          "&cursorId=00000000-0000-0000-0000-000000000001" +
+          "&archived=archived",
+      ),
+    } as never);
+
+    expect(response.status).toBe(200);
+    expect(fetchMobileNotifications).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        cursor: {
+          createdAt: "2026-04-16T10:00:00.000Z",
+          id: "00000000-0000-0000-0000-000000000001",
+        },
+        archived: "archived",
+      }),
+    );
   });
 
   it("returns a client-friendly error when loading notifications fails", async () => {

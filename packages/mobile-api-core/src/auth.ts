@@ -20,12 +20,12 @@ import {
   type User,
 } from "@supabase/supabase-js";
 import {
-  findMobileWorkspaceBySlug,
-  type MobileWorkspaceLookup,
-} from "./workspace";
-import { isMobileWorkspaceSetupComplete } from "./setup";
+  findMobileOrganizationBySlug,
+  type MobileOrganizationLookup,
+} from "./organization";
+import { isMobileOrgSetupComplete } from "./setup";
 
-type WorkspaceMembership = {
+type OrgMembership = {
   org_id: string;
   org_name: string;
   org_slug: string | null;
@@ -109,43 +109,43 @@ function getMobileUserName(user: User): {
   };
 }
 
-function getLockedWorkspaceMessage(
+function getLockedOrgMessage(
   orgRole: string,
   billingAccess: BillingAccessResult,
 ): string {
   if (billingAccess.reason === "suspended") {
-    return "Workspace unavailable. Contact your organization administrator.";
+    return "Organization unavailable. Contact your organization administrator.";
   }
 
   if (orgRole === "super_admin") {
-    return "Workspace unavailable. Sign in on the web to manage billing.";
+    return "Organization unavailable. Sign in on the web to manage billing.";
   }
 
-  return "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.";
+  return "Organization unavailable. Your organization will be available once your organization administrator finishes setup.";
 }
 
 function getIncompleteSetupMessage(orgRole: string): string {
   if (orgRole === "super_admin" || orgRole === "admin") {
-    return "Workspace unavailable. Sign in on the web to finish workspace setup.";
+    return "Organization unavailable. Sign in on the web to finish organization setup.";
   }
 
-  return "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.";
+  return "Organization unavailable. Your organization will be available once your organization administrator finishes setup.";
 }
 
-async function requireMobileWorkspace(
+async function requireMobileOrganization(
   serviceClient: SupabaseClient,
   slug: string,
-): Promise<MobileWorkspaceLookup> {
+): Promise<MobileOrganizationLookup> {
   try {
-    const workspace = await findMobileWorkspaceBySlug(serviceClient, slug);
-    if (!workspace) {
+    const organization = await findMobileOrganizationBySlug(serviceClient, slug);
+    if (!organization) {
       throw new MobileApiRequestError(
         404,
-        "No workspace matched that slug.",
+        "No organization matched that slug.",
       );
     }
 
-    return workspace;
+    return organization;
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
       throw error;
@@ -153,7 +153,7 @@ async function requireMobileWorkspace(
 
     throw new MobileApiRequestError(
       503,
-      "We could not verify that workspace right now.",
+      "We could not verify that organization right now.",
     );
   }
 }
@@ -227,23 +227,23 @@ async function assertMobileProfileSupported(
 
 async function loadMobileMemberships(
   sessionClient: SupabaseClient,
-): Promise<WorkspaceMembership[]> {
+): Promise<OrgMembership[]> {
   const membershipsResult = await sessionClient.rpc("get_my_organizations");
 
   if (membershipsResult.error) {
     throw new MobileApiRequestError(
       403,
-      "We could not verify your workspace access.",
+      "We could not verify your organization access.",
     );
   }
 
-  return (membershipsResult.data ?? []) as WorkspaceMembership[];
+  return (membershipsResult.data ?? []) as OrgMembership[];
 }
 
-async function switchMobileWorkspaceIfNeeded(
+async function switchMobileOrgIfNeeded(
   sessionClient: SupabaseClient,
   session: SignedInSession,
-  membership: WorkspaceMembership,
+  membership: OrgMembership,
 ): Promise<SignedInSession> {
   if (membership.is_active) {
     return session;
@@ -256,7 +256,7 @@ async function switchMobileWorkspaceIfNeeded(
   if (switchResult.error) {
     throw new MobileApiRequestError(
       400,
-      "We could not switch your workspace right now.",
+      "We could not switch your organization right now.",
     );
   }
 
@@ -264,7 +264,7 @@ async function switchMobileWorkspaceIfNeeded(
   if (refreshResult.error || !refreshResult.data.session) {
     throw new MobileApiRequestError(
       503,
-      "We could not refresh your session after switching workspaces.",
+      "We could not refresh your session after switching organizations.",
     );
   }
 
@@ -396,11 +396,11 @@ export async function resolveMobileAuthContext<
   if (billingAccess.isLocked) {
     throw new MobileApiRequestError(
       403,
-      getLockedWorkspaceMessage(orgRole, billingAccess),
+      getLockedOrgMessage(orgRole, billingAccess),
     );
   }
 
-  const setupComplete = await isMobileWorkspaceSetupComplete(
+  const setupComplete = await isMobileOrgSetupComplete(
     input.serviceClient,
     currentOrgId,
   );
@@ -438,9 +438,9 @@ export async function loginMobileUser(
   sessionClient: SupabaseClient,
   input: MobileAuthLoginBody,
 ): Promise<MobileAuthLoginResponse> {
-  const workspace = await requireMobileWorkspace(
+  const organization = await requireMobileOrganization(
     serviceClient,
-    input.workspaceSlug,
+    input.orgSlug,
   );
   const { session, user, mfaFactor } = await signInMobileUser(
     serviceClient,
@@ -462,33 +462,33 @@ export async function loginMobileUser(
 
   const memberships = await loadMobileMemberships(sessionClient);
   const targetMembership = memberships.find(
-    (membership) => membership.org_slug === workspace.slug,
+    (membership) => membership.org_slug === organization.slug,
   );
 
   if (!targetMembership) {
     throw new MobileApiRequestError(
       403,
-      "Your account is not associated with that workspace.",
+      "Your account is not associated with that organization.",
     );
   }
 
   const loginBillingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: workspace.suspendedAt,
-    subscriptionStatus: workspace.subscriptionStatus,
-    trialEndsAt: workspace.trialEndsAt,
+    suspendedAt: organization.suspendedAt,
+    subscriptionStatus: organization.subscriptionStatus,
+    trialEndsAt: organization.trialEndsAt,
   });
 
   if (loginBillingAccess.isLocked) {
     throw new MobileApiRequestError(
       403,
-      getLockedWorkspaceMessage(
+      getLockedOrgMessage(
         targetMembership.org_role ?? "user",
         loginBillingAccess,
       ),
     );
   }
 
-  const currentSession = await switchMobileWorkspaceIfNeeded(
+  const currentSession = await switchMobileOrgIfNeeded(
     sessionClient,
     session,
     targetMembership,
@@ -502,10 +502,10 @@ export async function loginMobileUser(
       expiresIn: currentSession.expires_in,
       tokenType: currentSession.token_type,
     },
-    workspace: {
-      id: workspace.id,
-      name: workspace.name,
-      slug: workspace.slug,
+    organization: {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
     },
     user: {
       id: user.id,

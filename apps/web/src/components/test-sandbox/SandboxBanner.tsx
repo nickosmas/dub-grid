@@ -116,7 +116,7 @@ export default function SandboxBanner() {
           }}
         >
           You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real
-          workspace.
+          organization.
         </span>
       </div>
 
@@ -129,7 +129,7 @@ export default function SandboxBanner() {
           onClick={handleReset}
           disabled={pendingAction != null}
           className="dg-btn dg-btn-secondary"
-          title="Discard all sandbox changes and start over with a fresh clone of your workspace."
+          title="Discard all sandbox changes and start over with a fresh clone of your organization."
           style={{
             minHeight: 28,
             padding: "0 10px",

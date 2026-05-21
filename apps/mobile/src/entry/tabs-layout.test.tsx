@@ -83,11 +83,11 @@ vi.mock("../shared/components/LoadingScreen", async () => {
   };
 });
 
-vi.mock("../features/auth/screens/WorkspaceLockedScreen", async () => {
+vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
   const React = await import("react");
 
   return {
-    WorkspaceLockedScreen: ({
+    OrganizationLockedScreen: ({
       message,
       onRetry,
       onSignOut,
@@ -99,7 +99,7 @@ vi.mock("../features/auth/screens/WorkspaceLockedScreen", async () => {
       React.createElement(
         "section",
         {},
-        React.createElement("h1", {}, "Workspace unavailable"),
+        React.createElement("h1", {}, "Organization unavailable"),
         React.createElement("p", {}, message),
         React.createElement(
           "button",
@@ -308,7 +308,7 @@ describe("TabsLayout", () => {
     expect(getByText("Schedule")).toBeInTheDocument();
   });
 
-  it("shows the workspace lock instead of app tabs when bootstrap reports the workspace is unavailable", () => {
+  it("shows the organization lock instead of app tabs when bootstrap reports the organization is unavailable", () => {
     const refetch = vi.fn();
     useBootstrap.mockReturnValue({
       data: {
@@ -322,7 +322,7 @@ describe("TabsLayout", () => {
         },
       },
       error: new Error(
-        "Workspace unavailable. Sign in on the web to finish workspace setup.",
+        "Organization unavailable. Sign in on the web to finish organization setup.",
       ),
       isFetching: false,
       refetch,
@@ -330,10 +330,10 @@ describe("TabsLayout", () => {
 
     render(<TabsLayout />);
 
-    expect(screen.getByText("Workspace unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Organization unavailable")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Workspace unavailable. Sign in on the web to finish workspace setup.",
+        "Organization unavailable. Sign in on the web to finish organization setup.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Schedule")).not.toBeInTheDocument();

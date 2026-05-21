@@ -28,6 +28,11 @@ interface ModalProps {
   style?: React.CSSProperties;
   onRequestClose?: () => boolean;
   showCloseButton?: boolean;
+  /**
+   * When true, the overlay starts below the sticky app header so the top
+   * nav remains visible and clickable. Use for non-blocking detail views.
+   */
+  headerSafe?: boolean;
   "aria-describedby"?: string;
 }
 
@@ -38,6 +43,7 @@ export default function Modal({
   style,
   onRequestClose,
   showCloseButton = true,
+  headerSafe = false,
   "aria-describedby": ariaDescribedby,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -116,7 +122,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className={`dg-modal-overlay${closing ? " closing" : ""}`}
+      className={`dg-modal-overlay${closing ? " closing" : ""}${headerSafe ? " is-header-safe" : ""}`}
       onClick={handleClose}
       onKeyDown={handleKeyDown}
       role="presentation"

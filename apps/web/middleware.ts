@@ -404,7 +404,7 @@ export async function middleware(req: NextRequest) {
   // with a pre-suspension JWT can still access the app until it expires
   // (up to 1 hour). This check catches that window.
   // Billing follows the same pattern: active trials and grace periods keep
-  // regular users out of billing, but a hard lock blocks workspace access.
+  // regular users out of billing, but a hard lock blocks organization access.
   // Skip for gridmasters (they manage suspended orgs) and impersonation.
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {

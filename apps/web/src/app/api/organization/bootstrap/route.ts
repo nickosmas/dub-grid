@@ -140,7 +140,7 @@ export async function GET(req: NextRequest) {
     }
 
     const orgAuth = await requireOrgPermissions(req, orgId, () => true, {
-      allowLockedWorkspace: true,
+      allowLockedOrganization: true,
       allowDuringSetup: true,
     });
     if ("response" in orgAuth) {

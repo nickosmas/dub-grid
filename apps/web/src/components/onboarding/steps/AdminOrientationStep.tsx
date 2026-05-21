@@ -32,7 +32,7 @@ const sections = [
   {
     icon: <Settings size={22} />,
     name: "Settings",
-    desc: "Configure departments, shifts, jobs, roles, and other workspace options.",
+    desc: "Configure departments, shifts, jobs, roles, and other organization options.",
   },
 ];
 

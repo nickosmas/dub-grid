@@ -669,7 +669,7 @@ function JobSectionCard({
         <div style={{ padding: "0 16px" }}>{children}</div>
       ) : (
         <EmptyState
-          compact
+          size="compact"
           title={section === "shiftless" ? "No general jobs yet" : "No scheduled jobs yet"}
           description={
             section === "shiftless"
@@ -718,6 +718,7 @@ function JobRow({
   canManageScheduleDefinitions,
   allJobs,
   shiftDisplayMode,
+  isLast,
 }: {
   job: JobDefinition & { isNew?: boolean };
   section: JobSection;
@@ -734,6 +735,7 @@ function JobRow({
   canManageScheduleDefinitions: boolean;
   allJobs: Array<JobDefinition & { isNew?: boolean }>;
   shiftDisplayMode: ShiftDisplayMode;
+  isLast?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isRegularStaffJob = isRegularStaffSystemJob(job);
@@ -1136,7 +1138,7 @@ function JobRow({
     form.eligibleRoleIds.length === 0 || form.requiredCertificationIds.length === 0;
 
   return (
-    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
+    <div className="dg-list-row" style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}>
       <div
         className="dg-hover-row"
         style={{
@@ -2505,7 +2507,7 @@ export default function JobsSettings({
         canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
         onAdd={handleAddScheduledJob}
       >
-        {scheduledRows.map((job) => (
+        {scheduledRows.map((job, jobIndex) => (
           <JobRow
             key={job.id}
             job={job}
@@ -2523,6 +2525,7 @@ export default function JobsSettings({
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
             shiftDisplayMode={shiftDisplayMode}
+            isLast={jobIndex === scheduledRows.length - 1}
           />
         ))}
       </JobSectionCard>
@@ -2546,7 +2549,7 @@ export default function JobsSettings({
         canManageScheduleDefinitions={canManageScheduleDefinitions}
         onAdd={handleAddShiftlessJob}
       >
-        {shiftlessRows.map((job) => (
+        {shiftlessRows.map((job, jobIndex) => (
           <JobRow
             key={job.id}
             job={job}
@@ -2564,6 +2567,7 @@ export default function JobsSettings({
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
             shiftDisplayMode={shiftDisplayMode}
+            isLast={jobIndex === shiftlessRows.length - 1}
           />
         ))}
       </JobSectionCard>

@@ -10,7 +10,7 @@ function getSetupQueryError(results: SetupQueryResult[]): unknown {
   return results.find((result) => result.error)?.error ?? null;
 }
 
-export async function isMobileWorkspaceSetupComplete(
+export async function isMobileOrgSetupComplete(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<boolean> {

@@ -33,7 +33,7 @@ const sections = [
   {
     icon: <Settings size={22} />,
     name: "Settings",
-    desc: "Review and configure departments, shifts, jobs, roles, and all workspace options.",
+    desc: "Review and configure departments, shifts, jobs, roles, and all organization options.",
   },
   {
     icon: <Shield size={22} />,

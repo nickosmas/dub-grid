@@ -35,11 +35,11 @@ vi.mock("../shared/components/LoadingScreen", async () => {
   };
 });
 
-vi.mock("../features/auth/screens/WorkspaceLockedScreen", async () => {
+vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
   const React = await import("react");
 
   return {
-    WorkspaceLockedScreen: ({
+    OrganizationLockedScreen: ({
       message,
       onRetry,
       onSignOut,
@@ -51,7 +51,7 @@ vi.mock("../features/auth/screens/WorkspaceLockedScreen", async () => {
       React.createElement(
         "section",
         {},
-        React.createElement("h1", {}, "Workspace unavailable"),
+        React.createElement("h1", {}, "Organization unavailable"),
         React.createElement("p", {}, message),
         React.createElement(
           "button",
@@ -180,7 +180,7 @@ describe("TabsLayoutWeb", () => {
     expect(screen.getByText("team:Schedule")).toBeInTheDocument();
   });
 
-  it("shows the workspace lock instead of web tabs when bootstrap reports the workspace is unavailable", () => {
+  it("shows the organization lock instead of web tabs when bootstrap reports the organization is unavailable", () => {
     const refetch = vi.fn();
     useBootstrap.mockReturnValue({
       data: {
@@ -193,7 +193,7 @@ describe("TabsLayoutWeb", () => {
         },
       },
       error: new Error(
-        "Workspace unavailable. Sign in on the web to manage billing.",
+        "Organization unavailable. Sign in on the web to manage billing.",
       ),
       isFetching: false,
       refetch,
@@ -201,7 +201,7 @@ describe("TabsLayoutWeb", () => {
 
     render(<TabsLayoutWeb />);
 
-    expect(screen.getByText("Workspace unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Organization unavailable")).toBeInTheDocument();
     expect(screen.queryByText("team:Schedule")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Try again"));

@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: "Terms of Service | DubGrid",
 };
 
+// Scope: written for the US market, governed by the laws of the State of
+// Delaware. If DubGrid begins serving EU/UK users, add the corresponding
+// consumer and data-protection terms.
 export default function TermsOfServicePage() {
   return (
     <div
@@ -42,7 +45,7 @@ export default function TermsOfServicePage() {
           Terms of Service
         </h1>
         <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-subtle)", marginBottom: "40px" }}>
-          Last updated: March 2026
+          Last updated: May 2026
         </p>
 
         <section style={{ marginBottom: "32px" }}>
@@ -57,12 +60,18 @@ export default function TermsOfServicePage() {
             1. Acceptance of Terms
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
-            By accessing or using DubGrid (&ldquo;the Service&rdquo;), you
-            agree to be bound by these Terms of Service (&ldquo;Terms&rdquo;).
-            If you are using the Service on behalf of an organization, you
-            represent that you have authority to bind that organization to
-            these Terms. If you do not agree to these Terms, do not use the
-            Service.
+            DubGrid is operated by DubGrid LLC (&ldquo;DubGrid,&rdquo;
+            &ldquo;we,&rdquo; &ldquo;our,&rdquo; or &ldquo;us&rdquo;). By
+            accessing or using DubGrid (&ldquo;the Service&rdquo;), you agree to
+            be bound by these Terms of Service (&ldquo;Terms&rdquo;). If you are
+            using the Service on behalf of an organization, you represent that
+            you have authority to bind that organization to these Terms. If you
+            do not agree to these Terms, do not use the Service.
+          </p>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginTop: "16px" }}>
+            You must be at least 18 years old and able to form a binding
+            contract to use the Service. The Service is intended for
+            organizations and users located in the United States.
           </p>
         </section>
 
@@ -116,7 +125,7 @@ export default function TermsOfServicePage() {
             administrators; we do not guarantee that any particular user
             will have access to any particular feature or dataset. You must
             use the correct subdomain for your organization to access your
-            workspace.
+            organization.
           </p>
         </section>
 
@@ -212,7 +221,79 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            6. Intellectual Property
+            6. Subscriptions, Billing, and Payment
+          </h2>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginBottom: "16px" }}>
+            Paid plans are offered as a per-seat monthly subscription. New
+            organizations may receive a free trial of 14 days; unless you cancel
+            before the trial ends, the subscription begins and the payment
+            method on file is charged. Subscriptions renew automatically each
+            month until cancelled. Fees are stated exclusive of taxes, which you
+            are responsible for where applicable.
+          </p>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginBottom: "16px" }}>
+            Payments are processed by our payment processor, Stripe; we do not
+            store full payment card details. You can cancel at any time from
+            your billing settings, effective at the end of the current billing
+            period. If you cancel mid-period, we will refund the unused portion
+            of that period on a pro-rata basis. Except for that pro-rata refund
+            and any refund required by law, fees are non-refundable.
+          </p>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
+            We may change subscription prices on reasonable advance notice,
+            effective at your next renewal. If your payment fails or is overdue,
+            we may suspend or limit access to paid features until the balance is
+            resolved.
+          </p>
+        </section>
+
+        <section style={{ marginBottom: "32px" }}>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            7. Customer Data and Privacy
+          </h2>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
+            As between you and us, your organization owns the roster, schedule,
+            and other data it submits to the Service (&ldquo;Customer
+            Data&rdquo;). You grant us a non-exclusive license to host, store,
+            process, transmit, and display Customer Data solely to provide and
+            improve the Service. Our handling of personal information is
+            described in our{" "}
+            <Link
+              href="/privacy"
+              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            >
+              Privacy Policy
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/cookie-policy"
+              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            >
+              Cookie Policy
+            </Link>
+            , which are incorporated into these Terms. If you send us feedback
+            or suggestions, you grant us a perpetual, royalty-free license to use
+            them without restriction.
+          </p>
+        </section>
+
+        <section style={{ marginBottom: "32px" }}>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            8. Intellectual Property
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             The Service, including its software, design, text, graphics, and
@@ -237,7 +318,27 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            7. Disclaimer of Warranties
+            9. Service Availability
+          </h2>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
+            We use commercially reasonable efforts to keep the Service
+            available, but we do not guarantee any particular level of uptime
+            and the Service may be unavailable from time to time for
+            maintenance, updates, or reasons outside our control. We may modify,
+            suspend, or discontinue features of the Service at any time.
+          </p>
+        </section>
+
+        <section style={{ marginBottom: "32px" }}>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            10. Disclaimer of Warranties
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             THE SERVICE IS PROVIDED &ldquo;AS IS&rdquo; AND &ldquo;AS
@@ -261,7 +362,7 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            8. Limitation of Liability
+            11. Limitation of Liability
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             TO THE MAXIMUM EXTENT PERMITTED BY LAW, DUBGRID AND ITS
@@ -287,7 +388,28 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            9. Termination
+            12. Indemnification
+          </h2>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
+            You agree to indemnify and hold harmless DubGrid and its affiliates,
+            officers, employees, and agents from any claims, damages, losses, or
+            expenses (including reasonable legal fees) arising out of your
+            Customer Data, your use of the Service, or your violation of these
+            Terms or applicable law, including any entry of prohibited health
+            information into the Service.
+          </p>
+        </section>
+
+        <section style={{ marginBottom: "32px" }}>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            13. Termination
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             We may suspend or terminate your access to the Service, or your
@@ -311,7 +433,7 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            10. Changes to the Service and Terms
+            14. Changes to the Service and Terms
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
             We may modify the Service or these Terms from time to time. We
@@ -333,15 +455,16 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            11. Governing Law and Disputes
+            15. Governing Law and Disputes
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
-            These Terms are governed by the laws of the jurisdiction in which
-            DubGrid operates, without regard to conflict of law principles.
-            Any dispute arising out of or relating to these Terms or the
-            Service shall be resolved in the courts of that jurisdiction,
-            except where prohibited. You may also have consumer or statutory
-            rights that cannot be waived by contract.
+            These Terms are governed by the laws of the State of Delaware, USA,
+            without regard to its conflict of law principles. Any dispute
+            arising out of or relating to these Terms or the Service shall be
+            resolved exclusively in the state or federal courts located in
+            Delaware, and you consent to their jurisdiction, except where
+            prohibited. You may also have consumer or statutory rights that
+            cannot be waived by contract.
           </p>
         </section>
 
@@ -354,12 +477,45 @@ export default function TermsOfServicePage() {
               color: "var(--color-text-secondary)",
             }}
           >
-            12. Contact
+            16. General
           </h2>
           <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
-            For questions about these Terms of Service, please contact us at
-            the email or address provided on the DubGrid website or in your
-            organization&apos;s account materials.
+            These Terms, together with the Privacy Policy and Cookie Policy, are
+            the entire agreement between you and DubGrid regarding the Service
+            and supersede any prior agreements. If any provision is found
+            unenforceable, the remaining provisions stay in effect. You may not
+            assign these Terms without our consent; we may assign them in
+            connection with a merger, acquisition, or sale of assets. Our
+            failure to enforce a provision is not a waiver of it. We are not
+            liable for delays or failures caused by events beyond our reasonable
+            control. We may provide notices to you by email or within the
+            Service.
+          </p>
+        </section>
+
+        <section style={{ marginBottom: "32px" }}>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 600,
+              marginBottom: "12px",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            17. Contact
+          </h2>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)" }}>
+            For questions about these Terms of Service, contact us at:
+          </p>
+          <p style={{ fontSize: "var(--dg-fs-body)", lineHeight: 1.7, color: "var(--color-text-secondary)", marginTop: "12px" }}>
+            DubGrid LLC<br />
+            [REGISTERED ADDRESS]<br />
+            <a
+              href="mailto:support@dubgrid.com"
+              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            >
+              support@dubgrid.com
+            </a>
           </p>
         </section>
       </div>

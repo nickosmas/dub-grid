@@ -83,7 +83,7 @@ function createQueryClient() {
 }
 
 describe("loadOrganizationBillingSummary", () => {
-  it("returns a complete simulated billing summary for test sandbox workspaces", async () => {
+  it("returns a complete simulated billing summary for test sandbox organizations", async () => {
     const summary = await loadOrganizationBillingSummary(
       createQueryClient() as unknown as Parameters<
         typeof loadOrganizationBillingSummary

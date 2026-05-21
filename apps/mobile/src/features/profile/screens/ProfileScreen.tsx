@@ -1,9 +1,11 @@
 import { router, Stack } from "expo-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -24,7 +26,9 @@ import { createDetailStackOptions } from "../../../shared/navigation/top-level-s
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfile,
+  getProfileChangeRequests,
   registerPushToken,
+  updateProfileChangeRequest,
 } from "../../../shared/lib/api";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
@@ -38,7 +42,7 @@ import {
 } from "../../../shared/lib/query-state";
 import {
   loadStoredPushDevice,
-  saveLastWorkspaceSlug,
+  saveLastOrgSlug,
 } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import {
@@ -62,6 +66,8 @@ import {
   getProfileInitials,
   profilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
+import { PendingRequestsCard } from "../components/PendingRequestsCard";
+import { LEGAL_URLS } from "../../consent/lib/consent";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -69,12 +75,7 @@ const ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-const PENDING_PROFILE_CHANGE_MESSAGE =
-  "A profile change request is pending admin review.";
-const PENDING_ACCOUNT_DELETION_MESSAGE =
-  "An account deletion request is pending admin review.";
-
-type WorkspaceSwitchClient = {
+type OrganizationSwitchClient = {
   rpc: (
     fn: string,
     args?: Record<string, unknown>,
@@ -100,7 +101,7 @@ export default function ProfileScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
-  const [switchingWorkspaceId, setSwitchingWorkspaceId] = useState<
+  const [switchingOrgId, setSwitchingOrgId] = useState<
     string | null
   >(null);
   const [pendingConfirmation, setPendingConfirmation] =
@@ -111,10 +112,47 @@ export default function ProfileScreen() {
     queryFn: () => getProfile(accessToken!),
     enabled: Boolean(accessToken),
   });
+  const changeRequestsQuery = useQuery({
+    queryKey: ["mobile", "profile", "change-requests", accessToken],
+    queryFn: () => getProfileChangeRequests(accessToken!),
+    enabled: Boolean(accessToken),
+  });
   const bootstrapQuery = useBootstrap(accessToken);
   const manualRefresh = useManualRefresh(() =>
-    Promise.all([profileQuery.refetch(), bootstrapQuery.refetch()]),
+    Promise.all([
+      profileQuery.refetch(),
+      changeRequestsQuery.refetch(),
+      bootstrapQuery.refetch(),
+    ]),
   );
+  const pendingChangeRequests: MobileProfileChangeRequest[] =
+    changeRequestsQuery.data?.requests.filter(
+      (request) => request.status === "pending",
+    ) ?? [];
+  const cancelChangeRequestMutation = useMutation({
+    mutationFn: (request: MobileProfileChangeRequest) =>
+      updateProfileChangeRequest(accessToken!, request.id, { action: "cancel" }),
+    onSuccess: async (_data, request) => {
+      pushToast({
+        tone: "success",
+        message:
+          request.type === "account_deletion"
+            ? "Account deletion request cancelled."
+            : "Name change request cancelled.",
+      });
+      await Promise.all([
+        changeRequestsQuery.refetch(),
+        profileQuery.refetch(),
+      ]);
+    },
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        fallbackMessage: "We couldn't cancel that request right now.",
+        title: "Could not cancel request",
+      });
+    },
+  });
   const profile = profileQuery.data ?? null;
   const contentState = getMobileQueryContentState({
     hasData: Boolean(profile),
@@ -186,21 +224,21 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleSwitchWorkspace(input: {
+  async function handleSwitchOrganization(input: {
     id: string;
     slug: string | null;
     isCurrent: boolean;
   }) {
-    if (input.isCurrent || switchingWorkspaceId) {
+    if (input.isCurrent || switchingOrgId) {
       return;
     }
 
-    setSwitchingWorkspaceId(input.id);
+    setSwitchingOrgId(input.id);
 
     try {
       const supabase = getSupabaseClient();
-      const workspaceClient = supabase as unknown as WorkspaceSwitchClient;
-      const switchResult = await workspaceClient.rpc("switch_org", {
+      const organizationClient = supabase as unknown as OrganizationSwitchClient;
+      const switchResult = await organizationClient.rpc("switch_org", {
         target_org_id: input.id,
       });
 
@@ -224,7 +262,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      await saveLastWorkspaceSlug(input.slug);
+      await saveLastOrgSlug(input.slug);
       await queryClient.invalidateQueries({ queryKey: ["mobile"] });
       await Promise.all([profileQuery.refetch(), bootstrapQuery.refetch()]);
     } catch (error) {
@@ -234,7 +272,7 @@ export default function ProfileScreen() {
         title: "Could not switch organization",
       });
     } finally {
-      setSwitchingWorkspaceId(null);
+      setSwitchingOrgId(null);
     }
   }
 
@@ -347,18 +385,17 @@ export default function ProfileScreen() {
             />
           </ProfileHero>
 
-          {profile.pendingProfileChangeRequest ? (
-            <StatusBanner
-              body={PENDING_PROFILE_CHANGE_MESSAGE}
-              title="Request pending"
-            />
-          ) : null}
-          {profile.pendingAccountDeletionRequest ? (
-            <StatusBanner
-              body={PENDING_ACCOUNT_DELETION_MESSAGE}
-              title="Request pending"
-            />
-          ) : null}
+          <PendingRequestsCard
+            requests={pendingChangeRequests}
+            cancellingId={
+              cancelChangeRequestMutation.isPending
+                ? (cancelChangeRequestMutation.variables?.id ?? null)
+                : null
+            }
+            onCancel={(request) =>
+              cancelChangeRequestMutation.mutate(request)
+            }
+          />
 
           <ProfileSection title="Organization details">
             <ProfileList>
@@ -369,7 +406,7 @@ export default function ProfileScreen() {
               />
               <ProfileInfoRow
                 iconName="compass-outline"
-                label="Workspace"
+                label="Organization"
                 value={formatProfileValue(profile.currentOrg.slug)}
               />
               <ProfileInfoRow
@@ -427,6 +464,27 @@ export default function ProfileScreen() {
             </ProfileList>
           </ProfileSection>
 
+          <ProfileSection title="Privacy & data">
+            <ProfileList>
+              <ProfileNavRow
+                iconName="shield-outline"
+                label="Privacy policy"
+                onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
+              />
+              <ProfileNavRow
+                iconName="document-text-outline"
+                label="Terms of service"
+                onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
+              />
+              <ProfileNavRow
+                iconName="options-outline"
+                isLast
+                label="Tracking & analytics preferences"
+                onPress={() => router.push("/(tabs)/profile/privacy")}
+              />
+            </ProfileList>
+          </ProfileSection>
+
           {logoutError ? (
             <StatusBanner
               body={getQueryErrorMessage(logoutError, logoutError)}
@@ -477,11 +535,11 @@ export default function ProfileScreen() {
               <ProfileSection title="Organizations">
                 <ProfileList>
                   {memberships.map((membership, index) => (
-                    <WorkspaceOptionRow
+                    <OrganizationOptionRow
                       key={membership.id}
                       isLast={index === memberships.length - 1}
                       membership={membership}
-                      switching={switchingWorkspaceId === membership.id}
+                      switching={switchingOrgId === membership.id}
                       onPress={() => {
                         // Use the native Alert API for confirmation: an iOS
                         // pageSheet Modal cannot reliably present another RN
@@ -501,7 +559,7 @@ export default function ProfileScreen() {
                               text: "Switch",
                               onPress: () => {
                                 setIsSwitchModalVisible(false);
-                                void handleSwitchWorkspace(membership);
+                                void handleSwitchOrganization(membership);
                               },
                             },
                           ],
@@ -529,7 +587,7 @@ export default function ProfileScreen() {
   );
 }
 
-function WorkspaceOptionRow({
+function OrganizationOptionRow({
   membership,
   switching,
   isLast,
@@ -565,13 +623,13 @@ function WorkspaceOptionRow({
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.workspaceOptionRow,
-        !isLast && styles.workspaceOptionDivider,
-        membership.isCurrent && styles.workspaceOptionCurrent,
-        pressed && !disabled && styles.workspaceOptionPressed,
+        styles.orgOptionRow,
+        !isLast && styles.orgOptionDivider,
+        membership.isCurrent && styles.orgOptionCurrent,
+        pressed && !disabled && styles.orgOptionPressed,
       ]}
     >
-      <View style={styles.workspaceOptionIcon}>
+      <View style={styles.orgOptionIcon}>
         <Ionicons
           color={
             membership.isCurrent ? mobileColors.brand : mobileColors.textSecondary
@@ -580,15 +638,15 @@ function WorkspaceOptionRow({
           size={18}
         />
       </View>
-      <View style={styles.workspaceOptionCopy}>
-        <Text style={styles.workspaceOptionName}>
+      <View style={styles.orgOptionCopy}>
+        <Text style={styles.orgOptionName}>
           {membership.name ?? "Organization"}
         </Text>
-        <Text style={styles.workspaceOptionMeta}>
-          {membership.slug ?? "workspace"} - {membership.orgRole ?? "user"}
+        <Text style={styles.orgOptionMeta}>
+          {membership.slug ?? "organization"} - {membership.orgRole ?? "user"}
         </Text>
       </View>
-      <Text style={styles.workspaceOptionStatus}>{statusLabel}</Text>
+      <Text style={styles.orgOptionStatus}>{statusLabel}</Text>
     </Pressable>
   );
 }
@@ -601,7 +659,7 @@ const styles = StyleSheet.create({
     ...mobileText.screenTitle,
     color: mobileColors.textPrimary,
   },
-  workspaceOptionRow: {
+  orgOptionRow: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
@@ -609,37 +667,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  workspaceOptionCurrent: {
+  orgOptionCurrent: {
     backgroundColor: mobileColors.surfaceSecondary,
   },
-  workspaceOptionPressed: {
+  orgOptionPressed: {
     opacity: 0.64,
   },
-  workspaceOptionDivider: {
+  orgOptionDivider: {
     borderBottomColor: mobileColors.borderSubtle,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  workspaceOptionIcon: {
+  orgOptionIcon: {
     alignItems: "center",
     height: 32,
     justifyContent: "center",
     width: 32,
   },
-  workspaceOptionCopy: {
+  orgOptionCopy: {
     flex: 1,
     gap: 3,
     minWidth: 0,
   },
-  workspaceOptionName: {
+  orgOptionName: {
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
     fontWeight: "500",
   },
-  workspaceOptionMeta: {
+  orgOptionMeta: {
     ...mobileText.body,
     color: mobileColors.textMuted,
   },
-  workspaceOptionStatus: {
+  orgOptionStatus: {
     ...mobileText.caption,
     color: mobileColors.textSubtle,
     fontWeight: "500",

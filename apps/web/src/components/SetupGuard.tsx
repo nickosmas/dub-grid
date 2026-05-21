@@ -84,7 +84,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
               margin: 0,
             }}
           >
-            Your admin is still configuring the workspace. Try refreshing in a few minutes.
+            Your admin is still configuring the organization. Try refreshing in a few minutes.
           </p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>

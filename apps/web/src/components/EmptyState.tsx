@@ -2,48 +2,83 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+type EmptyStateSize = "default" | "compact" | "inline";
+
 interface EmptyStateProps {
   icon?: ReactNode;
   title?: string;
   heading?: string;
   description?: string;
   action?: ReactNode;
-  /** Compact variant for use inside cards/sections with less padding and smaller text */
-  compact?: boolean;
+  /**
+   * - default: full-page empty state with large padding (64px) and heading-sized title
+   * - compact: smaller padding (32px) for cards/settings panels with body-sized title
+   * - inline: tightest variant (24px) for dashboard tiles with label-sized title
+   */
+  size?: EmptyStateSize;
   style?: CSSProperties;
+  "data-testid"?: string;
 }
 
-/**
- * Generic empty state component for pages/sections with no data.
- * Provides consistent visual treatment across the app.
- *
- * - Default: full-page empty state with large padding, icon circle, dashed border
- * - Compact: smaller padding and text for use inside cards or settings sections
- */
+const PADDING: Record<EmptyStateSize, string> = {
+  default: "64px 24px",
+  compact: "32px 16px",
+  inline: "24px 16px",
+};
+
+const RADIUS: Record<EmptyStateSize, number> = {
+  default: 14,
+  compact: 10,
+  inline: 10,
+};
+
+const OUTER_GAP: Record<EmptyStateSize, number> = {
+  default: 16,
+  compact: 10,
+  inline: 8,
+};
+
+const ICON_PADDING: Record<EmptyStateSize, number> = {
+  default: 20,
+  compact: 12,
+  inline: 8,
+};
+
 export function EmptyState({
   icon,
   title,
   heading,
   description,
   action,
-  compact,
+  size = "default",
   style,
+  "data-testid": dataTestId,
 }: EmptyStateProps) {
   const headingText = heading ?? title;
 
+  const titleFontSize =
+    size === "default"
+      ? "var(--dg-fs-heading)"
+      : size === "compact"
+        ? "var(--dg-fs-body)"
+        : "var(--dg-fs-label)";
+  const titleFontWeight = size === "default" ? 700 : 600;
+
   return (
     <div
+      data-testid={dataTestId}
       style={{
-        padding: compact ? "32px 16px" : "64px 24px",
+        padding: PADDING[size],
         textAlign: "center",
         background: "var(--color-surface)",
-        borderRadius: compact ? 10 : 14,
+        borderRadius: RADIUS[size],
         border: "1px dashed var(--color-border)",
         color: "var(--color-text-muted)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: compact ? 10 : 16,
+        justifyContent: "center",
+        gap: OUTER_GAP[size],
         ...style,
       }}
     >
@@ -52,12 +87,12 @@ export function EmptyState({
           style={{
             color: "var(--color-text-faint)",
             background: "var(--color-bg)",
-            padding: compact ? 12 : 20,
+            padding: ICON_PADDING[size],
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: compact ? undefined : "var(--shadow-raised)",
+            boxShadow: size === "default" ? "var(--shadow-raised)" : undefined,
           }}
         >
           {icon}
@@ -66,8 +101,8 @@ export function EmptyState({
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div
           style={{
-            fontSize: compact ? "var(--dg-fs-body)" : "var(--dg-fs-heading)",
-            fontWeight: compact ? 600 : 700,
+            fontSize: titleFontSize,
+            fontWeight: titleFontWeight,
             color: "var(--color-text-primary)",
           }}
         >
@@ -86,7 +121,7 @@ export function EmptyState({
           </p>
         )}
       </div>
-      {action && <div style={{ marginTop: compact ? 4 : 8 }}>{action}</div>}
+      {action && <div style={{ marginTop: size === "default" ? 8 : 4 }}>{action}</div>}
     </div>
   );
 }

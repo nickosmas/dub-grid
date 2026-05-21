@@ -17,6 +17,7 @@ import {
   fetchMobileFocusAreaRows as fetchMobileFocusAreaRowsData,
   fetchMobileJobNameRows,
   fetchMobileManagementMembershipRowsByUserIds,
+  fetchMobileNotificationFacets as fetchMobileNotificationFacetsData,
   fetchMobileNotificationsPage as fetchMobileNotificationsPageData,
   fetchMobileOpenShiftContextRows as fetchMobileOpenShiftContextRowsData,
   fetchMobilePeopleRows as fetchMobilePeopleRowsData,
@@ -61,7 +62,6 @@ import type {
   MobileDepartment,
   MobileFocusArea,
   MobileNamedItem,
-  MobileNotification,
   MobileOpenShift,
   MobilePerson,
   MobileScheduleEntry,
@@ -1729,9 +1729,15 @@ export async function fetchMobileUnreadNotificationCount(
 
 export async function fetchMobileNotifications(
   userClient: SupabaseClient,
-  input: { limit: number; offset: number },
-): Promise<{ unreadCount: number; notifications: MobileNotification[] }> {
+  input: Parameters<typeof fetchMobileNotificationsPageData>[1],
+): ReturnType<typeof fetchMobileNotificationsPageData> {
   return fetchMobileNotificationsPageData(userClient, input);
+}
+
+export async function fetchMobileNotificationFacets(
+  userClient: SupabaseClient,
+): ReturnType<typeof fetchMobileNotificationFacetsData> {
+  return fetchMobileNotificationFacetsData(userClient);
 }
 
 export function mapOrganizationToMobileConfig(org: Organization) {

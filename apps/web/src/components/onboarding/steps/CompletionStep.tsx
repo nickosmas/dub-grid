@@ -22,7 +22,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
   const isUser = role === "user";
 
   const heading = isSuperAdmin && !isSaOrientation
-    ? "Your Workspace is Ready!"
+    ? "Your Organization is Ready!"
     : "You\u2019re All Set!";
 
   const subtext = isSaOrientation

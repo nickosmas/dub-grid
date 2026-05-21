@@ -179,4 +179,187 @@ describe("dispatchNotificationEvent", () => {
       expect.anything(),
     );
   });
+
+  // ── New PR2 events ────────────────────────────────────────────────────
+
+  function makeSingleRowBuilder(row: Record<string, unknown> | null) {
+    const builder = {
+      select: vi.fn(() => builder),
+      eq: vi.fn(() => builder),
+      in: vi.fn(() => builder),
+      not: vi.fn(() => builder),
+      is: vi.fn(() => builder),
+      maybeSingle: vi.fn().mockResolvedValue({ data: row }),
+    };
+    return builder;
+  }
+
+  function makeListBuilder(rows: Array<Record<string, unknown>>) {
+    const builder: Record<string, unknown> = {};
+    builder.select = vi.fn(() => builder);
+    builder.eq = vi.fn(() => builder);
+    builder.is = vi.fn(() => builder);
+    builder.in = vi.fn(() => builder);
+    builder.not = vi.fn().mockResolvedValue({ data: rows });
+    return builder;
+  }
+
+  it("notifies the affected employee when a recurring shift is upserted", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "employees") {
+        return makeSingleRowBuilder({ user_id: "emp-user" });
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "recurring_shift_updated",
+      orgId: "org-1",
+      empId: "emp-1",
+      mode: "upsert",
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "emp-user",
+      "org-1",
+      "recurring_shift_updated",
+      "Recurring shift updated",
+      "Your recurring shift was updated.",
+      { empId: "emp-1", mode: "upsert" },
+    );
+  });
+
+  it("skips schedule note notification when status is draft", async () => {
+    fromMock.mockImplementation(() => makeSingleRowBuilder({ user_id: "emp-user" }));
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "schedule_note_changed",
+      orgId: "org-1",
+      empId: "emp-1",
+      date: "2026-05-20",
+      mode: "upsert",
+      status: "draft",
+    });
+
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("notifies the employee when a published schedule note is added", async () => {
+    fromMock.mockImplementation(() => makeSingleRowBuilder({ user_id: "emp-user" }));
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "schedule_note_changed",
+      orgId: "org-1",
+      empId: "emp-1",
+      date: "2026-05-20",
+      mode: "upsert",
+      status: "published",
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(1);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "emp-user",
+      "org-1",
+      "schedule_note_published",
+      "Schedule note added",
+      "Schedule note added for 2026-05-20.",
+      { empId: "emp-1", date: "2026-05-20", mode: "upsert" },
+    );
+  });
+
+  it("notifies all affected employees when recurring schedules are applied", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "employees") {
+        return makeListBuilder([
+          { user_id: "u1" },
+          { user_id: "u2" },
+        ]);
+      }
+      return makeSingleRowBuilder(null);
+    });
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "recurring_schedules_applied",
+      orgId: "org-1",
+      startDate: "2026-05-01",
+      endDate: "2026-05-31",
+      affectedEmpIds: ["emp-1", "emp-2"],
+    });
+
+    expect(sendNotification).toHaveBeenCalledTimes(2);
+    expect(sendNotification).toHaveBeenCalledWith(
+      "u1",
+      "org-1",
+      "recurring_schedules_applied",
+      "Recurring shifts applied",
+      expect.stringContaining("2026-05-01"),
+      expect.objectContaining({ startDate: "2026-05-01", endDate: "2026-05-31" }),
+    );
+  });
+
+  it("notifies the removed user and super_admins on membership_removed", async () => {
+    let call = 0;
+    fromMock.mockImplementation((table: string) => {
+      if (table === "organizations") {
+        return makeSingleRowBuilder({ name: "Acme" });
+      }
+      if (table === "organization_memberships") {
+        call++;
+        // Return super-admins list
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn().mockResolvedValue({
+                  data: [{ user_id: "super-1" }, { user_id: "super-2" }],
+                }),
+              })),
+            })),
+          })),
+        };
+      }
+      return makeSingleRowBuilder(null);
+    });
+    void call;
+
+    await dispatchNotificationEvent("super-1", {
+      action: "membership_removed",
+      orgId: "org-1",
+      removedUserId: "removed-user",
+    });
+
+    // super-1 is actor → excluded. Should notify super-2 + removed-user.
+    expect(sendNotification).toHaveBeenCalledTimes(2);
+    const calls = (sendNotification as ReturnType<typeof vi.fn>).mock.calls;
+    const recipients = calls.map((c) => c[0]);
+    expect(recipients).toContain("super-2");
+    expect(recipients).toContain("removed-user");
+    expect(recipients).not.toContain("super-1");
+  });
+
+  it("does not notify the actor when admin_permissions_changed targets themselves", async () => {
+    await dispatchNotificationEvent("self-user", {
+      action: "admin_permissions_changed",
+      orgId: "org-1",
+      targetUserId: "self-user",
+      before: { canApproveShiftRequests: true },
+      after: { canApproveShiftRequests: false },
+    });
+
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
+
+  it("skips employee_profile_changed when the affected employee has no linked user", async () => {
+    fromMock.mockImplementation(() => makeSingleRowBuilder({ user_id: null }));
+
+    await dispatchNotificationEvent("admin-user", {
+      action: "employee_profile_changed",
+      orgId: "org-1",
+      empId: "emp-1",
+      fields: ["firstName"],
+    });
+
+    expect(sendNotification).not.toHaveBeenCalled();
+  });
 });

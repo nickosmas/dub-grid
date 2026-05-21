@@ -13,7 +13,8 @@ const STATUS_BANNER_TONE = {
     iconColor: mobileColors.dangerText,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
-    iconName: "alert-circle-outline" as const,
+    iconName: "alert-circle" as const,
+    centeredIconName: "alert-circle-outline" as const,
     inlineActionTone: "danger" as const,
   },
   warning: {
@@ -22,7 +23,8 @@ const STATUS_BANNER_TONE = {
     iconColor: mobileColors.warningText,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
-    iconName: "warning-outline" as const,
+    iconName: "warning" as const,
+    centeredIconName: "warning-outline" as const,
     inlineActionTone: "secondary" as const,
   },
   info: {
@@ -31,7 +33,8 @@ const STATUS_BANNER_TONE = {
     iconColor: mobileColors.brand,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
-    iconName: "information-circle-outline" as const,
+    iconName: "information-circle" as const,
+    centeredIconName: "information-circle-outline" as const,
     inlineActionTone: "secondary" as const,
   },
   success: {
@@ -40,7 +43,8 @@ const STATUS_BANNER_TONE = {
     iconColor: mobileColors.successText,
     titleColor: mobileColors.textPrimary,
     bodyColor: mobileColors.textMuted,
-    iconName: "checkmark-circle-outline" as const,
+    iconName: "checkmark-circle" as const,
+    centeredIconName: "checkmark-circle-outline" as const,
     inlineActionTone: "secondary" as const,
   },
 } as const;
@@ -71,7 +75,7 @@ export function StatusBanner({
         body={body}
         fillScreen={fillScreen}
         iconColor={palette.iconColor}
-        iconName={palette.iconName}
+        iconName={palette.centeredIconName}
         onAction={onAction}
         title={title}
       />
@@ -89,17 +93,12 @@ export function StatusBanner({
       ]}
     >
       <View style={styles.copyRow}>
-        <View
-          style={[
-            styles.iconFrame,
-            {
-              backgroundColor: mobileColors.surface,
-              borderColor: palette.borderColor,
-            },
-          ]}
-        >
-          <Ionicons color={palette.iconColor} name={palette.iconName} size={18} />
-        </View>
+        <Ionicons
+          color={palette.iconColor}
+          name={palette.iconName}
+          size={24}
+          style={styles.icon}
+        />
         <View style={styles.copy}>
           <Text style={[styles.title, { color: palette.titleColor }]}>{title}</Text>
           {body ? (
@@ -172,14 +171,9 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
   },
-  iconFrame: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
+  icon: {
     flexShrink: 0,
+    marginTop: 1,
   },
   copy: {
     flex: 1,

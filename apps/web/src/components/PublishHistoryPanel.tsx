@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/features/schedule/client";
@@ -12,6 +14,8 @@ import type {
   AssignmentDefinition,
 } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { History } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import {
   createAssignmentDefinitionIdByPairMap,
   deriveAssignmentDefinitionIdsFromAssignments,
@@ -331,9 +335,7 @@ export default function PublishHistoryPanel({
   absenceTypeMap,
 }: PublishHistoryPanelProps) {
   const isMobile = useMediaQuery(MOBILE);
-  const [entries, setEntries] = useState<PublishHistoryEntryWithName[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
+  const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Build empId → "First Last" lookup from employees prop
@@ -353,28 +355,23 @@ export default function PublishHistoryPanel({
 
   const PAGE_SIZE = 20;
 
-  const loadInitial = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchPublishHistory(orgId, PAGE_SIZE, 0);
-      setEntries(data);
-      setHasMore(data.length === PAGE_SIZE);
-    } catch {
-      // Silently fail — non-critical
-    } finally {
-      setLoading(false);
-    }
-  }, [orgId]);
+  const historyQuery = useQuery({
+    queryKey: queryKeys.org.publishHistory(orgId),
+    queryFn: () => fetchPublishHistory(orgId, PAGE_SIZE, 0),
+    enabled: open,
+  });
 
-  useEffect(() => {
-    if (open) loadInitial();
-  }, [open, loadInitial]);
+  const entries = historyQuery.data ?? [];
+  const loading = open && historyQuery.isPending;
+  const hasMore = entries.length > 0 && entries.length % PAGE_SIZE === 0;
 
   const loadMore = async () => {
     try {
-      const data = await fetchPublishHistory(orgId, PAGE_SIZE, entries.length);
-      setEntries(prev => [...prev, ...data]);
-      setHasMore(data.length === PAGE_SIZE);
+      const more = await fetchPublishHistory(orgId, PAGE_SIZE, entries.length);
+      queryClient.setQueryData<PublishHistoryEntryWithName[]>(
+        queryKeys.org.publishHistory(orgId),
+        (prev) => [...(prev ?? []), ...more],
+      );
     } catch {
       // Silently fail
     }
@@ -446,9 +443,12 @@ export default function PublishHistoryPanel({
         )}
 
         {!loading && entries.length === 0 && (
-          <div style={{ textAlign: "center", padding: 40, color: "var(--color-text-muted)" }}>
-            No publish history found.
-          </div>
+          <EmptyState
+            size="compact"
+            icon={<History size={22} />}
+            title="No publish history yet"
+            description="Published schedules will be listed here."
+          />
         )}
 
         {entries.map(entry => {

@@ -18,6 +18,7 @@ import type { LucideIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { EmptyState } from "@/components/EmptyState";
 import {
   completeBillingCheckout,
   fetchOrganizationBilling,
@@ -240,16 +241,11 @@ function BillingOperations({
         </div>
         <div style={sectionBodyStyle}>
           {operations.length === 0 ? (
-            <div
-              style={{
-                padding: "8px 0",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-              }}
-            >
-              No billing activity yet.
-            </div>
+            <EmptyState
+              size="compact"
+              icon={<ReceiptText size={22} />}
+              title="No billing activity yet"
+            />
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -481,14 +477,14 @@ function billingNoticeCopy(
   switch (billingAccess.state) {
     case "trial_ending_soon":
       return billingAccess.daysUntilTrialEnd === 1
-        ? "Trial access ends tomorrow. Add billing to keep the workspace active."
-        : `Trial access ends in ${billingAccess.daysUntilTrialEnd ?? "a few"} days. Add billing to keep the workspace active.`;
+        ? "Trial access ends tomorrow. Add billing to keep the organization active."
+        : `Trial access ends in ${billingAccess.daysUntilTrialEnd ?? "a few"} days. Add billing to keep the organization active.`;
     case "trial_grace":
-      return "Trial access has ended. Add billing before the grace period ends to keep the workspace active.";
+      return "Trial access has ended. Add billing before the grace period ends to keep the organization active.";
     case "payment_attention_required":
-      return "Billing needs attention. Update payment details to keep the workspace active.";
+      return "Billing needs attention. Update payment details to keep the organization active.";
     case "locked":
-      return "Workspace access is locked until billing is restored.";
+      return "Organization access is locked until billing is restored.";
     default:
       return null;
   }
@@ -564,7 +560,7 @@ export default function BillingSettings({
   const billingResult = searchParams.get("billing");
   const checkoutSessionId = searchParams.get("stripe_checkout_session_id");
   // In sandbox mode the active org is the sandbox clone, which has no
-  // real Stripe state. Display the source workspace's billing instead so
+  // real Stripe state. Display the source organization's billing instead so
   // the user can see what's actually billed. Action buttons are still
   // gated by isInSandbox below, so the source-org data is read-only here.
   const billingOrgId =

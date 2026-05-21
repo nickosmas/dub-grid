@@ -237,9 +237,9 @@ describe("mobileApiRequest", () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError("Load failed"));
 
     vi.stubGlobal("fetch", fetchMock);
-    const { lookupWorkspace } = await import("./api");
+    const { lookupOrganization } = await import("./api");
 
-    await expect(lookupWorkspace("calmhaven")).rejects.toThrow(
+    await expect(lookupOrganization("calmhaven")).rejects.toThrow(
       "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
     );
   });
@@ -258,10 +258,10 @@ describe("mobileApiRequest", () => {
     );
 
     vi.stubGlobal("fetch", fetchMock);
-    const { loginToWorkspace } = await import("./api");
+    const { loginToOrganization } = await import("./api");
 
-    const loginPromise = loginToWorkspace({
-      workspaceSlug: "calmhaven",
+    const loginPromise = loginToOrganization({
+      orgSlug: "calmhaven",
       email: "mina@dubgrid.com",
       password: "super-secret",
     });
@@ -278,7 +278,7 @@ describe("mobileApiRequest", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
-      url: "https://www.dubgrid.com/api/mobile/v1/auth/workspace?slug=calmhaven",
+      url: "https://www.dubgrid.com/api/mobile/v1/auth/organization?slug=calmhaven",
       json: async () => {
         throw new Error("Unexpected token <");
       },
@@ -289,9 +289,9 @@ describe("mobileApiRequest", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    const { lookupWorkspace } = await import("./api");
+    const { lookupOrganization } = await import("./api");
 
-    await expect(lookupWorkspace("calmhaven")).rejects.toThrow(
+    await expect(lookupOrganization("calmhaven")).rejects.toThrow(
       "DubGrid isn't responding correctly right now. Try again in a moment.",
     );
   });
@@ -306,7 +306,7 @@ describe("mobileApiRequest", () => {
           expiresIn: 3600,
           tokenType: "bearer",
         },
-        workspace: {
+        organization: {
           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
           name: "Calmhaven",
           slug: "calmhaven",
@@ -321,10 +321,10 @@ describe("mobileApiRequest", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    const { loginToWorkspace } = await import("./api");
+    const { loginToOrganization } = await import("./api");
 
-    await loginToWorkspace({
-      workspaceSlug: "calmhaven",
+    await loginToOrganization({
+      orgSlug: "calmhaven",
       email: "user@example.com",
       password: "password",
     });

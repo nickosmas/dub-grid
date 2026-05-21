@@ -28,6 +28,7 @@ function IndicatorRow({
   canEdit,
   onSaved,
   onDeleted,
+  isLast,
 }: {
   indicator: LocalIndicator;
   orgId: string;
@@ -35,6 +36,7 @@ function IndicatorRow({
   canEdit: boolean;
   onSaved: (saved: IndicatorType, previousId: number) => void;
   onDeleted: (id: number) => void;
+  isLast?: boolean;
 }) {
   const [name, setName] = useState(indicator.name);
   const [color, setColor] = useState(indicator.color);
@@ -171,9 +173,10 @@ function IndicatorRow({
 
   return (
     <div
+      className="dg-list-row"
       style={{
-        borderBottom: "1px solid",
-        borderBottomColor: expanded ? "transparent" : "var(--color-border-light)",
+        borderBottom: isLast ? "none" : "1px solid",
+        borderBottomColor: expanded || isLast ? "transparent" : "var(--color-border-light)",
         transition: "border-bottom-color 220ms ease",
       }}
     >
@@ -523,7 +526,7 @@ export default function Indicators({
         </div>
         {local.length > 0 ? (
           <div style={{ padding: "0 16px" }}>
-            {local.map((indicator) => (
+            {local.map((indicator, indicatorIndex) => (
               <IndicatorRow
                 key={indicator.clientKey}
                 indicator={indicator}
@@ -532,12 +535,13 @@ export default function Indicators({
                 canEdit={canManageIndicatorTypes}
                 onSaved={handleSaved}
                 onDeleted={handleDeleted}
+                isLast={indicatorIndex === local.length - 1}
               />
             ))}
           </div>
         ) : (
           <EmptyState
-            compact
+            size="compact"
             title="No indicators yet"
             description="Indicators flag readings, conflicts, or notes on shift cells."
             action={

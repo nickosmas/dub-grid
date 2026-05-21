@@ -62,6 +62,7 @@ function AbsenceTypeRow({
   canEdit,
   allTypes,
   shiftDisplayMode,
+  isLast,
 }: {
   absenceType: AbsenceType & { isNew?: boolean };
   orgId: string;
@@ -70,6 +71,7 @@ function AbsenceTypeRow({
   canEdit: boolean;
   allTypes: Array<AbsenceType & { isNew?: boolean }>;
   shiftDisplayMode: ShiftDisplayMode;
+  isLast?: boolean;
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
@@ -218,7 +220,7 @@ function AbsenceTypeRow({
   }, [absenceType.id, onDeleted, orgId]);
 
   return (
-    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
+    <div className="dg-list-row" style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}>
       <div
         className="dg-hover-row"
         style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: 8, cursor: "pointer", transition: "background 0.15s" }}
@@ -465,7 +467,7 @@ export default function AbsenceTypesSettings({
         </div>
         {local.length > 0 ? (
           <div style={{ padding: "0 16px" }}>
-            {local.map((absenceType) => (
+            {local.map((absenceType, absenceIndex) => (
               <AbsenceTypeRow
                 key={absenceType.id}
                 absenceType={absenceType}
@@ -475,12 +477,13 @@ export default function AbsenceTypesSettings({
                 canEdit={canManageScheduleDefinitions}
                 allTypes={local}
                 shiftDisplayMode={shiftDisplayMode}
+                isLast={absenceIndex === local.length - 1}
               />
             ))}
           </div>
         ) : (
           <EmptyState
-            compact
+            size="compact"
             title="No absence types yet"
             description="Create the off-day and calloff labels your schedulers use."
             action={canManageScheduleDefinitions ? (

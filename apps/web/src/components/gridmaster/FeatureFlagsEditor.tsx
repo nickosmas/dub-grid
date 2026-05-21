@@ -16,7 +16,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 const REALTIME_FLAG = {
   name: "disable_realtime",
   label: "Pause Live Updates",
-  description: "Stop live schedule and workspace updates for this organization.",
+  description: "Stop live schedule and organization updates for this organization.",
 } as const;
 
 const HIGH_IMPACT_FLAGS = new Set<string>([REALTIME_FLAG.name]);
@@ -148,7 +148,7 @@ export default function FeatureFlagsEditor({
       {confirmOpen && (
         <ConfirmDialog
           title="Save Runtime Control Changes"
-          message="This change can affect live workspace behavior. Review carefully before saving."
+          message="This change can affect live organization behavior. Review carefully before saving."
           confirmLabel="Save Changes"
           variant="warning"
           isLoading={saving}

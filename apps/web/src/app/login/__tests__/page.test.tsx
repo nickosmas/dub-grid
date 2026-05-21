@@ -9,12 +9,12 @@ import LoginPage from "@/app/login/page";
 // Mock account client — setBrowserSession is called after server-side auth succeeds
 const mockSetSession = vi.fn();
 vi.mock("@/features/account/client", () => ({
-  fetchAccessibleWorkspaces: vi.fn().mockResolvedValue({ organizations: [] }),
+  fetchAccessibleOrganizations: vi.fn().mockResolvedValue({ organizations: [] }),
   getBrowserAuthSession: vi.fn().mockResolvedValue(null),
   refreshBrowserSession: vi.fn().mockResolvedValue(undefined),
   setBrowserSession: (...args: unknown[]) => mockSetSession(...args),
   signOutFromBrowser: vi.fn().mockResolvedValue(undefined),
-  switchBrowserWorkspace: vi.fn().mockResolvedValue(undefined),
+  switchBrowserOrganization: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/components/RouteGuards", () => ({

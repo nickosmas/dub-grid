@@ -28,6 +28,17 @@ export const colorTokens = {
   dangerBorder: "#FECACA",
   shadow: "rgba(15, 23, 42, 0.08)",
   shadowStrong: "rgba(15, 23, 42, 0.14)",
+  placeholderText: "#94A3B8",
+  inputBackground: "#F1F5F9",
+  inputBackgroundFocused: "#FFFFFF",
+  inputBackgroundError: "#FEF2F2",
+  inputBorder: "#E2E8F0",
+  inputBorderFocused: "#3B82F6",
+  inputBorderError: "#FCA5A5",
+  inputFocusRing: "rgba(59, 130, 246, 0.18)",
+  rippleNeutral: "rgba(15, 23, 42, 0.06)",
+  ripplePrimary: "rgba(255, 255, 255, 0.18)",
+  rippleDanger: "rgba(239, 68, 68, 0.18)",
 } as const;
 
 export const spacingTokens = {
@@ -88,7 +99,11 @@ export const typographyTokens = {
 
 export const mobileTypographyTokens = {
   fontFamily: {
-    base: "System",
+    base: "DMSans_400Regular",
+    regular: "DMSans_400Regular",
+    medium: "DMSans_500Medium",
+    semibold: "DMSans_600SemiBold",
+    bold: "DMSans_700Bold",
   },
   fontWeight: {
     regular: "400",
@@ -98,61 +113,73 @@ export const mobileTypographyTokens = {
   },
   text: {
     screenTitle: {
+      fontFamily: "DMSans_700Bold",
       fontSize: 22,
       lineHeight: 28,
       fontWeight: "700",
     },
     heroMetric: {
+      fontFamily: "DMSans_700Bold",
       fontSize: 24,
       lineHeight: 30,
       fontWeight: "700",
     },
     sectionTitle: {
+      fontFamily: "DMSans_700Bold",
       fontSize: 16,
       lineHeight: 22,
       fontWeight: "700",
     },
     cardTitle: {
+      fontFamily: "DMSans_600SemiBold",
       fontSize: 16,
       lineHeight: 22,
       fontWeight: "600",
     },
     rowTitle: {
+      fontFamily: "DMSans_600SemiBold",
       fontSize: 15,
       lineHeight: 21,
       fontWeight: "600",
     },
     body: {
+      fontFamily: "DMSans_400Regular",
       fontSize: 14,
       lineHeight: 21,
       fontWeight: "400",
     },
     bodyStrong: {
+      fontFamily: "DMSans_600SemiBold",
       fontSize: 14,
       lineHeight: 21,
       fontWeight: "600",
     },
     meta: {
+      fontFamily: "DMSans_400Regular",
       fontSize: 13,
       lineHeight: 18,
       fontWeight: "400",
     },
     label: {
+      fontFamily: "DMSans_600SemiBold",
       fontSize: 12,
       lineHeight: 16,
       fontWeight: "600",
     },
     caption: {
+      fontFamily: "DMSans_400Regular",
       fontSize: 12,
       lineHeight: 16,
       fontWeight: "400",
     },
     badge: {
+      fontFamily: "DMSans_700Bold",
       fontSize: 11,
       lineHeight: 14,
       fontWeight: "700",
     },
     micro: {
+      fontFamily: "DMSans_600SemiBold",
       fontSize: 10,
       lineHeight: 12,
       fontWeight: "600",
@@ -372,19 +399,19 @@ export const mobileNavigationTheme = {
   },
   fonts: {
     regular: {
-      fontFamily: "System",
+      fontFamily: "DMSans_400Regular",
       fontWeight: "400",
     },
     medium: {
-      fontFamily: "System",
+      fontFamily: "DMSans_500Medium",
       fontWeight: "500",
     },
     bold: {
-      fontFamily: "System",
+      fontFamily: "DMSans_600SemiBold",
       fontWeight: "600",
     },
     heavy: {
-      fontFamily: "System",
+      fontFamily: "DMSans_700Bold",
       fontWeight: "700",
     },
   },

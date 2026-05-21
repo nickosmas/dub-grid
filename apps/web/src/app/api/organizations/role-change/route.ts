@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Redirect to sandbox if the caller is in sandbox mode, so role
-    // changes inside a sandbox don't leak to the real workspace's
+    // changes inside a sandbox don't leak to the real organization's
     // memberships.
     const effectiveOrgId = parsed.data.orgId
       ? await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId)

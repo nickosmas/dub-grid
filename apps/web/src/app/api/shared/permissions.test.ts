@@ -191,7 +191,7 @@ describe("requireOrgPermissions", () => {
       expect(result.response.status).toBe(403);
       await expect(result.response.json()).resolves.toEqual({
         error:
-          "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+          "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
       });
     }
   });
@@ -303,7 +303,7 @@ describe("requireOrgPermissions", () => {
       expect(result.response.status).toBe(403);
       await expect(result.response.json()).resolves.toEqual({
         error:
-          "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+          "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
       });
     }
   });
@@ -354,7 +354,7 @@ describe("requireOrgPermissions", () => {
       makeRequest(),
       "11111111-1111-4111-8111-111111111111",
       () => true,
-      { allowDuringSetup: true, allowLockedWorkspace: true },
+      { allowDuringSetup: true, allowLockedOrganization: true },
     );
 
     expect("response" in result).toBe(false);

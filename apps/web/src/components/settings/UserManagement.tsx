@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { AdminPermissions, OrganizationUser, OrganizationRole } from "@/types";
 import {
   fetchOrganizationUsers,
@@ -15,6 +17,8 @@ import {
 import { toast } from "sonner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
+import { UserRound } from "lucide-react";
 import { queueNotification } from "@/lib/notify";
 import { useAuth } from "@/components/AuthProvider";
 import CustomSelect from "@/components/CustomSelect";
@@ -117,11 +121,73 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
   const isMobile = useMediaQuery(MOBILE);
   const myRole = isSuperAdmin ? "super_admin" : "user";
 
-  // Data
-  const [users, setUsers] = useState<OrganizationUser[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [invitations, setInvitations] = useState<import("@/types").Invitation[]>([]);
+  const queryClient = useQueryClient();
+
+  const usersQuery = useQuery({
+    queryKey: queryKeys.org.users(orgId),
+    queryFn: () => fetchOrganizationUsers(orgId),
+  });
+  const invitationsQuery = useQuery({
+    queryKey: queryKeys.org.invitations(orgId),
+    queryFn: () => fetchOrganizationInvitations(orgId),
+  });
+
+  const users = useMemo(() => usersQuery.data ?? [], [usersQuery.data]);
+  const invitations = useMemo(
+    () => invitationsQuery.data ?? [],
+    [invitationsQuery.data],
+  );
+  const loading = usersQuery.isPending;
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const error = mutationError ?? (
+    usersQuery.isError
+      ? formatClientErrorMessage(usersQuery.error, "Failed to load users")
+      : null
+  );
+  const setError = setMutationError;
+
+  const setUsers = useCallback(
+    (
+      updater:
+        | OrganizationUser[]
+        | ((prev: OrganizationUser[]) => OrganizationUser[]),
+    ) => {
+      queryClient.setQueryData<OrganizationUser[]>(
+        queryKeys.org.users(orgId),
+        (prev) => {
+          const current = prev ?? [];
+          return typeof updater === "function"
+            ? (updater as (p: OrganizationUser[]) => OrganizationUser[])(current)
+            : updater;
+        },
+      );
+    },
+    [orgId, queryClient],
+  );
+  const setInvitations = useCallback(
+    (
+      updater:
+        | import("@/types").Invitation[]
+        | ((
+            prev: import("@/types").Invitation[],
+          ) => import("@/types").Invitation[]),
+    ) => {
+      queryClient.setQueryData<import("@/types").Invitation[]>(
+        queryKeys.org.invitations(orgId),
+        (prev) => {
+          const current = prev ?? [];
+          return typeof updater === "function"
+            ? (
+                updater as (
+                  p: import("@/types").Invitation[],
+                ) => import("@/types").Invitation[]
+              )(current)
+            : updater;
+        },
+      );
+    },
+    [orgId, queryClient],
+  );
 
   // UI state
   const [activeTab, setActiveTab] = useState("active");
@@ -152,18 +218,9 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
   } | null>(null);
   const [invitationRevokeConfirm, setInvitationRevokeConfirm] = useState<import("@/types").Invitation | null>(null);
 
-  // ── Data fetching ────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    let mounted = true;
-    fetchOrganizationUsers(orgId)
-      .then((u) => { if (mounted) { setUsers(u); setLoading(false); } })
-      .catch((e) => { if (mounted) { setError(formatClientErrorMessage(e, "Failed to load users")); setLoading(false); } });
-    fetchOrganizationInvitations(orgId)
-      .then((inv) => { if (mounted) setInvitations(inv); })
-      .catch(() => {});
-    return () => { mounted = false; };
-  }, [orgId]);
+  // Data is fetched via `usersQuery` / `invitationsQuery` above and kept fresh
+  // by realtime invalidation on the `organization_memberships` and
+  // `invitations` tables.
 
   // ── Derived data ─────────────────────────────────────────────────────────────
 
@@ -717,17 +774,13 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
               <TableBody>
                 {sortedUsers.length === 0 && (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={4} className="py-16 text-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-faint)]">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                          <circle cx="9" cy="7" r="4" />
-                          <line x1="17" y1="11" x2="22" y2="11" />
-                        </svg>
-                        <p className="text-[13px] text-[var(--color-text-muted)]">
-                          {search ? "No users match your search" : "No users found"}
-                        </p>
-                      </div>
+                    <TableCell colSpan={4} className="p-0">
+                      <EmptyState
+                        size="compact"
+                        icon={<UserRound size={22} />}
+                        title={search ? "No users match your search" : "No users found"}
+                        style={{ border: "none", borderRadius: 0, background: "transparent" }}
+                      />
                     </TableCell>
                   </TableRow>
                 )}

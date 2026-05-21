@@ -651,7 +651,10 @@ export default function ProfileSecurityScreen() {
             <ProfileSection title="Account deletion">
               <Button
                 compact
-                disabled={deletionRequestMutation.isPending}
+                disabled={
+                  deletionRequestMutation.isPending ||
+                  Boolean(profileQuery.data.pendingAccountDeletionRequest)
+                }
                 label={
                   deletionRequestMutation.isPending
                     ? "Requesting..."

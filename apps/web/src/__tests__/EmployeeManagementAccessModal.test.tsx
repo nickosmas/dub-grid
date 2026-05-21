@@ -327,7 +327,7 @@ describe("EmployeeManagementAccessModal", () => {
     await screen.findByRole("dialog", { name: /edit management access/i });
 
     await user.click(screen.getByRole("button", { name: /remove from management/i }));
-    expect(screen.getByText(/keep them on the schedule/i)).toBeInTheDocument();
+    expect(screen.getByText(/stay on the schedule/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /save access/i }));
 
     await waitFor(() => {
@@ -395,7 +395,7 @@ describe("EmployeeManagementAccessModal", () => {
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Alicia Smith")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Use Account Name and Link" }));
+    await user.click(screen.getByRole("button", { name: "Use Account Name and Add to Management" }));
 
     await waitFor(() => {
       expect(reconcileEmployeeNameAndLinkUserMock).toHaveBeenCalledWith("emp-1", "user-1", "org-1");

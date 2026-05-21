@@ -116,7 +116,7 @@ export default function ExpandedStaffHours({
         {/* Staff list */}
         <div style={{ maxHeight: "60vh", overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {sorted.length === 0 ? (
-            <EmptyState compact heading="No staff matching filters" />
+            <EmptyState size="compact" heading="No staff matching filters" />
           ) : (
             sorted.map((h) => {
               const emp = empMap.get(h.empId);

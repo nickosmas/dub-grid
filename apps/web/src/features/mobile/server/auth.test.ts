@@ -154,7 +154,7 @@ describe("requireMobileAuth", () => {
     createMobileUserClient.mockReturnValue({});
   });
 
-  it("blocks mobile app access while workspace setup is incomplete", async () => {
+  it("blocks mobile app access while organization setup is incomplete", async () => {
     getServiceClient.mockReturnValue(createServiceClient({ setupComplete: false }));
 
     const { requireMobileAuth } = await import("./auth");
@@ -168,11 +168,11 @@ describe("requireMobileAuth", () => {
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
-      error: "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      error: "Organization unavailable. Sign in on the web to finish organization setup.",
     });
   });
 
-  it("allows mobile auth context once workspace setup is complete", async () => {
+  it("allows mobile auth context once organization setup is complete", async () => {
     getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
 
     const { requireMobileAuth } = await import("./auth");

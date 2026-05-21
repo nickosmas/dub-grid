@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import {
@@ -103,14 +104,19 @@ function makeRequest(overrides: Partial<ProfileChangeRequest> = {}): ProfileChan
 }
 
 function renderQueue() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
-    <ProfileChangeRequestQueue
-      orgId="org-1"
-      focusAreas={focusAreas}
-      certifications={certifications}
-      roles={roles}
-      departments={departments}
-    />,
+    <QueryClientProvider client={queryClient}>
+      <ProfileChangeRequestQueue
+        orgId="org-1"
+        focusAreas={focusAreas}
+        certifications={certifications}
+        roles={roles}
+        departments={departments}
+      />
+    </QueryClientProvider>,
   );
 }
 
@@ -153,7 +159,7 @@ describe("ProfileChangeRequestQueue", () => {
     expect(screen.getByText("Please update my work profile.")).toBeInTheDocument();
   });
 
-  it("shows account deletion safeguards and account snapshots", async () => {
+  it("shows account deletion warning and account snapshots", async () => {
     vi.mocked(fetchPeopleProfileChangeRequests).mockResolvedValue({
       requests: [
         makeRequest({
@@ -170,7 +176,7 @@ describe("ProfileChangeRequestQueue", () => {
     expect(await screen.findByText("Account deletion")).toBeInTheDocument();
     expect(screen.getByText("Account deletion request")).toBeInTheDocument();
     expect(
-      screen.getByText(/approval will run the account deletion safeguards/i),
+      screen.getByText(/approving will permanently delete this user's account/i),
     ).toBeInTheDocument();
     expect(screen.queryByText("Requester user ID")).not.toBeInTheDocument();
     expect(screen.queryByText("Linked employee ID")).not.toBeInTheDocument();

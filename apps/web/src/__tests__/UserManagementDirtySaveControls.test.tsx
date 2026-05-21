@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import UserManagementSettings from "@/components/settings/UserManagement";
 import {
   fetchOrganizationInvitations,

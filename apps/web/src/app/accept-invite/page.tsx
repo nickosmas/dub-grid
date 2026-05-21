@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PublicRoute } from "@/components/RouteGuards";
+import { PageShell, Card } from "@/components/auth/AuthCard";
+import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -16,11 +19,10 @@ import {
 } from "@/features/account/client";
 import { acceptInvitation } from "@/features/organization/client";
 
-type PageState = "loading" | "no-token" | "form" | "processing" | "success" | "error";
+type PageState = "loading" | "no-token" | "form" | "processing" | "success";
 
-export default function AcceptInvitePage() {
+function AcceptInviteContent() {
   const [state, setState] = useState<PageState>("loading");
-  const [error] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [orgSlug, setOrgSlug] = useState<string | null>(null);
 
@@ -161,51 +163,43 @@ export default function AcceptInvitePage() {
     }
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        padding: "24px",
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-brand-bg) 100%)",
-      }}
-    >
-      <div
-        className="dg-auth-card"
-        style={{
-          maxWidth: "480px",
-          background: "rgba(255, 255, 255, 0.95)",
-          backdropFilter: "blur(16px)",
-          borderRadius: "24px",
-          boxShadow: "0 20px 50px rgba(15, 23, 42, 0.1)",
-          textAlign: "center",
-          border: "1px solid rgba(255, 255, 255, 0.5)",
-        }}
-      >
+    <PageShell>
+      <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block" style={{ marginBottom: "32px" }}>
-          <DubGridLogo size={52} />
+        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
+          <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
 
         {state === "loading" || state === "processing" ? (
-          <LoadingState
-            message={state === "processing" ? "Setting up your account..." : "Loading..."}
+          <AuthStateCard
+            icon="spinner"
+            heading={state === "processing" ? "Setting up your account" : "Loading"}
+            message="Please wait while we process your invitation."
           />
         ) : state === "no-token" ? (
-          <ErrorState
-            title="Invalid Link"
+          <AuthStateCard
+            heading="Invalid link"
             message="This invitation link is missing a token. Please check the link you received and try again."
+            primaryCta={{ label: "Go to login", href: "/login" }}
           />
-        ) : state === "form" ? (
+        ) : state === "success" ? (
+          <SuccessState orgSlug={orgSlug} getLoginUrl={getLoginUrl} />
+        ) : (
           <>
-            <h1 style={headingStyle}>Accept Invitation</h1>
-            <p style={subtextStyle}>
+            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
+              Accept Invitation
+            </h1>
+            <p
+              style={{
+                fontSize: "var(--dg-fs-body-sm)",
+                color: "var(--color-text-muted)",
+                lineHeight: 1.5,
+                textAlign: "center",
+                marginBottom: "24px",
+              }}
+            >
               {orgName
                 ? <>Set your password to join <strong>{orgName}</strong> on DubGrid.</>
                 : "Set your password to join your organization on DubGrid."}
@@ -213,56 +207,83 @@ export default function AcceptInvitePage() {
 
             <form
               onSubmit={handleSubmit}
-              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+              style={{ display: "flex", flexDirection: "column", gap: 16 }}
             >
-              <input
-                type="email"
-                placeholder="Email"
-                className="dg-auth-input dg-standalone-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                readOnly={emailFromUrl}
-                style={{
-                  ...(emailFromUrl
-                    ? { background: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" }
-                    : {}),
-                }}
-              />
+              <div>
+                <label htmlFor="invite-email" className="dg-auth-field-label">
+                  Email
+                </label>
+                <input
+                  id="invite-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  className="dg-auth-input"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  readOnly={emailFromUrl}
+                  autoComplete="email"
+                  style={
+                    emailFromUrl
+                      ? { background: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" }
+                      : undefined
+                  }
+                />
+              </div>
 
               <div>
+                <label htmlFor="invite-password" className="dg-auth-field-label">
+                  Password
+                </label>
                 <PasswordInput
-                  placeholder="Password"
+                  id="invite-password"
+                  placeholder="Create a password"
                   value={password}
                   onChange={setPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword(!showPassword)}
-                  ariaDescribedBy="password-strength-label password-strength-hints"
+                  ariaDescribedBy={
+                    "password-strength-label password-strength-hints" +
+                    (formError ? " invite-form-error" : "")
+                  }
                 />
                 {password.length > 0 && <PasswordStrength password={password} />}
               </div>
-              <PasswordInput
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChange={setConfirmPassword}
-                showPassword={showPassword}
-                onToggle={() => setShowPassword(!showPassword)}
-              />
+
+              <div>
+                <label htmlFor="invite-confirm-password" className="dg-auth-field-label">
+                  Confirm Password
+                </label>
+                <PasswordInput
+                  id="invite-confirm-password"
+                  placeholder="Confirm password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  showPassword={showPassword}
+                  onToggle={() => setShowPassword(!showPassword)}
+                  ariaDescribedBy={formError ? "invite-form-error" : undefined}
+                />
+              </div>
 
               {formError && (
-                <p style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0, textAlign: "left" }}>
+                <p
+                  id="invite-form-error"
+                  style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0 }}
+                >
                   {formError}
                 </p>
               )}
 
-              <label style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                cursor: "pointer",
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-secondary)",
-              }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  cursor: "pointer",
+                  fontSize: "var(--dg-fs-body-sm)",
+                  color: "var(--color-text-secondary)",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={termsAccepted}
@@ -291,42 +312,19 @@ export default function AcceptInvitePage() {
                 type="submit"
                 disabled={loading || !termsAccepted}
                 className="dg-auth-submit"
-                style={{
-                  borderRadius: "12px",
-                  padding: "14px",
-                  fontSize: "var(--dg-fs-title)",
-                  fontWeight: 700,
-                  transition: "transform 150ms ease, box-shadow 150ms ease",
-                  boxShadow: "0 4px 12px rgba(37, 99, 235, 0.18)",
-                }}
+                style={{ marginTop: "4px" }}
               >
                 <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Set Password & Accept</ButtonLoading>
               </button>
             </form>
           </>
-        ) : state === "success" ? (
-          <SuccessState orgSlug={orgSlug} getLoginUrl={getLoginUrl} />
-        ) : state === "error" ? (
-          <ErrorState
-            title="Invitation Failed"
-            message={error ?? "An unexpected error occurred."}
-          />
-        ) : null}
-      </div>
-    </div>
+        )}
+      </Card>
+    </PageShell>
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function LoadingState({ message }: { message: string }) {
-  return (
-    <>
-      <h1 style={headingStyle}>{message}</h1>
-      <p style={subtextStyle}>Please wait while we process your invitation.</p>
-    </>
-  );
-}
+// ── Success state (with redirect countdown) ───────────────────────────────────
 
 function SuccessState({
   orgSlug,
@@ -349,76 +347,31 @@ function SuccessState({
       });
     }, 1000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <>
-      <h1 style={headingStyle}>You&apos;re All Set</h1>
-      <p style={subtextStyle}>
-        Your account has been created and invitation accepted.
-        Sign in to get started with your onboarding.
-        Redirecting{countdown > 0 ? ` in ${countdown}...` : "..."}
-      </p>
-      <button
-        onClick={() => (window.location.href = getLoginUrl(orgSlug))}
-        className="dg-auth-submit"
-        style={{
-          borderRadius: "12px",
-          padding: "14px",
-          fontSize: "var(--dg-fs-title)",
-          fontWeight: 700,
-          transition: "transform 150ms ease, box-shadow 150ms ease",
-          boxShadow: "0 4px 12px rgba(37, 99, 235, 0.18)",
-        }}
-      >
-        Sign In Now
-      </button>
-    </>
+    <AuthStateCard
+      icon="check"
+      heading="You're all set"
+      message={
+        <>
+          Your account has been created and invitation accepted. Sign in to get
+          started with your onboarding.
+          {countdown > 0 ? ` Redirecting in ${countdown}...` : " Redirecting..."}
+        </>
+      }
+      primaryCta={{
+        label: "Sign In Now",
+        onClick: () => (window.location.href = getLoginUrl(orgSlug)),
+      }}
+    />
   );
 }
 
-function ErrorState({ title, message }: { title: string; message: string }) {
+export default function AcceptInvitePage() {
   return (
-    <>
-      <h1 style={headingStyle}>{title}</h1>
-      <p style={subtextStyle}>{message}</p>
-      <button
-        onClick={() => (window.location.href = "/login")}
-        style={secondaryButtonStyle}
-      >
-        Go to Login
-      </button>
-    </>
+    <PublicRoute>
+      <AcceptInviteContent />
+    </PublicRoute>
   );
 }
-
-// ── Shared styles ─────────────────────────────────────────────────────────────
-
-const headingStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-page-title)",
-  fontWeight: 800,
-  marginBottom: "16px",
-  color: "var(--color-text-primary)",
-  letterSpacing: "-0.03em",
-};
-
-const subtextStyle: React.CSSProperties = {
-  fontSize: "var(--dg-fs-title)",
-  color: "var(--color-text-muted)",
-  lineHeight: 1.6,
-  marginBottom: "24px",
-};
-
-const secondaryButtonStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "14px",
-  background: "var(--color-bg-secondary)",
-  color: "var(--color-text-muted)",
-  border: "none",
-  borderRadius: "12px",
-  fontSize: "var(--dg-fs-body)",
-  fontWeight: 600,
-  cursor: "pointer",
-  transition: "background 150ms ease",
-};

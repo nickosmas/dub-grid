@@ -8,6 +8,7 @@ import {
   getVerifiedBrowserAuthUser,
 } from "@/features/account/client";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { openConsentPreferences } from "@/components/CookieConsent";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
 import StaffViewMockup from "@/components/landing/StaffViewMockup";
@@ -45,78 +46,78 @@ type Feature = {
 const FEATURES: Feature[] = [
   {
     icon: CalendarDays,
-    title: "Schedule Management",
+    title: "Build the week",
     description:
-      "Drag-and-drop shift grid with a draft-to-publish workflow. Week and month views with print-ready exports.",
+      "Drag, drop, done. Build the week in a grid that prints cleanly and publishes when you're ready.",
   },
   {
     icon: Users,
-    title: "Staff Management",
+    title: "Your team on file",
     description:
-      "Employee records, certifications, focus areas, and status tracking — all in one place.",
+      "Profiles, certifications, focus areas, and statuses. Sort by name or seniority, filter down to whoever you need.",
   },
   {
     icon: Shield,
-    title: "Role-Based Access",
+    title: "The right access",
     description:
-      "Super admin, admin with configurable permissions, and user roles. Everyone sees exactly what they need.",
+      "Owners, admins, and staff each see what's theirs. Fine-tune what each admin can change.",
   },
   {
     icon: Radio,
-    title: "Real-Time Collaboration",
+    title: "Always live",
     description:
-      "Live schedule updates and presence indicators. Changes are visible the moment they happen.",
+      "Publish the schedule and it reaches every screen instantly. No stale printouts, no one working off the old version.",
   },
   {
     icon: BarChart3,
-    title: "Coverage Intelligence",
+    title: "Spot every gap",
     description:
-      "Shift counts, gap detection, focus area filtering, and color-coded shift types at a glance.",
+      "Open shifts, hour counts, and color-coded shift codes. See where coverage falls short, at a glance.",
   },
   {
     icon: Repeat,
-    title: "Recurring Shifts",
+    title: "Recurring shifts",
     description:
-      "Daily, weekly, and biweekly templates with full series management.",
+      "Set each person's regular weekly shifts once, then apply the template across any date range.",
   },
   {
     icon: Settings,
-    title: "Customizable Terminology",
+    title: "Speaks your language",
     description:
-      "Rename focus areas, certifications, roles, shifts, and jobs to match your facility.",
+      "Call focus areas, certifications, and roles whatever your facility calls them.",
   },
   {
     icon: Mail,
-    title: "Invite-Only Onboarding",
+    title: "Invite only",
     description:
-      "Secure invitation flow with 72-hour expiry. No open registration, no unauthorized access.",
+      "Every account starts from a link that expires in 72 hours. No open sign-ups, no surprises.",
   },
 ];
 
 const TRUST_SIGNALS = [
   {
     icon: Shield,
-    title: "Role-Based Access Control",
+    title: "Permissions that fit",
     description:
-      "Granular permissions at every level. Admins, schedulers, and staff each see only what they need.",
+      "Owners, admins, and staff each see what's theirs. You decide what every admin can change.",
   },
   {
     icon: FileText,
-    title: "Immutable Audit Trail",
+    title: "A full audit trail",
     description:
-      "Every role change and schedule version is logged. Full accountability, zero ambiguity.",
+      "Every role change and schedule version is recorded, immutably. Nothing gets quietly overwritten or erased.",
   },
   {
     icon: Lock,
-    title: "Invite-Only Access",
+    title: "Invitation required",
     description:
-      "No open registration. Every user enters through a secure, time-limited invitation.",
+      "Nobody walks in off the street. Every account starts from a link, every link has an expiry.",
   },
   {
     icon: Building2,
-    title: "Multi-Organization",
+    title: "One app, every facility",
     description:
-      "Built from the ground up to scale. Each facility gets its own isolated workspace with dedicated subdomain routing.",
+      "Each facility gets its own private workspace on its own subdomain. Easy to scale, hard to mix up.",
   },
 ];
 
@@ -354,15 +355,16 @@ export default function RootPage() {
         <div className="max-w-4xl mx-auto px-6 text-center pt-28 pb-14">
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] text-[var(--color-text-primary)] leading-[1.05]">
-            Purpose built for
+            Scheduling, done right.
             <br />
-            <span className="text-[var(--color-brand)]">CS Care Facilities</span>
+            <span className="text-[var(--color-brand)]">Ditch the spreadsheet.</span>
           </h1>
 
           {/* Subtitle */}
           <p className="mt-6 text-lg md:text-xl text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
-            DubGrid replaces spreadsheets with a purpose-built scheduling
-            platform. Faster to use, easier to manage, impossible to break.
+            Built for the way care teams actually work. Quick to build the
+            schedule, easy to fill a gap, and right in your pocket on iOS and
+            Android.
           </p>
 
           {/* CTAs */}
@@ -400,11 +402,10 @@ export default function RootPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Everything you need
+              Everything you need, nothing you don't
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Built specifically for care facilities that need reliable,
-              role-aware scheduling.
+              Made for the way care teams actually work.
             </p>
           </div>
 
@@ -442,10 +443,10 @@ export default function RootPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Your command center
+              The full picture
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Coverage, hours, and open shifts on one screen. Spot the gap before it becomes a problem.
+              Coverage, hours, and open shifts on one screen. Catch a gap before it catches you.
             </p>
           </div>
           <DashboardMockup />
@@ -457,10 +458,10 @@ export default function RootPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Make it yours
+              Make it your own
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Rename focus areas, certifications, and roles to match how your facility actually works.
+              Rename focus areas, certifications, and roles so the app speaks the same language as your team.
             </p>
           </div>
           <SettingsMockup />
@@ -472,10 +473,10 @@ export default function RootPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Automate the routine
+              Set it once.
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Set recurring shift templates and apply them in one click. Daily, weekly, or biweekly.
+              Set each person's usual weekly shifts, then apply the template across any date range in a click.
             </p>
           </div>
           <RecurringShiftsMockup />
@@ -487,10 +488,10 @@ export default function RootPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Your team, at a glance
+              Your whole team, one screen
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Certifications, focus areas, and account status — all in one unified view.
+              Certifications, focus areas, and account status. Filter to whoever you need, sorted by name or seniority.
             </p>
           </div>
           <div className="max-w-4xl mx-auto">
@@ -507,10 +508,10 @@ export default function RootPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Built for trust
+              Secure by design
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Enterprise-grade security without the enterprise complexity.
+              Serious security under the hood. Nothing for you to configure to get there.
             </p>
           </div>
 
@@ -553,10 +554,10 @@ export default function RootPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Take it with you
+              Your schedule, in your pocket
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Check your schedule, swap shifts, and pick up open work from anywhere. Built native for iOS and Android.
+              Check the week, swap a shift, or grab an open shift right from your phone. Native iOS and Android.
             </p>
           </div>
           <div className="flex justify-center">
@@ -579,12 +580,12 @@ export default function RootPage() {
 
         <div className="relative max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
-            Ready to leave
+            Done with
             <br />
-            spreadsheets behind?
+            the spreadsheet?
           </h2>
           <p className="text-lg text-white/60 mt-4 max-w-xl mx-auto">
-            Your team deserves a scheduling tool that just works.
+            Your team deserves something that just works.
           </p>
           <Link
             href="/request-demo"
@@ -621,6 +622,13 @@ export default function RootPage() {
             >
               Terms of Service
             </Link>
+            <button
+              type="button"
+              onClick={openConsentPreferences}
+              className="text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)] transition-colors"
+            >
+              Cookie preferences
+            </button>
           </div>
         </div>
       </footer>

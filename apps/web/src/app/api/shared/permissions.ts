@@ -16,14 +16,14 @@ import {
 type PermissionContext = ReturnType<typeof buildPermissionContext>;
 
 interface OrgPermissionOptions {
-  allowLockedWorkspace?: boolean;
+  allowLockedOrganization?: boolean;
   allowDuringSetup?: boolean;
   /**
    * Opt out of the sandbox-redirect that requireOrgPermissions normally
    * applies when the caller has an active sandbox cookie. Use this for
    * endpoints that legitimately need to operate on the user's non-sandbox
    * org while they're in sandbox mode — for example, the billing read
-   * endpoint, which must show the source workspace's real Stripe state.
+   * endpoint, which must show the source organization's real Stripe state.
    */
   ignoreSandbox?: boolean;
 }
@@ -41,7 +41,7 @@ export interface AuthorizedOrgRequest {
    * Endpoints that perform org-scoped writes MUST use this field, not
    * the orgId from the request body. Otherwise, the permission check
    * validates against the sandbox while the actual mutation lands on
-   * the real workspace — exactly the data leak the redirect is meant
+   * the real organization — exactly the data leak the redirect is meant
    * to prevent.
    */
   orgId: string;
@@ -54,11 +54,11 @@ function forbiddenResponse() {
   );
 }
 
-function lockedWorkspaceResponse() {
+function lockedOrganizationResponse() {
   return NextResponse.json(
     {
       error:
-        "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+        "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
     },
     { status: 403 },
   );
@@ -279,16 +279,16 @@ export async function requireOrgPermissions(
   // ── Sandbox org-redirect ────────────────────────────────────────────
   // Many endpoints accept `orgId` from the client (URL/body/query), and
   // some client code derives that orgId from the unrefreshed JWT — which
-  // still points at the user's real workspace. Without this redirect, a
+  // still points at the user's real organization. Without this redirect, a
   // settings/save POST issued while the user is "inside" a sandbox would
-  // mutate the real workspace.
+  // mutate the real organization.
   //
   // When the user has an active sandbox cookie (verified server-side
   // here), route ALL org-scoped checks to their sandbox regardless of
   // the orgId argument. Gridmasters intentionally manage other orgs, so
   // we exempt them — their actions on non-sandbox orgs stay as-is.
   // Endpoints can also opt out via { ignoreSandbox: true } when they
-  // legitimately need to operate on the real workspace (e.g. billing).
+  // legitimately need to operate on the real organization (e.g. billing).
   const sandboxCookieValue = options?.ignoreSandbox
     ? null
     : req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
@@ -347,6 +347,7 @@ export async function requireOrgPermissions(
   const role = isGridmaster
     ? "gridmaster"
     : ((membership?.org_role as OrganizationRole | null) ?? "user");
+
   const permissions = buildPermissionContext(
     role,
     orgId,
@@ -360,10 +361,10 @@ export async function requireOrgPermissions(
   });
   if (
     billingAccess.isLocked &&
-    !options?.allowLockedWorkspace &&
+    !options?.allowLockedOrganization &&
     !permissions.isGridmaster
   ) {
-    return { response: lockedWorkspaceResponse() };
+    return { response: lockedOrganizationResponse() };
   }
 
   if (!isAllowed(permissions)) {
@@ -373,7 +374,7 @@ export async function requireOrgPermissions(
   if (!options?.allowDuringSetup && !permissions.isGridmaster) {
     const setupComplete = await isOrganizationSetupComplete(serviceClient, orgId);
     if (!setupComplete) {
-      return { response: lockedWorkspaceResponse() };
+      return { response: lockedOrganizationResponse() };
     }
   }
 

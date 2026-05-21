@@ -325,7 +325,7 @@ export function EmployeeManagementAccessModal({
   return (
     <>
       <Modal
-        title={isEditingExistingAccess ? "Edit Management Access" : "Grant Management Access"}
+        title={isEditingExistingAccess ? "Edit Management Access" : "Add to Management"}
         onClose={onClose}
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
@@ -334,8 +334,8 @@ export function EmployeeManagementAccessModal({
         <AccountNameMismatchPanel
           details={nameMismatch}
           title="Name mismatch found"
-          description="This employee record does not match the existing org member name. If the account name is correct, you can update the employee record to match it and continue granting management access."
-          confirmLabel="Use Account Name and Link"
+          description="This person's name doesn't match their existing account. If the account name is right, update it to match and continue adding them to management."
+          confirmLabel="Use Account Name and Add to Management"
           dismissLabel={EDITOR_ACTION_LABELS.close}
           onCancel={handleRequestClose}
           onConfirm={handleReconcileLink}
@@ -381,23 +381,38 @@ export function EmployeeManagementAccessModal({
             Management departments
             {!hasExistingManagementAccess && <span style={{ color: "var(--color-danger)" }}> *</span>}
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {managementDepartments.map((department) => (
-              <SelectableTag
-                key={department.id}
-                selected={managementDepartmentIds.includes(department.id)}
-                onClick={() => toggleDepartment(department.id)}
-                padding="5px 12px"
-                unselectedBackground="var(--color-bg-secondary)"
-                unselectedBorderColor="transparent"
-                unselectedTextColor="var(--color-text-faint)"
-              >
-                {department.name}
-              </SelectableTag>
-            ))}
-          </div>
-          {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
-            <FieldError message="Select at least one management department" />
+          {managementDepartments.length === 0 ? (
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              You don't have any management departments yet. Add one in Settings,
+              under Departments, then come back to assign it here.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {managementDepartments.map((department) => (
+                  <SelectableTag
+                    key={department.id}
+                    selected={managementDepartmentIds.includes(department.id)}
+                    onClick={() => toggleDepartment(department.id)}
+                    padding="5px 12px"
+                    unselectedBackground="var(--color-bg-secondary)"
+                    unselectedBorderColor="transparent"
+                    unselectedTextColor="var(--color-text-faint)"
+                  >
+                    {department.name}
+                  </SelectableTag>
+                ))}
+              </div>
+              {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
+                <FieldError message="Select at least one management department" />
+              )}
+            </>
           )}
           {managementDepartmentIds.length === 0 && hasExistingManagementAccess && (
             <div
@@ -407,7 +422,7 @@ export function EmployeeManagementAccessModal({
                 color: "var(--color-text-muted)",
               }}
             >
-              Saving now will remove this person from the Management roster and keep them on the schedule.
+              Saving now removes their management access. They'll stay on the schedule.
             </div>
           )}
         </div>

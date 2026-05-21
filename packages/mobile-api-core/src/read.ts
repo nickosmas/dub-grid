@@ -5,6 +5,9 @@ import type {
   MobileFocusArea,
   MobileNamedItem,
   MobileNotification,
+  MobileNotificationPriority,
+  MobileNotificationsCursor,
+  MobileNotificationsQuery,
   MobilePerson,
   MobileScheduleEntry,
   MobileScheduleRange,
@@ -153,13 +156,28 @@ type FetchMobilePeople = (
   orgId: string,
 ) => Promise<MobilePersonSource[]>;
 
-type FetchMobileNotifications = (
-  userClient: SupabaseClient,
-  input: { limit: number; offset: number },
-) => Promise<{
+export type FetchMobileNotificationsInput = {
+  limit: number;
+  cursor?: MobileNotificationsCursor | null;
+  category?: string;
+  type?: string;
+  priority?: MobileNotificationPriority;
+  read?: "read" | "unread";
+  search?: string;
+  archived?: "inbox" | "archived" | "any";
+  sort?: "asc" | "desc";
+};
+
+export type FetchMobileNotificationsResult = {
   unreadCount: number;
   notifications: MobileNotification[];
-}>;
+  nextCursor: MobileNotificationsCursor | null;
+};
+
+type FetchMobileNotifications = (
+  userClient: SupabaseClient,
+  input: FetchMobileNotificationsInput,
+) => Promise<FetchMobileNotificationsResult>;
 
 type MapOrganizationToMobileConfig = (
   org: Organization,
@@ -182,10 +200,7 @@ type MobilePeopleResponse = {
   people: MobilePerson[];
 };
 
-type MobileNotificationsResponse = {
-  unreadCount: number;
-  notifications: MobileNotification[];
-};
+type MobileNotificationsResponse = FetchMobileNotificationsResult;
 
 export function getEffectiveMobileRole(role: string): "super_admin" | "admin" | "user" {
   return role === "super_admin" || role === "admin" ? role : "user";
@@ -394,13 +409,25 @@ export async function loadMobilePeoplePayload(
 
 export async function loadMobileNotificationsPayload(
   auth: MobileNotificationsContext,
-  input: { limit?: number; offset?: number },
+  input: MobileNotificationsQuery,
   deps: {
     fetchMobileNotifications: FetchMobileNotifications;
   },
 ): Promise<MobileNotificationsResponse> {
+  const cursor =
+    input.cursorCreatedAt && input.cursorId
+      ? { createdAt: input.cursorCreatedAt, id: input.cursorId }
+      : null;
+
   return deps.fetchMobileNotifications(auth.userClient, {
-    limit: input.limit ?? 20,
-    offset: input.offset ?? 0,
+    limit: input.limit ?? 25,
+    cursor,
+    category: input.category,
+    type: input.type,
+    priority: input.priority,
+    read: input.read,
+    search: input.search,
+    archived: input.archived,
+    sort: input.sort,
   });
 }

@@ -31,7 +31,7 @@ import {
   updateProfileAccount,
   updateProfilePhone,
 } from "../../../shared/lib/api";
-import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
@@ -98,7 +98,6 @@ export default function ProfileWorkScreen() {
   const [pendingConfirmation, setPendingConfirmation] = useState<
     "save" | "discardCancel" | null
   >(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -110,6 +109,20 @@ export default function ProfileWorkScreen() {
   const linkedEmployee = profile?.linkedEmployee ?? null;
   const canEditProfileDirectly = Boolean(
     bootstrapQuery.data?.permissions.canManageEmployees,
+  );
+  const isNameRequest = Boolean(
+    !canEditProfileDirectly &&
+      profile &&
+      draft &&
+      (draft.firstName.trim() !== (profile.user.firstName ?? "").trim() ||
+        draft.lastName.trim() !== (profile.user.lastName ?? "").trim()),
+  );
+  const hasOtherChanges = Boolean(
+    profile &&
+      draft &&
+      (draft.email.trim().toLowerCase() !==
+        (profile.user.email ?? "").trim().toLowerCase() ||
+        (linkedEmployee && draft.phone.trim() !== (linkedEmployee.phone ?? ""))),
   );
   const contentState = getMobileQueryContentState({
     hasData: Boolean(profile),
@@ -145,7 +158,6 @@ export default function ProfileWorkScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      setSaveError(null);
       if (!accessToken || !profile || !draft) {
         throw new Error("Profile unavailable");
       }
@@ -233,12 +245,11 @@ export default function ProfileWorkScreen() {
       };
     },
     onError: (error) => {
-      setSaveError(
-        getInlineErrorMessageOrToast(pushToast, {
-          error,
-          fallbackMessage: "We couldn't save your profile right now.",
-        }),
-      );
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not save profile",
+        fallbackMessage: "We couldn't save your profile right now.",
+      });
     },
     onSuccess: async (result) => {
       setEditing(false);
@@ -264,7 +275,6 @@ export default function ProfileWorkScreen() {
   function startEditing() {
     if (!profile) return;
     setDraft(makeDraft(profile, linkedEmployee));
-    setSaveError(null);
     setEditing(true);
   }
 
@@ -272,7 +282,6 @@ export default function ProfileWorkScreen() {
     if (profile) {
       setDraft(makeDraft(profile, linkedEmployee));
     }
-    setSaveError(null);
     setEditing(false);
   }
 
@@ -280,7 +289,6 @@ export default function ProfileWorkScreen() {
     if (profile) {
       setDraft(makeDraft(profile, linkedEmployee));
     }
-    setSaveError(null);
   }
 
   return (
@@ -310,9 +318,6 @@ export default function ProfileWorkScreen() {
         />
       ) : (
         <>
-          {saveError ? (
-            <StatusBanner body={saveError} title="Could not save profile" />
-          ) : null}
           {profile.pendingProfileChangeRequest ? (
             <StatusBanner
               body={PENDING_PROFILE_CHANGE_MESSAGE}
@@ -330,7 +335,7 @@ export default function ProfileWorkScreen() {
               <ProfileInfoRow
                 iconName="compass-outline"
                 isLast
-                label="Workspace"
+                label="Organization"
                 value={formatProfileValue(profile.currentOrg.slug)}
               />
             </ProfileList>
@@ -346,6 +351,7 @@ export default function ProfileWorkScreen() {
               focusAreaLabel={profile.currentOrg.labels.focusArea}
               focusAreas={focusAreas}
               hasLinkedEmployee={Boolean(linkedEmployee)}
+              isNameRequest={isNameRequest}
               onCancel={cancelEditing}
               onCancelWithChanges={() => setPendingConfirmation("discardCancel")}
               onChange={setDraft}
@@ -501,18 +507,24 @@ export default function ProfileWorkScreen() {
       )}
       <ConfirmationModal
         body={
-          canEditProfileDirectly
-            ? "Your profile will be updated."
-            : "Your changes will be saved; any name change will be sent to an admin for review."
+          isNameRequest
+            ? hasOtherChanges
+              ? "Your new name will be sent to an admin for review. Your other edits will be saved."
+              : "Your new name will be sent to an admin for review."
+            : canEditProfileDirectly
+              ? "Your profile will be updated."
+              : "Your changes will be saved."
         }
-        confirmLabel="Save"
+        confirmLabel={isNameRequest ? "Send request" : "Save"}
         loading={saveMutation.isPending}
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={() => {
           setPendingConfirmation(null);
           saveMutation.mutate();
         }}
-        title="Save these changes?"
+        title={
+          isNameRequest ? "Send name change request?" : "Save these changes?"
+        }
         visible={pendingConfirmation === "save"}
       />
       <ConfirmationModal
@@ -540,6 +552,7 @@ function EditPanel({
   focusAreaLabel,
   focusAreas,
   hasLinkedEmployee,
+  isNameRequest,
   onCancel,
   onCancelWithChanges,
   onChange,
@@ -561,6 +574,7 @@ function EditPanel({
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
   hasLinkedEmployee: boolean;
+  isNameRequest: boolean;
   onCancel: () => void;
   onCancelWithChanges: () => void;
   onChange: (draft: ProfileDraft) => void;
@@ -629,6 +643,13 @@ function EditPanel({
 
   return (
     <>
+      {!canEditProfileDirectly ? (
+        <StatusBanner
+          body="Name changes need admin review. Email and phone updates apply immediately."
+          title="Editing your profile"
+          tone="info"
+        />
+      ) : null}
       <ProfileSection title="Account">
         <ProfilePanel>
           <ProfileTextInput
@@ -752,16 +773,19 @@ function EditPanel({
       ) : null}
 
       {!canEditProfileDirectly && nameChanged ? (
-        <ProfileSection title="Name change request">
+        <ProfileSection
+          description="You can't change your own name directly. Add an optional note and send the request to your admin for review."
+          title="Name change request"
+        >
           <ProfilePanel>
             <ProfileTextInput
               accessibilityLabel="Note for admins"
               editable={!disabled}
               error={fieldErrors.requestNote}
               focused={focusedField === "requestNote"}
-              label="Note for admins"
+              label="Note for admins (optional)"
               multiline
-              placeholder="Note for admins"
+              placeholder="Add context for your admin"
               value={draft.requestNote}
               onBlur={() => setFocusedField(null)}
               onChangeText={(value) => setField("requestNote", value)}
@@ -775,7 +799,15 @@ function EditPanel({
         <Button
           compact
           disabled={disabled || !hasChanges || hasValidationErrors}
-          label={disabled ? "Saving..." : "Save changes"}
+          label={
+            disabled
+              ? isNameRequest
+                ? "Sending..."
+                : "Saving..."
+              : isNameRequest
+                ? "Send request"
+                : "Save changes"
+          }
           onPress={onSave}
         />
         <Button

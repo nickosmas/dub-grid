@@ -13,6 +13,7 @@ import {
   saveOrganizationRoles,
 } from "@/features/settings/client";
 import type { NamedItem } from "@/types";
+import { indefiniteArticle } from "@dubgrid/domain";
 import { useWizardEditorCollector } from "../WizardModeContext";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -86,6 +87,8 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
   const roleLabel = org.roleLabel || "Roles";
   const certLabel = org.certificationLabel || "Certifications";
   const deptLabel = org.departmentLabel || "Departments";
+  const roleNoun = roleLabel.toLowerCase().replace(/s$/, "");
+  const certNoun = certLabel.toLowerCase().replace(/s$/, "");
   const focusLabel = org.focusAreaLabel || "Focus Areas";
 
   return (
@@ -133,7 +136,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
               rolesRef.current = saved;
               setOrgRoles(saved);
             }}
-            placeholder={`Add a ${roleLabel.toLowerCase().replace(/s$/, "")}...`}
+            placeholder={`Add ${indefiniteArticle(roleNoun)} ${roleNoun}...`}
             canEdit={true}
             initialEditing
             departments={departments}
@@ -159,7 +162,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
               certsRef.current = saved;
               handleCertificationsChange(saved);
             }}
-            placeholder={`Add a ${certLabel.toLowerCase().replace(/s$/, "")}...`}
+            placeholder={`Add ${indefiniteArticle(certNoun)} ${certNoun}...`}
             canEdit={true}
             initialEditing
             hideAbbr

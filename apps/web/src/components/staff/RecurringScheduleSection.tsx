@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -561,8 +563,26 @@ export function RecurringScheduleSection({
     () => new Map(jobs.map((job) => [job.id, job])),
     [jobs],
   );
-  const [allSchedules, setAllSchedules] = useState<RecurringScheduleDraft>({});
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const recurringShiftsQuery = useQuery({
+    queryKey: queryKeys.recurringShifts.all(orgId),
+    queryFn: () =>
+      fetchRecurringShifts(orgId, undefined, assignmentMap, false, absenceTypeMap),
+  });
+  const allSchedules = useMemo<RecurringScheduleDraft>(() => {
+    const schedules: RecurringScheduleDraft = {};
+    for (const recurringShift of recurringShiftsQuery.data ?? []) {
+      if (!schedules[recurringShift.empId]) {
+        schedules[recurringShift.empId] = {};
+      }
+      if (!(recurringShift.dayOfWeek in schedules[recurringShift.empId])) {
+        schedules[recurringShift.empId][recurringShift.dayOfWeek] =
+          recurringShift.input;
+      }
+    }
+    return schedules;
+  }, [recurringShiftsQuery.data]);
+  const loading = recurringShiftsQuery.isPending;
   const [dirtySchedules, setDirtySchedules] = useState<RecurringScheduleDraft>({});
   const [activeCell, setActiveCell] = useState<{
     empId: string;
@@ -581,88 +601,71 @@ export function RecurringScheduleSection({
   const [filterFocusArea, setFilterFocusArea] = useState<number | "">("");
 
   useEffect(() => {
+    if (recurringShiftsQuery.isError) {
+      setError(
+        formatClientErrorMessage(
+          recurringShiftsQuery.error,
+          "We couldn't load recurring schedules right now.",
+        ),
+      );
+    }
+  }, [recurringShiftsQuery.isError, recurringShiftsQuery.error]);
+
+  // Draft recovery: fetch the saved local draft for the current user and merge.
+  // Only run once per (org, user) after the server data has resolved.
+  const draftLoadedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (recurringShiftsQuery.isPending || !canManage || !currentUserId) return;
+    const key = `${orgId}:${currentUserId}`;
+    if (draftLoadedRef.current === key) return;
+    draftLoadedRef.current = key;
+
     let cancelled = false;
-    setLoading(true);
-
-    async function load() {
+    void (async () => {
       try {
-        const rows = await fetchRecurringShifts(
-          orgId,
-          undefined,
-          assignmentMap,
-          false,
-          absenceTypeMap,
-        );
-        if (cancelled) return;
-
-        const schedules: RecurringScheduleDraft = {};
-        for (const recurringShift of rows) {
-          if (!schedules[recurringShift.empId]) {
-            schedules[recurringShift.empId] = {};
-          }
-          if (!(recurringShift.dayOfWeek in schedules[recurringShift.empId])) {
-            schedules[recurringShift.empId][recurringShift.dayOfWeek] = recurringShift.input;
-          }
-        }
-        setAllSchedules(schedules);
-
-        try {
-          if (!canManage || !currentUserId) return;
-          const draft = await getRecurringDraft(orgId, currentUserId);
-          if (
-            !cancelled &&
-            draft?.draftData &&
-            Object.keys(draft.draftData).length > 0
-          ) {
-            const migrated: RecurringScheduleDraft = {};
-            for (const [employeeId, employeeDirty] of Object.entries(
-              draft.draftData,
-            )) {
-              for (const [dayKey, value] of Object.entries(employeeDirty)) {
-                const migratedValue = migrateLegacyDraftValue(
-                  value,
-                  assignments,
-                  absenceTypes,
-                );
-                if (migratedValue !== null) {
-                  if (!migrated[employeeId]) {
-                    migrated[employeeId] = {};
-                  }
-                  migrated[employeeId][Number(dayKey)] = migratedValue;
+        const draft = await getRecurringDraft(orgId, currentUserId);
+        if (
+          !cancelled &&
+          draft?.draftData &&
+          Object.keys(draft.draftData).length > 0
+        ) {
+          const migrated: RecurringScheduleDraft = {};
+          for (const [employeeId, employeeDirty] of Object.entries(
+            draft.draftData,
+          )) {
+            for (const [dayKey, value] of Object.entries(employeeDirty)) {
+              const migratedValue = migrateLegacyDraftValue(
+                value,
+                assignments,
+                absenceTypes,
+              );
+              if (migratedValue !== null) {
+                if (!migrated[employeeId]) {
+                  migrated[employeeId] = {};
                 }
+                migrated[employeeId][Number(dayKey)] = migratedValue;
               }
             }
-            if (Object.keys(migrated).length > 0) {
-              setDirtySchedules(migrated);
-              setSavedDraftTimestamp(draft.savedAt);
-            }
           }
-        } catch {
-          // Draft recovery is non-critical.
+          if (Object.keys(migrated).length > 0) {
+            setDirtySchedules(migrated);
+            setSavedDraftTimestamp(draft.savedAt);
+          }
         }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          setError(formatClientErrorMessage(err, "We couldn't load recurring schedules right now."));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      } catch {
+        // Draft recovery is non-critical.
       }
-    }
-
-    void load();
+    })();
     return () => {
       cancelled = true;
     };
   }, [
-    absenceTypeMap,
     absenceTypes,
+    assignments,
     canManage,
     currentUserId,
     orgId,
-    assignmentMap,
-    assignments,
+    recurringShiftsQuery.isPending,
   ]);
 
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
@@ -850,24 +853,9 @@ export function RecurringScheduleSection({
         }
       }
 
-      const freshRows = await fetchRecurringShifts(
-        orgId,
-        undefined,
-        assignmentMap,
-        false,
-        absenceTypeMap,
-      );
-      const freshSchedules: RecurringScheduleDraft = {};
-      for (const recurringShift of freshRows) {
-        if (!freshSchedules[recurringShift.empId]) {
-          freshSchedules[recurringShift.empId] = {};
-        }
-        if (!(recurringShift.dayOfWeek in freshSchedules[recurringShift.empId])) {
-          freshSchedules[recurringShift.empId][recurringShift.dayOfWeek] =
-            recurringShift.input;
-        }
-      }
-      setAllSchedules(freshSchedules);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.recurringShifts.all(orgId),
+      });
 
       setDirtySchedules((current) => {
         const next: RecurringScheduleDraft = {};

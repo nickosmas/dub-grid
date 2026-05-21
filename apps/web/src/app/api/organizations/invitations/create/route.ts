@@ -14,6 +14,7 @@ import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrors,
 } from "@/lib/staff-validation";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -99,6 +100,13 @@ export async function POST(req: NextRequest) {
       p_dept_admin_ids: deptAdminIds ?? [],
     });
     if (error) throw error;
+
+    void dispatchNotificationEvent(user.id, {
+      action: "invitation_created",
+      orgId,
+      invitationId: data.invitation_id as string,
+      inviteeEmail: normalizeRequiredStaffEmail(email),
+    });
 
     return NextResponse.json({
       invitationId: data.invitation_id as string,

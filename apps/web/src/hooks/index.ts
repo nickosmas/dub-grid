@@ -63,3 +63,6 @@ export type { ShiftRequestsData } from "./useShiftRequests";
 
 export { useSelfProfileData } from "./useSelfProfileData";
 export type { SelfProfileRecord } from "./useSelfProfileData";
+
+export { useOrgClaims } from "./useOrgClaims";
+export type { OrgClaims } from "./useOrgClaims";

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Monitor, Smartphone, Trash2 } from "lucide-react";
@@ -10,6 +11,7 @@ import {
   getBrowserAuthSession,
   revokeAccountSession,
 } from "@/features/account/client";
+import { queryKeys } from "@/lib/query-keys";
 
 interface UserSession {
   id: string;
@@ -70,66 +72,64 @@ function extractSupabaseSessionId(accessToken: string): string | null {
 
 export function SessionList() {
   const { user, isLoading: authLoading } = useAuth();
-  const [sessions, setSessions] = useState<UserSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const loadSessions = useCallback(async () => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (!user) {
-        setSessions([]);
-        return;
-      }
-
+  const sessionsQuery = useQuery({
+    queryKey: user ? queryKeys.account.sessions(user.id) : ["account", "anon", "sessions"],
+    queryFn: async () => {
       const rows = (await fetchAccountSessions()).sessions;
       const currentSession = await getBrowserAuthSession();
       const currentSupabaseSessionId = currentSession?.access_token
         ? extractSupabaseSessionId(currentSession.access_token)
         : null;
 
-      setSessions(
-        rows.map((row) => ({
-          id: row.id,
-          supabaseSessionId: row.supabaseSessionId,
-          platform: row.platform,
-          deviceLabel: row.deviceLabel ?? "Unknown device",
-          ipAddress: row.ipAddress,
-          lastActiveAt: row.lastActiveAt,
-          refreshTokenHash: row.refreshTokenHash,
-          isCurrent:
-            currentSupabaseSessionId != null &&
-            row.supabaseSessionId === currentSupabaseSessionId,
-        })),
-      );
-    } catch {
-      toast.error("Failed to load sessions");
-    } finally {
-      setLoading(false);
-    }
-  }, [authLoading, user]);
+      return rows.map<UserSession>((row) => ({
+        id: row.id,
+        supabaseSessionId: row.supabaseSessionId,
+        platform: row.platform,
+        deviceLabel: row.deviceLabel ?? "Unknown device",
+        ipAddress: row.ipAddress,
+        lastActiveAt: row.lastActiveAt,
+        refreshTokenHash: row.refreshTokenHash,
+        isCurrent:
+          currentSupabaseSessionId != null &&
+          row.supabaseSessionId === currentSupabaseSessionId,
+      }));
+    },
+    enabled: !authLoading && !!user,
+  });
 
   useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
-
-  async function handleRevoke(session: UserSession) {
-    setRevokingId(session.id);
-    try {
-      await revokeAccountSession(session.refreshTokenHash);
-      setSessions((prev) => prev.filter((s) => s.id !== session.id));
-      toast.success("Session revoked");
-    } catch {
-      toast.error("Failed to revoke session");
-    } finally {
-      setRevokingId(null);
+    if (sessionsQuery.isError) {
+      toast.error("Failed to load sessions");
     }
+  }, [sessionsQuery.isError]);
+
+  const sessions = sessionsQuery.data ?? [];
+  const loading = authLoading || sessionsQuery.isPending;
+
+  const revokeMutation = useMutation({
+    mutationFn: (session: UserSession) =>
+      revokeAccountSession(session.refreshTokenHash).then(() => session),
+    onSuccess: (session) => {
+      if (user) {
+        queryClient.setQueryData<UserSession[]>(
+          queryKeys.account.sessions(user.id),
+          (prev) => (prev ?? []).filter((s) => s.id !== session.id),
+        );
+      }
+      toast.success("Session revoked");
+    },
+    onError: () => {
+      toast.error("Failed to revoke session");
+    },
+  });
+  const revokingId = revokeMutation.isPending
+    ? revokeMutation.variables?.id ?? null
+    : null;
+
+  function handleRevoke(session: UserSession) {
+    revokeMutation.mutate(session);
   }
 
   if (loading) {

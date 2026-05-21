@@ -68,6 +68,7 @@ describe("StaffReorderListRow", () => {
       isReordering: true,
       isDragging: false,
       canManageEmployees: true,
+      canNavigateToDetailsPage: true,
       isSelected: false,
       focusAreas: [],
       certifications: [],
@@ -115,6 +116,7 @@ describe("StaffReorderListRow", () => {
         isReordering
         isDragging={false}
         canManageEmployees
+        canNavigateToDetailsPage
         isSelected={false}
         focusAreas={[]}
         certifications={[]}

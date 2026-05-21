@@ -121,17 +121,17 @@ function OnboardingCheck({
     enabled: canRecoverBilling,
     staleTime: 30_000,
   });
-  const shouldCheckWorkspace = !canRecoverBilling || Boolean(billing);
+  const shouldCheckOrganization = !canRecoverBilling || Boolean(billing);
   const { data: onboardingStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["onboarding-status", userId, orgId],
     queryFn: () => fetchOnboardingStatus(orgId),
-    enabled: shouldCheckWorkspace && billing?.billingAccess.isLocked !== true,
+    enabled: shouldCheckOrganization && billing?.billingAccess.isLocked !== true,
     staleTime: 30_000,
   });
 
   const { setupStatus, loading: orgLoading } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
-    enabled: shouldCheckWorkspace && billing?.billingAccess.isLocked !== true,
+    enabled: shouldCheckOrganization && billing?.billingAccess.isLocked !== true,
   });
 
   if (billingLoading) return null;

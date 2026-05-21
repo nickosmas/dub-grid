@@ -12,10 +12,10 @@ import {
 } from "../../../shared/theme/tokens";
 
 function formatLockedMessage(message: string): string {
-  return message.replace(/^Workspace unavailable\.\s*/i, "").trim() || message;
+  return message.replace(/^Organization unavailable\.\s*/i, "").trim() || message;
 }
 
-export function WorkspaceLockedScreen({
+export function OrganizationLockedScreen({
   message,
   isRetrying = false,
   onRetry,
@@ -41,7 +41,7 @@ export function WorkspaceLockedScreen({
       >
         <View style={styles.copy}>
           <Text style={styles.eyebrow}>DubGrid</Text>
-          <Text style={styles.title}>Workspace unavailable</Text>
+          <Text style={styles.title}>Organization unavailable</Text>
           <Text style={styles.body}>{body}</Text>
         </View>
 

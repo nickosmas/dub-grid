@@ -20,7 +20,7 @@ import {
   mobileShiftSwapOptionsQuerySchema,
   mobileShiftSwapOptionsResponseSchema,
   mobileUpdateShiftRequestBodySchema,
-  mobileWorkspaceLookupResponseSchema,
+  mobileOrganizationLookupResponseSchema,
   normalizeMobileScheduleRange,
 } from "./mobile";
 import { scheduleCellStateSchema } from "./schedule";
@@ -79,9 +79,9 @@ describe("mobile contracts", () => {
     });
   });
 
-  it("accepts a valid workspace lookup response", () => {
-    const result = mobileWorkspaceLookupResponseSchema.safeParse({
-      workspace: {
+  it("accepts a valid organization lookup response", () => {
+    const result = mobileOrganizationLookupResponseSchema.safeParse({
+      organization: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Acme Care",
         slug: "acme",
@@ -99,7 +99,7 @@ describe("mobile contracts", () => {
         expiresIn: 3600,
         tokenType: "bearer",
       },
-      workspace: {
+      organization: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Acme Care",
         slug: "acme",
@@ -336,7 +336,7 @@ describe("mobile contracts", () => {
         expiresIn: 3600,
         tokenType: "bearer",
       },
-      workspace: {
+      organization: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Acme Care",
         slug: "acme",

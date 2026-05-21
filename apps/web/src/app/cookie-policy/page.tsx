@@ -37,6 +37,8 @@ const tableHeader = {
   background: "var(--color-surface-hover)",
 } as const;
 
+// Scope: written for the US market. Cookie categories and consent map to the
+// CookieConsent banner (Accept all / Essential only / Customize).
 export default function CookiePolicyPage() {
   return (
     <div
@@ -78,7 +80,7 @@ export default function CookiePolicyPage() {
             marginBottom: "40px",
           }}
         >
-          Last updated: March 2026
+          Last updated: May 2026
         </p>
 
         {/* Introduction */}
@@ -97,11 +99,13 @@ export default function CookiePolicyPage() {
         <section style={{ marginBottom: "32px" }}>
           <h2 style={sectionHeading}>Managing Your Preferences</h2>
           <p style={{ ...bodyText, marginBottom: "16px" }}>
-            When you first visit DubGrid, a consent banner lets you choose
-            between <strong>essential only</strong> and{" "}
-            <strong>accept all</strong> cookies. You can change your choice at
-            any time using the buttons below, or clear cookies through your
-            browser settings.
+            When you first visit DubGrid, a consent banner lets you choose{" "}
+            <strong>Accept all</strong>, <strong>Essential only</strong>, or{" "}
+            <strong>Customize</strong> to set each category individually. You can
+            change your choice at any time using the controls below, the{" "}
+            <strong>Cookie preferences</strong> link in the site footer and in
+            Profile, Privacy &amp; data, or by clearing cookies in your browser
+            settings.
           </p>
           <CookiePreferencesManager />
         </section>
@@ -170,6 +174,17 @@ export default function CookiePolicyPage() {
                   </td>
                   <td style={tableCell}>Up to 30 minutes</td>
                 </tr>
+                <tr>
+                  <td style={tableCell}>
+                    <code>dubgrid-sandbox</code>
+                  </td>
+                  <td style={tableCell}>
+                    Marks an administrator&apos;s test-sandbox session so demo
+                    data stays separate from live data. Only set when sandbox
+                    mode is active.
+                  </td>
+                  <td style={tableCell}>Session</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -202,9 +217,9 @@ export default function CookiePolicyPage() {
                 <tr>
                   <td style={tableCell}>PostHog</td>
                   <td style={tableCell}>
-                    Product analytics &mdash; tracks page views and custom
-                    events (autocapture is disabled). Data is associated with
-                    your user ID when you are signed in.
+                    Product analytics. Tracks page views and custom events
+                    (autocapture is disabled). Data is associated with your
+                    user ID when you are signed in.
                   </td>
                   <td style={tableCell}>localStorage + cookie</td>
                 </tr>
@@ -215,6 +230,15 @@ export default function CookiePolicyPage() {
                     hosting provider.
                   </td>
                   <td style={tableCell}>Cookie / beacon</td>
+                </tr>
+                <tr>
+                  <td style={tableCell}>Sentry Session Replay</td>
+                  <td style={tableCell}>
+                    Records a privacy-masked replay of a sample of sessions so
+                    we can reproduce bugs. Only enabled with analytics consent;
+                    error monitoring (below) runs separately and is always on.
+                  </td>
+                  <td style={tableCell}>localStorage</td>
                 </tr>
               </tbody>
             </table>
@@ -227,7 +251,9 @@ export default function CookiePolicyPage() {
           <p style={{ ...bodyText, marginBottom: "16px" }}>
             The following service runs regardless of your cookie preference
             because it is necessary for the reliability of the application. It
-            does not track browsing behavior or set analytics cookies.
+            does not track browsing behavior or set analytics cookies. Sentry
+            Session Replay is a separate, optional feature listed under
+            Analytics Cookies above and only runs with your consent.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table
@@ -252,8 +278,8 @@ export default function CookiePolicyPage() {
                     and request context when errors occur so we can fix bugs.
                   </td>
                   <td style={tableCell}>
-                    No &mdash; personally identifiable information is not sent
-                    to Sentry.
+                    No. Personally identifiable information is not sent to
+                    Sentry.
                   </td>
                 </tr>
               </tbody>
@@ -276,30 +302,44 @@ export default function CookiePolicyPage() {
             }}
           >
             <li style={{ marginBottom: "6px" }}>
-              <strong>Supabase</strong> &mdash; authentication and database
-              hosting
+              <strong>Supabase</strong> (authentication and database hosting)
             </li>
             <li style={{ marginBottom: "6px" }}>
-              <strong>Vercel</strong> &mdash; application hosting and web
-              analytics
+              <strong>Vercel</strong> (application hosting and web analytics)
             </li>
             <li style={{ marginBottom: "6px" }}>
-              <strong>PostHog</strong> &mdash; product analytics (consent
-              required)
+              <strong>PostHog</strong> (product analytics, consent required)
             </li>
             <li style={{ marginBottom: "6px" }}>
-              <strong>Sentry</strong> &mdash; error monitoring
+              <strong>Sentry</strong> (error monitoring, always on; session
+              replay, consent required)
             </li>
             <li style={{ marginBottom: "6px" }}>
-              <strong>Stripe</strong> &mdash; payment processing (only during
-              checkout)
+              <strong>Stripe</strong> (payment processing, only during checkout)
+            </li>
+            <li style={{ marginBottom: "6px" }}>
+              <strong>Google Maps Platform</strong> (loads in your browser only
+              when an administrator uses address autocomplete in organization
+              settings)
             </li>
           </ul>
+          <p style={{ ...bodyText, marginTop: "12px" }}>
+            We also use service providers that operate on the server and do not
+            set cookies in your browser, such as Resend (transactional email)
+            and Upstash (rate limiting). These are described in our{" "}
+            <Link
+              href="/privacy"
+              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </section>
 
         {/* Links */}
         <section style={{ marginBottom: "32px" }}>
-          <h2 style={sectionHeading}>Related Policies</h2>
+          <h2 style={sectionHeading}>Related Policies and Contact</h2>
           <p style={bodyText}>
             For more information on how we handle your data, see our{" "}
             <Link
@@ -311,6 +351,14 @@ export default function CookiePolicyPage() {
             >
               Privacy Policy
             </Link>
+            . DubGrid is operated by DubGrid LLC. Questions about cookies? Email
+            us at{" "}
+            <a
+              href="mailto:support@dubgrid.com"
+              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+            >
+              support@dubgrid.com
+            </a>
             .
           </p>
         </section>

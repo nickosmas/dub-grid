@@ -36,6 +36,7 @@ import {
   staffNameSchema,
   staffNotesSchema,
 } from "@dubgrid/contracts";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,33 @@ const requestSchema = z.discriminatedUnion("action", [
 
 const MAX_RANGE_DAYS = 366;
 
+// View-only callers (canViewStaff but neither canViewEmployeeDetails nor
+// canManageEmployees, and not super_admin/gridmaster) get the same masked
+// payload the mobile person endpoint returns to non-managers.
+function isEmployeeDetailViewer(permissions: {
+  isGridmaster: boolean;
+  isSuperAdmin: boolean;
+  canViewEmployeeDetails: boolean;
+  canManageEmployees: boolean;
+}): boolean {
+  return (
+    permissions.isGridmaster ||
+    permissions.isSuperAdmin ||
+    permissions.canViewEmployeeDetails ||
+    permissions.canManageEmployees
+  );
+}
+
+function maskEmployeeForViewer(employee: Employee): Employee {
+  return {
+    ...employee,
+    contactNotes: "",
+    statusNote: "",
+    deptAdminIds: [],
+    userId: null,
+  };
+}
+
 function assertDateRange(startDate?: string, endDate?: string): void {
   if (!startDate || !endDate) {
     return;
@@ -137,6 +165,42 @@ function assertDateRange(startDate?: string, endDate?: string): void {
   if (diffMs > MAX_RANGE_DAYS * 86_400_000) {
     throw new Error(`Shift query range exceeds ${MAX_RANGE_DAYS} days`);
   }
+}
+
+function diffEmployeeProfileFields(
+  before: Employee,
+  after: Employee,
+): string[] {
+  const fields: string[] = [];
+  if (before.firstName !== after.firstName) fields.push("firstName");
+  if (before.lastName !== after.lastName) fields.push("lastName");
+  if (before.email !== after.email) fields.push("email");
+  if (before.phone !== after.phone) fields.push("phone");
+  if (before.contactNotes !== after.contactNotes) fields.push("contactNotes");
+  if (before.employmentType !== after.employmentType) fields.push("employmentType");
+  if (before.certificationId !== after.certificationId) fields.push("certification");
+  if (before.seniority !== after.seniority) fields.push("seniority");
+  if (
+    JSON.stringify([...before.roleIds].sort()) !==
+    JSON.stringify([...after.roleIds].sort())
+  )
+    fields.push("roles");
+  if (
+    JSON.stringify([...before.focusAreaIds].sort()) !==
+    JSON.stringify([...after.focusAreaIds].sort())
+  )
+    fields.push("focusAreas");
+  if (
+    JSON.stringify([...before.departmentIds].sort()) !==
+    JSON.stringify([...after.departmentIds].sort())
+  )
+    fields.push("departments");
+  if (
+    JSON.stringify([...before.deptAdminIds].sort()) !==
+    JSON.stringify([...after.deptAdminIds].sort())
+  )
+    fields.push("departmentAdmin");
+  return fields;
 }
 
 async function fetchLatestEmployee(
@@ -205,7 +269,7 @@ export async function POST(req: NextRequest) {
   // Redirect body.orgId to the sandbox if the caller is in sandbox
   // mode. Without this, the per-case auth checks below validate against
   // the sandbox while the downstream queries (`.eq("org_id", data.orgId)`,
-  // `employeeToRow(..., data.orgId)`, etc.) target the real workspace —
+  // `employeeToRow(..., data.orgId)`, etc.) target the real organization —
   // the same data-leak class fixed in /api/settings/config.
   {
     const auth = await requireAuthenticatedUser(req);
@@ -237,6 +301,8 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
+        const isManager = isEmployeeDetailViewer(auth.permissions);
+
         let query = auth.serviceClient
           .from("employees")
           .select(EMPLOYEE_COLS)
@@ -248,14 +314,20 @@ export async function POST(req: NextRequest) {
         if (data.statuses && data.statuses.length > 0) {
           query = query.in("status", data.statuses);
         }
+        // View-only callers see active staff only, matching the mobile
+        // /people endpoint.
+        if (!isManager) {
+          query = query.eq("status", "active");
+        }
 
         const { data: rows, error } = await query.order("seniority");
         if (error) {
           throw error;
         }
 
+        const mapped = ((rows ?? []) as DbEmployee[]).map(rowToEmployee);
         return NextResponse.json({
-          employees: ((rows ?? []) as DbEmployee[]).map(rowToEmployee),
+          employees: isManager ? mapped : mapped.map(maskEmployeeForViewer),
         });
       }
 
@@ -297,8 +369,15 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        const insertedRow = row as DbEmployee;
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "employee_created",
+          orgId: data.orgId,
+          empId: insertedRow.id,
+        });
+
         return NextResponse.json({
-          employee: rowToEmployee(row as DbEmployee),
+          employee: rowToEmployee(insertedRow),
         });
       }
 
@@ -349,6 +428,14 @@ export async function POST(req: NextRequest) {
             normalizedFields.contactNotes ?? data.employee.contactNotes,
         };
 
+        // Snapshot the prior row so we can diff status vs profile fields
+        // for notification dispatch after a successful update.
+        const previousRow = await fetchLatestEmployee(
+          auth.serviceClient,
+          data.orgId,
+          nextEmployee.id,
+        );
+
         let query = auth.serviceClient
           .from("employees")
           .update(employeeToRow(nextEmployee, data.orgId))
@@ -389,6 +476,30 @@ export async function POST(req: NextRequest) {
           nextEmployee.lastName,
         );
 
+        if (previousRow) {
+          if (previousRow.status !== nextEmployee.status) {
+            void dispatchNotificationEvent(auth.actor.id, {
+              action: "employee_status_changed",
+              orgId: data.orgId,
+              empId: nextEmployee.id,
+              fromStatus: previousRow.status,
+              toStatus: nextEmployee.status,
+            });
+          }
+          const changedProfileFields = diffEmployeeProfileFields(
+            previousRow,
+            nextEmployee,
+          );
+          if (changedProfileFields.length > 0) {
+            void dispatchNotificationEvent(auth.actor.id, {
+              action: "employee_profile_changed",
+              orgId: data.orgId,
+              empId: nextEmployee.id,
+              fields: changedProfileFields,
+            });
+          }
+        }
+
         return NextResponse.json({
           employee: rowToEmployee(updatedRow as DbEmployee),
         });
@@ -402,7 +513,8 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             permissions.canViewEmployeeDetails ||
-            permissions.canManageEmployees,
+            permissions.canManageEmployees ||
+            permissions.canViewStaff,
         );
         if ("response" in auth) {
           return auth.response;
@@ -413,6 +525,18 @@ export async function POST(req: NextRequest) {
           data.orgId,
           data.employeeId,
         );
+
+        if (!isEmployeeDetailViewer(auth.permissions)) {
+          // Mirror the mobile person endpoint: view-only callers only see
+          // active staff, with sensitive fields stripped.
+          if (!employee || employee.status !== "active") {
+            return NextResponse.json({ employee: null });
+          }
+          return NextResponse.json({
+            employee: maskEmployeeForViewer(employee),
+          });
+        }
+
         return NextResponse.json({ employee });
       }
 
