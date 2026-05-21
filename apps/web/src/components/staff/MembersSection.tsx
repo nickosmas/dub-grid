@@ -27,6 +27,7 @@ import type {
   FocusArea,
   Invitation,
   NamedItem,
+  OrganizationRole,
 } from "@/types";
 import { useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
@@ -46,7 +47,7 @@ import { BulkImportModal } from "./BulkImportModal";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessModal } from "./EmployeeManagementAccessModal";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
-import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
+import { InlineRoleSelect } from "./InlineRoleSelect";
 import { updateOrganizationMembershipGuarded } from "@/features/organization/client/access";
 import { AddManagementUserToScheduleModal } from "./AddManagementUserToScheduleModal";
 import { SortIcon } from "./SortIcon";
@@ -486,6 +487,41 @@ export function MembersSection({
     }
     return map;
   }, [directory]);
+  // Full directory person per linked employee, for inline role editing.
+  const directoryByEmployeeId = useMemo(() => {
+    const map = new Map<string, DirectoryPerson>();
+    for (const person of directory) {
+      if (person.employeeId) map.set(person.employeeId, person);
+    }
+    return map;
+  }, [directory]);
+  // Returns an inline role-change handler when the viewer may manage access and
+  // the person has an editable login; otherwise undefined (read-only cell).
+  const roleChangeHandlerFor = (
+    userId: string | null | undefined,
+    membershipUpdatedAt: string | null | undefined,
+  ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
+    if (!canManageManagementAccess || !orgId || !userId || !membershipUpdatedAt) {
+      return undefined;
+    }
+    const oid = orgId;
+    const uid = userId;
+    const expectedUpdatedAt = membershipUpdatedAt;
+    return async (newRole) => {
+      await updateOrganizationMembershipGuarded({
+        orgId: oid,
+        userId: uid,
+        expectedUpdatedAt,
+        orgRole: newRole,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.org.directory(oid),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.org.users(oid),
+      });
+    };
+  };
   const departmentUsers = useMemo(
     () => directory.filter((person) => person.managementDepartmentIds.length > 0),
     [directory],
@@ -1305,6 +1341,10 @@ export function MembersSection({
                               certifications={certifications}
                               roles={roles}
                               orgRole={orgRoleByEmployeeId.get(employee.id) ?? null}
+                              onRoleChange={roleChangeHandlerFor(
+                                directoryByEmployeeId.get(employee.id)?.userId,
+                                directoryByEmployeeId.get(employee.id)?.membershipUpdatedAt,
+                              )}
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={(employeeId) =>
@@ -1481,18 +1521,13 @@ export function MembersSection({
 
                           {!isMobile && !isTablet && (
                             <TableCell className="py-4">
-                              {person.orgRole ? (
-                                <span
-                                  className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                                  style={getOrgRoleBadgeStyle(person.orgRole)}
-                                >
-                                  {ORG_ROLE_LABELS[person.orgRole]}
-                                </span>
-                              ) : (
-                                <span className="text-[13px] text-[var(--color-text-muted)]">
-                                  {"\u2014"}
-                                </span>
-                              )}
+                              <InlineRoleSelect
+                                orgRole={person.orgRole}
+                                onChange={roleChangeHandlerFor(
+                                  person.userId,
+                                  person.membershipUpdatedAt,
+                                )}
+                              />
                             </TableCell>
                           )}
 

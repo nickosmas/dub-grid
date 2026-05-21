@@ -8,7 +8,7 @@ import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "
 import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
+import { InlineRoleSelect } from "./InlineRoleSelect";
 
 function hashCode(s: string): number {
   let h = 0;
@@ -34,6 +34,8 @@ interface StaffRowSharedProps {
   roles: NamedItem[];
   /** Access role (org_role) of the linked user, if any. Null for staff with no login. */
   orgRole?: OrganizationRole | null;
+  /** Inline role-change handler. Omitted when the viewer can't manage access. */
+  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onToggleSelect: (empId: string) => void;
   onRowClick: (empId: string) => void;
@@ -85,6 +87,7 @@ function StaffRowCells({
   certifications,
   roles,
   orgRole,
+  onRoleChange,
   pendingInviteByEmployeeId,
   onToggleSelect,
   onRowClick,
@@ -277,16 +280,7 @@ function StaffRowCells({
         tableClassName="hidden lg:table-cell py-4"
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
-        {orgRole ? (
-          <span
-            className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-            style={getOrgRoleBadgeStyle(orgRole)}
-          >
-            {ORG_ROLE_LABELS[orgRole]}
-          </span>
-        ) : (
-          <span className="text-[12px] text-[var(--color-text-muted)]">{"—"}</span>
-        )}
+        <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} />
       </StaffCell>
 
       {/* Chevron */}
