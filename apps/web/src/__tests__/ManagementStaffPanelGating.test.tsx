@@ -77,6 +77,22 @@ describe("ManagementStaffPanel access gating", () => {
     ).toBeTruthy();
   });
 
+  it("shows the role control for a super_admin (no permission matrix)", () => {
+    render(
+      <ManagementStaffPanel
+        {...baseProps}
+        person={makePerson({ orgRole: "super_admin" })}
+        canManageManagementAccess
+        onRoleChange={vi.fn(async () => {})}
+        onPermissionsChange={vi.fn(async () => {})}
+      />,
+    );
+    expect(screen.getByText("Role")).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: /manage permissions/i }),
+    ).toBeNull();
+  });
+
   it("offers access controls for an employee-linked admin too", () => {
     render(
       <ManagementStaffPanel

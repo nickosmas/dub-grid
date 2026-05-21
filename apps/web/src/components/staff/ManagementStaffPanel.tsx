@@ -371,7 +371,7 @@ export function ManagementStaffPanel({
   const accessControls =
     onRoleChange || onPermissionsChange ? (
       <>
-        {onRoleChange && person.orgRole && person.orgRole !== "super_admin" && (
+        {onRoleChange && person.orgRole && (
           <div>
             <label style={labelStyle}>Role</label>
             <CustomSelect
