@@ -33,7 +33,6 @@ import type {
   ShiftDisplayMode,
 } from "@/types";
 import OrgActivityLog from "@/components/settings/ActivityLog";
-import UserManagementSettings from "@/components/settings/UserManagement";
 import { MembersSection } from "@/components/staff/MembersSection";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
@@ -58,21 +57,6 @@ const MEMBERS_ICON = (
   </svg>
 );
 
-const USER_MANAGEMENT_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
 
 const ACTIVITY_ICON = (
   <svg
@@ -206,7 +190,6 @@ export default function StaffView({
   const allowedSections: StaffSection[] = [
     "directory",
     ...(canAccessPeopleAdminSurfaces ? ["requests" as const] : []),
-    ...((isSuperAdmin || isGridmaster) ? ["access" as const] : []),
     ...(canAccessPeopleRecurring ? ["recurring-schedule" as const] : []),
     ...(isSuperAdmin ? ["activity" as const] : []),
   ];
@@ -214,8 +197,9 @@ export default function StaffView({
   const resolvedSection =
     sectionParam === ("members" as string)
       ? ("directory" as StaffSection)
-      : sectionParam === ("users" as string)
-        ? ("access" as StaffSection)
+      : sectionParam === ("users" as string) ||
+          sectionParam === ("access" as string)
+        ? ("directory" as StaffSection)
         : sectionParam;
   const activeSection: StaffSection =
     resolvedSection && allowedSections.includes(resolvedSection)
@@ -227,9 +211,6 @@ export default function StaffView({
       { id: "directory", label: "Directory", icon: MEMBERS_ICON },
       ...(canAccessPeopleAdminSurfaces
         ? [{ id: "requests" as StaffSection, label: "Requests", icon: REQUESTS_ICON }]
-        : []),
-      ...((isSuperAdmin || isGridmaster)
-        ? [{ id: "access" as StaffSection, label: "User Access", icon: USER_MANAGEMENT_ICON }]
         : []),
       ...(canAccessPeopleRecurring
         ? [
@@ -390,18 +371,6 @@ export default function StaffView({
 
         {activeSection !== "directory" && (
           <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-            {activeSection === "access" &&
-              (isSuperAdmin || isGridmaster) &&
-              orgId && (
-                <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
-                  <UserManagementSettings
-                    orgId={orgId}
-                    isSuperAdmin={isSuperAdmin}
-                    departments={departmentsProp as unknown as Department[]}
-                  />
-                </div>
-              )}
-
             {activeSection === "activity" && isSuperAdmin && orgId && (
               <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
                 <OrgActivityLog orgId={orgId} />
