@@ -1041,6 +1041,9 @@ export type Database = {
           theme_config: Json | null
           timezone: string
           trial_ends_at: string | null
+          trial_started_at: string | null
+          trial_welcome_email_sent_at: string | null
+          trial_welcome_seen_at: string | null
           updated_at: string | null
           updated_by: string | null
         }
@@ -1082,6 +1085,9 @@ export type Database = {
           theme_config?: Json | null
           timezone?: string
           trial_ends_at?: string | null
+          trial_started_at?: string | null
+          trial_welcome_email_sent_at?: string | null
+          trial_welcome_seen_at?: string | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -1123,6 +1129,9 @@ export type Database = {
           theme_config?: Json | null
           timezone?: string
           trial_ends_at?: string | null
+          trial_started_at?: string | null
+          trial_welcome_email_sent_at?: string | null
+          trial_welcome_seen_at?: string | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -2572,6 +2581,7 @@ export type Database = {
         }
         Returns: Json
       }
+      start_trial_for_org: { Args: { p_org_id: string }; Returns: undefined }
       switch_org: { Args: { target_org_id: string }; Returns: undefined }
       sync_schedule_cell_snapshot: {
         Args: {

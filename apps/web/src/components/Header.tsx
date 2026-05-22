@@ -170,16 +170,19 @@ function formatHeaderBillingNotice(
     };
   }
 
+  // Trial clock has not started yet (no super_admin has signed in). Neutral,
+  // not a misconfiguration warning.
+  if (billingAccess.state === "trial_pending") {
+    return {
+      label: "Trial starting",
+      compactLabel: "Trial",
+      ariaLabel: "Trial is starting",
+      tone: "info",
+    };
+  }
+
   const days = billingAccess.daysUntilTrialEnd;
   if (days == null) {
-    if (billing.status === "trialing" || !billing.status) {
-      return {
-        label: "Trial not set",
-        compactLabel: "Trial",
-        ariaLabel: "Trial end date is not set",
-        tone: "warning",
-      };
-    }
     return null;
   }
 
@@ -440,6 +443,8 @@ export default function Header({ orgName }: HeaderProps) {
     (isSuperAdmin || isGridmaster);
 
   const handleSignOut = useCallback(() => {
+    // Swift sign-out: clear the session and land on the sign-in page.
+    // signOutLocal always redirects (even on error), so no splash is needed.
     signOutLocal().catch((err) => Sentry.captureException(err));
   }, [signOutLocal]);
 

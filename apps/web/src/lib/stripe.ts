@@ -115,7 +115,9 @@ export async function createCheckoutSession(
     mode: "subscription",
     line_items: [{ price: priceId, quantity: seats }],
     subscription_data: {
-      trial_period_days: DEFAULT_TRIAL_DAYS,
+      // No trial_period_days: the in-app 14-day trial (started on the first
+      // super_admin sign-in) is the only trial. Subscribing goes straight to
+      // active so we don't grant a second free period on top of it.
       metadata: { org_id: orgId },
     },
     success_url: withCheckoutSessionPlaceholder(returnUrl),

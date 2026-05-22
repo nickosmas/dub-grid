@@ -22,6 +22,7 @@ export const queryKeys = {
     coverageRequirements: (orgId: string) => ["org", orgId, "coverageRequirements"] as const,
     employeeCount: (orgId: string) => ["org", orgId, "employeeCount"] as const,
     billing: (orgId: string) => ["org", orgId, "billing"] as const,
+    trialWelcome: (orgId: string) => ["org", orgId, "trialWelcome"] as const,
     users: (orgId: string) => ["org", orgId, "users"] as const,
     directory: (orgId: string) => ["org", orgId, "directory"] as const,
     invitations: (orgId: string) => ["org", orgId, "invitations"] as const,
@@ -57,6 +58,7 @@ export const queryKeys = {
     sessions: (userId: string) => ["account", userId, "sessions"] as const,
     notificationPrefs: (userId: string) =>
       ["account", userId, "notificationPrefs"] as const,
+    terms: (userId: string) => ["account", userId, "terms"] as const,
   },
   notifications: {
     all: (userId: string) => ["notifications", userId] as const,

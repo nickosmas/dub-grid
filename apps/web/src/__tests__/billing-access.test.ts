@@ -17,6 +17,35 @@ describe("evaluateOrganizationBillingAccess", () => {
     });
   });
 
+  it("reports trial_pending when trialing with no trial end date set", () => {
+    expect(
+      evaluateOrganizationBillingAccess({
+        subscriptionStatus: "trialing",
+        trialEndsAt: null,
+        now: NOW,
+      }),
+    ).toMatchObject({
+      state: "trial_pending",
+      reason: "trial_not_started",
+      isLocked: false,
+      shouldNotifyAdmins: false,
+      daysUntilTrialEnd: null,
+    });
+  });
+
+  it("treats a missing status with no trial end date as trial_pending", () => {
+    expect(
+      evaluateOrganizationBillingAccess({
+        subscriptionStatus: null,
+        trialEndsAt: null,
+        now: NOW,
+      }),
+    ).toMatchObject({
+      state: "trial_pending",
+      isLocked: false,
+    });
+  });
+
   it("notifies admins when a trial is ending soon without locking users", () => {
     expect(
       evaluateOrganizationBillingAccess({

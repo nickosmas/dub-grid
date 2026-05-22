@@ -4,6 +4,7 @@ export const DEFAULT_TRIAL_DAYS = 14;
 
 export type BillingAccessState =
   | "active"
+  | "trial_pending"
   | "trialing"
   | "trial_ending_soon"
   | "trial_grace"
@@ -13,6 +14,7 @@ export type BillingAccessState =
 
 export type BillingAccessReason =
   | "active_subscription"
+  | "trial_not_started"
   | "trial_active"
   | "trial_ending_soon"
   | "trial_grace"
@@ -119,9 +121,12 @@ export function evaluateOrganizationBillingAccess(
 
   if (status === "trialing" || !status) {
     if (!trialEndsAt) {
+      // Trialing with no end date = the trial clock has not started yet. It
+      // starts when the first super_admin signs in (custom_access_token_hook).
+      // Not locked, but non-super-admins are gated until it starts (middleware).
       return {
-        state: "trialing",
-        reason: "trial_active",
+        state: "trial_pending",
+        reason: "trial_not_started",
         isLocked: false,
         shouldNotifyAdmins: false,
         daysUntilTrialEnd: null,

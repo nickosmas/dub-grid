@@ -989,6 +989,7 @@ export interface GridmasterOrgHealthSummary {
   };
   billing: {
     subscriptionStatus: string | null;
+    trialStartedAt: string | null;
     trialEndsAt: string | null;
     subscriptionSeats: number | null;
     stripeCustomerId: string | null;
@@ -1016,6 +1017,7 @@ export interface GridmasterOverview {
   };
   businessHealth: {
     trialEndingCount: number;
+    trialsNotStartedCount: number;
     billingRiskCount: number;
     missingStripeCount: number;
     seatMismatchCount: number;
@@ -1060,6 +1062,7 @@ export interface GridmasterBillingOrgSummary {
   status: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  trialStartedAt: string | null;
   trialEndsAt: string | null;
   currentPeriodEnd: string | null;
   cancelAt: string | null;
@@ -1075,6 +1078,8 @@ export interface GridmasterBillingSummary {
   generatedAt: string;
   organizations: GridmasterBillingOrgSummary[];
   trialEndingSoon: GridmasterBillingOrgSummary[];
+  /** Trialing orgs whose clock has not started (no super_admin has signed in). */
+  trialsNotStarted: GridmasterBillingOrgSummary[];
   riskOrganizations: GridmasterBillingOrgSummary[];
   missingStripeCustomer: GridmasterBillingOrgSummary[];
   seatMismatches: GridmasterBillingOrgSummary[];

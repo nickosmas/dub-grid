@@ -36,6 +36,7 @@ export interface Organization {
   stripeCustomerId?: string | null;
   subscriptionStatus?: string | null;
   trialEndsAt?: string | null;
+  trialStartedAt?: string | null;
   subscriptionSeats?: number | null;
   dataRetentionDays: number;
   featureOverrides: Record<string, boolean>;

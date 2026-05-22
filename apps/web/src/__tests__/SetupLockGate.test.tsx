@@ -96,6 +96,10 @@ vi.mock("@/components/UserViewBanner", () => ({
   default: () => null,
 }));
 
+vi.mock("@/components/TrialWelcomeModal", () => ({
+  default: () => null,
+}));
+
 function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: {
