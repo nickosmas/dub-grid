@@ -1,11 +1,12 @@
 import { ImageResponse } from "next/og";
-import { LogoGrid } from "./logo-grid";
+import { LogoGrid, loadDmSansFonts } from "./logo-grid";
 
 export const alt = "DubGrid — Smart staff scheduling for care facilities";
 export const size = { width: 1200, height: 600 };
 export const contentType = "image/png";
 
-export default function TwitterImage() {
+export default async function TwitterImage() {
+  const fonts = await loadDmSansFonts();
   return new ImageResponse(
     (
       <div
@@ -17,6 +18,7 @@ export default function TwitterImage() {
           justifyContent: "center",
           background: "#F8FAFC",
           gap: 48,
+          fontFamily: "DM Sans",
         }}
       >
         <LogoGrid size={200} />
@@ -31,11 +33,11 @@ export default function TwitterImage() {
             style={{
               fontSize: 72,
               fontWeight: 700,
-              color: "#2563EB",
-              letterSpacing: -2,
+              color: "#0F172A",
+              letterSpacing: -1.44,
             }}
           >
-            DubGrid
+            dubgrid
           </div>
           <div
             style={{
@@ -49,6 +51,6 @@ export default function TwitterImage() {
         </div>
       </div>
     ),
-    { ...size },
+    { ...size, fonts },
   );
 }

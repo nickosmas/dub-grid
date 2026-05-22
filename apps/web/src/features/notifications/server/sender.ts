@@ -1,5 +1,8 @@
+import { createElement } from "react";
+import { render } from "@react-email/components";
 import { createClient } from "@supabase/supabase-js";
-import { emailWrapper } from "@/lib/email";
+import { emailBaseUrl } from "@/lib/email";
+import { NotificationEmail } from "@/emails/NotificationEmail";
 import {
   isPushEligibleNotificationType,
   sendMobilePushNotifications,
@@ -161,13 +164,13 @@ export async function sendNotification(
   }
 
   try {
-    const html = emailWrapper(`
-      <h2 style="margin: 0 0 8px; font-size: 18px; color: #1a1a1a;">${escapeHtml(title)}</h2>
-      <p style="margin: 0 0 16px; font-size: 14px; color: #555; line-height: 1.6;">${escapeHtml(message)}</p>
-      <p style="margin: 0; font-size: 12px; color: #999;">
-        You can manage your notification preferences in your DubGrid profile settings.
-      </p>
-    `);
+    const html = await render(
+      createElement(NotificationEmail, {
+        title,
+        message,
+        logoUrl: emailBaseUrl(),
+      }),
+    );
 
     await sendResendEmail({
       apiKey: resendKey,
@@ -197,13 +200,4 @@ export async function sendNotification(
   } catch (err) {
     logger.error({ error: err, userId, type }, "Failed to send email notification");
   }
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
