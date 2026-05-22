@@ -11,6 +11,8 @@ import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
+import { isSelfAction, SelfActionForbiddenError } from "@dubgrid/domain";
+import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
   benchEmployee,
@@ -66,6 +68,7 @@ interface StaffDetailPageProps {
 export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const router = useRouter();
   const perms = usePermissions();
+  const { user: currentUser } = useAuth();
   const {
     org,
     focusAreas,
@@ -291,6 +294,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       }
       // Revert on failure
       setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "" } : prev);
+      if (err instanceof SelfActionForbiddenError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error("Failed to bench employee");
     }
   }, [employee, orgId, syncEmployeeCaches]);
@@ -311,6 +318,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         return;
       }
       setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "benched" } : prev);
+      if (err instanceof SelfActionForbiddenError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error("Failed to activate employee");
     }
   }, [employee, orgId, syncEmployeeCaches]);
@@ -331,6 +342,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         return;
       }
       setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "active" } : prev);
+      if (err instanceof SelfActionForbiddenError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error("Failed to terminate employee");
     }
   }, [employee, orgId, syncEmployeeCaches]);
@@ -530,6 +545,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         <EmployeeStatusActions
                           employee={employee}
                           canEdit={perms.canManageEmployees}
+                          isSelf={isSelfAction(currentUser?.id, employee.userId)}
                           pendingInvitation={pendingInvite ?? undefined}
                           onBench={handleBench}
                           onActivate={handleActivate}

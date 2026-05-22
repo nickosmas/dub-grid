@@ -39,6 +39,10 @@ vi.mock("@/hooks", () => ({
   useDirectory: () => mockUseDirectory(),
 }));
 
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => ({ user: { id: "viewer-user-id" } }),
+}));
+
 // Note: we no longer mock @tanstack/react-query; `renderWithQuery` provides a
 // real QueryClient so `useQuery` + `useQueryClient` work as in production.
 // `mockInvalidateQueries` is retained for compatibility but is unused.

@@ -12,8 +12,19 @@ import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import {
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
+
+function selfActionForbiddenResponse() {
+  return NextResponse.json(
+    { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+    { status: 403 },
+  );
+}
 
 const adminPermissionsSchema = z.record(z.string(), z.boolean());
 
@@ -191,6 +202,13 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "User membership not found" }, { status: 404 });
     }
 
+    // Self-action guard: you cannot change your own role. Permission-only
+    // self-edits remain allowed (they're inert for super_admins), so we only
+    // block when the role would actually change.
+    if (userId === user.id && orgRole !== undefined && orgRole !== currentUser.orgRole) {
+      return selfActionForbiddenResponse();
+    }
+
     if (!timestampsMatch(currentUser.updatedAt, expectedUpdatedAt)) {
       return buildConflictResponse(currentUser);
     }
@@ -330,6 +348,11 @@ export async function DELETE(req: NextRequest) {
   }
 
   const { orgId, userId, expectedUpdatedAt } = parsed.data;
+
+  // Self-action guard: you cannot remove yourself from the organization.
+  if (userId === user.id) {
+    return selfActionForbiddenResponse();
+  }
 
   try {
     const allowed = await requirePrivilegedActor(req, orgId);

@@ -493,6 +493,21 @@ export async function loginMobileUser(
     session,
     targetMembership,
   );
+
+  // First super_admin login starts the org's 14-day trial. This is a genuine
+  // credential login (not automatic reconciliation like switchMobileOrgIfNeeded),
+  // so it is a safe activation point. The RPC self-gates to super_admins and is
+  // idempotent; we still guard on role to skip a needless call for members, and
+  // never let a failure block sign-in.
+  if (targetMembership.org_role === "super_admin") {
+    const trialResult = await sessionClient.rpc("start_trial_for_org", {
+      p_org_id: organization.id,
+    });
+    if (trialResult.error) {
+      // Non-fatal: sign-in proceeds even if trial activation fails.
+    }
+  }
+
   const { firstName, lastName } = getMobileUserName(user);
 
   return {
