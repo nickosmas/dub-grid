@@ -1,6 +1,6 @@
 import {
   supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit,
-  EMPLOYEE_COLS, DEPARTMENT_COLS, OptimisticLockError,
+  EMPLOYEE_COLS, DEPARTMENT_COLS, OptimisticLockError, saveNamedEntities,
 } from "./shared";
 import { fetchAssignmentDefinitions } from "./config";
 import { parseNameMismatchResponse } from "@/lib/account-linking";
@@ -54,60 +54,22 @@ export async function saveDepartments(
   items: Department[],
   existing: Department[],
 ): Promise<Department[]> {
-  const existingIds = new Set(existing.map((e) => e.id));
-  const newIds = new Set(items.filter((i) => i.id).map((i) => i.id));
-
-  const toDelete = existing.filter((e) => !newIds.has(e.id));
-  if (toDelete.length > 0) {
-    const { error } = await supabase
-      .from("departments")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("org_id", orgId)
-      .in("id", toDelete.map((d) => d.id));
-    if (error) throw error;
-  }
-
-  // Separate update + insert to avoid GENERATED ALWAYS identity column errors
-  const toUpdate = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-  const toInsert = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
-
-  for (const { item, sortOrder } of toUpdate) {
-    const { error } = await supabase
-      .from("departments")
-      .update({ name: item.name, abbr: item.abbr || "", type: item.type, sort_order: sortOrder, permissions: item.permissions ?? null })
-      .eq("org_id", orgId)
-      .eq("id", item.id);
-    if (error) throw error;
-  }
-  // Insert new items — restore archived rows with matching names instead of inserting duplicates
-  for (const { item, sortOrder } of toInsert) {
-    const { data: archived } = await supabase
-      .from("departments")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("name", item.name)
-      .not("archived_at", "is", null)
-      .maybeSingle();
-    if (archived) {
-      const { error } = await supabase
-        .from("departments")
-        .update({ name: item.name, abbr: item.abbr || "", type: item.type, sort_order: sortOrder, archived_at: null, permissions: item.permissions ?? null })
-        .eq("id", archived.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from("departments")
-        .insert({ org_id: orgId, name: item.name, abbr: item.abbr || "", type: item.type, sort_order: sortOrder, permissions: item.permissions ?? null });
-      if (error) throw error;
-    }
-  }
+  const { created, updated, archived } = await saveNamedEntities({
+    table: "departments",
+    orgId,
+    items,
+    existing,
+    toRow: (item, sortOrder) => ({
+      name: item.name,
+      abbr: item.abbr || "",
+      type: item.type,
+      sort_order: sortOrder,
+      permissions: item.permissions ?? null,
+    }),
+  });
 
   await cacheDel(CacheKey.departments(orgId), CacheKey.orgDirectory(orgId));
-  void logAudit("departments.saved", "department", null, { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length }, orgId);
+  void logAudit("departments.saved", "department", null, { created, updated, archived }, orgId);
   return fetchDepartments(orgId);
 }
 

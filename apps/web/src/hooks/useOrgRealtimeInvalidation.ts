@@ -214,8 +214,28 @@ export function useOrgRealtimeInvalidation({
       .toString(36)
       .slice(2, 8)}`;
     const channel = createBrowserRealtimeChannel(channelId);
+
+    // Coalesce bursts: a bulk save (e.g. saving N departments) emits one
+    // postgres_changes event per row. Rather than running the full
+    // invalidation set N times — and broadcasting it to every other tab N
+    // times — accumulate the affected tables and flush once on a short
+    // debounce. Correctness is unchanged: each changed table is still
+    // invalidated, just once per burst.
+    const pendingTables = new Set<OrgRealtimeTable>();
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      flushTimer = null;
+      const tables = [...pendingTables];
+      pendingTables.clear();
+      for (const table of tables) {
+        invalidateOrgRealtimeQueries(queryClient, orgId, table);
+      }
+    };
     const handleChange = (table: OrgRealtimeTable) => {
-      invalidateOrgRealtimeQueries(queryClient, orgId, table);
+      pendingTables.add(table);
+      if (flushTimer === null) {
+        flushTimer = setTimeout(flush, 150);
+      }
     };
 
     channel.on(
@@ -255,6 +275,7 @@ export function useOrgRealtimeInvalidation({
     });
 
     return () => {
+      if (flushTimer !== null) clearTimeout(flushTimer);
       void removeBrowserRealtimeChannel(channel);
     };
   }, [disabled, orgId, queryClient]);

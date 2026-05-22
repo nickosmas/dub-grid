@@ -1,4 +1,3 @@
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
 import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, ORGANIZATION_WITH_BILLING_COLS } from "./shared";
 import type { DbInvitation, DbOrganization, TenantStats } from "./types";
 import { rowToInvitation, rowToOrganization } from "./mappers";
@@ -28,12 +27,6 @@ async function countScheduleCellsCreatedSince(
     .gte("created_at", since);
   if (error) throw error;
   return count ?? 0;
-}
-
-function defaultTrialEndFrom(date: Date): string {
-  return new Date(
-    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
-  ).toISOString();
 }
 
 export async function fetchAllOrganizations(
@@ -80,7 +73,9 @@ export async function createOrganization(data: Omit<Organization, 'id'>): Promis
       timezone: data.timezone || null,
       pay_period_start_date: data.payPeriodStartDate || null,
       subscription_status: "trialing",
-      trial_ends_at: defaultTrialEndFrom(new Date()),
+      // trial_ends_at left NULL: trial is "pending" until the first super_admin
+      // logs in (the start_trial_for_org RPC, called from the login flow, starts
+      // the clock then).
       enforce_conflict_prevention: data.enforceConflictPrevention ?? false,
       coverage_rule_config: data.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
       data_retention_days: data.dataRetentionDays ?? 365,
@@ -331,21 +326,22 @@ export async function fetchOrgActivityMetrics(orgId: string): Promise<OrgActivit
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const now = new Date().toISOString();
 
+  // Fetch the org's member user IDs once, then reuse for both profile queries
+  // below (this previously ran as two identical nested sub-queries).
+  const { data: memberRows } = await supabase
+    .from("organization_memberships")
+    .select("user_id")
+    .eq("org_id", orgId)
+    .is("archived_at", null);
+  const memberUserIds = (memberRows ?? []).map((r: { user_id: string }) => r.user_id);
+
   const [lastLoginResult, activeUsersResult, shiftsResult, pendingInvResult, acceptedInvResult] =
     await Promise.all([
       // Last login across all org users
       supabase
         .from("profiles")
         .select("last_sign_in_at")
-        .in(
-          "id",
-          (await supabase
-            .from("organization_memberships")
-            .select("user_id")
-            .eq("org_id", orgId)
-            .is("archived_at", null)
-          ).data?.map((r: { user_id: string }) => r.user_id) ?? [],
-        )
+        .in("id", memberUserIds)
         .not("last_sign_in_at", "is", null)
         .order("last_sign_in_at", { ascending: false })
         .limit(1),
@@ -354,15 +350,7 @@ export async function fetchOrgActivityMetrics(orgId: string): Promise<OrgActivit
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })
-        .in(
-          "id",
-          (await supabase
-            .from("organization_memberships")
-            .select("user_id")
-            .eq("org_id", orgId)
-            .is("archived_at", null)
-          ).data?.map((r: { user_id: string }) => r.user_id) ?? [],
-        )
+        .in("id", memberUserIds)
         .gte("last_sign_in_at", thirtyDaysAgo),
 
       // Schedule cells created in last 30 days

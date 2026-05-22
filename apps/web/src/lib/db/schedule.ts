@@ -26,6 +26,23 @@ import type {
 
 const SHIFT_SERIES_UPSERT_BATCH_SIZE = 25;
 
+/**
+ * Run an async task over each item in capped-concurrency batches. Used to turn
+ * per-cell schedule writes (each an independent RPC with its own optimistic
+ * version) from N sequential round-trips into ceil(N / size) parallel batches,
+ * without overwhelming the connection pool. Tasks run left-to-right within the
+ * overall ordering; failures reject as soon as a batch settles.
+ */
+async function runInBatches<T>(
+  items: T[],
+  size: number,
+  task: (item: T) => Promise<unknown>,
+): Promise<void> {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(task));
+  }
+}
+
 type CreateShiftSeriesOptions = {
   onProgress?: (progress: number) => void;
   batchSize?: number;
@@ -534,6 +551,10 @@ export async function applyRecurringSchedules(
   }
 
   const generated: { empId: string; date: string; label: string; absenceTypeId?: number }[] = [];
+  // Each matching (employee, date) is unique within this run, so the per-cell
+  // upserts are independent. Collect them and run in capped-concurrency batches
+  // after the scan instead of one sequential round-trip per generated cell.
+  const upsertTasks: Array<() => Promise<unknown>> = [];
   const current = new Date(startDate);
   while (current <= endDate) {
     const dateKey = formatDateKey(current);
@@ -554,12 +575,12 @@ export async function applyRecurringSchedules(
 
       if (!input) continue;
 
-      await upsertShift(
-        template.emp_id,
-        dateKey,
-        input,
-        orgId,
-        existingCell?.version,
+      const taskEmpId = template.emp_id;
+      const taskDateKey = dateKey;
+      const taskInput = input;
+      const taskVersion = existingCell?.version;
+      upsertTasks.push(() =>
+        upsertShift(taskEmpId, taskDateKey, taskInput, orgId, taskVersion),
       );
 
       const resolvedLabel = getRecurringInputShiftLabel(input, {
@@ -620,6 +641,8 @@ export async function applyRecurringSchedules(
 
     current.setDate(current.getDate() + 1);
   }
+
+  await runInBatches(upsertTasks, SHIFT_SERIES_UPSERT_BATCH_SIZE, (task) => task());
 
   void logAudit("recurring_schedule.applied", "recurring_shift", null, {
     startDate: startKey,
@@ -826,9 +849,10 @@ export async function updateSeriesAllShifts(
 
   const nextInput = normalizedInput;
 
-  for (const cell of (cells ?? []) as Array<{ emp_id: string; date: string; version: number }>) {
-    await upsertShift(cell.emp_id, cell.date, nextInput, orgId, cell.version);
-  }
+  const typedCells = (cells ?? []) as Array<{ emp_id: string; date: string; version: number }>;
+  await runInBatches(typedCells, SHIFT_SERIES_UPSERT_BATCH_SIZE, (cell) =>
+    upsertShift(cell.emp_id, cell.date, nextInput, orgId, cell.version),
+  );
 
   const { error } = await supabase
     .from("shift_series")
@@ -854,9 +878,9 @@ export async function deleteShiftSeries(seriesId: string, orgId: string): Promis
   if (cellError) throw new Error(cellError.message);
 
   const typedCells = (cells ?? []) as Array<{ emp_id: string; date: string; version: number }>;
-  for (const cell of typedCells) {
-    await deleteShift(cell.emp_id, cell.date, orgId, cell.version);
-  }
+  await runInBatches(typedCells, SHIFT_SERIES_UPSERT_BATCH_SIZE, (cell) =>
+    deleteShift(cell.emp_id, cell.date, orgId, cell.version),
+  );
 
   const { error } = await supabase
     .from("shift_series")

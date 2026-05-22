@@ -50,6 +50,7 @@ import OnboardingGate from "@/components/onboarding/OnboardingGate";
 
 import PostHogProvider from "@/components/PostHogProvider";
 import AppToaster from "@/components/AppToaster";
+import WebVitals from "@/components/WebVitals";
 
 const webCssVariables = createWebCssVariables() as CSSProperties;
 
@@ -86,6 +87,7 @@ export default function RootLayout({
         <AppToaster />
         <CookieConsent />
         <ConsentGatedAnalytics />
+        <WebVitals />
       </body>
     </html>
   );
