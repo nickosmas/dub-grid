@@ -309,6 +309,46 @@ describe("middleware: JWT verification", () => {
   });
 });
 
+describe("middleware: Content-Security-Policy", () => {
+  function scriptSrcOf(res: unknown): string {
+    const csp =
+      (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";
+    return (
+      csp
+        .split(";")
+        .map((d) => d.trim())
+        .find((d) => d.startsWith("script-src")) ?? ""
+    );
+  }
+
+  it("keeps 'unsafe-inline' and uses no nonce on static/public pages", async () => {
+    const req = makeNextRequest("http://localhost:3000/login");
+    const res = await runMiddleware(req);
+    const scriptSrc = scriptSrcOf(res);
+    expect(scriptSrc).toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain("'nonce-");
+  });
+
+  it("uses a per-request nonce + strict-dynamic and drops 'unsafe-inline' for the authenticated app", async () => {
+    mockSessionWithClaims({
+      platform_role: "none",
+      org_role: "admin",
+      org_id: "org-1",
+      org_slug: "acme",
+      sub: "user-1",
+    });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
+    const res = await runMiddleware(req);
+    expect((res as { _type: string })._type).toBe("next");
+    const scriptSrc = scriptSrcOf(res);
+    expect(scriptSrc).toMatch(/'nonce-[^']+'/);
+    expect(scriptSrc).toContain("'strict-dynamic'");
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+  });
+});
+
 describe("middleware: route guards", () => {
   it("allows user role on /people", async () => {
     mockSessionWithClaims({

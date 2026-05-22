@@ -40,15 +40,16 @@ defense-in-depth inconsistencies and informational notes.
 | F-1 | **High** | `next@16.2.4` has known middleware-bypass + SSRF + DoS advisories | ✅ Fixed — upgraded to `16.2.6` |
 | F-2 | Low | `/api/organizations/role-change` lacks rate limiting (siblings have it) | ✅ Fixed — `apiLimiter` added |
 | F-3 | Low | CSRF Origin validation applied inconsistently across mutating routes | ✅ Fixed — `validateCsrfOrigin` applied to 20 routes |
-| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ⏸ Deferred (deliberate) — see detail |
+| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ✅ Fixed — nonce + strict-dynamic for the authed app |
 | F-5 | ~~Info~~ | ~~Gridmaster demotion stale-token window~~ | ❌ Withdrawn — already implemented (see appendix) |
 | F-6 | Informational | Sandbox cookie is not `HttpOnly` | ✅ Fixed — cookie now `HttpOnly` |
-| F-7 | Informational | Transitive dependency advisories (not production-reachable) | ⏸ Bump on cadence (no churn now) — see detail |
+| F-7 | Informational | Transitive dependency advisories (not production-reachable) | ✅ Fixed — `protobufjs`/`fast-uri` patched via overrides |
 
-> **Remediation applied 2026-05-21:** F-1, F-2, F-3, F-6 fixed in code. F-5 was
-> found on re-verification to be already implemented and is withdrawn. F-4 and
-> F-7 are deliberately deferred with rationale below (each would cost more than it
-> returns right now).
+> **Remediation applied 2026-05-21/22:** all seven findings closed. F-1, F-2,
+> F-3, F-4, F-6, F-7 fixed in code; F-5 was found on re-verification to be already
+> implemented and is withdrawn. `npm audit` is now 0 critical / 0 high / 0 low /
+> 3 moderate (the 3 are `hono` via the `shadcn` dev CLI — dev tooling, not in the
+> production runtime).
 
 ---
 
@@ -149,17 +150,30 @@ Function`, React auto-escaping throughout — verified by grep across `apps` and
 `packages`). CSP here is a secondary control; the absence of an exploitable sink
 means the practical risk is minimal.
 
-**Decision — deferred (deliberate), 2026-05-21:** Not implemented. A nonce-based
-`script-src` + `strict-dynamic` migration in Next 16 must thread a per-request
-nonce through every inline script, but several routes (landing / privacy / terms)
-are **statically pre-rendered** and emit script tags with no nonce; `strict-dynamic`
-would override `'self'` and block those scripts, breaking React hydration on the
-public pages (the existing inline comment in `middleware.ts` documents exactly
-this). Weighed against **zero exploitable injection sink** (no
-`dangerouslySetInnerHTML`, `eval`, or `new Function` anywhere), shipping that
-migration now is net-negative: real breakage risk for negligible security gain.
-Tracked as future hardening, to be done alongside a deliberate static-vs-dynamic
-rendering pass — not as a reactive fix.
+**Fix applied (2026-05-22):** Implemented a **split CSP** in `apps/web/middleware.ts`
+that resolves the static-page constraint cleanly:
+
+- **Static/public pages** (marketing, login, auth flows) are pre-rendered and
+  can't carry a per-request nonce, so they keep `'unsafe-inline'`. These pages
+  hold no user data and have no injection sink, so this is acceptable.
+- **The authenticated app** is dynamically rendered, so in production it now uses
+  `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com`
+  with **no `'unsafe-inline'`**. The middleware generates a per-request nonce
+  (`crypto.getRandomValues`), sets it on the forwarded request CSP header so
+  Next.js stamps it onto its inline bootstrap scripts, and on the response.
+  `strict-dynamic` lets the nonced bundle load the runtime analytics by
+  propagation. In development both policies stay on `'unsafe-inline'` so
+  HMR / React Refresh keep working.
+
+Feasibility was verified first: the app has **no** `next/script`, raw `<script>`,
+`dangerouslySetInnerHTML`, or `eval` — only Next's own scripts (auto-nonced) and
+React-injected analytics (covered by propagation). Behavior is locked in by two
+new tests in `apps/web/src/__tests__/middleware.test.ts` (static pages keep
+`'unsafe-inline'` with no nonce; the authed app gets `nonce` + `strict-dynamic`
+and drops `'unsafe-inline'`). **Note:** end-to-end nonce stamping / hydration
+should still be smoke-tested in a production build + browser before release —
+that final check can't run in this environment (a full prod build is blocked by
+unrelated in-progress WIP).
 
 ---
 
@@ -215,16 +229,26 @@ cookie) was removed to prevent a future footgun.
 - **`fast-uri` (high, path traversal)** — reached only via `@sentry/nextjs → webpack → schema-utils → ajv`. This is a **build-time** toolchain dependency, absent from the production runtime. Not reachable.
 - Remaining moderates (`@expo/*`, `hono`, `@modelcontextprotocol/sdk`, `turbo`, `postcss`, `ws`) are dev/CLI/Expo-tooling, not in the deployed web runtime.
 
-**Decision — bump on cadence, no churn now (2026-05-21):** A non-force
-`npm audit fix` *does* clear both highs, but it rewrites the lockfile by
-**+1,181 packages / ~+15,900 lines** (it pulls duplicated nested trees to satisfy
-the patched ranges). For two **non-production-reachable** advisories, during active
-WIP, that churn risks subtle build/runtime resolution changes far out of
-proportion to the benefit — so it was attempted, inspected, and **reverted**. The
-Next.js bump (F-1) re-audit confirms its HIGH advisories cleared; the two
-remaining highs are these non-reachable transitives. Bump `posthog-js` and the
-Sentry/webpack chain as part of a normal, isolated dependency-update PR (not
-folded into a security fix), then re-audit.
+**Fix applied (2026-05-22):** Pinned both transitives to patched versions via
+**scoped npm `overrides`** in the root `package.json`, then re-resolved cleanly:
+
+- `protobufjs` → **7.5.9** (advisory range `<=7.5.7`), scoped under
+  `@opentelemetry/otlp-transformer`.
+- `fast-uri` → **^3.1.2** (advisory range `<=3.1.1`), scoped under `ajv`.
+
+The pre-existing bare override `protobufjs: 7.5.5` (which was *pinning the
+vulnerable version*) was bumped to `7.5.9`. `npm audit fix` was rejected — it
+churned the lockfile by ~1,200 packages — in favor of these surgical overrides.
+
+Important tooling note: this repo uses `install-strategy=nested` (`.npmrc`), under
+which npm preserves existing deeply-nested resolutions and does **not** apply
+overrides on an incremental `npm install` (the stale `node_modules`/lockfile win).
+Applying the override required a **clean reinstall** (`rm -rf node_modules
+package-lock.json && npm install`). After that, `npm audit` is **0 critical / 0
+high / 0 low / 3 moderate** (down from 20), and the lockfile package count
+*dropped* to 8,656 (better dedup — not the audit-fix churn). The 3 remaining
+moderates are `hono` / `@hono/node-server` via `@modelcontextprotocol/sdk` (the
+`shadcn` dev CLI) — dev tooling, not in the deployed runtime.
 
 ---
 
@@ -283,15 +307,15 @@ candidate leads that were **disproven**:
 ## Dependency audit summary
 
 Before fixes: **0 critical, 3 high, 14 moderate, 1 low.**
-After the F-1 Next.js bump: **0 critical, 2 high, 17 moderate, 1 low** — the
-remaining 2 highs are the non-reachable transitives below.
+After all fixes (F-1 bump + F-7 overrides, clean reinstall): **0 critical, 0 high,
+3 moderate, 0 low.**
 
 | Package | Severity | Production-reachable? | Action |
 |---------|----------|----------------------|--------|
 | `next` | ~~high~~ | **Yes** (framework + middleware auth) | ✅ Upgraded to `16.2.6` — HIGH advisories cleared |
-| `protobufjs` | high | No (posthog-js OTLP emit path) | Bump on cadence |
-| `fast-uri` | high | No (build-time webpack/ajv) | Bump on cadence |
-| `ws`, `postcss`, `hono`, `@expo/*`, `turbo`, etc. | moderate/low | No (dev/CLI/Expo tooling) | Bump on cadence |
+| `protobufjs` | ~~high~~ | No (posthog-js OTLP emit path) | ✅ Override → `7.5.9` |
+| `fast-uri` | ~~high~~ | No (build-time webpack/ajv) | ✅ Override → `3.1.2` |
+| `hono` / `@hono/node-server` | moderate | No (`shadcn` dev CLI only) | Left — dev tooling, not deployed |
 
 ---
 
@@ -302,9 +326,12 @@ remaining 2 highs are the non-reachable transitives below.
 - ✅ **F-3** — `validateCsrfOrigin` applied to 20 mutating routes; redundant
   inline check in `request-demo` removed.
 - ✅ **F-6** — Sandbox cookie set `HttpOnly`; dead client-clear helper removed.
+- ✅ **F-4** — Split CSP: authenticated app uses `nonce` + `strict-dynamic`
+  (no `'unsafe-inline'`); static/public pages keep `'unsafe-inline'`. New
+  middleware tests cover both. (Prod-build/browser smoke test still advised.)
+- ✅ **F-7** — `protobufjs`→`7.5.9`, `fast-uri`→`3.1.2` via scoped overrides;
+  `npm audit` now 0 high.
 - ❌ **F-5** — Withdrawn; already implemented (5-minute refresh lock + session wipe
   on gridmaster demotion/deactivation).
-- ⏸ **F-4** — Deferred deliberately (nonce migration risks breaking statically
-  pre-rendered pages; no exploitable sink). Future hardening.
-- ⏸ **F-7** — Deferred deliberately (auto-fix churns the lockfile by ~1,200
-  packages for non-reachable advisories). Bump on a normal dependency PR.
+
+**All seven findings are now closed.**
