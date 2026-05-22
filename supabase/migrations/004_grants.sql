@@ -17,7 +17,11 @@
 -- supabase_auth_admin needs USAGE on public schema to locate and call the hook
 GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
 
--- Hook needs to read profiles + org memberships + organizations for JWT claims
+-- Hook needs to read profiles + org memberships + organizations for JWT claims.
+-- The hook is SECURITY DEFINER (owned by postgres), so its only write
+-- (profiles.last_sign_in_at) runs with the owner's privileges. It no longer
+-- writes organizations (trials now start at org provisioning, not on sign-in),
+-- so no UPDATE grant on organizations is needed here.
 GRANT SELECT ON TABLE public.profiles TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organization_memberships TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organizations TO supabase_auth_admin;

@@ -64,7 +64,20 @@ CREATE TABLE public.organizations (
   pay_period_start_date DATE,
   stripe_customer_id   TEXT UNIQUE,
   subscription_status  TEXT NOT NULL DEFAULT 'trialing',
-  trial_ends_at        TIMESTAMPTZ DEFAULT (now() + interval '14 days'),
+  -- NULL trial_ends_at = "trial pending": the org exists but the trial clock has
+  -- not started yet. It starts when the FIRST super_admin genuinely LOGS IN to the
+  -- org, via the start_trial_for_org RPC called from the real web/mobile login
+  -- flow, which sets trial_ends_at = now() + 14 days. It is NOT started by token
+  -- refresh, automatic org reconciliation, or org switching (those leaked trials
+  -- onto orgs the user never chose). Keep 14 in sync with DEFAULT_TRIAL_DAYS in
+  -- packages/domain/src/billing.ts.
+  trial_ends_at        TIMESTAMPTZ,
+  -- Set to now() at the same moment trial_ends_at is set (trial activation), so
+  -- the start is recorded explicitly rather than inferred as ends - 14 days
+  -- (which would drift if DEFAULT_TRIAL_DAYS ever changes). NULL while pending.
+  trial_started_at     TIMESTAMPTZ,
+  trial_welcome_email_sent_at   TIMESTAMPTZ,
+  trial_welcome_seen_at         TIMESTAMPTZ,
   subscription_seats   INTEGER,
   data_retention_days  INTEGER NOT NULL DEFAULT 365,
   archived_at          TIMESTAMPTZ,
@@ -79,16 +92,21 @@ CREATE TABLE public.organizations (
   created_by           UUID,
   updated_by           UUID,
   created_at           TIMESTAMPTZ DEFAULT now(),
-  updated_at           TIMESTAMPTZ DEFAULT now(),
-
-  CONSTRAINT organizations_trialing_requires_trial_end
-    CHECK (subscription_status <> 'trialing' OR trial_ends_at IS NOT NULL)
+  updated_at           TIMESTAMPTZ DEFAULT now()
+  -- NOTE: no organizations_trialing_requires_trial_end constraint. A trialing org
+  -- with a NULL trial_ends_at is the legitimate "trial pending" state (clock not
+  -- started until the first super_admin signs in). The billing evaluator
+  -- (packages/domain/src/billing.ts) maps that combo to state "trial_pending".
 );
 
 COMMENT ON COLUMN public.organizations.suspended_at IS 'Non-null when the organization is suspended. Members are blocked from accessing the app.';
 COMMENT ON COLUMN public.organizations.data_retention_days IS 'Number of days to retain archived/deleted data before permanent purge (default 365)';
 COMMENT ON COLUMN public.organizations.stripe_customer_id IS 'Stripe customer ID for billing';
 COMMENT ON COLUMN public.organizations.subscription_status IS 'Stripe subscription status: trialing, active, past_due, canceled, unpaid';
+COMMENT ON COLUMN public.organizations.trial_ends_at IS 'NULL = trial pending until the FIRST super_admin genuinely logs in to the org, which (via the start_trial_for_org RPC, called from the real web/mobile login flow) sets it to now() + 14 days. Not started by token refresh, automatic org reconciliation, or org switching.';
+COMMENT ON COLUMN public.organizations.trial_started_at IS 'Set to now() at the same instant trial_ends_at is set (trial activation). Records the start explicitly instead of inferring it as trial_ends_at minus DEFAULT_TRIAL_DAYS. NULL while the trial is pending.';
+COMMENT ON COLUMN public.organizations.trial_welcome_email_sent_at IS 'Set once the "trial started" email has been sent (idempotency guard).';
+COMMENT ON COLUMN public.organizations.trial_welcome_seen_at IS 'Set when a super_admin dismisses the one-time trial welcome modal.';
 COMMENT ON COLUMN public.organizations.logo_url IS 'URL to the organization custom logo image';
 COMMENT ON COLUMN public.organizations.app_name IS 'Custom display name for the application';
 COMMENT ON COLUMN public.organizations.meta_description IS 'Custom SEO meta description';
