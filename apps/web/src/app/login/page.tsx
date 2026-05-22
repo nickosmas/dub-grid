@@ -5,9 +5,11 @@ import { PublicRoute } from "@/components/RouteGuards";
 import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { markAuthTransition } from "@/lib/auth-transition";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -21,6 +23,7 @@ import {
   refreshBrowserSession,
   setBrowserSession,
   signOutFromBrowser,
+  startBrowserTrial,
   switchBrowserOrganization,
 } from "@/features/account/client";
 
@@ -238,6 +241,7 @@ function DomainSelector() {
 // ── Gridmaster login (gridmaster subdomain) ─────────────────────────────────
 
 function GridmasterLogin() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -294,12 +298,11 @@ function GridmasterLogin() {
       // bake platform_role=gridmaster into the new JWT before we navigate.
       await refreshBrowserSession();
 
-      window.location.replace("/dashboard");
-
-      setTimeout(() => {
-        setLoading(false);
-        toast.error("Navigation timed out. Please try refreshing the page.");
-      }, 8000);
+      // Soft client navigation — keeps the SPA alive (no full-page reload).
+      // markAuthTransition() keeps ProtectedRoute from bouncing to /login
+      // while the auth context finishes settling after sign-in.
+      markAuthTransition();
+      router.replace("/dashboard");
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network")) {
@@ -314,7 +317,8 @@ function GridmasterLogin() {
   function handleMFAVerified() {
     // After MFA verification, refresh session and navigate
     refreshBrowserSession().then(() => {
-      window.location.replace("/dashboard");
+      markAuthTransition();
+      router.replace("/dashboard");
     });
   }
 
@@ -400,6 +404,7 @@ function GridmasterLogin() {
 // ── Step 2: Email + password (organization subdomain) ───────────────────────────
 
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -486,6 +491,10 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
       if (!isGridmaster) {
         const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+        // The org this login lands in: the JWT org when it already matches the
+        // subdomain, else the org we reconcile to below.
+        let signedInOrgId =
+          typeof claims.org_id === "string" ? claims.org_id : null;
 
         if (userSlug !== orgSlug) {
           // Slug mismatch — check membership
@@ -504,6 +513,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             try {
               await switchBrowserOrganization(targetOrg.org_id);
               await refreshBrowserSession();
+              signedInOrgId = targetOrg.org_id;
             } catch {
               await signOutFromBrowser("local");
               toast.error("Failed to switch organization. Please try again.");
@@ -517,14 +527,23 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             return;
           }
         }
+
+        // First super_admin login starts this org's trial. Idempotent + self-gated
+        // server-side, so it is safe to call on every login and never blocks it.
+        if (signedInOrgId) {
+          try {
+            await startBrowserTrial(signedInOrgId);
+          } catch {
+            // Non-fatal: never block sign-in on trial activation.
+          }
+        }
       }
 
-      window.location.replace("/dashboard");
-
-      setTimeout(() => {
-        setLoading(false);
-        toast.error("Navigation timed out. Please try refreshing the page.");
-      }, 8000);
+      // Soft client navigation — keeps the SPA alive (no full-page reload).
+      // markAuthTransition() keeps ProtectedRoute from bouncing to /login
+      // while the auth context finishes settling after sign-in.
+      markAuthTransition();
+      router.replace("/dashboard");
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
@@ -552,6 +571,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
         if (!isGridmaster) {
           const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
+          let signedInOrgId =
+            typeof claims.org_id === "string" ? claims.org_id : null;
           if (userSlug !== orgSlug) {
             const { organizations: orgs } = await fetchAccessibleOrganizations();
             if (!orgs) {
@@ -565,6 +586,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               try {
                 await switchBrowserOrganization(targetOrg.org_id);
                 await refreshBrowserSession();
+                signedInOrgId = targetOrg.org_id;
               } catch {
                 await signOutFromBrowser("local");
                 toast.error("Failed to switch organization.");
@@ -578,9 +600,19 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               return;
             }
           }
+
+          // First super_admin login starts this org's trial (idempotent, self-gated).
+          if (signedInOrgId) {
+            try {
+              await startBrowserTrial(signedInOrgId);
+            } catch {
+              // Non-fatal: never block sign-in on trial activation.
+            }
+          }
         }
 
-        window.location.replace("/dashboard");
+        markAuthTransition();
+        router.replace("/dashboard");
       } catch {
         toast.error("Unable to complete sign in. Please try again.");
         setMfaRequired(false);
