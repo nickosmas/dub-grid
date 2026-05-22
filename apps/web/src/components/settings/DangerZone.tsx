@@ -1,0 +1,131 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "sonner";
+import type { Organization } from "@/types";
+import { SectionCard } from "./shared";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { signOutFromBrowser } from "@/features/account/client/auth";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+
+interface DangerZoneProps {
+  organization: Organization;
+}
+
+export default function DangerZone({ organization }: DangerZoneProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const confirmPhrase = `DELETE ${organization.name}`;
+
+  function closeDialog() {
+    if (isDeleting) return;
+    setConfirmOpen(false);
+    setTyped("");
+  }
+
+  async function handleDelete() {
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/organizations/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: organization.id, confirmation: typed }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || "Failed to delete organization");
+      }
+      // The org is gone for this user. Sign out so the next page load
+      // re-authenticates against a remaining org (or the login screen).
+      try {
+        await signOutFromBrowser("global");
+      } catch {
+        // Session may already be invalid; redirect regardless.
+      }
+      window.location.href = "/login?deleted=true";
+    } catch (err) {
+      toast.error(formatClientErrorMessage(err, "Failed to delete organization"));
+      setIsDeleting(false);
+    }
+  }
+
+  return (
+    <SectionCard>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div>
+          <h2
+            style={{
+              fontSize: "var(--dg-fs-body)",
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+              margin: 0,
+            }}
+          >
+            Delete this organization
+          </h2>
+          <p
+            style={{
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--color-text-muted)",
+              margin: "6px 0 0",
+              lineHeight: 1.5,
+            }}
+          >
+            Closing {organization.name} cancels its subscription and removes access for
+            every member. Reach out to support if you need it restored.
+          </p>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-start",
+            paddingTop: 12,
+            borderTop: "1px solid var(--color-border-light)",
+          }}
+        >
+          <button
+            className="dg-btn dg-btn-danger-filled"
+            onClick={() => setConfirmOpen(true)}
+          >
+            Delete organization
+          </button>
+        </div>
+      </div>
+
+      {confirmOpen && (
+        <ConfirmDialog
+          title="Delete organization"
+          variant="danger"
+          confirmLabel="Delete organization"
+          isLoading={isDeleting}
+          confirmDisabled={typed !== confirmPhrase}
+          onCancel={closeDialog}
+          onConfirm={handleDelete}
+          message={
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <span>
+                This cancels billing and removes access for everyone in {organization.name}.
+                This cannot be undone from here.
+              </span>
+              <label className="dg-label" htmlFor="danger-confirm-input">
+                Type <strong>{confirmPhrase}</strong> to confirm
+              </label>
+              <input
+                id="danger-confirm-input"
+                className="dg-input"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                placeholder={confirmPhrase}
+                autoComplete="off"
+                autoFocus
+                disabled={isDeleting}
+              />
+            </div>
+          }
+        />
+      )}
+    </SectionCard>
+  );
+}

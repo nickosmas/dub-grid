@@ -32,12 +32,14 @@ describe("settings nav config", () => {
       "org-billing",
       "org-labels",
       "staff-departments",
+      "org-activity",
     ]);
     expect(organizationGroup?.items.map((item) => item.label)).toEqual([
       "Organization Details",
       "Billing",
       "Customization",
       "Departments",
+      "Activity Log",
     ]);
     expect(
       organizationGroup?.items.find((item) => item.id === "staff-departments")?.description,
@@ -48,5 +50,30 @@ describe("settings nav config", () => {
       "staff-roles",
       "staff-certifications",
     ]);
+  });
+
+  it("exposes the activity log and danger zone to super admins only", () => {
+    const groups = buildNavGroups(fullSettingsPermissions);
+    const allIds = groups.flatMap((group) => group.items.map((item) => item.id));
+    expect(allIds).toContain("org-activity");
+    expect(allIds).toContain("org-danger");
+
+    const dangerGroup = groups.find((group) => group.id === "danger");
+    expect(dangerGroup?.items.map((item) => item.id)).toEqual(["org-danger"]);
+    // Danger zone renders last in the sidebar.
+    expect(groups[groups.length - 1]?.id).toBe("danger");
+  });
+
+  it("hides the activity log and danger zone from non-super-admins", () => {
+    const adminPermissions: NavPermissions = {
+      ...fullSettingsPermissions,
+      isSuperAdmin: false,
+    };
+    const groups = buildNavGroups(adminPermissions);
+    const allIds = groups.flatMap((group) => group.items.map((item) => item.id));
+
+    expect(allIds).not.toContain("org-activity");
+    expect(allIds).not.toContain("org-danger");
+    expect(groups.find((group) => group.id === "danger")).toBeUndefined();
   });
 });
