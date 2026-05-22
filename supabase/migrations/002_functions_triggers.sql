@@ -118,7 +118,6 @@ DECLARE
   uid            UUID;
   lock_until     TIMESTAMPTZ;
   v_session_id   UUID;
-  v_effective_org UUID;
 BEGIN
   claims := event -> 'claims';
 
@@ -127,16 +126,17 @@ BEGIN
     uid := (event -> 'claims' ->> 'sub')::UUID;
   END IF;
 
-  -- Check for active JWT refresh lock (role change, org switch, etc.)
+  -- Clean up expired locks once, then check for an active one. (Active locks
+  -- have locked_until > NOW(), so the cleanup never removes them.)
+  DELETE FROM public.jwt_refresh_locks
+   WHERE user_id = uid AND locked_until <= NOW();
+
   SELECT locked_until INTO lock_until
     FROM public.jwt_refresh_locks
    WHERE user_id = uid
      AND locked_until > NOW();
 
   IF lock_until IS NOT NULL THEN
-    DELETE FROM public.jwt_refresh_locks
-     WHERE user_id = uid AND locked_until <= NOW();
-
     RETURN jsonb_build_object(
       'error', jsonb_build_object(
         'http_code', 403,
@@ -145,60 +145,61 @@ BEGIN
     );
   END IF;
 
-  -- Clean up any expired locks
-  DELETE FROM public.jwt_refresh_locks
-   WHERE user_id = uid AND locked_until <= NOW();
-
   -- Per-session org isolation: when the auth event carries a session_id,
-  -- look up that session's active_org_id (set by switch_org). This lets
-  -- multiple devices for the same user maintain independent org contexts.
+  -- the session's active_org_id (set by switch_org) overrides the user's
+  -- default. This lets multiple devices keep independent org contexts.
   --
-  -- On first contact for a session (no row exists yet), eagerly INSERT a row
-  -- that freezes the session's active_org_id at the user's current default
-  -- (profiles.org_id). Without this eager insert, an established session
-  -- without a row would re-read profiles.org_id on every refresh and inherit
-  -- any cross-device switches — defeating per-session isolation.
+  -- On first contact for a session (no row yet), eagerly INSERT one that
+  -- freezes active_org_id at the user's current default (profiles.org_id).
+  -- Without it, an established session without a row would re-read
+  -- profiles.org_id on every refresh and inherit cross-device switches —
+  -- defeating per-session isolation. ON CONFLICT makes this a no-op on every
+  -- mint after the first, so steady-state refresh cost is the single SELECT
+  -- below. The current token's effective org is unchanged either way: a
+  -- freshly inserted row holds active_org_id = profiles.org_id.
   v_session_id := NULLIF(event -> 'claims' ->> 'session_id', '')::UUID;
 
   IF v_session_id IS NOT NULL THEN
-    SELECT s.active_org_id
-      INTO v_effective_org
-      FROM public.user_sessions s
-     WHERE s.supabase_session_id = v_session_id
-       AND s.user_id = uid;
-
-    IF NOT FOUND THEN
-      INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
-      SELECT uid, v_session_id, p.org_id
-        FROM public.profiles p
-       WHERE p.id = uid
-      ON CONFLICT (supabase_session_id) DO NOTHING
-      RETURNING active_org_id INTO v_effective_org;
-    END IF;
+    INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
+    SELECT uid, v_session_id, p.org_id
+      FROM public.profiles p
+     WHERE p.id = uid
+    ON CONFLICT (supabase_session_id) DO NOTHING;
   END IF;
 
-  -- Resolve user profile with org context.
-  -- Effective org = per-session active_org_id (if set) else profiles.org_id.
-  -- Archived orgs are filtered out (AND o.archived_at IS NULL).
-  -- Suspended orgs are filtered out (AND o.suspended_at IS NULL).
-  -- Deactivated users get no org claims (AND p.deactivated_at IS NULL on membership join).
-  -- org_role is NOT coalesced — a NULL value means no membership exists,
-  -- which must result in no org claims being set (prevents read access
-  -- to an org the user has no membership for).
+  -- Resolve profile, effective org, membership, and org status in a single
+  -- statement (previously a separate session lookup fed a second join query).
+  -- Effective org = per-session active_org_id (if set) else profiles.org_id;
+  -- the correlated subquery resolves it inline so the membership/organization
+  -- joins key off it in the same round-trip. When no session_id is present the
+  -- subquery matches nothing and COALESCE falls back to profiles.org_id.
+  -- Archived orgs (o.archived_at), suspended orgs (o.suspended_at), and
+  -- deactivated users (p.deactivated_at) are filtered out. org_role is NOT
+  -- coalesced — a NULL value means no membership, which must yield no org
+  -- claims (prevents read access to an org the user has no membership for).
   SELECT
-    COALESCE(v_effective_org, p.org_id) AS org_id,
-    p.platform_role::TEXT               AS platform_role,
-    cm.org_role::TEXT                   AS org_role,
-    o.slug                              AS org_slug,
-    o.name                              AS org_name
+    eff.org_id              AS org_id,
+    p.platform_role::TEXT   AS platform_role,
+    cm.org_role::TEXT       AS org_role,
+    o.slug                  AS org_slug,
+    o.name                  AS org_name
   INTO user_profile
   FROM public.profiles p
+  CROSS JOIN LATERAL (
+    SELECT COALESCE(
+      (SELECT s.active_org_id
+         FROM public.user_sessions s
+        WHERE s.supabase_session_id = v_session_id
+          AND s.user_id = uid),
+      p.org_id
+    ) AS org_id
+  ) eff
   LEFT JOIN public.organization_memberships cm
     ON cm.user_id = p.id
-   AND cm.org_id = COALESCE(v_effective_org, p.org_id)
+   AND cm.org_id = eff.org_id
    AND cm.archived_at IS NULL
   LEFT JOIN public.organizations o
-    ON o.id = COALESCE(v_effective_org, p.org_id)
+    ON o.id = eff.org_id
    AND o.archived_at IS NULL
    AND o.suspended_at IS NULL
   WHERE p.id = uid
@@ -227,6 +228,13 @@ BEGIN
        SET last_sign_in_at = NOW()
      WHERE id = uid
        AND (last_sign_in_at IS NULL OR last_sign_in_at < NOW() - INTERVAL '5 minutes');
+
+    -- NOTE: the trial clock is NOT started here. The hook fires on every token
+    -- mint (including refresh) and sees the session's defaulted/resolved org, not
+    -- the subdomain the user actually logged into (reconciliation happens client
+    -- side, after this runs), so it cannot target the right org. Trials start on
+    -- the first super_admin LOGIN via the start_trial_for_org RPC, called from the
+    -- genuine web/mobile login flow. See trial_started_at in 001.
   ELSE
     claims := jsonb_set(claims, '{platform_role}', '"none"');
     claims := jsonb_set(claims, '{org_role}',      '"user"');
@@ -520,6 +528,13 @@ BEGIN
     RAISE EXCEPTION 'Caller identity mismatch';
   END IF;
 
+  -- Self-action guard: no one may change their own org role (neither demotion
+  -- nor promotion). Mirrors the gridmaster self-demotion guard. Forces another
+  -- admin to act, which also prevents self-inflicted lockout.
+  IF p_target_user_id = p_changed_by_id THEN
+    RAISE EXCEPTION 'SELF_ACTION_FORBIDDEN: you cannot change your own role';
+  END IF;
+
   -- Advisory lock prevents two callers from changing the same user's role
   -- simultaneously (last-write-wins race). Released at end of transaction.
   PERFORM pg_advisory_xact_lock(hashtext('change_role_' || p_target_user_id::TEXT));
@@ -582,9 +597,17 @@ BEGIN
     END IF;
   END IF;
 
+  -- Tier guard: an admin may not touch privileged accounts in either
+  -- direction. They cannot promote anyone INTO admin/super_admin/gridmaster,
+  -- and cannot change the role of a target who already holds one of those
+  -- tiers (which would otherwise let an admin demote a super_admin). Only
+  -- super_admins and gridmasters manage privileged roles.
   IF COALESCE(v_caller_org_role, 'user') = 'admin'
-     AND p_new_role IN ('gridmaster', 'admin', 'super_admin') THEN
-    RAISE EXCEPTION 'admin cannot promote to admin, super_admin, or gridmaster';
+     AND (
+       v_old_role IN ('gridmaster', 'admin', 'super_admin')
+       OR p_new_role IN ('gridmaster', 'admin', 'super_admin')
+     ) THEN
+    RAISE EXCEPTION 'admin cannot change the role of an admin, super_admin, or gridmaster';
   END IF;
 
   -- Prevent demotion of the last super_admin in an org.
@@ -624,7 +647,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.change_user_role IS 'Race-condition-safe role change RPC. Verifies caller identity via auth.uid(), gates on admin/super_admin/gridmaster, enforces org scoping (explicit p_org_id or fallback to target profiles.org_id), and prevents admin self-promotion.';
+COMMENT ON FUNCTION public.change_user_role IS 'Race-condition-safe role change RPC. Verifies caller identity via auth.uid(), gates on admin/super_admin/gridmaster, enforces org scoping (explicit p_org_id or fallback to target profiles.org_id), prevents admin self-promotion, and blocks any self role change (you cannot change your own role).';
 
 
 -- ── assign_org_role_by_email ──────────────────────────────────────────────────
@@ -653,6 +676,16 @@ BEGIN
     )
   ) THEN
     RAISE EXCEPTION 'Unauthorized: insufficient permissions';
+  END IF;
+
+  -- Tier guard: a non-gridmaster admin may only assign the 'user' role. They
+  -- cannot grant admin or super_admin (which would let an admin self-promote
+  -- or escalate anyone). Only super_admins and gridmasters assign privileged
+  -- roles via this path.
+  IF NOT public.is_gridmaster()
+     AND public.caller_org_role() = 'admin'
+     AND p_org_role IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'admin cannot assign admin or super_admin';
   END IF;
 
   SELECT id INTO target_user_id FROM auth.users WHERE email = p_email;
@@ -756,6 +789,13 @@ BEGIN
   SET org_id = target_org_id, updated_at = NOW()
   WHERE id = v_uid;
 
+  -- NOTE: switching orgs does NOT start a trial. switch_org is called by
+  -- automatic reconciliation (web subdomain alignment after login, mobile
+  -- switchMobileOrgIfNeeded on auth/refresh), not only by deliberate user
+  -- switches, so a billing side effect here leaks trials onto orgs the user
+  -- never chose to use. Trials start on the first super_admin LOGIN, via the
+  -- start_trial_for_org RPC called from the genuine login flow (see below).
+
   -- No jwt_refresh_lock here: the caller refreshes immediately after this RPC,
   -- and the JWT hook reads from user_sessions.active_org_id (this session only).
   -- A lock would block the caller's own refreshSession() call. Other sessions
@@ -764,6 +804,41 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.switch_org(UUID) TO authenticated;
+
+
+-- ── start_trial_for_org ───────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.start_trial_for_org(p_org_id UUID)
+RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  -- Start the org's 14-day trial the first time a super_admin GENUINELY logs in to
+  -- it. Called only from the real login flow (web login handler / mobile
+  -- loginMobileUser), never from token refresh, automatic org reconciliation, or
+  -- switch_org. Idempotent: guarded by trial_ends_at IS NULL. Self-gated to a
+  -- super_admin membership so members/admins cannot start a trial. Keep the 14-day
+  -- interval in sync with DEFAULT_TRIAL_DAYS in packages/domain/src/billing.ts.
+  UPDATE public.organizations o
+     SET trial_started_at = NOW(),
+         trial_ends_at    = NOW() + INTERVAL '14 days'
+   WHERE o.id = p_org_id
+     AND o.subscription_status = 'trialing'
+     AND o.trial_ends_at IS NULL
+     AND o.archived_at IS NULL
+     AND o.suspended_at IS NULL
+     AND EXISTS (
+       SELECT 1 FROM public.organization_memberships m
+        WHERE m.user_id = auth.uid()
+          AND m.org_id = p_org_id
+          AND m.org_role = 'super_admin'
+          AND m.archived_at IS NULL
+     );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.start_trial_for_org(UUID) TO authenticated;
 
 
 -- ── get_my_organizations ──────────────────────────────────────────────────────
@@ -799,7 +874,10 @@ BEGIN
   SELECT cm.org_id, o.name, o.slug, cm.org_role, (cm.org_id = v_active_oid)
   FROM public.organization_memberships cm
   JOIN public.organizations o ON o.id = cm.org_id
-  WHERE cm.user_id = v_uid ORDER BY o.name;
+  WHERE cm.user_id = v_uid
+    AND cm.archived_at IS NULL
+    AND o.archived_at IS NULL
+  ORDER BY o.name;
 END;
 $$;
 
