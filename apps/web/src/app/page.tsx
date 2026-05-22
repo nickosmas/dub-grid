@@ -246,7 +246,7 @@ export default function RootPage() {
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <DubGridLogo size={28} color="var(--color-brand)" />
-            <DubGridWordmark fontSize={18} color="var(--color-brand)" />
+            <DubGridWordmark fontSize={18} color="#111827" />
           </div>
 
           {/* Desktop nav links */}
@@ -290,7 +290,7 @@ export default function RootPage() {
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
               <DubGridLogo size={28} color="var(--color-brand)" />
-              <DubGridWordmark fontSize={18} color="var(--color-brand)" />
+              <DubGridWordmark fontSize={18} color="#111827" />
             </div>
             <button
               onClick={() => setMobileMenuOpen(false)}
