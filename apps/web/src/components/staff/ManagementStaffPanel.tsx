@@ -86,6 +86,9 @@ interface ManagementStaffPanelProps {
   onBench?: (empId: string, note?: string) => void;
   onActivate?: (empId: string) => void;
   onTerminate?: (empId: string) => void;
+  /** True when this panel's subject is the current user — destructive
+   *  self-actions (role change, status, remove from management) are hidden. */
+  isSelf?: boolean;
 }
 
 export function ManagementStaffPanel({
@@ -104,6 +107,7 @@ export function ManagementStaffPanel({
   onBench,
   onActivate,
   onTerminate,
+  isSelf = false,
 }: ManagementStaffPanelProps) {
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);
@@ -368,6 +372,7 @@ export function ManagementStaffPanel({
       onRoleChange={onRoleChange}
       onPermissionsChange={onPermissionsChange}
       labelStyle={labelStyle}
+      isSelf={isSelf}
     />
   );
 
@@ -605,7 +610,7 @@ export function ManagementStaffPanel({
               )}
               {accessControls}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                {person.managementDepartmentIds.length > 0 && deptIds.length > 0 && (
+                {!isSelf && person.managementDepartmentIds.length > 0 && deptIds.length > 0 && (
                   <button
                     type="button"
                     onClick={() => {
@@ -1208,6 +1213,7 @@ export function ManagementStaffPanel({
                   version: 0,
                 }}
                 canEdit
+                isSelf={isSelf}
                 onBench={onBench}
                 onActivate={onActivate}
                 onTerminate={onTerminate}

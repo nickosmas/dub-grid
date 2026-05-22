@@ -4,13 +4,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole, AdminPermissions } from "@/types";
+import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
-import InlineEditEmployee from "@/components/EditEmployeePanel";
+import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
 
@@ -84,8 +86,10 @@ export function StaffDetailPanel({
   onPermissionsChange,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
+  const isSelf = isSelfAction(currentUser?.id, employee.userId);
   const hue = hashCode(employee.id) % 360;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [closing, setClosing] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [revokingInvite, setRevokingInvite] = useState(false);
@@ -104,7 +108,6 @@ export function StaffDetailPanel({
     Boolean(pendingInvitation || (orgId && onInvite));
   const showManagementAccessAction =
     Boolean(canManageManagementAccess && onManageManagementAccess && employee.status !== "terminated");
-  const showStatusActions = canEditEmployee;
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
 
@@ -282,6 +285,8 @@ export function StaffDetailPanel({
             certificationLabel={certificationLabel}
             departments={departments}
             departmentLabel={departmentLabel}
+            ref={editorRef}
+            hideActions
             onSave={onSave}
             onCancel={closePanel}
             onDirtyChange={setHasUnsavedChanges}
@@ -434,44 +439,45 @@ export function StaffDetailPanel({
                 adminPermissions={adminPermissions}
                 onRoleChange={onRoleChange}
                 onPermissionsChange={onPermissionsChange}
+                isSelf={isSelf}
               />
             </div>
           )}
         </div>
 
-        {/* Sticky bottom status actions */}
-        {showStatusActions && (
-          <div style={{ flexShrink: 0, padding: "16px 24px", borderTop: "1px solid var(--color-border-light)" }}>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Staffing status
-              </div>
-              <EmployeeStatusActions
-                employee={employee}
-                canEdit={canEditEmployee}
-                onBench={onBench}
-                onActivate={onActivate}
-                onTerminate={onDelete}
-                onRevokeAccess={canManageEmployees ? onRevokeAccess : undefined}
-                variant="panel"
-              />
-            </div>
-          </div>
-        )}
+        {/* Sticky bottom actions */}
+        <div style={{ flexShrink: 0, padding: "16px 24px", borderTop: "1px solid var(--color-border-light)" }}>
+          {canEditEmployee ? (
+            <EditorActionRow
+              secondaryAction={
+                <button
+                  onClick={() => editorRef.current?.requestDismiss()}
+                  className="dg-btn dg-btn-secondary"
+                >
+                  {getEditorDismissLabel({ hasUnsavedChanges })}
+                </button>
+              }
+              primaryAction={
+                <button
+                  onClick={() => editorRef.current?.save()}
+                  disabled={!hasUnsavedChanges}
+                  className="dg-btn dg-btn-primary"
+                >
+                  {EDITOR_ACTION_LABELS.save}
+                </button>
+              }
+            />
+          ) : (
+            <EditorActionRow
+              secondaryAction={
+                <button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
+                  {EDITOR_ACTION_LABELS.close}
+                </button>
+              }
+            />
+          )}
+        </div>
+
       </div>
       {unsavedChangesDialog}
       {pendingInvitationAction && pendingInvitation && (

@@ -280,7 +280,7 @@ function StaffRowCells({
         tableClassName="hidden lg:table-cell py-4"
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
-        <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} />
+        <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} isSelf={isYou} />
       </StaffCell>
 
       {/* Chevron */}

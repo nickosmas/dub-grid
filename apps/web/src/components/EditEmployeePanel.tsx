@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -41,6 +41,14 @@ export interface EditEmployeePanelProps {
   onInvite?: (emp: Employee) => void;
   pendingInvitation?: Invitation;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
+  /** When true, render no Close/Save row — the host renders its own footer and
+   *  drives save/dismiss through the ref handle. */
+  hideActions?: boolean;
+}
+
+export interface EditEmployeePanelHandle {
+  save: () => void;
+  requestDismiss: () => void;
 }
 
 type EditForm = {
@@ -71,7 +79,7 @@ function buildEditForm(employee: Employee): EditForm {
   };
 }
 
-export default function EditEmployeePanel({
+const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelProps>(function EditEmployeePanel({
   employee,
   focusAreas,
   certifications,
@@ -85,7 +93,8 @@ export default function EditEmployeePanel({
   onInvite,
   pendingInvitation,
   onRevoke,
-}: EditEmployeePanelProps) {
+  hideActions,
+}: EditEmployeePanelProps, ref) {
   const isMobile = useMediaQuery(MOBILE);
   const [form, setForm] = useState<EditForm>(() => buildEditForm(employee));
 
@@ -201,6 +210,12 @@ export default function EditEmployeePanel({
 
     onCancel();
   }, [employee, isModified, onCancel]);
+
+  useImperativeHandle(
+    ref,
+    () => ({ save: handleSave, requestDismiss: handleDismiss }),
+    [handleSave, handleDismiss],
+  );
 
   const toggleRole = useCallback(
     (roleId: number) =>
@@ -746,7 +761,7 @@ export default function EditEmployeePanel({
         }}
       >
         {/* Primary actions */}
-        {canEdit && (
+        {!hideActions && canEdit && (
           <EditorActionRow
             secondaryAction={
               <button
@@ -777,7 +792,7 @@ export default function EditEmployeePanel({
             }
           />
         )}
-        {!canEdit && (
+        {!hideActions && !canEdit && (
           <EditorActionRow
             secondaryAction={
               <button onClick={onCancel} className="dg-btn dg-btn-secondary">
@@ -789,4 +804,6 @@ export default function EditEmployeePanel({
       </div>
     </div>
   );
-}
+});
+
+export default EditEmployeePanel;

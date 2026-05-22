@@ -14,6 +14,8 @@ import {
   updatePendingInvitation,
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
+import { isSelfAction } from "@dubgrid/domain";
+import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
 import {
   applyManagementDirectoryUpdate,
@@ -120,6 +122,8 @@ export function MembersSection({
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id ?? null;
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
   const directoryOrgId = canViewManagementUsers ? orgId ?? null : null;
@@ -501,7 +505,15 @@ export function MembersSection({
     userId: string | null | undefined,
     membershipUpdatedAt: string | null | undefined,
   ): ((newRole: OrganizationRole) => Promise<void>) | undefined => {
-    if (!canManageManagementAccess || !orgId || !userId || !membershipUpdatedAt) {
+    // Never provide a role-change handler for the current user: you can't
+    // change your own role (also blocked at the API/DB boundary).
+    if (
+      !canManageManagementAccess ||
+      !orgId ||
+      !userId ||
+      !membershipUpdatedAt ||
+      isSelfAction(currentUserId, userId)
+    ) {
       return undefined;
     }
     const oid = orgId;
@@ -1527,6 +1539,7 @@ export function MembersSection({
                                   person.userId,
                                   person.membershipUpdatedAt,
                                 )}
+                                isSelf={isSelfAction(currentUserId, person.userId)}
                               />
                             </TableCell>
                           )}
@@ -1782,6 +1795,7 @@ export function MembersSection({
           departmentLabel={managementDepartmentLabel}
           canManageScheduleEmployees={canManageEmployees}
           canManageManagementAccess={canManageManagementAccess}
+          isSelf={isSelfAction(currentUserId, selectedPerson.userId)}
           onRoleChange={
             canManageManagementAccess &&
             selectedPerson.userId &&
