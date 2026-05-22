@@ -72,12 +72,16 @@ describe("Login page submit states", () => {
   });
 
   it("failed sign-in: loading resets to false and error message is displayed", async () => {
-    // Arrange: fetch returns 401 (invalid credentials)
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ success: false, error: "Invalid email or password" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
+    // Arrange: fetch returns 401 (invalid credentials).
+    // Return a fresh Response per call — OrgLogin also fires a /api/validate-domain
+    // fetch on mount, and a single shared Response body can only be read once.
+    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ success: false, error: "Invalid email or password" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
     );
 
     const { container } = render(<LoginPage />);

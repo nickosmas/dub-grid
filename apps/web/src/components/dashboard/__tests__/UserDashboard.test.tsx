@@ -1,3 +1,7 @@
+// Pin to UTC (production runtime) so split-shift/time-of-day rendering is
+// deterministic regardless of the dev machine's timezone.
+process.env.TZ = "UTC";
+
 import {
   fireEvent,
   render,

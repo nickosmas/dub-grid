@@ -1,3 +1,8 @@
+// Pin the runtime timezone to UTC (matching production servers) so the
+// default mobile schedule range derived from the system clock resolves to
+// stable ISO dates regardless of the local machine timezone.
+process.env.TZ = "UTC";
+
 import { NextResponse } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
