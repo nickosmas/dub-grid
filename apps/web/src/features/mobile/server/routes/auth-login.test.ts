@@ -389,7 +389,8 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      error: "No organization matched that slug.",
+      error:
+        "We couldn't find that organization. Check the subdomain and try again.",
     });
   });
 });

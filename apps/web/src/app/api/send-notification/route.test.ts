@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const validateCsrfOrigin = vi.fn();
-const requireAuthenticatedUser = vi.fn();
-const requireOrgPermissions = vi.fn();
+const requireAuthenticatedUserWithClaims = vi.fn();
+const resolveEffectiveOrgId = vi.fn();
 const checkRateLimit = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 
@@ -12,11 +12,12 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
+    requireAuthenticatedUserWithClaims(req),
 }));
 
 vi.mock("@/app/api/shared/permissions", () => ({
-  requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
+  resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -43,14 +44,6 @@ import { POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
-const TARGET_USER_ID = "33333333-3333-4333-8333-333333333333";
-
-const basePermissions = {
-  isGridmaster: false,
-  isSuperAdmin: false,
-  canPublishSchedule: false,
-  canApproveShiftRequests: false,
-};
 
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest("http://localhost/api/send-notification", {
@@ -60,108 +53,30 @@ function makeRequest(body: Record<string, unknown>) {
   });
 }
 
+// The route gates on org isolation (the caller's JWT org_id must match the body
+// orgId) after auth + rate limiting, then dispatches the event. Per-action
+// permission checks live in the notification pipeline, not this route.
 describe("POST /api/send-notification", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     validateCsrfOrigin.mockReturnValue(null);
-    requireAuthenticatedUser.mockResolvedValue({
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
       user: { id: "actor-user", email: "actor@example.com" },
+      session: { access_token: "test-token" },
+      claims: { sub: "actor-user", org_id: ORG_ID },
     });
     checkRateLimit.mockResolvedValue({
       limited: false,
       reset: null,
       misconfigured: false,
     });
-    requireOrgPermissions.mockImplementation(
-      async (
-        _req: NextRequest,
-        _orgId: string,
-        isAllowed: (permissions: typeof basePermissions) => boolean,
-      ) =>
-        isAllowed(basePermissions)
-          ? { actor: { id: "actor-user" }, permissions: basePermissions }
-          : {
-              response: NextResponse.json(
-                { error: "Insufficient permissions" },
-                { status: 403 },
-              ),
-            },
+    resolveEffectiveOrgId.mockImplementation(
+      async (_req: NextRequest, _userId: string, orgId: string) => orgId,
     );
     dispatchNotificationEvent.mockResolvedValue(undefined);
   });
 
-  it("rejects role_changed unless the caller is gridmaster or super admin", async () => {
-    const response = await POST(
-      makeRequest({
-        action: "role_changed",
-        orgId: ORG_ID,
-        targetUserId: TARGET_USER_ID,
-        fromRole: "user",
-        toRole: "admin",
-      }),
-    );
-
-    expect(response.status).toBe(403);
-    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
-  });
-
-  it("allows schedule_published for callers with publish permission", async () => {
-    requireOrgPermissions.mockImplementationOnce(
-      async (
-        _req: NextRequest,
-        _orgId: string,
-        isAllowed: (permissions: typeof basePermissions) => boolean,
-      ) => {
-        const permissions = { ...basePermissions, canPublishSchedule: true };
-        return isAllowed(permissions)
-          ? { actor: { id: "actor-user" }, permissions }
-          : {
-              response: NextResponse.json(
-                { error: "Insufficient permissions" },
-                { status: 403 },
-              ),
-            };
-      },
-    );
-
-    const response = await POST(
-      makeRequest({
-        action: "schedule_published",
-        orgId: ORG_ID,
-        startDate: "2026-05-10",
-        endDate: "2026-05-16",
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    expect(dispatchNotificationEvent).toHaveBeenCalledWith(
-      "actor-user",
-      expect.objectContaining({ action: "schedule_published", orgId: ORG_ID }),
-    );
-  });
-
-  it("allows shift request events for callers who can approve requests", async () => {
-    requireOrgPermissions.mockImplementationOnce(
-      async (
-        _req: NextRequest,
-        _orgId: string,
-        isAllowed: (permissions: typeof basePermissions) => boolean,
-      ) => {
-        const permissions = {
-          ...basePermissions,
-          canApproveShiftRequests: true,
-        };
-        return isAllowed(permissions)
-          ? { actor: { id: "actor-user" }, permissions }
-          : {
-              response: NextResponse.json(
-                { error: "Insufficient permissions" },
-                { status: 403 },
-              ),
-            };
-      },
-    );
-
+  it("dispatches the event when the caller's org matches the body org", async () => {
     const response = await POST(
       makeRequest({
         action: "shift_request_resolved",
@@ -180,5 +95,40 @@ describe("POST /api/send-notification", () => {
         orgId: ORG_ID,
       }),
     );
+  });
+
+  it("rejects when the body org does not match the caller's JWT org", async () => {
+    const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
+    const response = await POST(
+      makeRequest({
+        action: "schedule_published",
+        orgId: OTHER_ORG,
+        startDate: "2026-05-10",
+        endDate: "2026-05-16",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 when the caller is rate limited", async () => {
+    checkRateLimit.mockResolvedValueOnce({
+      limited: true,
+      reset: Date.now() + 60_000,
+      misconfigured: false,
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "schedule_published",
+        orgId: ORG_ID,
+        startDate: "2026-05-10",
+        endDate: "2026-05-16",
+      }),
+    );
+
+    expect(response.status).toBe(429);
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
   });
 });

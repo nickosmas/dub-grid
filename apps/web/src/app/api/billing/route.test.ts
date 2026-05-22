@@ -207,7 +207,7 @@ describe("GET /api/billing", () => {
       expect.any(NextRequest),
       ORG_ID,
       expect.any(Function),
-      { allowLockedOrganization: true },
+      { allowLockedOrganization: true, ignoreSandbox: true },
     );
     const isAllowed = requireOrgPermissions.mock.calls[0][2];
     expect(isAllowed({ isGridmaster: false, isSuperAdmin: true })).toBe(true);

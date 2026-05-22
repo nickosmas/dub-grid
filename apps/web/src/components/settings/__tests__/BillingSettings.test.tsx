@@ -18,6 +18,8 @@ vi.mock("@/hooks", () => ({
   useLogout: () => ({ signOutLocal: mockSignOutLocal }),
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
+  useIsInSandbox: () => false,
+  useSandboxSourceOrgId: () => null,
 }));
 
 vi.mock("@/features/billing/client", () => ({
