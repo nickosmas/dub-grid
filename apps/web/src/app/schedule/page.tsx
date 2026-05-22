@@ -1,12 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { extractJwtClaims } from "@/features/permissions/shared";
 import SchedulerPageClient, {
   type SchedulePageInitialState,
 } from "./SchedulePageClient";
-
-type Claims = {
-  org_id?: unknown;
-};
 
 async function loadInitialScheduleState(): Promise<SchedulePageInitialState> {
   const cookieStore = await cookies();
@@ -25,19 +22,22 @@ async function loadInitialScheduleState(): Promise<SchedulePageInitialState> {
     },
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getSession (reads cookies) and getUser (validates against the auth server)
+  // are independent, so run them in parallel instead of sequentially.
+  const [
+    {
+      data: { session },
+    },
+    {
+      data: { user },
+    },
+  ] = await Promise.all([supabase.auth.getSession(), supabase.auth.getUser()]);
 
-  let orgId: string | null = null;
-  if (session?.access_token) {
-    const { data } = await supabase.auth.getClaims(session.access_token);
-    const claims = data?.claims as Claims | undefined;
-    orgId = typeof claims?.org_id === "string" ? claims.org_id : null;
-  }
+  // org_id is a top-level claim the JWT hook already baked in — decode it
+  // locally instead of an extra supabase.auth.getClaims() round-trip.
+  const orgId = session?.access_token
+    ? extractJwtClaims(session.access_token).orgId
+    : null;
 
   return {
     authenticatedUserId: user?.id ?? null,

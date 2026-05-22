@@ -3,7 +3,7 @@ import {
   FOCUS_AREA_COLS, SHIFT_CATEGORY_COLS, JOB_COLS, NAMED_ITEM_COLS, ORG_ROLE_COLS,
   COVERAGE_REQ_COLS,
   ABSENCE_TYPE_COLS, INDICATOR_TYPE_COLS,
-  logAudit,
+  logAudit, saveNamedEntities,
 } from "./shared";
 import type {
   DbFocusArea, DbShiftCategory, DbJobDefinition, DbNamedItem,
@@ -280,61 +280,21 @@ export async function saveCertifications(
   items: NamedItem[],
   existing: NamedItem[],
 ): Promise<NamedItem[]> {
-  const existingIds = new Set(existing.map((e) => e.id));
-  const newIds = new Set(items.filter((i) => i.id).map((i) => i.id));
-
-  // Soft-delete removed items (row persists — all FK/array references remain valid)
-  const toDelete = existing.filter((e) => !newIds.has(e.id));
-  if (toDelete.length > 0) {
-    const { error } = await supabase
-      .from("certifications")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("org_id", orgId)
-      .in("id", toDelete.map((d) => d.id));
-    if (error) throw error;
-  }
-
-  // Separate update + insert to avoid GENERATED ALWAYS identity column errors
-  const toUpdate = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-  const toInsert = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
-
-  for (const { item, sortOrder } of toUpdate) {
-    const { error } = await supabase
-      .from("certifications")
-      .update({ name: item.name, abbr: item.abbr, department_id: item.departmentId ?? null, sort_order: sortOrder })
-      .eq("org_id", orgId)
-      .eq("id", item.id);
-    if (error) throw error;
-  }
-  // Insert new items — restore archived rows with matching names instead of inserting duplicates
-  for (const { item, sortOrder } of toInsert) {
-    const { data: archived } = await supabase
-      .from("certifications")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("name", item.name)
-      .not("archived_at", "is", null)
-      .maybeSingle();
-    if (archived) {
-      const { error } = await supabase
-        .from("certifications")
-        .update({ name: item.name, abbr: item.abbr, department_id: item.departmentId ?? null, sort_order: sortOrder, archived_at: null })
-        .eq("id", archived.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from("certifications")
-        .insert({ org_id: orgId, name: item.name, abbr: item.abbr, department_id: item.departmentId ?? null, sort_order: sortOrder });
-      if (error) throw error;
-    }
-  }
+  const { created, updated, archived } = await saveNamedEntities({
+    table: "certifications",
+    orgId,
+    items,
+    existing,
+    toRow: (item, sortOrder) => ({
+      name: item.name,
+      abbr: item.abbr,
+      department_id: item.departmentId ?? null,
+      sort_order: sortOrder,
+    }),
+  });
 
   await cacheDel(CacheKey.certifications(orgId), CacheKey.assignments(orgId), CacheKey.assignments(orgId, true));
-  void logAudit("certifications.saved", "certification", null, { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length }, orgId);
+  void logAudit("certifications.saved", "certification", null, { created, updated, archived }, orgId);
   return fetchCertifications(orgId);
 }
 
@@ -378,81 +338,22 @@ export async function saveOrganizationRoles(
   items: NamedItem[],
   existing: NamedItem[],
 ): Promise<NamedItem[]> {
-  const existingIds = new Set(existing.map((e) => e.id));
-  const newIds = new Set(items.filter((i) => i.id).map((i) => i.id));
-
-  // Soft-delete removed items (row persists — all FK/array references remain valid)
-  const toDelete = existing.filter((e) => !newIds.has(e.id));
-  if (toDelete.length > 0) {
-    const { error } = await supabase
-      .from("organization_roles")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("org_id", orgId)
-      .in("id", toDelete.map((d) => d.id));
-    if (error) throw error;
-  }
-
-  // Separate update + insert to avoid GENERATED ALWAYS identity column errors
-  const toUpdate = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-  const toInsert = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
-
-  for (const { item, sortOrder } of toUpdate) {
-    const { error } = await supabase
-      .from("organization_roles")
-      .update({
-        name: item.name,
-        abbr: item.abbr,
-        is_schedule_role: item.isScheduleRole ?? true,
-        department_id: item.departmentId ?? null,
-        sort_order: sortOrder,
-      })
-      .eq("org_id", orgId)
-      .eq("id", item.id);
-    if (error) throw error;
-  }
-  // Insert new items — restore archived rows with matching names instead of inserting duplicates
-  for (const { item, sortOrder } of toInsert) {
-    const { data: archived } = await supabase
-      .from("organization_roles")
-      .select("id")
-      .eq("org_id", orgId)
-      .eq("name", item.name)
-      .not("archived_at", "is", null)
-      .maybeSingle();
-    if (archived) {
-      const { error } = await supabase
-        .from("organization_roles")
-        .update({
-          name: item.name,
-          abbr: item.abbr,
-          is_schedule_role: item.isScheduleRole ?? true,
-          department_id: item.departmentId ?? null,
-          sort_order: sortOrder,
-          archived_at: null,
-        })
-        .eq("id", archived.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from("organization_roles")
-        .insert({
-          org_id: orgId,
-          name: item.name,
-          abbr: item.abbr,
-          is_schedule_role: item.isScheduleRole ?? true,
-          department_id: item.departmentId ?? null,
-          sort_order: sortOrder,
-        });
-      if (error) throw error;
-    }
-  }
+  const { created, updated, archived } = await saveNamedEntities({
+    table: "organization_roles",
+    orgId,
+    items,
+    existing,
+    toRow: (item, sortOrder) => ({
+      name: item.name,
+      abbr: item.abbr,
+      is_schedule_role: item.isScheduleRole ?? true,
+      department_id: item.departmentId ?? null,
+      sort_order: sortOrder,
+    }),
+  });
 
   await cacheDel(CacheKey.orgRoles(orgId));
-  void logAudit("org_roles.saved", "org_role", null, { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length }, orgId);
+  void logAudit("org_roles.saved", "org_role", null, { created, updated, archived }, orgId);
   return fetchOrganizationRoles(orgId);
 }
 

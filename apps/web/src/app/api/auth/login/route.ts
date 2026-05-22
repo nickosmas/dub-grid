@@ -5,6 +5,7 @@ import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { Timer } from "@/lib/server-timing";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ const bodySchema = z.object({
  * Rate-limits by SHA-256 hash of email (never stores raw email in Redis).
  */
 export async function POST(req: NextRequest) {
+  const timer = new Timer();
   // ── CSRF: validate Origin header ──────────────────────────────────
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
@@ -52,7 +54,9 @@ export async function POST(req: NextRequest) {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  const { limited, reset, misconfigured } = await checkRateLimit(loginLimiter, `login:${emailHash}`);
+  const { limited, reset, misconfigured } = await timer.time("ratelimit", () =>
+    checkRateLimit(loginLimiter, `login:${emailHash}`),
+  );
 
   if (misconfigured) {
     return NextResponse.json(
@@ -91,10 +95,9 @@ export async function POST(req: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { data, error } = await timer.time("signin", () =>
+    supabase.auth.signInWithPassword({ email, password }),
+  );
 
   if (error) {
     logger.info({ emailHash, path: "/api/auth/login", errorMsg: error.message }, "Login failed");
@@ -111,7 +114,7 @@ export async function POST(req: NextRequest) {
   );
 
   // Return the session tokens so the client can set them
-  return NextResponse.json({
+  const res = NextResponse.json({
     success: true,
     session: {
       access_token: data.session.access_token,
@@ -126,4 +129,6 @@ export async function POST(req: NextRequest) {
     },
     mfa_required: verifiedTotpFactors.length > 0,
   });
+  timer.applyTo(res.headers);
+  return res;
 }

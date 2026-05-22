@@ -129,6 +129,17 @@ export function usePermissions(): Permissions {
 
     const { effectiveRole, orgId } = extractJwtClaims(accessToken);
 
+    // Surface the JWT-derived orgId immediately, while permissions are still
+    // loading. orgId is a JWT claim (no network needed), so orgId-gated queries
+    // like useEmployees can start fetching in parallel with this permissions
+    // request and the org bootstrap, instead of waiting for either to resolve.
+    // isLoading stays true, so UI gates that key off permsLoading are unaffected.
+    if (orgId) {
+      setPerms((prev) =>
+        prev.orgId === orgId && prev.isLoading ? prev : { ...LOADING_PERMS, orgId },
+      );
+    }
+
     void (async () => {
       try {
         const { permissions } = await fetchAccountPermissions();

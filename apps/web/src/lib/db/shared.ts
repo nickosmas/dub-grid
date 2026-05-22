@@ -35,6 +35,119 @@ export class OptimisticLockError extends Error {
   }
 }
 
+// ── Batched save for sort-ordered, soft-deletable named entities ─────────────
+// departments / certifications / organization_roles all share the same save
+// shape: soft-delete removed rows, update kept rows, and insert new ones —
+// reusing (restoring) an archived row when an incoming name matches, to avoid
+// duplicate-name rows. The old per-item loops issued ~2N sequential round-trips
+// (a name lookup + a write per new item, plus one update per kept item). This
+// collapses that to a constant handful: one delete, the updates in parallel,
+// one archived-name lookup, the restores in parallel, and one bulk insert.
+//
+// Updates/restores can't be a single statement (each row has different values)
+// and can't be an upsert-by-id (the PK is GENERATED ALWAYS AS IDENTITY, which
+// rejects an explicit id on the INSERT path of ON CONFLICT) — so they run as
+// parallel single-row writes instead.
+export interface SaveNamedEntitiesResult {
+  created: number;
+  updated: number;
+  archived: number;
+}
+
+export async function saveNamedEntities<T extends { id: number; name: string }>(opts: {
+  table: string;
+  orgId: string;
+  items: T[];
+  existing: { id: number }[];
+  /** Column payload for a row, excluding id/org_id/archived_at. */
+  toRow: (item: T, sortOrder: number) => Record<string, unknown>;
+}): Promise<SaveNamedEntitiesResult> {
+  const { table, orgId, items, existing, toRow } = opts;
+  const existingIds = new Set(existing.map((e) => e.id));
+  const newIds = new Set(items.filter((i) => i.id).map((i) => i.id));
+
+  // 1. Soft-delete removed items (row persists — FK/array references stay valid)
+  const toDelete = existing.filter((e) => !newIds.has(e.id));
+  if (toDelete.length > 0) {
+    const { error } = await supabase
+      .from(table)
+      .update({ archived_at: new Date().toISOString() })
+      .eq("org_id", orgId)
+      .in("id", toDelete.map((d) => d.id));
+    if (error) throw error;
+  }
+
+  const toUpdate = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
+  const toInsert = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
+
+  // 2. Updates — parallel single-row writes
+  await Promise.all(
+    toUpdate.map(({ item, sortOrder }) =>
+      supabase
+        .from(table)
+        .update(toRow(item, sortOrder))
+        .eq("org_id", orgId)
+        .eq("id", item.id)
+        .then(({ error }) => {
+          if (error) throw error;
+        }),
+    ),
+  );
+
+  // 3. One batched lookup for archived rows matching incoming names
+  const archivedByName = new Map<string, number>();
+  if (toInsert.length > 0) {
+    const names = [...new Set(toInsert.map(({ item }) => item.name))];
+    const { data, error } = await supabase
+      .from(table)
+      .select("id, name")
+      .eq("org_id", orgId)
+      .in("name", names)
+      .not("archived_at", "is", null);
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: number; name: string }[]) {
+      if (!archivedByName.has(row.name)) archivedByName.set(row.name, row.id);
+    }
+  }
+
+  // 4. Split inserts into restores (reuse one archived row per name) vs fresh
+  const usedArchivedIds = new Set<number>();
+  const restores: { id: number; row: Record<string, unknown> }[] = [];
+  const fresh: Record<string, unknown>[] = [];
+  for (const { item, sortOrder } of toInsert) {
+    const archivedId = archivedByName.get(item.name);
+    if (archivedId !== undefined && !usedArchivedIds.has(archivedId)) {
+      usedArchivedIds.add(archivedId);
+      restores.push({ id: archivedId, row: { ...toRow(item, sortOrder), archived_at: null } });
+    } else {
+      fresh.push({ org_id: orgId, ...toRow(item, sortOrder) });
+    }
+  }
+
+  await Promise.all(
+    restores.map(({ id, row }) =>
+      supabase
+        .from(table)
+        .update(row)
+        .eq("org_id", orgId)
+        .eq("id", id)
+        .then(({ error }) => {
+          if (error) throw error;
+        }),
+    ),
+  );
+  if (fresh.length > 0) {
+    const { error } = await supabase.from(table).insert(fresh);
+    if (error) throw error;
+  }
+
+  return { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length };
+}
+
 /** Strip seconds from PostgreSQL TIME values ("HH:MM:SS" → "HH:MM"). */
 export function trimTime(t: string | null): string | null {
   if (!t) return t;
@@ -70,7 +183,7 @@ export function resolveCodeLabels(
 
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
-export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_owner_user_id, sandbox_source_org_id, enforce_conflict_prevention, coverage_rule_config, subscription_status, trial_ends_at, data_retention_days, feature_overrides, updated_at";
+export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_owner_user_id, sandbox_source_org_id, enforce_conflict_prevention, coverage_rule_config, subscription_status, trial_ends_at, trial_started_at, data_retention_days, feature_overrides, updated_at";
 export const ORGANIZATION_WITH_BILLING_COLS = `${ORGANIZATION_COLS}, stripe_customer_id, subscription_seats`;
 export const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 export const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
