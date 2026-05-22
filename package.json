@@ -48,6 +48,12 @@
   },
   "overrides": {
     "@hono/node-server": "1.19.14",
+    "@opentelemetry/otlp-transformer": {
+      "protobufjs": "7.5.9"
+    },
+    "ajv": {
+      "fast-uri": "^3.1.2"
+    },
     "@expo/plist": {
       "@xmldom/xmldom": "0.8.13"
     },
@@ -60,13 +66,14 @@
     "@xmldom/xmldom": "0.8.13",
     "axios": "1.15.2",
     "dompurify": "3.4.1",
+    "fast-uri": "^3.1.2",
     "follow-redirects": "1.16.0",
     "hono": "4.12.15",
     "plist": {
       "@xmldom/xmldom": "0.8.13"
     },
     "postcss": "8.5.12",
-    "protobufjs": "7.5.5",
+    "protobufjs": "7.5.9",
     "tar": "^7.5.13",
     "tmp": ">=0.2.3",
     "xcode": {
