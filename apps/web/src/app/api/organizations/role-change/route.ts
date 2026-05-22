@@ -6,7 +6,12 @@ import {
 } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { apiErrorResponse } from "@/lib/error-handling";
+import {
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 
 const roleChangeSchema = z.object({
   targetUserId: z.string().uuid(),
@@ -25,6 +30,23 @@ export async function POST(req: NextRequest) {
       return auth.response;
     }
 
+    const { limited, reset, misconfigured } = await checkRateLimit(
+      apiLimiter,
+      auth.user.id,
+    );
+    if (misconfigured) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      );
+    }
+
     let body: unknown;
     try {
       body = await req.json();
@@ -35,6 +57,15 @@ export async function POST(req: NextRequest) {
     const parsed = roleChangeSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+
+    // Self-action guard: you cannot change your own role. The RPC also blocks
+    // this; we short-circuit here for a clean, mappable error code.
+    if (parsed.data.targetUserId === auth.user.id) {
+      return NextResponse.json(
+        { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+        { status: 403 },
+      );
     }
 
     // Redirect to sandbox if the caller is in sandbox mode, so role
@@ -54,6 +85,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
+      // Map the RPC's self-action guard to a clean, mappable error code.
+      if (result.error.message?.includes(SELF_ACTION_FORBIDDEN_CODE)) {
+        return NextResponse.json(
+          { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+          { status: 403 },
+        );
+      }
       return apiErrorResponse(result.error, "Failed to change role", 400);
     }
 

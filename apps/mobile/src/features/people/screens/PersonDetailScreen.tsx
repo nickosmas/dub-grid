@@ -748,7 +748,7 @@ export default function PersonDetailScreen() {
             {person.status !== "active" ? (
               <Button
                 compact
-                disabled={statusMutation.isPending}
+                disabled={statusMutation.isPending || isSelf}
                 label={statusMutation.isPending ? "Updating..." : "Activate"}
                 onPress={() => setConfirmAction("activate")}
                 tone="success"

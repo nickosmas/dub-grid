@@ -116,14 +116,9 @@ describe("updateMobilePersonStatus self-action guard", () => {
     expect(deps.updateEmployeeStatus).toHaveBeenCalledTimes(1);
   });
 
-  it("allows activate on self (non-destructive)", async () => {
+  it("rejects activate on self with self_action_forbidden", async () => {
     const employee = makeEmployee({ userId: "user-self", status: "benched" });
     const deps = makeDeps(employee);
-    deps.updateEmployeeStatus.mockResolvedValue({
-      ...employee,
-      status: "active",
-      version: 1,
-    });
 
     const result = await updateMobilePersonStatus(
       makeAuth("user-self"),
@@ -136,6 +131,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
       deps,
     );
 
-    expect(result.kind).toBe("updated");
+    expect(result.kind).toBe("self_action_forbidden");
+    expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
   });
 });

@@ -12,11 +12,6 @@ export interface SandboxCookieData {
   userId: string;
 }
 
-const secureSuffix =
-  typeof window !== "undefined" && window.location.protocol === "https:"
-    ? "; Secure"
-    : "";
-
 /**
  * Parse the sandbox cookie out of a raw cookie string.
  * Returns null when the cookie is missing, malformed, or fails minimal
@@ -57,10 +52,4 @@ export function getSandboxFromCookie(
  */
 export function encodeSandboxCookieValue(data: SandboxCookieData): string {
   return encodeURIComponent(JSON.stringify(data));
-}
-
-/** Client-side helper: clear the sandbox cookie. */
-export function clearSandboxCookieFromBrowser(): void {
-  if (typeof document === "undefined") return;
-  document.cookie = `${SANDBOX_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax${secureSuffix}`;
 }

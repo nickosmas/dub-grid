@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 
 const actorNamesSchema = z.object({
   orgId: z.string().uuid(),
@@ -31,6 +32,9 @@ async function ensureViewerCanAccessOrg(orgId: string, userId: string): Promise<
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {

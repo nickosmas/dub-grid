@@ -1,3 +1,8 @@
+// Pin the runtime timezone to UTC (matching production servers) so the
+// ISO date round-trips in resolveMobileDateRange/getMobileDatesBetween are
+// stable regardless of the local machine timezone the suite runs on.
+process.env.TZ = "UTC";
+
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchMobileOpenShifts,

@@ -40,6 +40,8 @@ import Coverage from "./Coverage";
 import StringListSettings from "./StringListSettings";
 import DepartmentsSettings from "./DepartmentsSettings";
 import Indicators from "./Indicators";
+import OrgActivityLog from "./ActivityLog";
+import DangerZone from "./DangerZone";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface SettingsPageProps {
@@ -308,6 +310,12 @@ export default function SettingsPage({
           </div>
         )}
 
+        {activeSection === "org-activity" && isSuperAdmin && (
+          <div style={{ width: "100%", maxWidth }}>
+            <OrgActivityLog orgId={organization.id} />
+          </div>
+        )}
+
         {activeSection === "org-display" && canManageOrgSettings && (
           <div style={{ width: "100%", maxWidth }}>
             <DisplayMode
@@ -490,6 +498,14 @@ export default function SettingsPage({
         {activeSection === "platform-impersonation" && isGridmaster && (
           <div style={{ width: "100%", maxWidth }}>
             <ImpersonationPanel />
+          </div>
+        )}
+
+        {/* ── Danger Zone group ───────────────────────────────── */}
+
+        {activeSection === "org-danger" && isSuperAdmin && (
+          <div style={{ width: "100%", maxWidth }}>
+            <DangerZone organization={organization} />
           </div>
         )}
 

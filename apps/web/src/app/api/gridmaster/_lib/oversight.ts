@@ -111,6 +111,7 @@ export async function loadGridmasterOverview(
     },
     businessHealth: {
       trialEndingCount: billing.trialEndingSoon.length,
+      trialsNotStartedCount: billing.trialsNotStarted.length,
       billingRiskCount: billing.riskOrganizations.length,
       missingStripeCount: billing.missingStripeCustomer.length,
       seatMismatchCount: billing.seatMismatches.length,
@@ -415,6 +416,7 @@ function buildOrgHealthSummaries(facts: Awaited<ReturnType<typeof loadOversightF
       },
       billing: {
         subscriptionStatus: org.subscriptionStatus ?? null,
+        trialStartedAt: org.trialStartedAt ?? null,
         trialEndsAt: org.trialEndsAt ?? null,
         subscriptionSeats: org.subscriptionSeats ?? null,
         stripeCustomerId: org.stripeCustomerId ?? null,
@@ -476,6 +478,7 @@ function buildBillingSummary(
       status,
       stripeCustomerId: org.stripeCustomerId ?? stringOrNull(subscription?.stripe_customer_id),
       stripeSubscriptionId: stringOrNull(subscription?.stripe_subscription_id),
+      trialStartedAt: org.trialStartedAt ?? null,
       trialEndsAt,
       currentPeriodEnd: stringOrNull(subscription?.current_period_end),
       cancelAt: stringOrNull(subscription?.cancel_at),
@@ -493,6 +496,11 @@ function buildBillingSummary(
     const diff = Date.parse(row.trialEndsAt) - nowMs;
     return diff >= 0 && diff <= 14 * DAY_MS;
   });
+  // Trialing orgs with no end date = trial pending (no super_admin has signed in
+  // yet, so the clock has not started).
+  const trialsNotStarted = organizations.filter(
+    (row) => !row.trialEndsAt && (row.status === "trialing" || !row.status),
+  );
   const riskOrganizations = organizations.filter((row) =>
     ["past_due", "canceled", "unpaid", "incomplete", "incomplete_expired"].includes(row.status ?? ""),
   );
@@ -504,6 +512,7 @@ function buildBillingSummary(
     generatedAt: facts.now.toISOString(),
     organizations,
     trialEndingSoon,
+    trialsNotStarted,
     riskOrganizations,
     missingStripeCustomer,
     seatMismatches,

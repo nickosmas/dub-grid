@@ -658,11 +658,8 @@ export default function BillingSettings({
 
   const seatTone =
     billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
-  const isTrialEndMissing =
-    Boolean(billing) &&
-    (billing!.status === "trialing" || !billing!.status) &&
-    !billing!.trialEndsAt &&
-    billing!.billingAccess.daysUntilTrialEnd == null;
+  const isTrialPending =
+    Boolean(billing) && billing!.billingAccess.state === "trial_pending";
   const primaryAction =
     billing?.hasStripeCustomer && billing.hasStripeSubscription
       ? "Manage billing"
@@ -870,21 +867,21 @@ export default function BillingSettings({
                 </div>
               )}
 
-              {isTrialEndMissing && (
+              {isTrialPending && (
                 <div
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-warning-border)",
-                    background: "var(--color-warning-bg)",
-                    color: "var(--color-warning)",
+                    border: "1px solid var(--color-info-border)",
+                    background: "var(--color-info-bg)",
+                    color: "var(--color-info-text)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}
                 >
-                  This organization is marked trialing, but no trial end date is
-                  set. A gridmaster should extend the trial to initialize the
-                  countdown.
+                  Your trial starts the first time an administrator signs in. The
+                  countdown begins then. Refresh this page to see your trial end
+                  date.
                 </div>
               )}
 

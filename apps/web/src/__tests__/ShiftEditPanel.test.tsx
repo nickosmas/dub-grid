@@ -1,3 +1,8 @@
+// Pin to UTC (production runtime) so the panel's week-range labels and
+// local-midnight date probes are deterministic regardless of the dev machine's
+// timezone.
+process.env.TZ = "UTC";
+
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
@@ -844,12 +849,12 @@ describe("ShiftEditPanel", () => {
         ],
       });
 
-      const mentoredToggles = screen.getAllByRole("button", {
+      const mentoredToggles = screen.getAllByRole("switch", {
         name: /Mentored assignment for/i,
       });
       expect(mentoredToggles).toHaveLength(2);
-      expect(mentoredToggles[0]).toHaveAttribute("aria-pressed", "true");
-      expect(mentoredToggles[1]).toHaveAttribute("aria-pressed", "false");
+      expect(mentoredToggles[0]).toHaveAttribute("aria-checked", "true");
+      expect(mentoredToggles[1]).toHaveAttribute("aria-checked", "false");
 
       await user.click(mentoredToggles[1]);
 
@@ -1619,10 +1624,15 @@ describe("ShiftEditPanel", () => {
           requestMode: "swap",
         },
         availableSwapDates: makeIsoDateRange("2037-05-04", 28),
-        isRequestableShift: (empId, date) =>
-          empId === "emp-2" &&
-          (date.toISOString().startsWith("2037-05-05") ||
-            date.toISOString().startsWith("2037-05-26")),
+        isRequestableShift: (empId, date) => {
+          // The panel builds the probe Date at LOCAL midnight (new Date(`${iso}T00:00:00`)),
+          // so match on the local calendar date rather than the UTC ISO string.
+          const localKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+          return (
+            empId === "emp-2" &&
+            (localKey === "2037-05-05" || localKey === "2037-05-26")
+          );
+        },
       });
 
       expect(

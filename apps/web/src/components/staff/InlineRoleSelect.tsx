@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { OrganizationRole } from "@/types";
+import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
@@ -22,12 +23,28 @@ const ROLE_OPTIONS: { value: OrganizationRole; label: string }[] = [
 export function InlineRoleSelect({
   orgRole,
   onChange,
+  isSelf = false,
 }: {
   orgRole: OrganizationRole | null | undefined;
   onChange?: (newRole: OrganizationRole) => Promise<void>;
+  isSelf?: boolean;
 }) {
   const [pending, setPending] = useState<OrganizationRole | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // You can't change your own role: show a read-only badge regardless of
+  // whether an onChange handler was provided.
+  if (orgRole && (isSelf || !onChange)) {
+    return (
+      <span
+        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+        style={getOrgRoleBadgeStyle(orgRole)}
+        title={isSelf ? SELF_ACTION_FORBIDDEN_MESSAGE : undefined}
+      >
+        {ORG_ROLE_LABELS[orgRole]}
+      </span>
+    );
+  }
 
   if (!orgRole || !onChange) {
     return orgRole ? (

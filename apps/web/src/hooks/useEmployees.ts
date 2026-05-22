@@ -10,6 +10,7 @@ import {
   updateEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
+import { SelfActionForbiddenError } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -165,6 +166,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
         return;
       }
       setAllLocal(prevAll);
+      if (err instanceof SelfActionForbiddenError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error("Failed to terminate employee");
       Sentry.captureException(err);
     }
@@ -204,6 +209,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
         return;
       }
       setAllLocal(prevAll);
+      if (err instanceof SelfActionForbiddenError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error("Failed to bench employee");
       Sentry.captureException(err);
     }
@@ -239,6 +248,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
         return;
       }
       setAllLocal(prevAll);
+      if (err instanceof SelfActionForbiddenError) {
+        toast.error(err.message);
+        return;
+      }
       toast.error("Failed to activate employee");
       Sentry.captureException(err);
     }

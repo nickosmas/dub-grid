@@ -40,7 +40,7 @@ const inputPrimitive = readFileSync(resolveWebSource("components/ui/input.tsx"),
 const sidebarPrimitive = readFileSync(resolveWebSource("components/ui/sidebar.tsx"), "utf-8");
 const tooltipPrimitive = readFileSync(resolveWebSource("components/ui/tooltip.tsx"), "utf-8");
 const skeletonPrimitive = readFileSync(resolveWebSource("components/ui/skeleton.tsx"), "utf-8");
-const appLayout = readFileSync(resolveWebSource("app/layout.tsx"), "utf-8");
+const appToaster = readFileSync(resolveWebSource("components/AppToaster.tsx"), "utf-8");
 const repoRoot = resolveRepoRoot();
 
 function collectSourceFiles(dir: string): string[] {
@@ -136,7 +136,7 @@ describe("shared chrome theming", () => {
     expect(sidebarPrimitive).toContain("rounded-[var(--dg-radius-lg)]");
     expect(tooltipPrimitive).toContain("rounded-[var(--tooltip-border-radius)]");
     expect(skeletonPrimitive).toContain("rounded-[var(--dg-radius-sm)]");
-    expect(appLayout).toContain("rounded-[var(--dg-radius-lg)]");
+    expect(appToaster).toContain("rounded-[var(--dg-radius-lg)]");
   });
 
   it("routes current inset tab consumers through the shared shell classes", () => {

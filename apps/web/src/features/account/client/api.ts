@@ -301,6 +301,18 @@ export function switchBrowserOrganization(
   });
 }
 
+// Starts the org's trial on the first super_admin login. Idempotent + self-gated
+// to super_admins server-side, so it is safe to call after any genuine login.
+export function startBrowserTrial(
+  orgId: string,
+): Promise<{ success: true }> {
+  return requestJson("/api/auth/start-trial", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgId }),
+  });
+}
+
 export function fetchInvitationLookup(
   token: string,
 ): Promise<InvitationLookup> {

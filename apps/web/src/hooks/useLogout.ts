@@ -1,7 +1,7 @@
 // src/hooks/useLogout.ts
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { parseHost } from "@/lib/subdomain";
+import * as Sentry from "@/lib/sentry";
 import { clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "@/features/permissions/client";
 import {
@@ -36,32 +36,33 @@ async function clearRealtimeChannels(): Promise<void> {
 
 /**
  * Per-device logout helper.
- * - signOutLocal: this browser/tab only (redirects to apex landing)
+ * - signOutLocal: this browser/tab only — clears the session and lands on the
+ *   sign-in page (`/login`), swiftly and with no transition splash.
  * - signOutOthers: all other devices
  */
 export function useLogout() {
   const queryClient = useQueryClient();
 
-  async function signOutLocal(redirectTo?: string): Promise<void> {
-    queryClient.clear(); // Clears all React Query caches (org data, employees, etc.)
-    clearPermsCache(); // usePermissions still uses module-level cache
-    clearImpersonationCookie();
+  async function signOutLocal(redirectTo = "/login"): Promise<void> {
+    // Best-effort teardown. Each step is non-critical to the redirect — if any
+    // throws we still navigate away in `finally` so the user is never stranded
+    // (a thrown signOut was what left logout stuck before).
+    try {
+      queryClient.clear(); // Clears all React Query caches (org data, employees, etc.)
+      clearPermsCache(); // usePermissions still uses module-level cache
+      clearImpersonationCookie();
 
-    // Best-effort impersonation cleanup — fire-and-forget.
-    // Sessions auto-expire after 30 min, so this is non-critical.
-    void clearLogoutCleanup().catch(() => {});
+      // Best-effort impersonation cleanup — fire-and-forget.
+      // Sessions auto-expire after 30 min, so this is non-critical.
+      void clearLogoutCleanup().catch(() => {});
 
-    await clearRealtimeChannels();
-
-    await signOutFromBrowser("local");
-    sessionStorage.removeItem("dg_user_name");
-
-    if (redirectTo) {
+      await clearRealtimeChannels();
+      await signOutFromBrowser("local");
+      sessionStorage.removeItem("dg_user_name");
+    } catch (err) {
+      Sentry.captureException(err);
+    } finally {
       window.location.replace(redirectTo);
-    } else {
-      const parsed = parseHost(window.location.host);
-      const apexUrl = `${window.location.protocol}//${parsed.rootDomain}${parsed.port}/`;
-      window.location.replace(apexUrl);
     }
   }
 

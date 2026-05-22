@@ -13,6 +13,16 @@ const ROLE_LABELS: Record<OrganizationRole, string> = {
   user: "Member",
 };
 
+// Matches the panels' field labels (e.g. First name / Phone) so the access
+// fields read as part of the same form rather than a bare browser <label>.
+const DEFAULT_LABEL_STYLE: CSSProperties = {
+  display: "block",
+  fontSize: "var(--dg-fs-label)",
+  fontWeight: 600,
+  color: "var(--color-text-secondary)",
+  marginBottom: 6,
+};
+
 /**
  * Role dropdown + permission-matrix launcher for a member's org access.
  * Self-gates on the callbacks, which callers pass only to super_admins /
@@ -25,12 +35,14 @@ export function MemberAccessControls({
   onRoleChange,
   onPermissionsChange,
   labelStyle,
+  isSelf = false,
 }: {
   orgRole: OrganizationRole | null | undefined;
   adminPermissions?: AdminPermissions | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
   onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
   labelStyle?: CSSProperties;
+  isSelf?: boolean;
 }) {
   const [pendingRole, setPendingRole] = useState<OrganizationRole | null>(null);
   const [changingRole, setChangingRole] = useState(false);
@@ -38,12 +50,23 @@ export function MemberAccessControls({
 
   if (!onRoleChange && !onPermissionsChange) return null;
 
+  const fieldLabelStyle = labelStyle ?? DEFAULT_LABEL_STYLE;
+
   return (
     <>
-      {onRoleChange && orgRole && (
+      {onRoleChange && orgRole && isSelf && (
         <div>
-          <label style={labelStyle}>Role</label>
-          <CustomSelect
+          <label style={fieldLabelStyle}>Role</label>
+          <div style={{ maxWidth: 240 }}>
+            <CustomSelect value={orgRole} disabled onChange={() => {}} options={[{ value: orgRole, label: ROLE_LABELS[orgRole] ?? orgRole }]} />
+          </div>
+        </div>
+      )}
+      {onRoleChange && orgRole && !isSelf && (
+        <div>
+          <label style={fieldLabelStyle}>Role</label>
+          <div style={{ maxWidth: 240 }}>
+            <CustomSelect
             value={orgRole}
             disabled={changingRole}
             onChange={(value) => {
@@ -54,7 +77,8 @@ export function MemberAccessControls({
               { value: "admin", label: "Admin" },
               { value: "super_admin", label: "Super Admin" },
             ]}
-          />
+            />
+          </div>
           {pendingRole && (
             <ConfirmDialog
               title="Change role"
@@ -86,7 +110,7 @@ export function MemberAccessControls({
       )}
       {onPermissionsChange && orgRole === "admin" && (
         <div>
-          <label style={labelStyle}>Permissions</label>
+          <label style={fieldLabelStyle}>Permissions</label>
           <div>
             <button
               type="button"

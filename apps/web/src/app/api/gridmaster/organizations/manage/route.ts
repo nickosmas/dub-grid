@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
 import type { DbOrganization } from "@dubgrid/db-types";
 import {
   createRequestSupabaseClient,
@@ -16,12 +15,6 @@ import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export const dynamic = "force-dynamic";
-
-function trialEndFrom(date: Date): string {
-  return new Date(
-    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
-  ).toISOString();
-}
 
 const createSetupSchema = z.object({
   name: z.string().trim().min(1),
@@ -247,7 +240,10 @@ export async function POST(req: NextRequest) {
             timezone: input.timezone || null,
             pay_period_start_date: null,
             subscription_status: "trialing",
-            trial_ends_at: trialEndFrom(new Date()),
+            // trial_ends_at intentionally left NULL: the trial is "pending" until
+            // the first super_admin logs in (the start_trial_for_org RPC, called
+            // from the login flow, then starts the 14-day clock). See
+            // packages/domain/src/billing.ts trial_pending.
             enforce_conflict_prevention: false,
             data_retention_days: 365,
             feature_overrides: {},

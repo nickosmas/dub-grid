@@ -18,6 +18,8 @@ vi.mock("@/hooks", () => ({
   useLogout: () => ({ signOutLocal: mockSignOutLocal }),
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
+  useIsInSandbox: () => false,
+  useSandboxSourceOrgId: () => null,
 }));
 
 vi.mock("@/features/billing/client", () => ({
@@ -176,12 +178,13 @@ describe("BillingSettings", () => {
     expect(screen.queryByText("billing.subscription_canceled")).not.toBeInTheDocument();
   });
 
-  it("flags trialing organizations that do not have a trial end date", async () => {
+  it("explains a pending trial that has not started yet", async () => {
     vi.mocked(fetchOrganizationBilling).mockResolvedValueOnce({
       ...billingSummary,
       trialEndsAt: null,
       billingAccess: {
         ...billingSummary.billingAccess,
+        state: "trial_pending",
         daysUntilTrialEnd: null,
         trialGraceEndsAt: null,
       },
@@ -193,7 +196,7 @@ describe("BillingSettings", () => {
     expect(screen.queryByText("Trial time left")).not.toBeInTheDocument();
     expect(
       screen.getByText(
-        "This organization is marked trialing, but no trial end date is set. A gridmaster should extend the trial to initialize the countdown.",
+        "Your trial starts the first time an administrator signs in. The countdown begins then. Refresh this page to see your trial end date.",
       ),
     ).toBeInTheDocument();
   });

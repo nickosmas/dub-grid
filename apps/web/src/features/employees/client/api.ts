@@ -2,6 +2,7 @@
 
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { SELF_ACTION_FORBIDDEN_CODE, SelfActionForbiddenError } from "@dubgrid/domain";
 import type {
   AuditLogEntry,
   Employee,
@@ -332,11 +333,15 @@ async function updateEmployeeStatus(input: {
   });
 
   const body = (await response.json().catch(() => null)) as
-    | { error?: string; employee?: Employee }
+    | { error?: string; code?: string; employee?: Employee }
     | null;
 
   if (response.status === 409 && body?.employee) {
     throw new EmployeeStatusConflictError(body.employee);
+  }
+
+  if (body?.code === SELF_ACTION_FORBIDDEN_CODE) {
+    throw new SelfActionForbiddenError(body.error);
   }
 
   if (!response.ok || !body?.employee) {

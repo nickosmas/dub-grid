@@ -191,7 +191,7 @@ export default function GridmasterDashboard({
               <OversightCard
                 label="Billing Risk"
                 value={overview.businessHealth.billingRiskCount}
-                detail={`${overview.businessHealth.trialEndingCount} trials ending, ${overview.businessHealth.seatMismatchCount} seat gaps`}
+                detail={`${overview.businessHealth.trialEndingCount} trials ending, ${overview.businessHealth.trialsNotStartedCount} not started, ${overview.businessHealth.seatMismatchCount} seat gaps`}
                 tone={overview.businessHealth.billingRiskCount > 0 || overview.businessHealth.seatMismatchCount > 0 ? "danger" : "good"}
               />
               <OversightCard

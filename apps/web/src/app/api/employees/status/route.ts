@@ -9,6 +9,10 @@ import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
+import {
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +124,15 @@ export async function POST(req: NextRequest) {
     if (currentError) throw currentError;
 
     const currentEmployee = rowToEmployee(currentRow as DbEmployee);
+
+    // Self-action guard: you cannot change your own staffing status
+    // (bench / terminate / activate). Another admin must act.
+    if (currentEmployee.userId === user.id) {
+      return NextResponse.json(
+        { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+        { status: 403 },
+      );
+    }
 
     if (currentEmployee.version !== expectedVersion) {
       return buildConflictResponse(currentEmployee);

@@ -305,6 +305,42 @@ describe.runIf(reachable)("role-escalation guards (live DB)", () => {
       }
     });
 
+    it("blocks a super_admin from changing their own role (self-guard)", async () => {
+      await db.query("BEGIN");
+      try {
+        await asUser(fx.superAdminUserId, fx.orgId, "super_admin");
+        await expect(
+          db.query(
+            `SELECT public.change_user_role(
+               $1::uuid, 'user', $1::uuid, gen_random_uuid()::text, $2::uuid
+             )`,
+            [fx.superAdminUserId, fx.orgId],
+          ),
+        ).rejects.toThrow(/SELF_ACTION_FORBIDDEN/i);
+      } finally {
+        await db.query("ROLLBACK");
+        await resetSession();
+      }
+    });
+
+    it("blocks an admin from changing their own role (self-guard)", async () => {
+      await db.query("BEGIN");
+      try {
+        await asUser(fx.adminUserId, fx.orgId, "admin");
+        await expect(
+          db.query(
+            `SELECT public.change_user_role(
+               $1::uuid, 'user', $1::uuid, gen_random_uuid()::text, $2::uuid
+             )`,
+            [fx.adminUserId, fx.orgId],
+          ),
+        ).rejects.toThrow(/SELF_ACTION_FORBIDDEN/i);
+      } finally {
+        await db.query("ROLLBACK");
+        await resetSession();
+      }
+    });
+
     it("allows a super_admin to demote a super_admin (when another super_admin remains)", async () => {
       await db.query("BEGIN");
       try {

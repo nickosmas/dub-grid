@@ -2,6 +2,8 @@
 
 import { useAuth } from "@/components/AuthProvider";
 import { useEffect } from "react";
+import AuthSplash from "@/components/AuthSplash";
+import { isAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 
 /**
  * Wraps public (unauthenticated) routes such as /login.
@@ -22,12 +24,32 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      window.location.replace("/login");
+    if (isLoading) return;
+    if (user) {
+      // Arrived authenticated — the login navigation settled, so the splash
+      // can stop bridging the gap.
+      consumeAuthTransition();
+      return;
     }
+    // Not authenticated. During a login navigation the session is still
+    // settling — hold the splash briefly instead of bouncing, with a guard so
+    // a session that never materializes can't get stuck. Otherwise (e.g.
+    // sign-out) redirect to the sign-in page immediately.
+    if (isAuthTransitionPending()) {
+      const t = setTimeout(() => {
+        consumeAuthTransition();
+        window.location.replace("/login");
+      }, 6000);
+      return () => clearTimeout(t);
+    }
+    window.location.replace("/login");
   }, [isLoading, user]);
 
-  if (isLoading || !user) return null;
+  // Bridge a login navigation with the branded splash; otherwise render nothing
+  // (a sign-out redirects to /login instantly — no logo flash).
+  if (isLoading || !user) {
+    return isAuthTransitionPending() ? <AuthSplash /> : null;
+  }
 
   return <>{children}</>;
 }

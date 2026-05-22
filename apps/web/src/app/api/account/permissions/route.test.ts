@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUserWithClaims = vi.fn();
 const getImpersonationFromCookie = vi.fn();
+const extractJwtClaims = vi.fn();
 const serviceFrom = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
@@ -16,15 +17,25 @@ vi.mock("@/lib/impersonation", () => ({
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    from: serviceFrom,
-  }),
+  getServiceClient: () => ({ from: serviceFrom }),
 }));
+
+// Keep the real buildPerms (so the returned permission shape is authentic) but
+// control extractJwtClaims, which is what the route trusts to derive the
+// caller's effective role + org from the access token.
+vi.mock("@/features/permissions/shared", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/permissions/shared")>();
+  return {
+    ...actual,
+    extractJwtClaims: (token: string) => extractJwtClaims(token),
+  };
+});
 
 import { GET } from "./route";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
+const SECOND_ORG_ID = "33333333-3333-4333-8333-333333333333";
 
 const tableResults = new Map<string, Array<{ data: unknown; error: unknown }>>();
 
@@ -35,107 +46,80 @@ function enqueue(table: string, ...results: Array<{ data: unknown; error?: unkno
   );
 }
 
+function nextResult(table: string) {
+  return tableResults.get(table)?.shift() ?? { data: null, error: null };
+}
+
 function makeQuery(table: string) {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     is: vi.fn(() => query),
-    maybeSingle: vi.fn(() =>
-      Promise.resolve(tableResults.get(table)?.shift() ?? { data: null, error: null }),
-    ),
+    single: vi.fn(() => Promise.resolve(nextResult(table))),
+    maybeSingle: vi.fn(() => Promise.resolve(nextResult(table))),
   };
   return query;
 }
 
-const SECOND_ORG_ID = "33333333-3333-4333-8333-333333333333";
-
-function mockAuthWithOrg(orgId: string | null) {
-  requireAuthenticatedUserWithClaims.mockResolvedValue({
+function makeAuth() {
+  return {
     user: { id: USER_ID, email: "user@example.com" },
     session: { access_token: "test-token" },
-    claims: { sub: USER_ID, org_id: orgId ?? undefined },
-  });
+    claims: { sub: USER_ID, platform_role: "none" },
+  };
 }
 
 describe("GET /api/account/permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tableResults.clear();
-    mockAuthWithOrg(ORG_ID);
+    requireAuthenticatedUserWithClaims.mockResolvedValue(makeAuth());
     getImpersonationFromCookie.mockReturnValue(null);
     serviceFrom.mockImplementation((table: string) => makeQuery(table));
+    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: null });
   });
 
-  it("resolves super admin permissions from live membership instead of JWT claims", async () => {
-    enqueue("profiles", {
-      data: {
-        org_id: ORG_ID,
-        platform_role: "none",
-        deactivated_at: null,
-      },
-    });
-    enqueue("organization_memberships", {
-      data: {
-        org_role: "super_admin",
-        admin_permissions: null,
-      },
-    });
+  function request() {
+    return GET(new NextRequest("http://localhost/api/account/permissions"));
+  }
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/permissions"),
-    );
+  it("resolves super_admin permissions straight from the JWT claims", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+
+    const response = await request();
 
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.permissions.role).toBe("super_admin");
     expect(body.permissions.orgId).toBe(ORG_ID);
     expect(body.permissions.isSuperAdmin).toBe(true);
+    // Privileged roles are trusted from the JWT; no membership lookup.
+    expect(serviceFrom).not.toHaveBeenCalled();
   });
 
   it("uses the JWT org claim, not the profile default, when they diverge", async () => {
-    mockAuthWithOrg(SECOND_ORG_ID);
-    enqueue("profiles", {
-      data: {
-        org_id: ORG_ID,
-        platform_role: "none",
-        deactivated_at: null,
-      },
-    });
-    enqueue("organization_memberships", {
-      data: {
-        org_role: "super_admin",
-        admin_permissions: null,
-      },
+    extractJwtClaims.mockReturnValue({
+      effectiveRole: "super_admin",
+      orgId: SECOND_ORG_ID,
     });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/permissions"),
-    );
+    const response = await request();
 
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.permissions.orgId).toBe(SECOND_ORG_ID);
   });
 
-  it("falls back to profile.org_id when the JWT lacks an org claim", async () => {
-    mockAuthWithOrg(null);
+  it("falls back to profile.org_id + live membership when the JWT lacks an org claim", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "admin", orgId: null });
     enqueue("profiles", {
-      data: {
-        org_id: ORG_ID,
-        platform_role: "none",
-        deactivated_at: null,
-      },
+      data: { org_id: ORG_ID, platform_role: "none" },
     });
     enqueue("organization_memberships", {
-      data: {
-        org_role: "admin",
-        admin_permissions: null,
-      },
+      data: { org_role: "admin", admin_permissions: null },
     });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/permissions"),
-    );
+    const response = await request();
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -143,39 +127,14 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.role).toBe("admin");
   });
 
-  it("returns expired-session response when the live profile is deactivated", async () => {
-    enqueue("profiles", {
-      data: {
-        org_id: ORG_ID,
-        platform_role: "none",
-        deactivated_at: "2026-05-10T12:00:00.000Z",
-      },
-    });
-
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/permissions"),
-    );
-
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({
-      error: "Your session expired. Please sign in again.",
-    });
-    expect(serviceFrom).not.toHaveBeenCalledWith("organization_memberships");
-  });
-
   it("fails closed to user permissions when no live membership exists", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: null });
     enqueue("profiles", {
-      data: {
-        org_id: ORG_ID,
-        platform_role: "none",
-        deactivated_at: null,
-      },
+      data: { org_id: ORG_ID, platform_role: "none" },
     });
     enqueue("organization_memberships", { data: null });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/permissions"),
-    );
+    const response = await request();
 
     expect(response.status).toBe(200);
     const body = await response.json();

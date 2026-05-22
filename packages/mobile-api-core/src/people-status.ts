@@ -1,5 +1,10 @@
 import type { MobilePerson, MobilePersonStatusUpdateBody } from "@dubgrid/contracts";
 import type { Employee } from "@dubgrid/domain";
+import {
+  isSelfAction,
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
@@ -67,6 +72,12 @@ type PeopleStatusResult =
       status: 409;
     }
   | {
+      kind: "self_action_forbidden";
+      error: string;
+      code: typeof SELF_ACTION_FORBIDDEN_CODE;
+      status: 403;
+    }
+  | {
       kind: "latest_unavailable";
       error: string;
       status: 500;
@@ -107,6 +118,17 @@ export async function updateMobilePersonStatus(
       kind: "not_found",
       error: "Employee not found",
       status: 404,
+    };
+  }
+
+  // Self-action guard: you can't change your own staffing status
+  // (bench / terminate / activate). Another admin must act.
+  if (isSelfAction(auth.user.id, currentEmployee.userId)) {
+    return {
+      kind: "self_action_forbidden",
+      error: SELF_ACTION_FORBIDDEN_MESSAGE,
+      code: SELF_ACTION_FORBIDDEN_CODE,
+      status: 403,
     };
   }
 

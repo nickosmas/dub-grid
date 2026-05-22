@@ -7,6 +7,18 @@ const serviceFrom = vi.fn();
 
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
+  // The sandbox redirect resolves the effective org before permission checks;
+  // in tests it is a pass-through so the body orgId is used unchanged.
+  resolveEffectiveOrgId: async (_req: NextRequest, _userId: string, orgId: string) =>
+    orgId,
+}));
+
+vi.mock("@/lib/csrf", () => ({
+  validateCsrfOrigin: () => null,
+}));
+
+vi.mock("@/lib/api-auth", () => ({
+  requireAuthenticatedUser: async () => ({ user: { id: "actor-user" } }),
 }));
 
 vi.mock("@/app/api/shared/schedule", () => ({

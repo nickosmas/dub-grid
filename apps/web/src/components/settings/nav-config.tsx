@@ -4,16 +4,16 @@ import React from "react";
 
 // ── Section IDs ──────────────────────────────────────────────────────────────
 export type SectionId =
-  | "org-general" | "org-billing" | "org-labels" | "org-display"
+  | "org-general" | "org-billing" | "org-labels" | "org-activity" | "org-display"
   | "schedule-rules" | "schedule-shifts" | "schedule-jobs" | "schedule-absence-types" | "schedule-coverage"
   | "staff-certifications" | "staff-roles" | "staff-departments" | "staff-indicators"
-  | "platform-impersonation";
+  | "platform-impersonation" | "org-danger";
 
 export const VALID_SECTIONS: SectionId[] = [
-  "org-general", "org-billing", "org-labels", "org-display",
+  "org-general", "org-billing", "org-labels", "org-activity", "org-display",
   "schedule-rules", "schedule-shifts", "schedule-jobs", "schedule-absence-types", "schedule-coverage",
   "staff-certifications", "staff-roles", "staff-departments", "staff-indicators",
-  "platform-impersonation",
+  "platform-impersonation", "org-danger",
 ];
 
 // ── Backwards-compatible URL mapping ─────────────────────────────────────────
@@ -49,6 +49,8 @@ const iconRoles = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" st
 const iconDepartment = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
 const iconIndicator = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>;
 const iconImpersonate = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const iconActivity = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>;
+const iconDanger = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
 
 // ── Nav Item / Group types ───────────────────────────────────────────────────
 export interface NavItem {
@@ -86,22 +88,22 @@ export interface NavPermissions {
 
 export function buildNavGroups(
   perms: NavPermissions,
-  overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string; departmentLabel?: string },
+  overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
-  const scheduledDepartmentLabel = overrides?.departmentLabel ?? "Scheduled Departments";
 
   if (perms.canAccessSettings) {
     const orgItems: NavItem[] = [];
     if (perms.isSuperAdmin) orgItems.push({ id: "org-general", label: "Organization Details", icon: iconBuilding, description: "Manage your organization's name and basic profile information." });
     if (perms.isSuperAdmin || perms.isGridmaster) orgItems.push({ id: "org-billing", label: "Billing", icon: iconBilling, helpHint: "Seats are based on active organization users, not employees.", description: "Review subscription status, seats, and Stripe billing access." });
-    if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Custom Labels", icon: iconLabels, helpHint: "Labels rename visible wording across DubGrid but do not change behavior.", description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
+    if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Customization", icon: iconLabels, helpHint: "Labels rename visible wording across DubGrid but do not change behavior.", description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
+    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "staff-departments", label: "Departments", icon: iconDepartment, helpHint: "Scheduled departments drive the grid; management departments are app-only.", description: "Includes scheduled departments for the grid and management departments for app-only staff." });
+    if (perms.isSuperAdmin) orgItems.push({ id: "org-activity", label: "Activity Log", icon: iconActivity, helpHint: "A record of changes made across your organization.", description: "Review the audit trail of role, membership, billing, and configuration changes across your organization." });
     if (orgItems.length > 0) groups.push({ id: "organization", label: "Organization", items: orgItems });
   }
 
   if (perms.canAccessSettings) {
     const staffItems: NavItem[] = [];
-    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: scheduledDepartmentLabel, icon: iconDepartment, helpHint: "Scheduled departments drive the grid; management departments are app-only.", description: "Organize your scheduled departments, focus areas, and management departments." });
     if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", icon: iconRoles, helpHint: "Roles are visible tags; only schedule-eligible roles can gate jobs.", description: "Manage visible role tags and choose which ones actually count for job eligibility on the schedule." });
     if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", icon: iconDesignations, helpHint: "Certifications can display on staff and can restrict assignments.", description: "The certification badge shown next to the employee's name on the schedule grid." });
     if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff & Designations", items: staffItems });
@@ -129,6 +131,16 @@ export function buildNavGroups(
     });
   }
 
+  if (perms.isSuperAdmin) {
+    groups.push({
+      id: "danger",
+      label: "Danger Zone",
+      items: [
+        { id: "org-danger", label: "Delete Organization", icon: iconDanger, helpHint: "This cancels billing and removes access for everyone.", description: "Permanently close this organization. Billing stops and all members lose access." },
+      ],
+    });
+  }
+
   return groups;
 }
 
@@ -139,7 +151,6 @@ export function getDefaultSection(perms: NavPermissions): SectionId {
 }
 
 /** Get max content width for a section. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getMaxWidth(section: SectionId): number {
   if (section === "org-billing") {
     return 980;
@@ -150,6 +161,10 @@ export function getMaxWidth(section: SectionId): number {
   }
 
   if (section === "staff-roles" || section === "staff-certifications") {
+    return 1120;
+  }
+
+  if (section === "org-activity") {
     return 1120;
   }
 

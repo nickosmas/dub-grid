@@ -3,12 +3,15 @@
 import { useState } from "react";
 import type { Employee, Invitation } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
+import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 export interface EmployeeStatusActionsProps {
   employee: Employee;
   canEdit: boolean;
+  /** When true, this employee is the current user — destructive self-actions are hidden. */
+  isSelf?: boolean;
   pendingInvitation?: Invitation;
   onBench: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
@@ -22,6 +25,7 @@ export interface EmployeeStatusActionsProps {
 export function EmployeeStatusActions({
   employee,
   canEdit,
+  isSelf = false,
   pendingInvitation,
   onBench,
   onActivate,
@@ -63,6 +67,15 @@ export function EmployeeStatusActions({
   }
 
   if (!canEdit) return null;
+
+  // Self-action guard: you can't bench / terminate / activate your own record.
+  if (isSelf) {
+    return (
+      <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: 0 }}>
+        {SELF_ACTION_FORBIDDEN_MESSAGE}
+      </p>
+    );
+  }
 
   // ── Invitation section (panel variant only) ──
   const invitationSection = variant === "panel" && pendingInvitation && onInvite ? (

@@ -32,7 +32,6 @@ import type {
   AssignmentDefinition,
   ShiftDisplayMode,
 } from "@/types";
-import OrgActivityLog from "@/components/settings/ActivityLog";
 import { MembersSection } from "@/components/staff/MembersSection";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
@@ -57,22 +56,6 @@ const MEMBERS_ICON = (
   </svg>
 );
 
-
-const ACTIVITY_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 8v4l3 3" />
-    <circle cx="12" cy="12" r="10" />
-  </svg>
-);
 
 const REQUESTS_ICON = (
   <svg
@@ -110,7 +93,7 @@ const CALENDAR_ICON = (
   </svg>
 );
 
-type StaffSection = "directory" | "requests" | "access" | "activity" | "recurring-schedule";
+type StaffSection = "directory" | "requests" | "access" | "recurring-schedule";
 
 interface StaffViewProps {
   employees: Employee[];
@@ -191,7 +174,6 @@ export default function StaffView({
     "directory",
     ...(canAccessPeopleAdminSurfaces ? ["requests" as const] : []),
     ...(canAccessPeopleRecurring ? ["recurring-schedule" as const] : []),
-    ...(isSuperAdmin ? ["activity" as const] : []),
   ];
   const sectionParam = searchParams.get("section") as StaffSection | null;
   const resolvedSection =
@@ -221,11 +203,8 @@ export default function StaffView({
             },
           ]
         : []),
-      ...(isSuperAdmin
-        ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: ACTIVITY_ICON }]
-        : []),
     ],
-    [canAccessPeopleAdminSurfaces, canAccessPeopleRecurring, isGridmaster, isSuperAdmin],
+    [canAccessPeopleAdminSurfaces, canAccessPeopleRecurring],
   );
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -371,12 +350,6 @@ export default function StaffView({
 
         {activeSection !== "directory" && (
           <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-            {activeSection === "activity" && isSuperAdmin && orgId && (
-              <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
-                <OrgActivityLog orgId={orgId} />
-              </div>
-            )}
-
             {activeSection === "requests" && canAccessPeopleAdminSurfaces && orgId && (
               <ProfileChangeRequestQueue
                 orgId={orgId}

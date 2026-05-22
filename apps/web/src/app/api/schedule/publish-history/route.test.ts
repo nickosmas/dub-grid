@@ -94,6 +94,7 @@ describe("GET /api/schedule/publish-history", () => {
     const serviceClient = createServiceClient();
     requireOrgPermissions.mockResolvedValue({
       serviceClient,
+      orgId: ORG_ID,
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},

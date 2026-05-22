@@ -8,6 +8,7 @@ import {
   resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
@@ -202,6 +203,9 @@ async function requireEmployeeAction(
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   let body: unknown;
   try {
     body = await req.json();

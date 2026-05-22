@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
+import { useTermsAcceptanceStatus } from "@/hooks";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { DubGridLogo } from "@/components/Logo";
+import { queryKeys } from "@/lib/query-keys";
 import { CURRENT_TERMS_VERSION } from "@/features/account/shared/terms";
 import {
-  fetchTermsAcceptanceStatus,
   recordCurrentTermsAcceptance,
   signOutFromBrowser,
 } from "@/features/account/client";
@@ -16,53 +18,31 @@ import {
  * Non-dismissable modal that blocks the app until the user accepts
  * the current terms version. Only shown to authenticated users whose
  * profile.terms_version doesn't match CURRENT_TERMS_VERSION.
+ *
+ * Acceptance status comes from the shared useTermsAcceptanceStatus query
+ * (keyed by stable user id) so auth-event re-renders don't refetch and
+ * remount the gate — and so TrialWelcomeModal can gate itself behind the
+ * same source of truth.
  */
 export default function TermsAcceptanceGate({ children }: { children: React.ReactNode }) {
-  const { user, isLoading: authLoading } = useAuth();
-  const [needsAcceptance, setNeedsAcceptance] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { data } = useTermsAcceptanceStatus();
   const [checked, setChecked] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function check() {
-      if (authLoading) return;
-      if (!user || cancelled) {
-        if (!cancelled) {
-          setNeedsAcceptance(false);
-        }
-        return;
+  const accept = useMutation({
+    mutationFn: recordCurrentTermsAcceptance,
+    onSuccess: () => {
+      if (user) {
+        // Optimistically flip the shared query — no refetch flicker, and the
+        // trial welcome (gated on this) reveals immediately.
+        queryClient.setQueryData(queryKeys.account.terms(user.id), {
+          acceptedCurrentTerms: true,
+          acceptedVersion: CURRENT_TERMS_VERSION,
+        });
       }
-
-      let data;
-      try {
-        data = await fetchTermsAcceptanceStatus();
-      } catch (error) {
-        console.error("Failed to load terms status", error);
-        if (!cancelled) {
-          setNeedsAcceptance(false);
-        }
-        return;
-      }
-
-      if (!cancelled) {
-        setNeedsAcceptance(!data.acceptedCurrentTerms);
-      }
-    }
-    void check();
-    return () => { cancelled = true; };
-  }, [authLoading, user]);
-
-  async function handleAccept() {
-    setLoading(true);
-    try {
-      if (!user) {
-        toast.error("Session expired. Please sign in again.");
-        return;
-      }
-      await recordCurrentTermsAcceptance();
-      setNeedsAcceptance(false);
-    } catch (err: unknown) {
+    },
+    onError: async (err: unknown) => {
       const msg = err instanceof Error
         ? err.message
         : typeof err === "object" && err !== null && "message" in err
@@ -82,10 +62,19 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
         return;
       }
       toast.error("Failed to record acceptance. Please try again.");
-    } finally {
-      setLoading(false);
+    },
+  });
+
+  function handleAccept() {
+    if (!user) {
+      toast.error("Session expired. Please sign in again.");
+      return;
     }
+    accept.mutate();
   }
+
+  const loading = accept.isPending;
+  const needsAcceptance = Boolean(data) && data?.acceptedCurrentTerms === false;
 
   if (!user || !needsAcceptance) return <>{children}</>;
 
@@ -107,6 +96,7 @@ export default function TermsAcceptanceGate({ children }: { children: React.Reac
           background: "var(--dg-overlay)",
           backdropFilter: "blur(var(--dg-overlay-blur))",
           WebkitBackdropFilter: "blur(var(--dg-overlay-blur))",
+          animation: "fade-in var(--dg-duration-standard) ease",
         }}
       >
         <div style={{

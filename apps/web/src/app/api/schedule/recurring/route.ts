@@ -7,6 +7,7 @@ import {
   resolveEffectiveOrgId,
 } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { rowToRecurringShift } from "@/lib/db/mappers";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
@@ -76,6 +77,9 @@ function canManageRecurring(
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   let body: unknown;
   try {
     body = await req.json();

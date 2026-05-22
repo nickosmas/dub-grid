@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
+import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import {
   fetchOrganizationBootstrap,
@@ -128,6 +129,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div key={effectiveOrgKey} style={{ display: "contents" }}>
         {children}
       </div>
+      {!isGridmaster && <TrialWelcomeModal />}
     </>
   );
 }

@@ -317,7 +317,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    const toggle = screen.getByRole("button", {
+    const toggle = screen.getByRole("switch", {
       name: /enforce shift conflict prevention/i,
     });
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -395,7 +395,7 @@ describe("settings dirty save controls", () => {
     );
   });
 
-  it("disables indicator Save until a row changes, then disables it again after save", async () => {
+  it("disables indicator Save until a row changes, then closes the editor after save", async () => {
     const user = userEvent.setup();
     const indicator: IndicatorType = {
       id: 1,
@@ -439,12 +439,16 @@ describe("settings dirty save controls", () => {
 
     await user.click(saveButton);
 
+    // A successful save collapses the editor shut, so its Save / Close /
+    // Discard controls are no longer present.
     await waitFor(() => {
-      expect(saveButton).toBeDisabled();
+      expect(
+        screen.queryByRole("button", { name: /^save$/i }),
+      ).not.toBeInTheDocument();
     });
     expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /^close$/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^discard$/i }),
     ).not.toBeInTheDocument();

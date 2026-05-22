@@ -31,6 +31,21 @@ export function fetchOrganizationBilling(
   );
 }
 
+export type TrialWelcomeState = {
+  shouldShowWelcome: boolean;
+  trialEndsAt: string | null;
+};
+
+export function fetchTrialWelcomeState(): Promise<TrialWelcomeState> {
+  return requestBillingJson<TrialWelcomeState>("/api/trial-welcome");
+}
+
+export async function dismissTrialWelcome(): Promise<void> {
+  await requestBillingJson<{ success: true }>("/api/trial-welcome", {
+    method: "POST",
+  });
+}
+
 export async function startBillingCheckout(input: {
   orgId: string;
   returnUrl: string;

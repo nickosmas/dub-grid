@@ -83,7 +83,7 @@ const certification = {
 } as const;
 
 describe("settings help cleanup", () => {
-  it("removes the custom labels explainer and shows a visible scheduled departments note", () => {
+  it("removes the custom labels explainer and shows visible inline field hints", () => {
     render(
       <OrganizationLabels
         organization={organization as never}
@@ -92,7 +92,9 @@ describe("settings help cleanup", () => {
     );
 
     expect(screen.queryByText("How custom labels work")).not.toBeInTheDocument();
-    expect(screen.getByText("Scheduled only. Does not rename management departments.")).toBeInTheDocument();
+    expect(screen.getByText("e.g. Focus Areas, Departments, Units")).toBeInTheDocument();
+    expect(screen.getByText("e.g. Certifications, Designations")).toBeInTheDocument();
+    expect(screen.getByText("e.g. Responsibilities, Positions")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });
 
