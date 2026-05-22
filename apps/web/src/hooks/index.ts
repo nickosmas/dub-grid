@@ -17,6 +17,8 @@ export type {
 
 export { useLogout } from "./useLogout";
 
+export { useTermsAcceptanceStatus } from "./useTermsAcceptanceStatus";
+
 export { useOrganizationData } from "./useOrganizationData";
 export type { OrganizationData, SetupStatus } from "./useOrganizationData";
 export {
