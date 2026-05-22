@@ -109,14 +109,23 @@ export async function POST(req: NextRequest) {
 
     if (action === "extend_trial") {
       const days = parsed.data.trialDays ?? 14;
+      // If extending starts a pending trial (no start recorded yet), stamp the
+      // start now; otherwise preserve the existing start so the column stays
+      // consistent with trial_ends_at. See trial activation in 002 migrations.
+      const { data: orgRow } = await admin
+        .from("organizations")
+        .select("trial_started_at")
+        .eq("id", orgId)
+        .single();
+      const startedAt = orgRow?.trial_started_at ?? new Date().toISOString();
       if (!sub?.stripe_subscription_id) {
         // No Stripe subscription — just update trial_ends_at on the org
         const newEnd = new Date(Date.now() + days * 86400000).toISOString();
-        await admin.from("organizations").update({ trial_ends_at: newEnd, subscription_status: "trialing" }).eq("id", orgId);
+        await admin.from("organizations").update({ trial_started_at: startedAt, trial_ends_at: newEnd, subscription_status: "trialing" }).eq("id", orgId);
       } else {
         const newEnd = new Date(Date.now() + days * 86400000);
         await extendTrial(sub.stripe_subscription_id, newEnd);
-        await admin.from("organizations").update({ trial_ends_at: newEnd.toISOString(), subscription_status: "trialing" }).eq("id", orgId);
+        await admin.from("organizations").update({ trial_started_at: startedAt, trial_ends_at: newEnd.toISOString(), subscription_status: "trialing" }).eq("id", orgId);
       }
       await writeGridmasterAuditLog({
         serviceClient: admin,

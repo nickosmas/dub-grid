@@ -240,11 +240,15 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         resource_id: ORG_ID,
       }),
     );
+    // Trial is "pending" at creation: subscription_status is trialing but
+    // trial_ends_at is left unset until the first super_admin signs in.
     expect(organizationInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         subscription_status: "trialing",
-        trial_ends_at: expect.any(String),
       }),
+    );
+    expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty(
+      "trial_ends_at",
     );
   });
 });

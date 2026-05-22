@@ -51,11 +51,34 @@ function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString() : "—";
 }
 
+// A trialing org with no end date hasn't started its trial yet (no super_admin
+// has signed in). Show that explicitly rather than an ambiguous dash.
+function formatTrialEnds(org: GridmasterBillingOrgSummary) {
+  if (org.trialEndsAt) return new Date(org.trialEndsAt).toLocaleDateString();
+  if (org.status === "trialing" || !org.status) return "Not started";
+  return "—";
+}
+
 function statusTone(status: string | null) {
   if (status === "active" || status === "trialing") return "var(--color-success)";
   if (status === "past_due" || status === "incomplete") return "var(--color-warning)";
   if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") return "var(--color-danger)";
   return "var(--color-text-muted)";
+}
+
+// A trialing org with no end date hasn't started its trial yet (no super_admin
+// has intentionally accessed it). Surface that as a distinct "pending" status
+// instead of the green "Trial active" the bare status maps to.
+function isTrialPending(org: GridmasterBillingOrgSummary) {
+  return org.status === "trialing" && !org.trialEndsAt;
+}
+
+function statusLabelFor(org: GridmasterBillingOrgSummary) {
+  return isTrialPending(org) ? "Trial pending" : formatBillingStatusLabel(org.status);
+}
+
+function statusToneFor(org: GridmasterBillingOrgSummary) {
+  return isTrialPending(org) ? "var(--color-text-muted)" : statusTone(org.status);
 }
 
 function BillingRowActions({
@@ -111,7 +134,9 @@ function BillingRowActions({
       <button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={busy}
+        // Only a trialing org has a trial to extend; for active/canceled/past_due
+        // there is no trial clock, so the action would be a no-op.
+        disabled={busy || org.status !== "trialing"}
         onClick={() => onExtendTrial(org)}
       >
         Extend trial
@@ -132,7 +157,9 @@ function BillingRowActions({
       <button
         type="button"
         className="dg-btn dg-btn-danger dg-btn-xs"
-        disabled={busy || org.status === "canceled"}
+        // No Stripe subscription = nothing to cancel; use Override to change a
+        // local-only org's status instead.
+        disabled={busy || org.status === "canceled" || !org.stripeSubscriptionId}
         onClick={() => onCancel(org)}
       >
         Cancel
@@ -329,6 +356,7 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
             <MiniCard label="Trials Ending" value={billing.trialEndingSoon.length} tone={billing.trialEndingSoon.length ? "warning" : "neutral"} />
+            <MiniCard label="Trials Not Started" value={billing.trialsNotStarted.length} />
             <MiniCard label="Billing Risk" value={billing.riskOrganizations.length} tone={billing.riskOrganizations.length ? "danger" : "neutral"} />
             <MiniCard label="Missing Stripe" value={billing.missingStripeCustomer.length} tone={billing.missingStripeCustomer.length ? "warning" : "neutral"} />
             <MiniCard label="Seat Mismatch" value={billing.seatMismatches.length} tone={billing.seatMismatches.length ? "danger" : "neutral"} />
@@ -339,7 +367,7 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
               <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
                 <thead>
                   <tr>
-                    {["Organization", "Status", "Trial Ends", "Period End", "Cancel At", "Seats", "App Users", "Delta", "Stripe", "Updated", "Actions"].map((heading) => (
+                    {["Organization", "Status", "Trial Started", "Trial Ends", "Period End", "Cancel At", "Seats", "App Users", "Delta", "Stripe", "Updated", "Actions"].map((heading) => (
                       <th key={heading} style={thStyle}>{heading}</th>
                     ))}
                   </tr>
@@ -350,8 +378,9 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
                     return (
                       <tr key={org.orgId} onClick={() => onSelectOrg(org.orgId, "billing")} style={{ cursor: "pointer", background: risky ? "var(--color-danger-bg)" : undefined }}>
                         <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
-                        <td style={{ ...tdStyle, color: statusTone(org.status), fontWeight: 800 }}>{formatBillingStatusLabel(org.status)}</td>
-                        <td style={tdStyle}>{formatDate(org.trialEndsAt)}</td>
+                        <td style={{ ...tdStyle, color: statusToneFor(org), fontWeight: 800 }}>{statusLabelFor(org)}</td>
+                        <td style={tdStyle}>{org.trialStartedAt ? new Date(org.trialStartedAt).toLocaleDateString() : (isTrialPending(org) ? "Not started" : "—")}</td>
+                        <td style={tdStyle}>{formatTrialEnds(org)}</td>
                         <td style={tdStyle}>{formatDate(org.currentPeriodEnd)}</td>
                         <td style={{ ...tdStyle, color: org.cancelAt ? "var(--color-warning)" : "var(--color-text-muted)", fontWeight: org.cancelAt ? 700 : undefined }}>{formatDate(org.cancelAt)}</td>
                         <td style={tdStyle}>{org.seats ?? "—"}</td>

@@ -182,6 +182,12 @@ function billingStatusTone(status: string | null) {
   return "var(--color-text-muted)";
 }
 
+// A trialing org with no end date hasn't started its trial yet: show "Trial
+// pending" (muted) rather than the green "Trial active" the bare status maps to.
+function billingStatusIsPending(status: string | null, trialEndsAt: string | null) {
+  return status === "trialing" && !trialEndsAt;
+}
+
 function BillingMetric({
   label,
   value,
@@ -428,9 +434,32 @@ function BillingTab({ organization }: { organization: Organization }) {
           <div style={sectionBodyStyle}>
             <InfoRow
               label="Status"
-              value={<span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 800 }}>{formatBillingStatusLabel(billingOrg.status)}</span>}
+              value={
+                billingStatusIsPending(billingOrg.status, billingOrg.trialEndsAt)
+                  ? <span style={{ color: "var(--color-text-muted)", fontWeight: 800 }}>Trial pending</span>
+                  : <span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 800 }}>{formatBillingStatusLabel(billingOrg.status)}</span>
+              }
             />
-            <InfoRow label="Trial ends" value={formatBillingDate(billingOrg.trialEndsAt)} />
+            <InfoRow
+              label="Trial started"
+              value={
+                billingOrg.trialStartedAt
+                  ? new Date(billingOrg.trialStartedAt).toLocaleDateString()
+                  : billingOrg.status === "trialing" || !billingOrg.status
+                    ? "Not started"
+                    : "—"
+              }
+            />
+            <InfoRow
+              label="Trial ends"
+              value={
+                billingOrg.trialEndsAt
+                  ? new Date(billingOrg.trialEndsAt).toLocaleDateString()
+                  : billingOrg.status === "trialing" || !billingOrg.status
+                    ? "Not started"
+                    : "—"
+              }
+            />
             <InfoRow label="Period end" value={formatBillingDate(billingOrg.currentPeriodEnd)} />
             <InfoRow label="Cancel at" value={formatBillingDate(billingOrg.cancelAt)} />
             <InfoRow label="Canceled at" value={formatBillingDate(billingOrg.canceledAt)} />
@@ -1256,7 +1285,10 @@ function OverviewTab({
             value={
               organization.trialEndsAt
                 ? new Date(organization.trialEndsAt).toLocaleDateString()
-                : "—"
+                : organization.subscriptionStatus === "trialing" ||
+                    !organization.subscriptionStatus
+                  ? "Not started"
+                  : "—"
             }
           />
           <InfoRow

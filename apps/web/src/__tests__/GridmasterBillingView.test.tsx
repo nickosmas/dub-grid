@@ -33,6 +33,7 @@ const billingSummary: GridmasterBillingSummary = {
       status: "trialing",
       stripeCustomerId: "cus_123",
       stripeSubscriptionId: "sub_123",
+      trialStartedAt: "2026-05-18T00:00:00.000Z",
       trialEndsAt: "2026-06-01T00:00:00.000Z",
       currentPeriodEnd: "2026-06-15T00:00:00.000Z",
       cancelAt: null,
@@ -45,6 +46,7 @@ const billingSummary: GridmasterBillingSummary = {
     },
   ],
   trialEndingSoon: [],
+  trialsNotStarted: [],
   riskOrganizations: [],
   missingStripeCustomer: [],
   seatMismatches: [],
@@ -87,6 +89,21 @@ describe("GridmasterBillingView", () => {
         "11111111-1111-4111-8111-111111111111",
       );
     });
+  });
+
+  it("shows 'Trial pending' for a trialing org whose trial has not started", async () => {
+    mockFetchGridmasterBilling.mockResolvedValue({
+      ...billingSummary,
+      organizations: [{ ...billingSummary.organizations[0], trialEndsAt: null }],
+    });
+
+    renderView();
+
+    await screen.findByText("Acme Health");
+    // Status cell reads "Trial pending" (not the green "Trial active") when the
+    // clock has not started. "Trial active" still exists as a status-override
+    // dropdown option, so we assert on the pending label specifically.
+    expect(screen.getByText("Trial pending")).toBeInTheDocument();
   });
 
   it("opens the selected organization's billing tab from the table row", async () => {

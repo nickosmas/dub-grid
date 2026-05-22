@@ -11,6 +11,7 @@ const employeeIs = vi.fn();
 const membershipIs = vi.fn();
 const organizationEq = vi.fn();
 const organizationUpdate = vi.fn();
+const organizationSingle = vi.fn();
 const auditInsert = vi.fn();
 const scheduleSubscriptionCancellation = vi.fn();
 const syncSubscriptionSeats = vi.fn();
@@ -92,6 +93,7 @@ describe("POST /api/gridmaster/subscription", () => {
     });
     organizationEq.mockResolvedValue({ error: null });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
+    organizationSingle.mockResolvedValue({ data: { trial_started_at: null }, error: null });
     scheduleSubscriptionCancellation.mockResolvedValue({
       status: "active",
       cancel_at: 1_780_876_800,
@@ -131,7 +133,14 @@ describe("POST /api/gridmaster/subscription", () => {
         };
       }
       if (table === "organizations") {
-        return { update: organizationUpdate };
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: organizationSingle,
+            })),
+          })),
+          update: organizationUpdate,
+        };
       }
       if (table === "audit_log") {
         return { insert: auditInsert };
@@ -187,6 +196,8 @@ describe("POST /api/gridmaster/subscription", () => {
       expect.objectContaining({
         subscription_status: "trialing",
         trial_ends_at: expect.any(String),
+        // Pending trial (trial_started_at null) gets its start stamped on extend.
+        trial_started_at: expect.any(String),
       }),
     );
     expect(auditInsert).toHaveBeenCalledWith(
