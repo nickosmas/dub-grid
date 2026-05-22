@@ -86,16 +86,14 @@ export async function saveNamedEntities<T extends { id: number; name: string }>(
 
   // 2. Updates — parallel single-row writes
   await Promise.all(
-    toUpdate.map(({ item, sortOrder }) =>
-      supabase
+    toUpdate.map(async ({ item, sortOrder }) => {
+      const { error } = await supabase
         .from(table)
         .update(toRow(item, sortOrder))
         .eq("org_id", orgId)
-        .eq("id", item.id)
-        .then(({ error }) => {
-          if (error) throw error;
-        }),
-    ),
+        .eq("id", item.id);
+      if (error) throw error;
+    }),
   );
 
   // 3. One batched lookup for archived rows matching incoming names
@@ -129,16 +127,14 @@ export async function saveNamedEntities<T extends { id: number; name: string }>(
   }
 
   await Promise.all(
-    restores.map(({ id, row }) =>
-      supabase
+    restores.map(async ({ id, row }) => {
+      const { error } = await supabase
         .from(table)
         .update(row)
         .eq("org_id", orgId)
-        .eq("id", id)
-        .then(({ error }) => {
-          if (error) throw error;
-        }),
-    ),
+        .eq("id", id);
+      if (error) throw error;
+    }),
   );
   if (fresh.length > 0) {
     const { error } = await supabase.from(table).insert(fresh);
