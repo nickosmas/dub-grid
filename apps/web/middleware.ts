@@ -7,6 +7,7 @@ import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { Timer } from "@/lib/server-timing";
 import * as Sentry from "@/lib/sentry";
 
 /**
@@ -81,30 +82,59 @@ export function getRoleLevel(role: string): number {
 }
 
 export async function middleware(req: NextRequest) {
+  const timer = new Timer();
   const host = req.headers.get("host") ?? "";
   const pathname = req.nextUrl.pathname;
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
-  // CSP — 'self' + 'unsafe-inline' for scripts.
-  // 'strict-dynamic' is intentionally NOT used because statically pre-rendered
-  // pages (landing, privacy, terms) have no nonce on their <script> tags, so
-  // 'strict-dynamic' would override 'self' and block all scripts, preventing
-  // React hydration (stuck loading spinner in production).
-  const cspHeader = `
+  // CSP. Two script-src policies:
+  //  - Static/public pages (marketing, login, auth flows) are pre-rendered and
+  //    can't carry a per-request nonce, so they keep 'unsafe-inline'. These pages
+  //    hold no user data and have no injection sink (see SECURITY_AUDIT.md F-4).
+  //  - The authenticated app is dynamically rendered, so in production it drops
+  //    'unsafe-inline' for a per-request nonce: Next.js stamps the nonce onto its
+  //    own inline bootstrap scripts (read from the request CSP header), and the
+  //    runtime-injected analytics load via the host allowlist below.
+  // 'strict-dynamic' is deliberately NOT used — it would block the pre-rendered
+  // pages' un-nonced scripts. In development both policies stay on 'unsafe-inline'
+  // so HMR / React Refresh keep working.
+  const isDev = process.env.NODE_ENV === "development";
+  const nonce = isDev
+    ? ""
+    : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+  const analyticsSrc = "https://va.vercel-scripts.com";
+  const devScriptExtras = isDev ? "'unsafe-eval'" : "";
+  const devConnectExtras = isDev
+    ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
+    : "";
+  const buildCsp = (scriptSrc: string) =>
+    `
     default-src 'self';
-    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com;
+    script-src ${scriptSrc};
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${devConnectExtras};
     frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
     form-action 'self';
-    ${process.env.NODE_ENV === "production" ? "upgrade-insecure-requests;" : ""}
-  `;
-  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
+    ${isDev ? "" : "upgrade-insecure-requests;"}
+  `.replace(/\s{2,}/g, " ").trim();
+
+  // Static/public pages keep 'unsafe-inline'.
+  const contentSecurityPolicyHeaderValue = buildCsp(
+    `'self' 'unsafe-inline' ${devScriptExtras} ${analyticsSrc}`,
+  );
+  // Authenticated app: nonce + strict-dynamic in production, 'unsafe-inline' in
+  // dev. strict-dynamic is safe here (these pages are dynamically rendered and
+  // carry the nonce); it lets the nonced Next bundle load analytics by
+  // propagation. The analytics host stays for CSP2 browsers that ignore
+  // strict-dynamic.
+  const dynamicCspHeaderValue = isDev
+    ? contentSecurityPolicyHeaderValue
+    : buildCsp(`'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc}`);
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
@@ -144,6 +174,12 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
+  // Past the public/static branches: this is the authenticated, dynamically
+  // rendered app. Swap in the nonce-based CSP so Next.js stamps the nonce onto
+  // its inline scripts (it reads the nonce from this request CSP header) and we
+  // can drop 'unsafe-inline'.
+  requestHeaders.set("Content-Security-Policy", dynamicCspHeaderValue);
+
   // Create a mutable response so @supabase/ssr can refresh session cookies
   // and pass the modified request headers forward for Next.js SSR hydration
   const res = NextResponse.next({
@@ -151,7 +187,7 @@ export async function middleware(req: NextRequest) {
   });
 
   // Apply CSP to the response sent to the browser
-  res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+  res.headers.set("Content-Security-Policy", dynamicCspHeaderValue);
 
   // Use @supabase/ssr to read the session from cookies. This correctly handles
   // the sb-<project-ref>-auth-token cookie format and multi-chunk cookie
@@ -189,7 +225,9 @@ export async function middleware(req: NextRequest) {
   try {
     const jwks = getJwks();
     if (jwks) {
-      const { payload } = await jwtVerify(session.access_token, jwks);
+      const { payload } = await timer.time("jwt_verify", () =>
+        jwtVerify(session.access_token, jwks),
+      );
       claims = payload as JWTClaims;
     } else {
       claims = decodeJwt(session.access_token) as JWTClaims;
@@ -228,7 +266,7 @@ export async function middleware(req: NextRequest) {
 
     try {
       // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
-      const profile = await cacheThrough(
+      const profile = await timer.time("mw_profile", () => cacheThrough(
         CacheKey.mwProfile(userId),
         TTL.MIDDLEWARE,
         async () => {
@@ -239,7 +277,7 @@ export async function middleware(req: NextRequest) {
             .maybeSingle();
           return data;
         },
-      );
+      ));
 
       // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
       let resolvedOrgRole = "user";
@@ -247,7 +285,7 @@ export async function middleware(req: NextRequest) {
       let resolvedOrgSlug: string | undefined = undefined;
 
       if (subdomain && subdomain !== "gridmaster") {
-        const membership = await cacheThrough(
+        const membership = await timer.time("mw_membership", () => cacheThrough(
           CacheKey.mwMembership(userId, subdomain),
           TTL.MIDDLEWARE,
           async () => {
@@ -259,7 +297,7 @@ export async function middleware(req: NextRequest) {
               .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
             return data;
           },
-        );
+        ));
 
         if (membership) {
           resolvedOrgRole = membership.org_role;
@@ -364,14 +402,14 @@ export async function middleware(req: NextRequest) {
             const svc = createClient(supabaseUrl2, serviceKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             });
-            const { data } = await svc
+            const { data } = await timer.time("mw_sandbox", async () => svc
               .from("organizations")
               .select("id, slug")
               .eq("id", sandboxCookie.sandboxOrgId)
               .eq("workspace_kind", "sandbox")
               .eq("sandbox_owner_user_id", session?.user?.id)
               .is("archived_at", null)
-              .maybeSingle();
+              .maybeSingle());
             if (data) {
               isInSandbox = true;
               claims = {
@@ -408,18 +446,27 @@ export async function middleware(req: NextRequest) {
   // Skip for gridmasters (they manage suspended orgs) and impersonation.
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
-      const orgAccess = await cacheThrough(
-        CacheKey.mwOrgAccess(claims.org_id),
+      const orgAccess = await timer.time("mw_org_access", () => cacheThrough(
+        CacheKey.mwOrgAccess(claims.org_id!),
         TTL.MIDDLEWARE,
         async () => {
           const { data } = await supabase
             .from("organizations")
-            .select("suspended_at, subscription_status, trial_ends_at")
+            .select("suspended_at, archived_at, subscription_status, trial_ends_at")
             .eq("id", claims.org_id!)
             .maybeSingle();
           return data ?? null;
         },
-      );
+      ));
+
+      // A deleted (archived) org revokes access just like a suspended one. A
+      // user with a pre-deletion JWT can still hit the app until it clears, so
+      // catch that window here.
+      if (orgAccess?.archived_at !== null && orgAccess?.archived_at !== undefined) {
+        const loginUrl = new URL("/login", req.url);
+        loginUrl.searchParams.set("deleted", "true");
+        return NextResponse.redirect(loginUrl);
+      }
 
       if (orgAccess?.suspended_at !== null && orgAccess?.suspended_at !== undefined) {
         const loginUrl = new URL("/login", req.url);
@@ -432,9 +479,10 @@ export async function middleware(req: NextRequest) {
         trialEndsAt: orgAccess?.trial_ends_at ?? null,
       });
 
+      const canRecoverBilling =
+        getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
+
       if (billingAccess.isLocked) {
-        const canRecoverBilling =
-          getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
         const isBillingRecoveryPath =
           pathname === "/settings" &&
           req.nextUrl.searchParams.get("section") === "org-billing";
@@ -446,6 +494,12 @@ export async function middleware(req: NextRequest) {
         }
 
         if (!canRecoverBilling && pathname !== "/billing-required") {
+          return NextResponse.redirect(new URL("/billing-required", req.url));
+        }
+      } else if (billingAccess.state === "trial_pending" && !canRecoverBilling) {
+        // Trial clock has not started yet (no super_admin has signed in). Hold
+        // non-super-admins on the setup screen until a super_admin starts it.
+        if (pathname !== "/billing-required") {
           return NextResponse.redirect(new URL("/billing-required", req.url));
         }
       } else if (pathname === "/billing-required") {
@@ -517,6 +571,7 @@ export async function middleware(req: NextRequest) {
   if (isInSandbox) {
     res.headers.set("x-dubgrid-sandbox", "true");
   }
+  timer.applyTo(res.headers);
   return res;
 }
 
