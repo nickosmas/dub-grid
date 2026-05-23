@@ -6,9 +6,10 @@ import { useTermsAcceptanceStatus } from "@/hooks/useTermsAcceptanceStatus";
 // Mock react-query so the test exercises the hook's contract (the query key it
 // builds + the enabled flag) without mounting react-query's provider — which
 // otherwise resolves react-query's source and pulls a duplicate React.
-const useQuery = vi.fn(() => ({ data: undefined }));
+type QueryOpts = { queryKey: readonly unknown[]; enabled?: boolean; queryFn?: unknown };
+const useQuery = vi.fn((_opts: QueryOpts) => ({ data: undefined as unknown }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: (opts: unknown) => useQuery(opts as never),
+  useQuery: (opts: QueryOpts) => useQuery(opts),
 }));
 
 vi.mock("@/features/account/client", () => ({
@@ -31,9 +32,9 @@ describe("useTermsAcceptanceStatus", () => {
     mockUseAuth.mockReturnValue({ user: { id: "u-1" } as User, isLoading: false });
     const { rerender } = renderHook(() => useTermsAcceptanceStatus());
 
-    const firstKey = useQuery.mock.calls[0][0].queryKey;
+    const firstKey = useQuery.mock.calls[0]![0].queryKey;
     expect(firstKey).toEqual(["account", "u-1", "terms"]);
-    expect(useQuery.mock.calls[0][0].enabled).toBe(true);
+    expect(useQuery.mock.calls[0]![0].enabled).toBe(true);
 
     // New object, same id — the key must be value-equal so react-query reuses
     // the cached query rather than refetching.
@@ -47,6 +48,6 @@ describe("useTermsAcceptanceStatus", () => {
   it("disables the query while auth is still loading", () => {
     mockUseAuth.mockReturnValue({ user: null, isLoading: true });
     renderHook(() => useTermsAcceptanceStatus());
-    expect(useQuery.mock.calls[0][0].enabled).toBe(false);
+    expect(useQuery.mock.calls[0]![0].enabled).toBe(false);
   });
 });
