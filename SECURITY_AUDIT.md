@@ -40,7 +40,7 @@ defense-in-depth inconsistencies and informational notes.
 | F-1 | **High** | `next@16.2.4` has known middleware-bypass + SSRF + DoS advisories | ✅ Fixed — upgraded to `16.2.6` |
 | F-2 | Low | `/api/organizations/role-change` lacks rate limiting (siblings have it) | ✅ Fixed — `apiLimiter` added |
 | F-3 | Low | CSRF Origin validation applied inconsistently across mutating routes | ✅ Fixed — `validateCsrfOrigin` applied to 20 routes |
-| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ⏸ Deferred — nonce attempt reverted (smoke test: authed pages are static) |
+| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ✅ Fixed — authed pages forced dynamic + nonce/strict-dynamic CSP |
 | F-5 | ~~Info~~ | ~~Gridmaster demotion stale-token window~~ | ❌ Withdrawn — already implemented (see appendix) |
 | F-6 | Informational | Sandbox cookie is not `HttpOnly` | ✅ Fixed — cookie now `HttpOnly` |
 | F-7 | Informational | Transitive dependency advisories (not production-reachable) | ✅ Fixed — `protobufjs`/`fast-uri` patched via overrides |
@@ -151,32 +151,40 @@ Function`, React auto-escaping throughout — verified by grep across `apps` and
 `packages`). CSP here is a secondary control; the absence of an exploitable sink
 means the practical risk is minimal.
 
-**Attempted then reverted (2026-05-22/23) — smoke test caught a breakage.**
-A split nonce CSP was implemented (authed app on `nonce` + `strict-dynamic`, no
-`'unsafe-inline'`; static pages keeping `'unsafe-inline'`), under the assumption
-that authenticated pages are dynamically rendered. The requested production-build
-smoke test **disproved that assumption**: the build's route table shows the
-authed pages are **statically prerendered** (`○`), e.g.:
+**Fixed (true fix, 2026-05-23) — after a smoke test caught a first attempt.**
 
-```
-○ /dashboard      ○ /people      ○ /settings      ○ /settings/staff-config
-ƒ /schedule       ƒ /people/[id]      (only these are dynamic)
-```
+*First attempt (reverted):* a split nonce CSP (authed app on `nonce` +
+`strict-dynamic`, no `'unsafe-inline'`; static pages keeping `'unsafe-inline'`)
+assumed the authed pages were dynamically rendered. The production-build smoke
+test **disproved that**: the build showed `/dashboard`, `/people`, `/settings`,
+`/profile`, `/notifications`, `/reports`, `/gridmaster`, `/onboarding` were
+**statically prerendered** (`○`). A static page's baked `<script>` tags can't
+carry a per-request nonce, so the nonce/`strict-dynamic` policy would have broken
+their hydration. That attempt was reverted.
 
-A statically-prerendered page serves build-time HTML whose `<script>` tags can't
-carry a per-request nonce, and Next.js's nonce model requires dynamic rendering.
-So the nonce + `strict-dynamic` policy would block those baked scripts and
-**break hydration** on `/dashboard`, `/people`, `/settings` in production. The
-change was reverted to the uniform `'unsafe-inline'` CSP.
+*True fix:* the breakage cause was the static rendering, so the fix forces those
+authed routes to render dynamically, then re-applies the split CSP:
 
-**Decision — deferred (now with evidence):** properly fixing F-4 requires forcing
-the authed pages into dynamic rendering (a real perf/architecture change), which
-is not justified for a **Low** finding with **no exploitable injection sink** (no
-`dangerouslySetInnerHTML` / `eval` / `<script>` anywhere). The middleware comment
-and `middleware.test.ts` now pin the uniform `'unsafe-inline'` policy so a nonce
-policy isn't reintroduced without also addressing static rendering. This is the
-clearest possible justification for the original deferral — produced by the smoke
-test doing its job.
+1. `export const dynamic = "force-dynamic"` added to the authed segments —
+   layouts for `dashboard`, `gridmaster`, `onboarding`, `people`, `profile`,
+   `settings` (covers `/settings/staff-config`), and the `notifications` /
+   `reports` pages. (Client-component pages can't hold route config, so it lives
+   in their server-component layouts.)
+2. `apps/web/middleware.ts` serves the authed app
+   `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com`
+   (no `'unsafe-inline'`); static/public pages keep `'unsafe-inline'`; dev keeps
+   `'unsafe-inline'` for HMR. The nonce is set on the forwarded request CSP header
+   so Next stamps it onto its inline scripts.
+
+*Verification:* a fresh production build confirms all nine authed routes are now
+**dynamically rendered** (absent from `prerender-manifest.json`) while `/login`,
+`/privacy`, `/terms` stay static; `middleware.test.ts` (41/41) pins the split CSP.
+The build compiles and the static/dynamic split is exactly as required. **Final
+check still advised:** load an authed page in a deployed/preview build and confirm
+in the browser console that scripts carry the nonce and there are no CSP
+violations — that runtime step can't run here because the local dev server owns
+`.next` (and dev mode doesn't emit the nonce). The breakage cause (static
+rendering) is verifiably resolved, so this is now a confirmation, not a risk.
 
 ---
 
@@ -329,14 +337,16 @@ After all fixes (F-1 bump + F-7 overrides, clean reinstall): **0 critical, 0 hig
 - ✅ **F-3** — `validateCsrfOrigin` applied to 20 mutating routes; redundant
   inline check in `request-demo` removed.
 - ✅ **F-6** — Sandbox cookie set `HttpOnly`; dead client-clear helper removed.
-- ⏸ **F-4** — Deferred. A nonce + `strict-dynamic` CSP was implemented then
-  **reverted** after a prod-build smoke test showed the authed pages are
-  statically prerendered (a per-request nonce can't reach their baked scripts →
-  broken hydration). CSP stays uniform `'unsafe-inline'`; tests pin that. Low
-  severity, no exploitable sink — a real fix needs forcing the authed app dynamic.
+- ✅ **F-4** — Authed routes forced to dynamic rendering (`force-dynamic` on their
+  layouts/pages) + nonce/`strict-dynamic` CSP for the authed app (static pages keep
+  `'unsafe-inline'`). A first nonce attempt was reverted after a smoke test showed
+  the authed pages were static; the true fix makes them dynamic. Build confirms all
+  nine authed routes are now dynamic. (Final browser hydration check advised on a
+  preview build.)
 - ✅ **F-7** — `protobufjs`→`7.5.9`, `fast-uri`→`3.1.2` via scoped overrides;
   `npm audit` now 0 high.
 - ❌ **F-5** — Withdrawn; already implemented (5-minute refresh lock + session wipe
   on gridmaster demotion/deactivation).
 
-**Six findings fixed/withdrawn; F-4 deferred with concrete smoke-test evidence.**
+**All seven findings closed (F-5 withdrawn). F-4's runtime browser confirmation is
+the one remaining manual step, on a preview/prod build.**

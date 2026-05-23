@@ -4,6 +4,11 @@ export const metadata: Metadata = {
   title: "Settings | DubGrid",
 };
 
+// F-4: render this authed route dynamically so the per-request CSP nonce set in
+// middleware is stamped onto its scripts. A static prerender can't carry a nonce.
+// Covers /settings and the nested /settings/staff-config.
+export const dynamic = "force-dynamic";
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;
 }
