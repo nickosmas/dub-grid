@@ -88,53 +88,30 @@ export async function middleware(req: NextRequest) {
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
-  // CSP. Two script-src policies:
-  //  - Static/public pages (marketing, login, auth flows) are pre-rendered and
-  //    can't carry a per-request nonce, so they keep 'unsafe-inline'. These pages
-  //    hold no user data and have no injection sink (see SECURITY_AUDIT.md F-4).
-  //  - The authenticated app is dynamically rendered, so in production it drops
-  //    'unsafe-inline' for a per-request nonce: Next.js stamps the nonce onto its
-  //    own inline bootstrap scripts (read from the request CSP header), and the
-  //    runtime-injected analytics load via the host allowlist below.
-  // 'strict-dynamic' is deliberately NOT used — it would block the pre-rendered
-  // pages' un-nonced scripts. In development both policies stay on 'unsafe-inline'
-  // so HMR / React Refresh keep working.
-  const isDev = process.env.NODE_ENV === "development";
-  const nonce = isDev
-    ? ""
-    : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
-  const analyticsSrc = "https://va.vercel-scripts.com";
-  const devScriptExtras = isDev ? "'unsafe-eval'" : "";
-  const devConnectExtras = isDev
-    ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
-    : "";
-  const buildCsp = (scriptSrc: string) =>
-    `
+  // CSP — 'self' + 'unsafe-inline' for scripts.
+  // A nonce + 'strict-dynamic' policy was attempted (SECURITY_AUDIT.md F-4) but
+  // reverted: a production-build smoke test showed the authenticated pages
+  // (/dashboard, /people, /settings, …) are STATICALLY prerendered (○), not
+  // dynamic. A static page serves build-time HTML whose <script> tags can't
+  // carry a per-request nonce, so a nonce/'strict-dynamic' policy blocks them and
+  // breaks hydration. Next's nonce model requires dynamic rendering, which these
+  // pages deliberately avoid. With no XSS sink in the app (no
+  // dangerouslySetInnerHTML / eval / <script>), 'unsafe-inline' is an accepted
+  // low risk; nonces would require forcing the whole authed app dynamic.
+  const cspHeader = `
     default-src 'self';
-    script-src ${scriptSrc};
+    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com;
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${devConnectExtras};
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
     frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
     form-action 'self';
-    ${isDev ? "" : "upgrade-insecure-requests;"}
-  `.replace(/\s{2,}/g, " ").trim();
-
-  // Static/public pages keep 'unsafe-inline'.
-  const contentSecurityPolicyHeaderValue = buildCsp(
-    `'self' 'unsafe-inline' ${devScriptExtras} ${analyticsSrc}`,
-  );
-  // Authenticated app: nonce + strict-dynamic in production, 'unsafe-inline' in
-  // dev. strict-dynamic is safe here (these pages are dynamically rendered and
-  // carry the nonce); it lets the nonced Next bundle load analytics by
-  // propagation. The analytics host stays for CSP2 browsers that ignore
-  // strict-dynamic.
-  const dynamicCspHeaderValue = isDev
-    ? contentSecurityPolicyHeaderValue
-    : buildCsp(`'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc}`);
+    ${process.env.NODE_ENV === "production" ? "upgrade-insecure-requests;" : ""}
+  `;
+  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
@@ -174,12 +151,6 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Past the public/static branches: this is the authenticated, dynamically
-  // rendered app. Swap in the nonce-based CSP so Next.js stamps the nonce onto
-  // its inline scripts (it reads the nonce from this request CSP header) and we
-  // can drop 'unsafe-inline'.
-  requestHeaders.set("Content-Security-Policy", dynamicCspHeaderValue);
-
   // Create a mutable response so @supabase/ssr can refresh session cookies
   // and pass the modified request headers forward for Next.js SSR hydration
   const res = NextResponse.next({
@@ -187,7 +158,7 @@ export async function middleware(req: NextRequest) {
   });
 
   // Apply CSP to the response sent to the browser
-  res.headers.set("Content-Security-Policy", dynamicCspHeaderValue);
+  res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
 
   // Use @supabase/ssr to read the session from cookies. This correctly handles
   // the sb-<project-ref>-auth-token cookie format and multi-chunk cookie

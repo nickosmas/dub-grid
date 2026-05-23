@@ -40,16 +40,17 @@ defense-in-depth inconsistencies and informational notes.
 | F-1 | **High** | `next@16.2.4` has known middleware-bypass + SSRF + DoS advisories | ✅ Fixed — upgraded to `16.2.6` |
 | F-2 | Low | `/api/organizations/role-change` lacks rate limiting (siblings have it) | ✅ Fixed — `apiLimiter` added |
 | F-3 | Low | CSRF Origin validation applied inconsistently across mutating routes | ✅ Fixed — `validateCsrfOrigin` applied to 20 routes |
-| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ✅ Fixed — nonce + strict-dynamic for the authed app |
+| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ⏸ Deferred — nonce attempt reverted (smoke test: authed pages are static) |
 | F-5 | ~~Info~~ | ~~Gridmaster demotion stale-token window~~ | ❌ Withdrawn — already implemented (see appendix) |
 | F-6 | Informational | Sandbox cookie is not `HttpOnly` | ✅ Fixed — cookie now `HttpOnly` |
 | F-7 | Informational | Transitive dependency advisories (not production-reachable) | ✅ Fixed — `protobufjs`/`fast-uri` patched via overrides |
 
-> **Remediation applied 2026-05-21/22:** all seven findings closed. F-1, F-2,
-> F-3, F-4, F-6, F-7 fixed in code; F-5 was found on re-verification to be already
-> implemented and is withdrawn. `npm audit` is now 0 critical / 0 high / 0 low /
-> 3 moderate (the 3 are `hono` via the `shadcn` dev CLI — dev tooling, not in the
-> production runtime).
+> **Remediation status (2026-05-21→23):** F-1, F-2, F-3, F-6, F-7 fixed in code;
+> F-5 withdrawn (already implemented); **F-4 deferred** — a nonce-CSP attempt was
+> reverted after a production-build smoke test showed the authed pages are
+> statically prerendered (a nonce would break their hydration). `npm audit` is
+> now 0 critical / 0 high / 0 low / 3 moderate (the 3 are `hono` via the `shadcn`
+> dev CLI — dev tooling, not in the production runtime).
 
 ---
 
@@ -150,30 +151,32 @@ Function`, React auto-escaping throughout — verified by grep across `apps` and
 `packages`). CSP here is a secondary control; the absence of an exploitable sink
 means the practical risk is minimal.
 
-**Fix applied (2026-05-22):** Implemented a **split CSP** in `apps/web/middleware.ts`
-that resolves the static-page constraint cleanly:
+**Attempted then reverted (2026-05-22/23) — smoke test caught a breakage.**
+A split nonce CSP was implemented (authed app on `nonce` + `strict-dynamic`, no
+`'unsafe-inline'`; static pages keeping `'unsafe-inline'`), under the assumption
+that authenticated pages are dynamically rendered. The requested production-build
+smoke test **disproved that assumption**: the build's route table shows the
+authed pages are **statically prerendered** (`○`), e.g.:
 
-- **Static/public pages** (marketing, login, auth flows) are pre-rendered and
-  can't carry a per-request nonce, so they keep `'unsafe-inline'`. These pages
-  hold no user data and have no injection sink, so this is acceptable.
-- **The authenticated app** is dynamically rendered, so in production it now uses
-  `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com`
-  with **no `'unsafe-inline'`**. The middleware generates a per-request nonce
-  (`crypto.getRandomValues`), sets it on the forwarded request CSP header so
-  Next.js stamps it onto its inline bootstrap scripts, and on the response.
-  `strict-dynamic` lets the nonced bundle load the runtime analytics by
-  propagation. In development both policies stay on `'unsafe-inline'` so
-  HMR / React Refresh keep working.
+```
+○ /dashboard      ○ /people      ○ /settings      ○ /settings/staff-config
+ƒ /schedule       ƒ /people/[id]      (only these are dynamic)
+```
 
-Feasibility was verified first: the app has **no** `next/script`, raw `<script>`,
-`dangerouslySetInnerHTML`, or `eval` — only Next's own scripts (auto-nonced) and
-React-injected analytics (covered by propagation). Behavior is locked in by two
-new tests in `apps/web/src/__tests__/middleware.test.ts` (static pages keep
-`'unsafe-inline'` with no nonce; the authed app gets `nonce` + `strict-dynamic`
-and drops `'unsafe-inline'`). **Note:** end-to-end nonce stamping / hydration
-should still be smoke-tested in a production build + browser before release —
-that final check can't run in this environment (a full prod build is blocked by
-unrelated in-progress WIP).
+A statically-prerendered page serves build-time HTML whose `<script>` tags can't
+carry a per-request nonce, and Next.js's nonce model requires dynamic rendering.
+So the nonce + `strict-dynamic` policy would block those baked scripts and
+**break hydration** on `/dashboard`, `/people`, `/settings` in production. The
+change was reverted to the uniform `'unsafe-inline'` CSP.
+
+**Decision — deferred (now with evidence):** properly fixing F-4 requires forcing
+the authed pages into dynamic rendering (a real perf/architecture change), which
+is not justified for a **Low** finding with **no exploitable injection sink** (no
+`dangerouslySetInnerHTML` / `eval` / `<script>` anywhere). The middleware comment
+and `middleware.test.ts` now pin the uniform `'unsafe-inline'` policy so a nonce
+policy isn't reintroduced without also addressing static rendering. This is the
+clearest possible justification for the original deferral — produced by the smoke
+test doing its job.
 
 ---
 
@@ -326,12 +329,14 @@ After all fixes (F-1 bump + F-7 overrides, clean reinstall): **0 critical, 0 hig
 - ✅ **F-3** — `validateCsrfOrigin` applied to 20 mutating routes; redundant
   inline check in `request-demo` removed.
 - ✅ **F-6** — Sandbox cookie set `HttpOnly`; dead client-clear helper removed.
-- ✅ **F-4** — Split CSP: authenticated app uses `nonce` + `strict-dynamic`
-  (no `'unsafe-inline'`); static/public pages keep `'unsafe-inline'`. New
-  middleware tests cover both. (Prod-build/browser smoke test still advised.)
+- ⏸ **F-4** — Deferred. A nonce + `strict-dynamic` CSP was implemented then
+  **reverted** after a prod-build smoke test showed the authed pages are
+  statically prerendered (a per-request nonce can't reach their baked scripts →
+  broken hydration). CSP stays uniform `'unsafe-inline'`; tests pin that. Low
+  severity, no exploitable sink — a real fix needs forcing the authed app dynamic.
 - ✅ **F-7** — `protobufjs`→`7.5.9`, `fast-uri`→`3.1.2` via scoped overrides;
   `npm audit` now 0 high.
 - ❌ **F-5** — Withdrawn; already implemented (5-minute refresh lock + session wipe
   on gridmaster demotion/deactivation).
 
-**All seven findings are now closed.**
+**Six findings fixed/withdrawn; F-4 deferred with concrete smoke-test evidence.**

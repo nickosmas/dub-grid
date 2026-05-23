@@ -321,6 +321,12 @@ describe("middleware: Content-Security-Policy", () => {
     );
   }
 
+  // NOTE: a nonce + 'strict-dynamic' policy for the authed app was attempted
+  // (F-4) and reverted — a prod-build smoke test showed the authed pages are
+  // statically prerendered, so a per-request nonce can't reach their baked
+  // scripts (it broke hydration). The CSP is uniform 'unsafe-inline' for now;
+  // these tests pin that so a nonce policy isn't reintroduced without also
+  // making the authed pages dynamic. See SECURITY_AUDIT.md F-4.
   it("keeps 'unsafe-inline' and uses no nonce on static/public pages", async () => {
     const req = makeNextRequest("http://localhost:3000/login");
     const res = await runMiddleware(req);
@@ -329,7 +335,7 @@ describe("middleware: Content-Security-Policy", () => {
     expect(scriptSrc).not.toContain("'nonce-");
   });
 
-  it("uses a per-request nonce + strict-dynamic and drops 'unsafe-inline' for the authenticated app", async () => {
+  it("keeps 'unsafe-inline' (no nonce) for the authenticated app too — authed pages are statically prerendered", async () => {
     mockSessionWithClaims({
       platform_role: "none",
       org_role: "admin",
@@ -343,9 +349,9 @@ describe("middleware: Content-Security-Policy", () => {
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
     const scriptSrc = scriptSrcOf(res);
-    expect(scriptSrc).toMatch(/'nonce-[^']+'/);
-    expect(scriptSrc).toContain("'strict-dynamic'");
-    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain("'nonce-");
+    expect(scriptSrc).not.toContain("'strict-dynamic'");
   });
 });
 
