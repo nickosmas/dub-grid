@@ -21,12 +21,22 @@ export async function GET(req: NextRequest) {
   );
   if ("response" in auth) return auth.response;
 
-  const status =
-    (req.nextUrl.searchParams.get("status") as ProfileChangeRequestStatus | null) ??
-    undefined;
+  // Validate the status param against the known enum (M-6) rather than blind-casting.
+  const VALID_STATUSES: ProfileChangeRequestStatus[] = [
+    "pending",
+    "approved",
+    "rejected",
+    "cancelled",
+  ];
+  const rawStatus = req.nextUrl.searchParams.get("status");
+  if (rawStatus !== null && !VALID_STATUSES.includes(rawStatus as ProfileChangeRequestStatus)) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+  const status = (rawStatus as ProfileChangeRequestStatus | null) ?? undefined;
   const requests = await listAdminProfileChangeRequests({
     serviceClient: auth.serviceClient,
-    orgId,
+    // Effective (sandbox-redirected) org, not the raw query param (M-1).
+    orgId: auth.orgId,
     status,
   });
 

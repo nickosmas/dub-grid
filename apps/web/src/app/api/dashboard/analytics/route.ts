@@ -36,9 +36,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Effective (sandbox-redirected) org, not the raw body orgId (M-1).
     const [weeklyShiftHours, employeeUtilization] = await Promise.all([
-      fetchWeeklyShiftHours(orgId, weeks),
-      fetchEmployeeUtilization(orgId, weeks),
+      fetchWeeklyShiftHours(auth.orgId, weeks),
+      fetchEmployeeUtilization(auth.orgId, weeks),
     ]);
 
     return NextResponse.json({ weeklyShiftHours, employeeUtilization });

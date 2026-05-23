@@ -56,7 +56,9 @@ function getRequestIp(req: NextRequest): string | null {
 async function requirePrivilegedActor(
   req: NextRequest,
   orgId: string,
-): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+): Promise<
+  { ok: true; orgId: string } | { ok: false; response: NextResponse }
+> {
   const auth = await requireOrgPermissions(
     req,
     orgId,
@@ -66,7 +68,10 @@ async function requirePrivilegedActor(
     return { ok: false, response: auth.response };
   }
 
-  return { ok: true };
+  // Return the EFFECTIVE org (sandbox-redirected). Callers must mutate this org,
+  // not the raw client-supplied orgId — otherwise a sandbox user passes the gate
+  // against their sandbox but writes the real org. See SECURITY_AUDIT / H-1.
+  return { ok: true, orgId: auth.orgId };
 }
 
 async function fetchOrganizationUser(
@@ -191,11 +196,13 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { orgId, userId, expectedUpdatedAt, orgRole, adminPermissions } = parsed.data;
+  const { orgId: requestedOrgId, userId, expectedUpdatedAt, orgRole, adminPermissions } = parsed.data;
 
   try {
-    const allowed = await requirePrivilegedActor(req, orgId);
+    const allowed = await requirePrivilegedActor(req, requestedOrgId);
     if (!allowed.ok) return allowed.response;
+    // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
+    const orgId = allowed.orgId;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {
@@ -347,7 +354,7 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { orgId, userId, expectedUpdatedAt } = parsed.data;
+  const { orgId: requestedOrgId, userId, expectedUpdatedAt } = parsed.data;
 
   // Self-action guard: you cannot remove yourself from the organization.
   if (userId === user.id) {
@@ -355,8 +362,10 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const allowed = await requirePrivilegedActor(req, orgId);
+    const allowed = await requirePrivilegedActor(req, requestedOrgId);
     if (!allowed.ok) return allowed.response;
+    // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
+    const orgId = allowed.orgId;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {

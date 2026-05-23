@@ -48,7 +48,9 @@ export async function PATCH(
     const request = await resolveProfileChangeRequest({
       serviceClient: auth.serviceClient,
       actor: auth.actor,
-      orgId,
+      // Effective (sandbox-redirected) org, not the raw query param — this can
+      // delete an account, so it must never act on the real org from a sandbox.
+      orgId: auth.orgId,
       requestId: id,
       action: parsed.data.action,
       resolverNote: parsed.data.resolverNote,

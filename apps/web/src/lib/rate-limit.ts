@@ -99,6 +99,16 @@ export async function checkRateLimit(
     }
     return { limited: false };
   }
-  const { success, reset } = await limiter.limit(key);
-  return { limited: !success, reset };
+  try {
+    const { success, reset } = await limiter.limit(key);
+    return { limited: !success, reset };
+  } catch {
+    // Redis/Upstash unreachable. Don't let it escape as a framework 500 from
+    // whatever callsite invoked us (some call before their try block). Fail
+    // closed in production (treat like misconfigured → 503), open in dev. (M-3)
+    if (isProduction) {
+      return { limited: true, misconfigured: true };
+    }
+    return { limited: false };
+  }
 }

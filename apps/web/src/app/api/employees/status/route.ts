@@ -4,6 +4,7 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
@@ -81,9 +82,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const { empId, orgId, action, expectedVersion, note } = parsed.data;
+  const { empId, action, expectedVersion, note } = parsed.data;
 
   try {
+    // Resolve the effective org: if the caller is in sandbox mode, route the
+    // check AND the mutation to their sandbox, never the raw request orgId
+    // (otherwise a sandbox user could mutate the real org). See H-1.
+    const orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
+
     // ── Permission check ──────────────────────────────────────────────
     const serviceClient = getServiceClient();
     const [{ data: membership }, { data: profile }] = await Promise.all([
