@@ -197,12 +197,15 @@ export async function PATCH(req: NextRequest) {
   }
 
   const { orgId: requestedOrgId, userId, expectedUpdatedAt, orgRole, adminPermissions } = parsed.data;
+  // Effective (sandbox-redirected) org; reassigned after the gate. Declared
+  // here so the catch block can reference it for logging.
+  let orgId = requestedOrgId;
 
   try {
     const allowed = await requirePrivilegedActor(req, requestedOrgId);
     if (!allowed.ok) return allowed.response;
     // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
-    const orgId = allowed.orgId;
+    orgId = allowed.orgId;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {
@@ -355,6 +358,9 @@ export async function DELETE(req: NextRequest) {
   }
 
   const { orgId: requestedOrgId, userId, expectedUpdatedAt } = parsed.data;
+  // Effective (sandbox-redirected) org; reassigned after the gate. Declared here
+  // so the catch block can reference it for logging.
+  let orgId = requestedOrgId;
 
   // Self-action guard: you cannot remove yourself from the organization.
   if (userId === user.id) {
@@ -365,7 +371,7 @@ export async function DELETE(req: NextRequest) {
     const allowed = await requirePrivilegedActor(req, requestedOrgId);
     if (!allowed.ok) return allowed.response;
     // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
-    const orgId = allowed.orgId;
+    orgId = allowed.orgId;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {

@@ -64,12 +64,14 @@ function getServerSnapshot(): boolean {
 }
 
 export function setUserViewActive(active: boolean): void {
-  if (typeof window !== "undefined") {
-    if (active) {
-      sessionStorage.setItem(USER_VIEW_KEY, "1");
-    } else {
-      sessionStorage.removeItem(USER_VIEW_KEY);
-    }
+  if (typeof window === "undefined") return;
+  // No-op when unchanged (L-1) — avoids a synchronous re-render storm across
+  // every mounted usePermissions consumer when nothing actually changed.
+  if (readUserView() === active) return;
+  if (active) {
+    sessionStorage.setItem(USER_VIEW_KEY, "1");
+  } else {
+    sessionStorage.removeItem(USER_VIEW_KEY);
   }
   userViewListeners.forEach((fn) => fn());
 }
@@ -163,17 +165,17 @@ export function usePermissions(): Permissions {
     };
   }, [authLoading, accessToken, userId]);
 
-  // ── Realtime: invalidate permission cache on membership/department changes ──
+  // ── Realtime: invalidate permission cache on membership changes ──
   // When another session (e.g. super_admin) updates the current user's
-  // admin_permissions, org_role, or a department's permissions template,
-  // a Postgres change event re-resolves the cache and triggers a re-render.
+  // admin_permissions or org_role, a Postgres change event re-resolves the
+  // cache and triggers a re-render. (L-2: we no longer subscribe to
+  // `departments` — departments don't grant permissions, so those events only
+  // caused org-wide perms-refetch storms with zero permission impact.)
   useEffect(() => {
     if (!accessToken || !userId) return;
-    const { orgId } = extractJwtClaims(accessToken);
 
     let mounted = true;
     let membershipChannel: BrowserRealtimeChannel | null = null;
-    let departmentChannel: BrowserRealtimeChannel | null = null;
     // Unique channel name per effect instance avoids reusing an already-subscribed
     // channel during React strict-mode double-mounts.
     const channelId = `perms:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
@@ -212,25 +214,9 @@ export function usePermissions(): Permissions {
       )
       .subscribe();
 
-    if (orgId) {
-      departmentChannel = createBrowserRealtimeChannel(`dept-perms:${channelId}`)
-        .on(
-          "postgres_changes" as "system",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "departments",
-            filter: `org_id=eq.${orgId}`,
-          } as Record<string, unknown>,
-          reResolve,
-        )
-        .subscribe();
-    }
-
     return () => {
       mounted = false;
       if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
-      if (departmentChannel) void removeBrowserRealtimeChannel(departmentChannel);
     };
   }, [accessToken, userId]);
 

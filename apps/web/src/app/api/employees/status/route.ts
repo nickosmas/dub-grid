@@ -83,12 +83,15 @@ export async function POST(req: NextRequest) {
   }
 
   const { empId, action, expectedVersion, note } = parsed.data;
+  // Effective (sandbox-redirected) org; resolved inside the try, declared here
+  // so the catch block can reference it for logging. (H-1)
+  let orgId = parsed.data.orgId;
 
   try {
     // Resolve the effective org: if the caller is in sandbox mode, route the
     // check AND the mutation to their sandbox, never the raw request orgId
     // (otherwise a sandbox user could mutate the real org). See H-1.
-    const orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
+    orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
 
     // ── Permission check ──────────────────────────────────────────────
     const serviceClient = getServiceClient();

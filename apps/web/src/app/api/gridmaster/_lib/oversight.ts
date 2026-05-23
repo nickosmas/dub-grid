@@ -192,9 +192,16 @@ async function loadOversightFacts(serviceClient: QueryClient) {
       rows.filter((row) => !row.archived_at),
     ),
     selectRows(serviceClient, "invitations", "org_id, email, accepted_at, revoked_at, expires_at, created_at, updated_at"),
-    selectRows(serviceClient, "schedule_cells", "org_id, created_at, updated_at").then((rows) =>
-      rows.filter((row) => dateMs(row.created_at) >= Date.parse(thirtyDaysAgo)),
-    ),
+    // L-3: push the 30-day window into the query instead of fetching the entire
+    // schedule_cells table and filtering in JS (which both over-fetched and hit
+    // PostgREST's silent max-rows truncation).
+    serviceClient
+      .from("schedule_cells")
+      .select("org_id, created_at, updated_at")
+      .gte("created_at", thirtyDaysAgo)
+      .then(
+        (res: { data: Array<Record<string, unknown>> | null }) => res.data ?? [],
+      ),
     selectRows(serviceClient, "shift_requests", "org_id, type, status, created_at, updated_at, resolved_at, expires_at"),
     selectRows(serviceClient, "user_sessions", "user_id, platform, app_version, device_label, last_active_at, created_at"),
     selectRows(serviceClient, "mobile_device_tokens", "user_id, org_id, platform, last_seen_at, disabled_at, created_at"),

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import AuthSplash from "@/components/AuthSplash";
 import { isAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 
@@ -22,6 +22,10 @@ export function PublicRoute({ children }: { children: React.ReactNode }) {
  */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  // Wall-clock deadline for the "session never materialized" bounce (L-5).
+  // Stored in a ref so auth state flapping ([isLoading,user]) during the settle
+  // doesn't keep resetting the timeout past the intended 6s hard cap.
+  const bounceDeadlineRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -29,6 +33,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
       // Arrived authenticated — the login navigation settled, so the splash
       // can stop bridging the gap.
       consumeAuthTransition();
+      bounceDeadlineRef.current = null;
       return;
     }
     // Not authenticated. During a login navigation the session is still
@@ -36,10 +41,14 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     // a session that never materializes can't get stuck. Otherwise (e.g.
     // sign-out) redirect to the sign-in page immediately.
     if (isAuthTransitionPending()) {
+      if (bounceDeadlineRef.current === null) {
+        bounceDeadlineRef.current = Date.now() + 6000;
+      }
+      const remaining = Math.max(0, bounceDeadlineRef.current - Date.now());
       const t = setTimeout(() => {
         consumeAuthTransition();
         window.location.replace("/login");
-      }, 6000);
+      }, remaining);
       return () => clearTimeout(t);
     }
     window.location.replace("/login");
