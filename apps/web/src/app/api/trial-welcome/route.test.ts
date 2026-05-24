@@ -42,18 +42,26 @@ import { GET, POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 
-// One query object backs both chains the route uses:
-//   GET:  .select(...).eq(...).maybeSingle()
-//   send/POST: .update(...).eq(...).is(...)
+// One query object backs the chains the route uses:
+//   GET org read:   .select(...).eq(...).maybeSingle()
+//   email claim:    .update(...).eq(...).is(...).select(...).maybeSingle()
+//   POST seen-mark: .update(...).eq(...).is(...)
+// All builder methods are chainable; maybeSingle is the terminal that resolves.
 let orgResult: { data: unknown; error: unknown } = { data: null, error: null };
+// The atomic email claim resolves to the row it won (null = lost the race / already sent).
+let claimResult: { data: unknown; error: unknown } = { data: { id: "org" }, error: null };
+let maybeSingleCalls = 0;
 
 function makeQuery() {
   const query = {
     select: vi.fn(() => query),
     update: vi.fn(() => query),
     eq: vi.fn(() => query),
-    is: vi.fn(() => Promise.resolve({ error: null })),
-    maybeSingle: vi.fn(() => Promise.resolve(orgResult)),
+    is: vi.fn(() => query),
+    // First maybeSingle in a GET is the org read; the second (if any) is the claim.
+    maybeSingle: vi.fn(() =>
+      Promise.resolve(maybeSingleCalls++ === 0 ? orgResult : claimResult),
+    ),
   };
   return query;
 }
@@ -74,6 +82,8 @@ describe("GET /api/trial-welcome", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     orgResult = { data: null, error: null };
+    claimResult = { data: { id: "org" }, error: null };
+    maybeSingleCalls = 0;
     requireAuthenticatedUserWithClaims.mockResolvedValue(superAdminAuth());
     serviceFrom.mockImplementation(() => makeQuery());
   });
@@ -176,6 +186,57 @@ describe("GET /api/trial-welcome", () => {
 
       const res = await GET(request());
       expect(res.status).toBe(200);
+      expect(sendResendEmail).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prevKey === undefined) delete process.env.RESEND_API_KEY;
+      else process.env.RESEND_API_KEY = prevKey;
+    }
+  });
+
+  it("sends only ONE email when two requests race (atomic claim)", async () => {
+    const prevKey = process.env.RESEND_API_KEY;
+    process.env.RESEND_API_KEY = "re_test";
+    try {
+      // Stateful service that models the atomic claim: the UPDATE ... WHERE
+      // trial_welcome_email_sent_at IS NULL ... RETURNING row only succeeds for
+      // the first caller; the racing caller gets no row back.
+      let sentAt: string | null = null;
+      const org = {
+        name: "Acme",
+        subscription_status: "trialing",
+        trial_ends_at: "2026-06-05T00:00:00Z",
+        trial_welcome_seen_at: null,
+      };
+      serviceFrom.mockImplementation(() => {
+        let pendingUpdate: string | null | undefined;
+        const q: Record<string, unknown> = {
+          select: () => q,
+          eq: () => q,
+          is: () => q,
+          update: (vals: { trial_welcome_email_sent_at: string | null }) => {
+            pendingUpdate = vals.trial_welcome_email_sent_at;
+            return q;
+          },
+          maybeSingle: () => {
+            // org read
+            if (pendingUpdate === undefined) {
+              return Promise.resolve({
+                data: { ...org, trial_welcome_email_sent_at: sentAt },
+                error: null,
+              });
+            }
+            // atomic claim: only flips null -> value once
+            if (sentAt === null && pendingUpdate) {
+              sentAt = pendingUpdate;
+              return Promise.resolve({ data: { id: "org" }, error: null });
+            }
+            return Promise.resolve({ data: null, error: null });
+          },
+        };
+        return q;
+      });
+
+      await Promise.all([GET(request()), GET(request())]);
       expect(sendResendEmail).toHaveBeenCalledTimes(1);
     } finally {
       if (prevKey === undefined) delete process.env.RESEND_API_KEY;

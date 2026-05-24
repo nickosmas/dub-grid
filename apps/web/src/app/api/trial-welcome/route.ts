@@ -79,33 +79,50 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(empty);
   }
 
-  // Lazily send the "trial started" email once. Only mark as sent on success so
-  // a transient failure retries on the next load.
+  // Lazily send the "trial started" email exactly once. This GET is polled and
+  // refetched by the welcome modal, so a plain check-send-mark would let two
+  // concurrent requests both read sent_at=null and each send an email. Instead
+  // we ATOMICALLY claim the send first: flip trial_welcome_email_sent_at from
+  // NULL in a single UPDATE and only the request that wins the row (returns it)
+  // sends. On failure we roll the claim back so a later load retries.
   if (!org.trial_welcome_email_sent_at) {
     const apiKey = process.env.RESEND_API_KEY;
     const fromEmail =
       process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
     if (apiKey && user.email) {
-      try {
-        await sendResendEmail({
-          apiKey,
-          from: fromEmail,
-          to: user.email,
-          subject: sanitizeHeaderValue(
-            `Your DubGrid trial for ${org.name} has started`,
-          ),
-          html: await buildTrialStartedEmail(org.name, org.trial_ends_at),
-        });
-        await service
-          .from("organizations")
-          .update({ trial_welcome_email_sent_at: new Date().toISOString() })
-          .eq("id", orgId)
-          .is("trial_welcome_email_sent_at", null);
-      } catch (err) {
-        Sentry.captureException(err, {
-          extra: { context: "trial-welcome-email" },
-        });
-        logger.error({ err }, "Failed to send trial-started email");
+      const claimedAt = new Date().toISOString();
+      const { data: claimed, error: claimError } = await service
+        .from("organizations")
+        .update({ trial_welcome_email_sent_at: claimedAt })
+        .eq("id", orgId)
+        .is("trial_welcome_email_sent_at", null)
+        .select("id")
+        .maybeSingle();
+
+      if (!claimError && claimed) {
+        // We won the claim — send exactly once.
+        try {
+          await sendResendEmail({
+            apiKey,
+            from: fromEmail,
+            to: user.email,
+            subject: sanitizeHeaderValue(
+              `Your DubGrid trial for ${org.name} has started`,
+            ),
+            html: await buildTrialStartedEmail(org.name, org.trial_ends_at),
+          });
+        } catch (err) {
+          // Roll the claim back (only if it's still ours) so a retry can send.
+          await service
+            .from("organizations")
+            .update({ trial_welcome_email_sent_at: null })
+            .eq("id", orgId)
+            .eq("trial_welcome_email_sent_at", claimedAt);
+          Sentry.captureException(err, {
+            extra: { context: "trial-welcome-email" },
+          });
+          logger.error({ err }, "Failed to send trial-started email");
+        }
       }
     }
   }

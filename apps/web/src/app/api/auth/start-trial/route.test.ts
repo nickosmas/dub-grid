@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const requireAuthenticatedSession = vi.fn();
+const requireAuthenticatedUserWithClaims = vi.fn();
 const rpc = vi.fn();
 const createRequestSupabaseClient = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedSession: (req: NextRequest) =>
-    requireAuthenticatedSession(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
+    requireAuthenticatedUserWithClaims(req),
   createRequestSupabaseClient: () => createRequestSupabaseClient(),
 }));
 
@@ -25,9 +25,9 @@ function makeRequest(body: unknown) {
 describe("POST /api/auth/start-trial", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireAuthenticatedSession.mockResolvedValue({
-      session: { access_token: "token" },
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
       user: { id: "user-1" },
+      claims: { org_role: "super_admin", org_id: ORG_ID },
     });
     rpc.mockResolvedValue({ error: null });
     createRequestSupabaseClient.mockReturnValue({ rpc });
@@ -44,7 +44,7 @@ describe("POST /api/auth/start-trial", () => {
   });
 
   it("rejects unauthenticated requests before calling the RPC", async () => {
-    requireAuthenticatedSession.mockResolvedValueOnce({
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce({
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
 
@@ -52,6 +52,30 @@ describe("POST /api/auth/start-trial", () => {
 
     expect(response.status).toBe(401);
     expect(createRequestSupabaseClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-super_admin claim before calling the RPC (B4)", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce({
+      user: { id: "user-1" },
+      claims: { org_role: "admin", org_id: ORG_ID },
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID }));
+
+    expect(response.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the claim org doesn't match the requested org (B4)", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce({
+      user: { id: "user-1" },
+      claims: { org_role: "super_admin", org_id: "22222222-2222-4222-8222-222222222222" },
+    });
+
+    const response = await POST(makeRequest({ orgId: ORG_ID }));
+
+    expect(response.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
   });
 

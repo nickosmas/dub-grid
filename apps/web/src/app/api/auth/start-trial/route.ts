@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   createRequestSupabaseClient,
-  requireAuthenticatedSession,
+  requireAuthenticatedUserWithClaims,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 
@@ -19,11 +19,11 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedSession(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {
       return auth.response;
     }
-    void auth;
+    const { claims } = auth;
 
     let body: unknown;
     try {
@@ -35,6 +35,14 @@ export async function POST(req: NextRequest) {
     const parsed = startTrialSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    }
+
+    // Defense-in-depth: the RPC self-gates to a super_admin membership and is
+    // idempotent, but reject up front unless the caller's signature-verified
+    // claims are super_admin for THIS org. (The login flow only calls this for
+    // the org it just signed into, so claims.org_id matches.)
+    if (claims.org_role !== "super_admin" || String(claims.org_id ?? "") !== parsed.data.orgId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const supabase = createRequestSupabaseClient(req);
