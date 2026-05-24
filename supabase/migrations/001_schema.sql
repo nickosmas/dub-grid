@@ -670,7 +670,10 @@ CREATE TABLE public.notifications (
     'billing_payment_succeeded',
     -- security
     'security_email_changed', 'security_password_changed',
-    'security_mfa_changed', 'security_new_device', 'security_session_revoked'
+    'security_mfa_changed', 'security_new_device', 'security_session_revoked',
+    -- platform / gridmaster (org lifecycle events, written with org_id = NULL)
+    'org_created', 'org_trial_started', 'org_archived', 'org_restored',
+    'org_subscription_converted', 'org_subscription_canceled', 'org_payment_failed'
   )),
   channel     TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
   category    TEXT,
@@ -1358,6 +1361,19 @@ COMMENT ON TABLE public.subscriptions IS 'Stripe subscription tracking per organ
 
 ALTER TABLE public.subscriptions
   ADD CONSTRAINT subscriptions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+-- ── stripe_processed_events ──────────────────────────────────────────────────
+-- Idempotency ledger for the Stripe webhook (M-4). Stripe legitimately
+-- redelivers events; the handler inserts the event id here first and skips
+-- reprocessing on a unique-violation, so audit/activity rows aren't duplicated.
+
+CREATE TABLE public.stripe_processed_events (
+  event_id     TEXT PRIMARY KEY,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.stripe_processed_events IS 'Dedup ledger for Stripe webhook event ids (replay idempotency)';
 
 
 -- ── audit_log ──────────────────────────────────────────────────────────────

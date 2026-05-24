@@ -120,7 +120,10 @@ function NotificationIcon({ type }: { type: string }) {
   if (
     type === "billing_subscription_changed" ||
     type === "billing_payment_failed" ||
-    type === "billing_payment_succeeded"
+    type === "billing_payment_succeeded" ||
+    type === "org_subscription_converted" ||
+    type === "org_subscription_canceled" ||
+    type === "org_payment_failed"
   ) {
     return <CreditCardIcon />;
   }
@@ -130,7 +133,11 @@ function NotificationIcon({ type }: { type: string }) {
     type === "employee_profile_changed" ||
     type === "org_settings_changed" ||
     type === "org_suspended" ||
-    type === "org_unsuspended"
+    type === "org_unsuspended" ||
+    type === "org_created" ||
+    type === "org_trial_started" ||
+    type === "org_archived" ||
+    type === "org_restored"
   ) {
     return <BuildingIcon />;
   }
@@ -148,7 +155,16 @@ function NotificationIcon({ type }: { type: string }) {
   return <BellIcon />;
 }
 
-export default function NotificationBell() {
+/**
+ * @param onViewAll Optional override for the "View all" footer. When provided,
+ *   it replaces the default `/notifications` link, e.g. so the gridmaster portal
+ *   can route to its own in-portal feed view instead of ejecting to the app.
+ */
+export default function NotificationBell({
+  onViewAll,
+}: {
+  onViewAll?: () => void;
+} = {}) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const queryClient = useQueryClient();
@@ -423,25 +439,49 @@ export default function NotificationBell() {
           </div>
 
           {/* Footer: view all */}
-          <Link
-            href="/notifications"
-            onClick={() => setOpen(false)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "10px 16px",
-              borderTop: "1px solid var(--color-border-light)",
-              background: "var(--color-surface)",
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 600,
-              color: "var(--color-link)",
-              textDecoration: "none",
-              fontFamily: "inherit",
-            }}
-          >
-            View all notifications
-          </Link>
+          {onViewAll ? (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onViewAll(); }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                padding: "10px 16px",
+                border: "none",
+                borderTop: "1px solid var(--color-border-light)",
+                background: "var(--color-surface)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                color: "var(--color-link)",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              View all notifications
+            </button>
+          ) : (
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "10px 16px",
+                borderTop: "1px solid var(--color-border-light)",
+                background: "var(--color-surface)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                color: "var(--color-link)",
+                textDecoration: "none",
+                fontFamily: "inherit",
+              }}
+            >
+              View all notifications
+            </Link>
+          )}
         </div>
       )}
       {confirmingMarkAllRead && (

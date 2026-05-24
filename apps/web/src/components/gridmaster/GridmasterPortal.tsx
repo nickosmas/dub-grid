@@ -39,6 +39,8 @@ import GridmasterSecurityView from "@/components/gridmaster/GridmasterSecurityVi
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
+import NotificationBell from "@/components/NotificationBell";
+import { InboxView as NotificationsInboxView } from "@/app/notifications/NotificationsInboxPage";
 import {
   fetchGridmasterDashboardData,
   type GridmasterDashboardData,
@@ -59,7 +61,8 @@ type GridmasterView =
   | "organization"
   | "impersonation"
   | "impersonation-history"
-  | "create-organization";
+  | "create-organization"
+  | "notifications";
 
 // ── Sidebar nav items ────────────────────────────────────────────────────────
 
@@ -108,6 +111,13 @@ const HistoryIcon = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+const BellIcon = (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 
@@ -376,6 +386,7 @@ export default function GridmasterPortal() {
       id: "tools",
       label: "Tools",
       items: [
+        { key: "notifications" as GridmasterView, label: "Notifications", icon: BellIcon, onClick: () => { setView("notifications"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
         { key: "impersonation" as GridmasterView, label: "Impersonation", icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setSelectedOrgInitialTab(undefined); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
         { key: "impersonation-history" as GridmasterView, label: "History", icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
@@ -502,6 +513,11 @@ export default function GridmasterPortal() {
             onSelect={selectOrg}
           />
         </div>
+        <div style={{ flexShrink: 0, display: "flex", alignItems: "center", marginRight: isMobile ? 0 : 4 }}>
+          <NotificationBell
+            onViewAll={() => { setView("notifications"); setSelectedId(null); setSelectedOrgInitialTab(undefined); }}
+          />
+        </div>
         {!isMobile && (
           <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
             <button
@@ -602,6 +618,7 @@ export default function GridmasterPortal() {
             { key: "gridmaster-accounts", label: "GM Accounts" },
             { key: "audit-log", label: "Audit" },
             { key: "create-organization", label: "New Org" },
+            { key: "notifications", label: "Notifications" },
             { key: "impersonation", label: "Impersonate" },
             { key: "impersonation-history", label: "History" },
           ] as { key: GridmasterView; label: string }[]).map((item) => (
@@ -803,6 +820,10 @@ export default function GridmasterPortal() {
 
           {view === "impersonation-history" && (
             <ImpersonationHistory />
+          )}
+
+          {view === "notifications" && (
+            <NotificationsInboxView />
           )}
         </main>
       </SidebarProvider>

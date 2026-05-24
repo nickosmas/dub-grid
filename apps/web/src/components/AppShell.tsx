@@ -87,8 +87,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     staleTime: 60_000,
     enabled: !isGridmaster && Boolean(orgId),
   });
-  const effectiveOrgKey =
-    bootstrapQuery.data?.org?.id ?? orgId ?? "bootstrap-pending";
+  // Keyed remount of the page subtree resets form state on sandbox org switches.
+  // Only apply it on app routes: on public routes (e.g. /login) the org id
+  // resolving from null -> real id during the post-login settle would otherwise
+  // remount the login page mid-sign-in and blank its fields before navigation.
+  const effectiveOrgKey = isAppRoute(pathname)
+    ? bootstrapQuery.data?.org?.id ?? orgId ?? "bootstrap-pending"
+    : "public";
 
   // Publish the actual sticky-header height as a CSS custom property so that
   // sidebar layouts (StaffView, SettingsPage, etc.) can subtract the correct

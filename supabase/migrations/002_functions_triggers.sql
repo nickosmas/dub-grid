@@ -410,6 +410,12 @@ CREATE TRIGGER trigger_organizations_audit
   BEFORE INSERT OR UPDATE ON public.organizations
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
 
+-- Notify gridmasters of important org lifecycle events (trial start, create,
+-- archive/restore, suspend/unsuspend, subscription conversion/cancel/payment fail)
+CREATE TRIGGER trg_notify_gridmasters_of_org_event
+  AFTER INSERT OR UPDATE ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.notify_gridmasters_of_org_event();
+
 CREATE TRIGGER trigger_focus_areas_audit
   BEFORE INSERT OR UPDATE ON public.focus_areas
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
@@ -763,9 +769,13 @@ BEGIN
     RAISE EXCEPTION 'Not a member of this organization';
   END IF;
 
+  -- Reject switching a normal member into an archived OR suspended org. The JWT
+  -- hook strips claims for suspended orgs anyway, but blocking the switch up
+  -- front avoids landing the session in a no-org limbo. (Gridmasters are exempt
+  -- above — oversight must still reach suspended orgs.)
   IF NOT EXISTS (
     SELECT 1 FROM public.organizations
-    WHERE id = target_org_id AND archived_at IS NULL
+    WHERE id = target_org_id AND archived_at IS NULL AND suspended_at IS NULL
   ) THEN
     RAISE EXCEPTION 'Organization not found';
   END IF;
@@ -839,6 +849,101 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.start_trial_for_org(UUID) TO authenticated;
+
+
+-- ── notify_gridmasters_of_org_event ───────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.notify_gridmasters_of_org_event()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_type     TEXT;
+  v_priority TEXT := 'normal';
+  v_title    TEXT;
+  v_message  TEXT;
+  v_name     TEXT := COALESCE(NEW.name, 'An organization');
+BEGIN
+  -- Surface important org lifecycle events to every gridmaster as an in-app
+  -- notification, written with org_id = NULL so it shows regardless of the
+  -- gridmaster's current org context (the get_notifications RPC returns rows where
+  -- org_id IS NULL). Fires on every writer of the organizations table (web login,
+  -- mobile login, gridmaster portal, org self-delete, Stripe webhook), so there is
+  -- a single source of truth. Emits at most one notification per row change and
+  -- returns NULL without inserting for non-noteworthy changes (settings edits,
+  -- repeated identical Stripe 'updated' events) to keep the gridmaster feed quiet.
+  IF TG_OP = 'INSERT' THEN
+    v_type    := 'org_created';
+    v_title   := 'New organization created';
+    v_message := v_name || ' was just created.';
+  ELSIF NEW.trial_started_at IS NOT NULL AND OLD.trial_started_at IS NULL THEN
+    v_type    := 'org_trial_started';
+    v_title   := 'Trial started';
+    v_message := v_name || ' started its trial.';
+  ELSIF NEW.archived_at IS NOT NULL AND OLD.archived_at IS NULL THEN
+    v_type     := 'org_archived';
+    v_priority := 'high';
+    v_title    := 'Organization archived';
+    v_message  := v_name || ' was archived.';
+  ELSIF NEW.archived_at IS NULL AND OLD.archived_at IS NOT NULL THEN
+    v_type    := 'org_restored';
+    v_title   := 'Organization restored';
+    v_message := v_name || ' was restored.';
+  ELSIF NEW.suspended_at IS NOT NULL AND OLD.suspended_at IS NULL THEN
+    v_type     := 'org_suspended';
+    v_priority := 'high';
+    v_title    := 'Organization suspended';
+    v_message  := v_name || ' was suspended.';
+  ELSIF NEW.suspended_at IS NULL AND OLD.suspended_at IS NOT NULL THEN
+    v_type    := 'org_unsuspended';
+    v_title   := 'Organization unsuspended';
+    v_message := v_name || ' was unsuspended.';
+  ELSIF NEW.subscription_status IS DISTINCT FROM OLD.subscription_status THEN
+    IF OLD.subscription_status = 'trialing' AND NEW.subscription_status = 'active' THEN
+      v_type    := 'org_subscription_converted';
+      v_title   := 'Trial converted to paid';
+      v_message := v_name || ' converted from trial to a paid subscription.';
+    ELSIF NEW.subscription_status = 'canceled' THEN
+      v_type     := 'org_subscription_canceled';
+      v_priority := 'high';
+      v_title    := 'Subscription canceled';
+      v_message  := v_name || ' canceled its subscription.';
+    ELSIF NEW.subscription_status IN ('past_due', 'unpaid')
+          AND OLD.subscription_status NOT IN ('past_due', 'unpaid') THEN
+      -- Fire once when the org first enters a failed-payment state; a later
+      -- past_due -> unpaid escalation must not produce a second alert.
+      v_type     := 'org_payment_failed';
+      v_priority := 'high';
+      v_title    := 'Payment failed';
+      v_message  := 'A payment for ' || v_name || ' failed.';
+    ELSE
+      RETURN NULL;
+    END IF;
+  ELSE
+    RETURN NULL;
+  END IF;
+
+  -- A notification is a side effect of the org operation that fired this trigger
+  -- (trial start, Stripe webhook sync, org create/suspend/archive). Never let a
+  -- failure here roll back that operation: swallow and log instead of propagating.
+  BEGIN
+    INSERT INTO public.notifications (
+      user_id, org_id, type, channel, category, priority, title, message, metadata
+    )
+    SELECT
+      p.id, NULL, v_type, 'in_app', 'platform', v_priority, v_title, v_message,
+      jsonb_build_object('orgId', NEW.id, 'orgName', NEW.name, 'slug', NEW.slug)
+    FROM public.profiles p
+    WHERE p.platform_role = 'gridmaster';
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'notify_gridmasters_of_org_event: failed to notify gridmasters for org % (%): %',
+      NEW.id, v_type, SQLERRM;
+  END;
+
+  RETURN NULL;
+END;
+$$;
 
 
 -- ── get_my_organizations ──────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import type { NotificationType } from "@/types";
 
-const NOTIFICATION_CATEGORIES: Record<string, string> = {
+export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   // schedule
   shift_change: "schedule",
   schedule_published: "schedule",
@@ -51,6 +51,15 @@ const NOTIFICATION_CATEGORIES: Record<string, string> = {
   impersonation_start: "system",
   impersonation_end: "system",
   system: "system",
+  // platform / gridmaster (org lifecycle events, written directly by the
+  // notify_gridmasters_of_org_event DB trigger; mapped here for parity)
+  org_created: "platform",
+  org_trial_started: "platform",
+  org_archived: "platform",
+  org_restored: "platform",
+  org_subscription_converted: "platform",
+  org_subscription_canceled: "platform",
+  org_payment_failed: "platform",
 };
 
 /**
@@ -66,6 +75,7 @@ const DEFAULT_EMAIL_ENABLED: Record<string, boolean> = {
   billing: true,
   security: true,
   system: false,
+  platform: false,
 };
 
 /** Max emails per user per hour (throttle) */

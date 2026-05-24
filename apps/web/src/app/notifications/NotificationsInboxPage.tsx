@@ -68,7 +68,8 @@ type CategoryFilter =
   | "account"
   | "billing"
   | "security"
-  | "system";
+  | "system"
+  | "platform";
 
 const CATEGORY_LABEL: Record<CategoryFilter, string> = {
   all: "All notifications",
@@ -79,6 +80,7 @@ const CATEGORY_LABEL: Record<CategoryFilter, string> = {
   billing: "Billing",
   security: "Security",
   system: "System",
+  platform: "Platform",
 };
 
 const PRIORITY_LABEL: Record<NotificationPriority, string> = {
@@ -126,22 +128,29 @@ function NotificationIcon({ type }: { type: NotificationType }) {
   ) {
     return <Users size={16} />;
   }
-  // account / org
+  // account / org (+ platform org lifecycle)
   if (
     type === "employee_created" ||
     type === "employee_status_changed" ||
     type === "employee_profile_changed" ||
     type === "org_settings_changed" ||
     type === "org_suspended" ||
-    type === "org_unsuspended"
+    type === "org_unsuspended" ||
+    type === "org_created" ||
+    type === "org_trial_started" ||
+    type === "org_archived" ||
+    type === "org_restored"
   ) {
     return <Building2 size={16} />;
   }
-  // billing
+  // billing (+ platform subscription lifecycle)
   if (
     type === "billing_subscription_changed" ||
     type === "billing_payment_failed" ||
-    type === "billing_payment_succeeded"
+    type === "billing_payment_succeeded" ||
+    type === "org_subscription_converted" ||
+    type === "org_subscription_canceled" ||
+    type === "org_payment_failed"
   ) {
     return <CreditCard size={16} />;
   }
@@ -246,7 +255,7 @@ function NotificationsInboxPage() {
   );
 }
 
-function InboxView() {
+export function InboxView() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);

@@ -770,7 +770,15 @@ export type NotificationType =
   | 'security_password_changed'
   | 'security_mfa_changed'
   | 'security_new_device'
-  | 'security_session_revoked';
+  | 'security_session_revoked'
+  // platform / gridmaster (org lifecycle events, org_id = NULL)
+  | 'org_created'
+  | 'org_trial_started'
+  | 'org_archived'
+  | 'org_restored'
+  | 'org_subscription_converted'
+  | 'org_subscription_canceled'
+  | 'org_payment_failed';
 
 export type NotificationPriority = 'low' | 'normal' | 'high' | 'critical';
 
