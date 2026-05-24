@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { passwordResetLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { passwordResetLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -62,6 +62,25 @@ export async function POST(req: NextRequest) {
   }
 
   const { email } = parsed.data;
+
+  // ── Per-target-email rate limit ───────────────────────────────────────
+  // The per-actor limit above is keyed by the gridmaster; without this a single
+  // gridmaster could flood one user's inbox with reset emails. Cap at 5/hour
+  // per target address.
+  const target = await checkRateLimit(emailTargetLimiter, `pwreset-email:${hashEmail(email)}`);
+  if (target.misconfigured) {
+    return NextResponse.json(
+      { success: false, error: "Service temporarily unavailable" },
+      { status: 503 },
+    );
+  }
+  if (target.limited) {
+    const retryAfter = target.reset ? Math.ceil((target.reset - Date.now()) / 1000) : 60;
+    return NextResponse.json(
+      { success: false, error: "Too many reset emails sent to this address. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
 
   // ── Generate password reset link via Supabase Admin API ─────────────
   try {

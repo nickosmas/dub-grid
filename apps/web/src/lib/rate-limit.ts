@@ -1,5 +1,14 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { createHash } from "node:crypto";
+
+/**
+ * SHA-256 of a normalized email, for use as a rate-limit key without storing
+ * the raw address in Redis (matches the login route's hashing).
+ */
+export function hashEmail(email: string): string {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+}
 
 const hasRedisEnv =
   !!process.env.UPSTASH_REDIS_REST_URL &&
@@ -58,6 +67,13 @@ export const passwordResetLimiter = createSlidingWindowLimiter(5, "15 m");
  * Provides brute-force protection at the application level.
  */
 export const loginLimiter = createSlidingWindowLimiter(15, "15 m");
+
+/**
+ * Per-TARGET-email limiter — 5 emails per hour to a single recipient, keyed by
+ * `hashEmail(targetEmail)`. Layers on top of the per-actor limiters so one
+ * actor can't flood a single inbox (invite/password-reset email bombing).
+ */
+export const emailTargetLimiter = createSlidingWindowLimiter(5, "1 h");
 
 export function getRateLimitConfigStatus(): {
   configured: boolean;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { z } from "zod";
-import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { inviteLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
@@ -92,6 +92,24 @@ export async function POST(req: NextRequest) {
   }
 
   const { token, email, orgName, inviterName } = parsed.data;
+
+  // ── Per-target-email rate limit ───────────────────────────────────────
+  // The per-actor limit above doesn't stop one sender from flooding a single
+  // inbox; cap invites to any one recipient at 5/hour.
+  const target = await checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
+  if (target.misconfigured) {
+    return NextResponse.json(
+      { success: false, error: "Service temporarily unavailable" },
+      { status: 503 },
+    );
+  }
+  if (target.limited) {
+    const retryAfter = target.reset ? Math.ceil((target.reset - Date.now()) / 1000) : 60;
+    return NextResponse.json(
+      { success: false, error: "Too many invites sent to this address. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
 
   // ── Build email ─────────────────────────────────────────────────────
   const baseUrl = emailBaseUrl();
