@@ -60,6 +60,25 @@ export async function POST(req: NextRequest) {
 
   logger.info({ type: event.type, id: event.id }, "Stripe webhook received");
 
+  // Replay idempotency (M-4): Stripe redelivers events. Claim the event id
+  // first; a unique-violation means we already processed it → ack and skip so
+  // we don't write duplicate audit/activity rows. Fail open if the ledger table
+  // isn't present yet (pre-migration) so the webhook keeps working.
+  {
+    const { error: claimError } = await getServiceClient()
+      .from("stripe_processed_events")
+      .insert({ event_id: event.id });
+    if (claimError) {
+      if (claimError.code === "23505") {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+      logger.warn(
+        { error: claimError, id: event.id },
+        "Stripe event dedup ledger unavailable — processing without replay guard",
+      );
+    }
+  }
+
   try {
     switch (event.type) {
       case "customer.subscription.created":

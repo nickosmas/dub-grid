@@ -9,6 +9,7 @@ const organizationMaybeSingle = vi.fn();
 const organizationEq = vi.fn();
 const organizationUpdate = vi.fn();
 const auditInsert = vi.fn();
+const dedupInsert = vi.fn();
 
 vi.mock("@/lib/stripe", async () => ({
   ...(await vi.importActual<typeof import("@/lib/stripe")>("@/lib/stripe")),
@@ -64,7 +65,12 @@ describe("POST /api/stripe/webhook", () => {
     organizationEq.mockResolvedValue({ error: null });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
     auditInsert.mockResolvedValue({ error: null });
+    // First-time event by default (no prior row) — the replay-dedup insert succeeds.
+    dedupInsert.mockResolvedValue({ error: null });
     serviceFrom.mockImplementation((table: string) => {
+      if (table === "stripe_processed_events") {
+        return { insert: dedupInsert };
+      }
       if (table === "subscriptions") {
         return {
           select: vi.fn(() => ({
@@ -427,6 +433,36 @@ describe("POST /api/stripe/webhook", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Webhook processing failed",
     });
+    expect(organizationUpdate).not.toHaveBeenCalled();
+    expect(auditInsert).not.toHaveBeenCalled();
+  });
+
+  it("skips reprocessing a redelivered event (replay idempotency, M-4)", async () => {
+    // The dedup ledger insert hits a unique-violation → event already processed.
+    dedupInsert.mockResolvedValue({ error: { code: "23505" } });
+    constructEvent.mockReturnValue({
+      id: "evt_123",
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_123",
+          customer: "cus_123",
+          status: "active",
+          metadata: { org_id: "11111111-1111-4111-8111-111111111111" },
+          items: { data: [] },
+        },
+      },
+    });
+
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      received: true,
+      duplicate: true,
+    });
+    // No side effects on a duplicate.
+    expect(subscriptionUpsert).not.toHaveBeenCalled();
     expect(organizationUpdate).not.toHaveBeenCalled();
     expect(auditInsert).not.toHaveBeenCalled();
   });
