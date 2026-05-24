@@ -83,4 +83,35 @@ describe("useLogout", () => {
     );
     expect(mockReplace).toHaveBeenCalledWith("/login");
   });
+
+  it("clears all dg_* session/local state but preserves device-level keys (A1)", async () => {
+    sessionStorage.setItem("dg_user_view", "1");
+    sessionStorage.setItem("dg_user_name", "Nic");
+    sessionStorage.setItem("dg_onboarding_done:u:o", "1");
+    sessionStorage.setItem("dg_onboarding_phase:u:o", "config");
+    sessionStorage.setItem("dg_auth_transition", "1");
+    localStorage.setItem("dg_onboarding:u:o", "2");
+    // Device-level prefs (hyphen prefix / non-dg keys) must survive logout.
+    localStorage.setItem("dg-sidebar-manual-collapse", "1");
+    localStorage.setItem("dubgrid-cookie-consent", "x");
+
+    const { result } = renderHook(() => useLogout());
+    await act(async () => {
+      await result.current.signOutLocal("/login");
+    });
+
+    for (const k of [
+      "dg_user_view",
+      "dg_user_name",
+      "dg_onboarding_done:u:o",
+      "dg_onboarding_phase:u:o",
+      "dg_auth_transition",
+    ]) {
+      expect(sessionStorage.getItem(k)).toBeNull();
+    }
+    expect(localStorage.getItem("dg_onboarding:u:o")).toBeNull();
+    // Preserved:
+    expect(localStorage.getItem("dg-sidebar-manual-collapse")).toBe("1");
+    expect(localStorage.getItem("dubgrid-cookie-consent")).toBe("x");
+  });
 });

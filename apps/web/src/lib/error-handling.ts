@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { toast } from "sonner";
 import { signOutFromBrowser } from "@/features/account/client";
 import { extractRawErrorMessage, formatClientErrorMessage } from "@/lib/client-facing";
+import { isLoggingOut } from "@/lib/logout-state";
 
 /**
  * Build a sanitized JSON error response for an API route handler.
@@ -33,6 +34,11 @@ export function extractErrorMessage(err: unknown, fallback: string): string {
  * @param action  Optional verb phrase describing what failed (e.g. "delete shift", "save profile")
  */
 export async function handleApiError(error: unknown, action?: string) {
+    // During logout the cache is cleared and the session torn down while the app
+    // is still mounted, so in-flight queries fail with 401/expired. Stay silent —
+    // signOutLocal already owns the redirect; a toast here would just flash.
+    if (isLoggingOut()) return;
+
     const rawMessage = extractRawErrorMessage(error) ?? "";
     const message = formatClientErrorMessage(error, "");
 

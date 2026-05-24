@@ -85,8 +85,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         }
 
         const sessionPromise = getBrowserAuthSession();
+        // 12s, not 5s: a genuine token refresh on a slow network can legitimately
+        // take several seconds. 5s lost that race and silently logged the user
+        // out; 12s still escapes a truly hung getSession (stale remote↔local
+        // cookies) without nuking a session that was merely slow.
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("session_timeout")), 5000),
+          setTimeout(() => reject(new Error("session_timeout")), 12000),
         );
         const initialSession = await Promise.race([sessionPromise, timeoutPromise]);
 
@@ -103,9 +107,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
           trackSession().catch(() => {});
         }
       } catch (error) {
-        // Timeout or stale auth state — clear persisted browser auth so the app
-        // can recover cleanly on the next login attempt without noisy refresh-token errors.
-        if (isRecoverableBrowserAuthFailure(error) || (error instanceof Error && error.message === "session_timeout")) {
+        // Only WIPE persisted auth for a known-recoverable failure (stale/invalid
+        // refresh token), where clearing is the recovery. On a bare timeout the
+        // tokens may still be valid (just slow) — don't wipe them, or we'd convert
+        // a slow network into a forced logout; just drop the in-memory session so
+        // the next mount re-checks and can recover.
+        if (isRecoverableBrowserAuthFailure(error)) {
           clearBrowserAuthState();
         }
         setSession(null);

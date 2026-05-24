@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
+import { setUserViewActive } from "@/hooks";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -314,12 +315,20 @@ function GridmasterLogin() {
     }
   }
 
-  function handleMFAVerified() {
-    // After MFA verification, refresh session and navigate
-    refreshBrowserSession().then(() => {
+  async function handleMFAVerified() {
+    // After MFA verification, refresh session and navigate. Must handle a
+    // refresh failure (network/token hiccup) — otherwise the MFA screen hangs
+    // forever with an unhandled rejection. Mirrors the org-login path. (H-3)
+    try {
+      await refreshBrowserSession();
       markAuthTransition();
       router.replace("/dashboard");
-    });
+    } catch {
+      toast.error("Your session could not be verified. Please sign in again.");
+      void signOutFromBrowser("local");
+      setMfaRequired(false);
+      setLoading(false);
+    }
   }
 
   function handleMFACancel() {
@@ -405,6 +414,19 @@ function GridmasterLogin() {
 
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const router = useRouter();
+
+  // Same-org login → soft nav (smooth, no reload). After an ORG SWITCH → hard
+  // nav: a soft nav leaves useOrganizationData's one-time org context pinned to
+  // the previous org, which destabilizes the onboarding gate (the orientation
+  // wizard flickers/shows twice or is skipped). A full reload resets every
+  // org-context source to the switched org.
+  function navigateToDashboard(didSwitchOrg: boolean) {
+    if (didSwitchOrg) {
+      window.location.replace("/dashboard");
+    } else {
+      router.replace("/dashboard");
+    }
+  }
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -488,6 +510,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
       const claims = decodeJwt(result.session.access_token);
       const isGridmaster = claims.platform_role === "gridmaster";
+      let didSwitchOrg = false;
 
       if (!isGridmaster) {
         const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
@@ -514,6 +537,10 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               await switchBrowserOrganization(targetOrg.org_id);
               await refreshBrowserSession();
               signedInOrgId = targetOrg.org_id;
+              didSwitchOrg = true;
+              // Don't carry a prior session's "view as user" toggle into the
+              // org we just switched into (it would silently force read-only).
+              setUserViewActive(false);
             } catch {
               await signOutFromBrowser("local");
               toast.error("Failed to switch organization. Please try again.");
@@ -539,11 +566,8 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         }
       }
 
-      // Soft client navigation — keeps the SPA alive (no full-page reload).
-      // markAuthTransition() keeps ProtectedRoute from bouncing to /login
-      // while the auth context finishes settling after sign-in.
       markAuthTransition();
-      router.replace("/dashboard");
+      navigateToDashboard(didSwitchOrg);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
@@ -568,6 +592,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
         const claims = decodeJwt(session.access_token);
         const isGridmaster = claims.platform_role === "gridmaster";
+        let didSwitchOrg = false;
 
         if (!isGridmaster) {
           const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
@@ -587,6 +612,10 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 await switchBrowserOrganization(targetOrg.org_id);
                 await refreshBrowserSession();
                 signedInOrgId = targetOrg.org_id;
+                didSwitchOrg = true;
+                // Don't carry a prior session's "view as user" toggle into the
+                // org we just switched into (it would silently force read-only).
+                setUserViewActive(false);
               } catch {
                 await signOutFromBrowser("local");
                 toast.error("Failed to switch organization.");
@@ -612,7 +641,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         }
 
         markAuthTransition();
-        router.replace("/dashboard");
+        navigateToDashboard(didSwitchOrg);
       } catch {
         toast.error("Unable to complete sign in. Please try again.");
         setMfaRequired(false);
