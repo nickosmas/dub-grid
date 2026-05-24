@@ -50,7 +50,7 @@ const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
   ssr: false,
 });
 
-import { AnimatedDubGridLogo } from "@/components/Logo";
+import { ScheduleLoadingScreen } from "./ScheduleLoadingScreen";
 import {
   addDays,
   formatDate,
@@ -5245,21 +5245,7 @@ function SchedulerContent() {
   const isLoading = orgLoading || empLoading || scheduleLoading;
 
   if (orgLoading || (scheduleLoading && !org)) {
-    return (
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--color-bg)",
-          zIndex: 50,
-        }}
-      >
-        <AnimatedDubGridLogo size={160} />
-      </div>
-    );
+    return <ScheduleLoadingScreen />;
   }
   if (loadError && !org) {
     return (
@@ -5392,21 +5378,7 @@ function SchedulerContent() {
         color: "var(--color-text-primary)",
       }}
     >
-      {isLoading && employees.length > 0 && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "var(--color-bg)",
-            zIndex: 50,
-          }}
-        >
-          <AnimatedDubGridLogo size={160} />
-        </div>
-      )}
+      {isLoading && employees.length > 0 && <ScheduleLoadingScreen />}
 
       {!isLoading && (
         <>
