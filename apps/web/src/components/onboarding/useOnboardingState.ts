@@ -2,7 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { completeOnboarding as completeOnboardingRequest } from "@/features/onboarding/client";
+import {
+  completeOnboarding as completeOnboardingRequest,
+  markOnboardingComplete,
+  clearOnboardingPhase,
+} from "@/features/onboarding/client";
 
 export interface StepConfig {
   id: string;
@@ -57,10 +61,12 @@ export function useOnboardingState(
     setCurrentStepIndex(safeStepIndex);
   }
 
-  // Persist step to localStorage
+  // Persist the CLAMPED step (L-4) — persisting the raw currentStepIndex could
+  // store an out-of-range value when the steps array shrinks, so a reload in
+  // that window re-reads a stale index before the realign lands.
   useEffect(() => {
-    localStorage.setItem(key, String(currentStepIndex));
-  }, [currentStepIndex, key]);
+    localStorage.setItem(key, String(safeStepIndex));
+  }, [safeStepIndex, key]);
 
   const goNext = useCallback(() => {
     setCurrentStepIndex((i) => Math.min(i + 1, steps.length - 1));
@@ -86,6 +92,10 @@ export function useOnboardingState(
       ["onboarding-status", userId, orgId],
       { completed: true, completedAt: new Date().toISOString(), tooltipToursCompleted: {} },
     );
+    // Session guard: survives remounts/refetches so no wizard re-appears after
+    // completion this session (e.g. the config→orientation double-show).
+    markOnboardingComplete(userId, orgId);
+    clearOnboardingPhase(userId, orgId);
   }, [userId, orgId, key, queryClient]);
 
   return {

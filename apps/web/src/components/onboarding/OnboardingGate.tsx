@@ -7,7 +7,14 @@ import { useAuth } from "@/components/AuthProvider";
 import { useOrganizationData, usePermissions } from "@/hooks";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import { useBillingRealtimeInvalidation } from "@/features/billing/useBillingRealtimeInvalidation";
-import { fetchOnboardingStatus } from "@/features/onboarding/client";
+import {
+  fetchOnboardingStatus,
+  isOnboardingComplete,
+  getOnboardingPhase,
+  freezeOnboardingPhase,
+} from "@/features/onboarding/client";
+import AuthSplash from "@/components/AuthSplash";
+import { isAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 import { queryKeys } from "@/lib/query-keys";
 
 /** Routes where the onboarding gate should never intercept. */
@@ -52,7 +59,14 @@ export default function OnboardingGate({
 
   // Pass through for: loading, unauthenticated, public routes,
   // gridmaster, no org, impersonating
-  if (authLoading || perms.isLoading) return <>{children}</>;
+  if (authLoading || perms.isLoading) {
+    // During the post-login transition, hold the branded splash instead of
+    // flashing the app/blank while perms resolve and the onboarding decision is
+    // made (this route bypasses ProtectedRoute's splash). Normal in-app nav has
+    // perms cached, so this branch isn't hit and nothing changes there.
+    if (isAuthTransitionPending() && !isPublicRoute(pathname)) return <AuthSplash />;
+    return <>{children}</>;
+  }
   if (!user) return <>{children}</>;
   if (isPublicRoute(pathname)) return <>{children}</>;
   if (perms.isGridmaster) return <>{children}</>;
@@ -129,12 +143,38 @@ function OnboardingCheck({
     staleTime: 30_000,
   });
 
-  const { setupStatus, loading: orgLoading } = useOrganizationData({
+  const { org, setupStatus, loading: orgLoading } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
     enabled: shouldCheckOrganization && billing?.billingAccess.isLocked !== true,
   });
 
-  if (billingLoading) return null;
+  // Consume the post-login auth-transition flag once we've reached a settled
+  // state (onboarding already complete, or a final wizard/app decision). Done in
+  // an effect, NOT during render, so a discarded concurrent/strict-mode render
+  // can't clear the splash flag before the navigation that needs it. (M-5)
+  const onboardingComplete = isOnboardingComplete(userId, orgId);
+  const reachedFinalDecision =
+    onboardingComplete ||
+    (!billingLoading &&
+      billing?.billingAccess.isLocked !== true &&
+      !statusLoading &&
+      !orgLoading);
+  useEffect(() => {
+    if (reachedFinalDecision) consumeAuthTransition();
+  }, [reachedFinalDecision]);
+
+  // Onboarding was completed in this session — never re-mount a wizard, even if
+  // a refetch momentarily reads onboarding-status as not-completed. Closes the
+  // config→orientation double-show race. (Server onboarding_completed_at remains
+  // the cross-session source of truth for the queries above.)
+  if (onboardingComplete) {
+    return <>{children}</>;
+  }
+
+  // Render the branded splash (not a blank frame) while these gate queries
+  // resolve — this route bypasses ProtectedRoute's splash, so without it the
+  // post-login screen flashes blank before the wizard mounts.
+  if (billingLoading) return <AuthSplash />;
 
   if (billing?.billingAccess.isLocked) {
     if (isBillingRecoveryRoute(pathname, section)) {
@@ -143,21 +183,42 @@ function OnboardingCheck({
     return <BillingRedirect />;
   }
 
-  if (statusLoading || orgLoading) return null;
+  if (statusLoading || orgLoading) return <AuthSplash />;
+
+  // (auth-transition flag is consumed by the effect above once settled — M-5)
 
   // Adding employees is a post-wizard task on the People page, so it doesn't
   // gate org setup completion. setupStatus.isComplete is the configuration
   // contract (focus areas + schedule definitions + certifications + roles).
-  const isOrgSetupComplete = setupStatus.isComplete;
+  const liveSetupComplete = setupStatus.isComplete;
   // Only roles that can actually advance org config get the setup wizard.
   // canManageOrg covers gridmaster (filtered earlier) + super_admin + any
   // manage-* perm. Admins without a manage-* perm have nothing to do in the
-  // config wizard — they'd loop on the ADMIN_STEPS orientation since
-  // completing it doesn't flip isOrgSetupComplete — so they wait alongside
-  // regular users until super_admin finishes.
+  // config wizard, so they wait (SetupPendingScreen) until a super_admin
+  // finishes, then get the orientation.
   const canCompleteSetup = canManageOrg;
 
-  if (!isOrgSetupComplete) {
+  // Pick the wizard variant once and freeze it for the session. A super_admin
+  // completes org setup *inside* the config wizard, flipping liveSetupComplete
+  // to true mid-flow; without the freeze that swaps the config wizard out for
+  // the orientation wizard (the "two wizards in a row" bug).
+  //
+  // Only freeze when the bootstrap is reliably for THIS org (org.id === orgId).
+  // On a login that switches orgs, useOrganizationData briefly resolves a
+  // different org, so freezing then could latch the wrong phase. When it's not
+  // yet reliable we fall back to live status (no freeze) — which self-corrects
+  // on the next render and never sticks wrong, instead of stalling on a splash.
+  // Non-managers also stay on live status so pending-screen → orientation works.
+  const orgDataReliable = Boolean(org) && org?.id === orgId;
+  let phase = getOnboardingPhase(userId, orgId);
+  if (!phase) {
+    phase = liveSetupComplete ? "orientation" : "config";
+    if (canCompleteSetup && orgDataReliable) {
+      freezeOnboardingPhase(userId, orgId, phase);
+    }
+  }
+
+  if (phase === "config") {
     if (!canCompleteSetup) {
       return <SetupPendingScreen />;
     }
@@ -165,24 +226,14 @@ function OnboardingCheck({
     // (commit d7e7b96). Render the wizard inline so users with incomplete
     // org setup see it on whatever route they landed on after login.
     return (
-      <OnboardingWizard
-        role={role}
-        orgId={orgId}
-        userId={userId}
-        isOrgSetup={isOrgSetupComplete}
-      />
+      <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={false} />
     );
   }
 
+  // orientation
   if (onboardingStatus?.completed) return <>{children}</>;
 
-  // Show onboarding wizard
   return (
-    <OnboardingWizard
-      role={role}
-      orgId={orgId}
-      userId={userId}
-      isOrgSetup={isOrgSetupComplete}
-    />
+    <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={true} />
   );
 }
