@@ -61,7 +61,7 @@ export default defineConfig(async () => {
         // that vitest can't resolve/run in jsdom. Shim them to test stubs (same
         // approach as the react-native shim above). expo-notifications is
         // type-only in src, so it needs no runtime shim.
-        ...["haptics", "constants", "secure-store", "network", "tracking-transparency"].map(
+        ...["haptics", "constants", "secure-store", "network", "tracking-transparency", "font", "asset"].map(
           (m) => ({
             find: new RegExp(`^expo-${m}$`),
             replacement: path.resolve(__dirname, `./src/test/shims/expo-${m}.ts`),
