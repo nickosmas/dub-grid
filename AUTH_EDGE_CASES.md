@@ -1,13 +1,20 @@
 # Auth Errors & Edge Cases — DubGrid
 
-**Date:** 2026-05-24
-**Scope:** The authentication surface — login (org/gridmaster/domain-selector),
+**Date:** 2026-05-24 (findings) · re-verified 2026-05-25
+**Scope:** The authentication surface — login (org/gridmaster/subdomain-selector),
 logout, session lifecycle (`AuthProvider`, `RouteGuards`, token refresh),
 org-switch, post-login gating (onboarding/trial/billing), MFA, impersonation,
 sandbox, invitations, password reset, rate limiting, CSRF.
 **Method:** Three parallel read-only sweeps, then every reported item re-checked
 by hand against current source. Speculative leads that did not hold are recorded
 in **Checked — not a finding** so the verification is auditable.
+
+**How to read this doc.** It is a point-in-time findings log, not a living spec:
+the **Fixed this pass** rows are the fixes shipped 2026-05-24, **Already fixed**
+confirms earlier items, and **Checked — not a finding** records disproven leads
+with their source reference. For the steady-state auth model see
+`docs/authentication.md`; for RBAC see `RBAC_SYSTEM_DESIGN.md`. All rows below were
+re-confirmed against current source on 2026-05-25.
 
 > Companion to `SECURITY_AUDIT.md` (2026-05-21, F-1..F-7) and `POTENTIAL_BUGS.md`
 > (2026-05-23, C/H/M/L). This doc does not restate their findings; it covers the

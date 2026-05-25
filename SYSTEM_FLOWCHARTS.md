@@ -10,130 +10,374 @@
 sequenceDiagram
     actor User
     participant Browser
-    participant LoginPage as Login Page
+    participant OrgLoginPage as OrgLogin Component
+    participant APILogin as POST /api/auth/login
     participant SupaAuth as Supabase Auth
     participant JWTHook as custom_access_token_hook
     participant DB as PostgreSQL
+    participant TrialAPI as POST /api/auth/start-trial
     participant Middleware as Edge Middleware
 
-    Note over User,Middleware: === ORG LOGIN (e.g., calmhaven.localhost/login) ===
+    Note over User,Middleware: === ORG LOGIN (e.g., calmhaven.dubgrid.com/login) ===
 
-    User->>Browser: Navigate to org.localhost/login
-    Browser->>LoginPage: Render DomainSelector (if no subdomain)
-    User->>LoginPage: Enter org slug (e.g., "calmhaven")
-    LoginPage->>LoginPage: GET /api/validate-domain?slug=calmhaven
-    LoginPage-->>Browser: Redirect to calmhaven.localhost/login?verified=1
-
-    User->>LoginPage: Enter email + password
-    LoginPage->>SupaAuth: signInWithPassword({ email, password })
-    SupaAuth->>SupaAuth: Validate credentials vs auth.users
-
-    Note over SupaAuth,JWTHook: Auth hook fires on every token issuance
-
-    SupaAuth->>JWTHook: event { user_id, claims }
-    JWTHook->>DB: Check jwt_refresh_locks for active lock
-    alt Lock exists (role change in progress)
-        Note over JWTHook: Hook does NOT return HTTP 403 — it issues a<br/>minimal/stripped JWT (no platform_role/org_role/<br/>org_id claims) so the stale role can't be used.
-        JWTHook-->>SupaAuth: Stripped JWT payload (claims omitted)
-        SupaAuth-->>LoginPage: Session with minimal claims
-        LoginPage->>LoginPage: Missing claims → treat as stale,<br/>refreshSession() once lock expires
+    User->>Browser: Navigate to calmhaven.dubgrid.com/login
+    User->>OrgLoginPage: Enter email + password
+    OrgLoginPage->>APILogin: POST /api/auth/login (rate-limited)
+    APILogin->>SupaAuth: signInWithPassword(email, password)
+    SupaAuth->>JWTHook: Fire custom_access_token_hook on token mint
+    JWTHook->>DB: DELETE expired jwt_refresh_locks, check active lock
+    alt Active lock (role change in progress)
+        JWTHook-->>SupaAuth: HTTP 403 response, token issuance blocked
+        SupaAuth-->>APILogin: Error
+        APILogin-->>OrgLoginPage: Error response
     else No lock
-        JWTHook->>DB: SELECT platform_role, org_role, org_id, org_slug<br/>FROM profiles JOIN organization_memberships JOIN organizations
-        DB-->>JWTHook: { platform_role, org_role, org_id, org_slug }
-        JWTHook->>JWTHook: Inject claims at JWT top level
+        JWTHook->>DB: INSERT user_sessions row (supabase_session_id, active_org_id) ON CONFLICT DO NOTHING
+        JWTHook->>DB: Resolve via profiles JOIN user_sessions(active_org_id) JOIN organization_memberships JOIN organizations (filters archived + suspended orgs)
+        DB-->>JWTHook: platform_role, org_role, org_id, org_slug
+        JWTHook->>JWTHook: Inject claims at JWT top level (not in app_metadata)
         JWTHook-->>SupaAuth: Modified JWT payload
     end
+    SupaAuth-->>APILogin: Session tokens
+    APILogin-->>OrgLoginPage: session, user, mfa_required
 
-    SupaAuth-->>LoginPage: Session { access_token, refresh_token }
-    LoginPage->>LoginPage: Decode JWT — check org_slug vs URL subdomain
+    OrgLoginPage->>Browser: setBrowserSession(access_token, refresh_token)
 
-    alt org_slug matches subdomain
-        LoginPage-->>Browser: Redirect to /dashboard
-    else org_slug mismatch (user belongs to different org)
-        LoginPage->>SupaAuth: RPC get_my_organizations()
-        SupaAuth-->>LoginPage: List of user's org memberships
-        LoginPage->>SupaAuth: RPC switch_org(target_org_id)
-        SupaAuth->>DB: UPDATE profiles SET org_id = target_org_id
-        LoginPage->>SupaAuth: refreshSession()
-        SupaAuth->>JWTHook: Re-issue token with new org context
-        JWTHook-->>SupaAuth: Fresh JWT with correct org claims
-        SupaAuth-->>LoginPage: New session
-        LoginPage-->>Browser: Redirect to /dashboard
+    alt MFA required
+        OrgLoginPage-->>User: Show MFA verify form
+        User->>OrgLoginPage: Enter TOTP code
+        OrgLoginPage->>SupaAuth: verifyTOTP
+        SupaAuth-->>OrgLoginPage: Verified
+        OrgLoginPage->>SupaAuth: refreshBrowserSession
     end
+
+    OrgLoginPage->>OrgLoginPage: decodeJwt(access_token) to read org_slug
+    alt org_slug matches subdomain
+        Note over OrgLoginPage: No switch needed
+    else org_slug mismatch
+        OrgLoginPage->>DB: GET /api/auth/organizations (get_my_organizations RPC)
+        DB-->>OrgLoginPage: User org memberships (archived orgs excluded)
+        OrgLoginPage->>DB: POST /api/auth/organizations (switch_org RPC for target org)
+        OrgLoginPage->>SupaAuth: refreshBrowserSession to pick up new org in JWT
+        Note over OrgLoginPage: didSwitchOrg = true, use window.location.replace for hard nav
+    end
+
+    Note over OrgLoginPage: Trial activation (idempotent, non-blocking)
+    OrgLoginPage->>TrialAPI: POST /api/auth/start-trial with orgId
+    TrialAPI->>DB: RPC start_trial_for_org(p_org_id) - self-gated to super_admin, only if trial_ends_at IS NULL
+    DB-->>TrialAPI: Void (no-op if not super_admin or already started)
+
+    OrgLoginPage->>Browser: markAuthTransition() then router.replace("/dashboard") or window.location.replace for org switch
 
     Note over Browser,Middleware: === AUTHENTICATED REQUEST ===
 
-    Browser->>Middleware: GET /dashboard (with cookies)
-    Middleware->>Middleware: Extract session from sb-*-auth-token cookies
-    Middleware->>Middleware: jwtVerify(access_token, JWKS)
-    Middleware->>Middleware: Extract claims { platform_role, org_role, org_id, org_slug }
-    Middleware->>Middleware: Calculate effective role + check route guards
-    Middleware->>Middleware: Inject x-dubgrid-role, x-dubgrid-org-id headers
-    Middleware-->>Browser: NextResponse.next() — render page
+    Browser->>Middleware: GET /dashboard (with sb-*-auth-token cookies)
+    Middleware->>SupaAuth: createServerClient.getSession() reads + reconstructs multi-chunk cookie
+    alt No session
+        Middleware-->>Browser: Redirect to /login
+    else Session exists
+        Middleware->>Middleware: jwtVerify(access_token, JWKS) - ES256
+        alt jwtVerify fails
+            Middleware->>Middleware: decodeJwt fallback (unverified)
+            alt Claims show platform_role = gridmaster
+                Middleware-->>Browser: Redirect to /login?error=session_invalid
+            end
+        end
+        Middleware->>Middleware: Check claims completeness + subdomain match
+        alt Claims incomplete or subdomain mismatch
+            Middleware->>DB: Fallback: query profiles + organization_memberships via Redis-cached cacheThrough (30s TTL)
+        end
+        Middleware->>Middleware: calculateEffectiveRole (gridmaster > org_role)
+        Middleware->>DB: cacheThrough: org archived_at, suspended_at, subscription_status, trial_ends_at (30s TTL)
+        alt org archived
+            Middleware-->>Browser: Redirect to /login?deleted=true
+        else org suspended
+            Middleware-->>Browser: Redirect to /login?suspended=true
+        else billing locked + super_admin
+            Middleware-->>Browser: Redirect to /settings?section=org-billing
+        else billing locked + non-super_admin
+            Middleware-->>Browser: Redirect to /billing-required
+        else trial_pending + non-super_admin
+            Middleware-->>Browser: Redirect to /billing-required
+        else route guard fails
+            Middleware-->>Browser: Redirect to /schedule
+        else
+            Middleware->>Middleware: Inject x-dubgrid-role, x-dubgrid-org-id, x-dubgrid-org-slug headers
+            Middleware-->>Browser: NextResponse.next()
+        end
+    end
 
-    Note over User,Middleware: === GRIDMASTER LOGIN (separate flow) ===
+    Note over User,Middleware: === GRIDMASTER LOGIN (gridmaster.dubgrid.com/login) ===
 
-    User->>LoginPage: Navigate to /gridmaster/login
-    User->>LoginPage: Enter gridmaster credentials
-    LoginPage->>SupaAuth: signInWithPassword()
-    SupaAuth->>JWTHook: Issue token
-    JWTHook->>DB: Resolve — platform_role = 'gridmaster', no org context
-    JWTHook-->>SupaAuth: JWT { platform_role: "gridmaster", org_role: null, org_id: null }
-    SupaAuth-->>LoginPage: Session
-    LoginPage-->>Browser: Redirect to /gridmaster
+    User->>Browser: Navigate to gridmaster.dubgrid.com/login
+    User->>Browser: Enter gridmaster credentials
+    Browser->>SupaAuth: signInWithPassword()
+    SupaAuth->>JWTHook: Fire hook
+    JWTHook->>DB: Resolve - platform_role = gridmaster, no org context (org_id null)
+    JWTHook-->>SupaAuth: JWT with platform_role=gridmaster, no org claims
+    SupaAuth-->>Browser: Session
+    Browser->>SupaAuth: refreshBrowserSession
+    Browser->>Browser: markAuthTransition, router.replace("/dashboard")
 ```
 
 ---
 
-## 2. RBAC Hierarchy & Permission Model
+## 2. Post-Login Navigation and Logout
+
+```mermaid
+flowchart TD
+    subgraph Login["Login Success Path"]
+        L1["signInWithPassword succeeds"]
+        L2["setBrowserSession tokens in browser"]
+        L3{"MFA required?"}
+        L4["Show MFA form, verifyTOTP, refreshBrowserSession"]
+        L5{"org_slug matches subdomain?"}
+        L6["switch_org RPC + refreshBrowserSession\ndidSwitchOrg = true"]
+        L7["start_trial_for_org call (non-blocking, best-effort)"]
+        L8["markAuthTransition()\nsessionStorage dg_auth_transition=1"]
+        L9A["router.replace('/dashboard')\nsoft nav: SPA stays alive"]
+        L9B["window.location.replace('/dashboard')\nhard nav after org switch: resets all org context"]
+    end
+
+    subgraph Bridge["Auth-Settle Bridge"]
+        PR["ProtectedRoute checks auth"]
+        OG["OnboardingGate checks auth + perms"]
+        AS{"isAuthTransitionPending?"}
+        SPLASH["Render AuthSplash\n(branded loading screen)"]
+        SETTLED["consumeAuthTransition()\nclear sessionStorage flag"]
+        CHILDREN["Render children"]
+    end
+
+    subgraph Logout["Logout Path (signOutLocal)"]
+        LO1["beginLogout(): silence error toasts"]
+        LO2["queryClient.clear()"]
+        LO3["clearPermsCache()"]
+        LO4["clearImpersonationCookie()"]
+        LO5["clearRealtimeChannels() (untrack + remove)"]
+        LO6["signOutFromBrowser('local')"]
+        LO7["clearDubgridSessionState() (all dg_* keys from session + local storage)"]
+        LO8["finally: window.location.replace('/login')\nAlways runs, user never stranded"]
+    end
+
+    L1 --> L2 --> L3
+    L3 -->|Yes| L4 --> L5
+    L3 -->|No| L5
+    L5 -->|Yes| L7
+    L5 -->|No| L6 --> L7
+    L7 --> L8
+    L8 --> L9A
+    L8 --> L9B
+
+    L9A --> PR
+    L9B --> PR
+    PR --> OG
+    OG --> AS
+    AS -->|Yes| SPLASH
+    AS -->|No| CHILDREN
+    SPLASH -->|auth settles, user confirmed| SETTLED --> CHILDREN
+
+    LO1 --> LO2 --> LO3 --> LO4 --> LO5 --> LO6 --> LO7 --> LO8
+
+    style Login fill:#dbeafe,stroke:#2563eb
+    style Bridge fill:#fef3c7,stroke:#d97706
+    style Logout fill:#fce7f3,stroke:#db2777
+    style SPLASH fill:#bfdbfe,stroke:#2563eb
+    style LO8 fill:#dcfce7,stroke:#16a34a
+```
+
+---
+
+## 3. JWT Custom Access Token Hook
+
+```mermaid
+flowchart TD
+    TRIGGER["Supabase fires hook on every token mint\n(sign-in, refresh, impersonation)"]
+
+    subgraph Hook["custom_access_token_hook (SECURITY DEFINER, owned by postgres)"]
+        GETUID["Extract user_id from event"]
+        CLEAN["DELETE expired jwt_refresh_locks WHERE user_id = uid"]
+        LOCKCHECK{"Active lock?\nlocked_until > NOW()"}
+        RETURN403["Return HTTP 403\n(token issuance blocked)"]
+
+        SESS["Extract session_id from event claims"]
+        UPSERT["INSERT user_sessions (user_id, supabase_session_id, active_org_id)\nON CONFLICT DO NOTHING\n(freezes active_org_id at profiles.org_id for new sessions)"]
+
+        RESOLVE["Single-query resolve via:\nprofiles\nCROSS JOIN LATERAL: COALESCE(user_sessions.active_org_id, profiles.org_id)\nLEFT JOIN organization_memberships (archived_at IS NULL)\nLEFT JOIN organizations (archived_at IS NULL, suspended_at IS NULL)\nWHERE profiles.deactivated_at IS NULL"]
+
+        FOUND{"Row found?"}
+        SETCLAIMS["Set platform_role at top level of JWT payload"]
+        FULLORG{"org_id + org_role\n+ org_slug all present?"}
+        SETFULL["Set org_role, org_id, org_slug, org_name\nat JWT top level"]
+        STRIPORG["Strip org_role='user'\nRemove org_id, org_slug, org_name\n(prevents stale claims from prior token)"]
+        DEBOUNCE["UPDATE profiles.last_sign_in_at\n(debounced: skip if within 5 minutes)"]
+        NOTFOUND["Set platform_role='none', org_role='user'\nRemove all org claims"]
+        RETURN["Return modified claims payload"]
+    end
+
+    NOTE["Note: Trial activation is NOT done here.\nThe hook fires on every refresh and cannot\ntarget the right org before client-side reconciliation.\nTrials start via start_trial_for_org RPC from the login flow."]
+
+    TRIGGER --> GETUID --> CLEAN --> LOCKCHECK
+    LOCKCHECK -->|Yes| RETURN403
+    LOCKCHECK -->|No| SESS
+    SESS --> UPSERT
+    UPSERT --> RESOLVE --> FOUND
+    FOUND -->|Yes| SETCLAIMS --> FULLORG
+    FULLORG -->|Yes| SETFULL --> DEBOUNCE --> RETURN
+    FULLORG -->|No| STRIPORG --> DEBOUNCE --> RETURN
+    FOUND -->|No| NOTFOUND --> RETURN
+    NOTE -.-> DEBOUNCE
+
+    style Hook fill:#dcfce7,stroke:#16a34a
+    style RETURN403 fill:#fee2e2,stroke:#dc2626
+    style NOTE fill:#f5f3ff,stroke:#7c3aed
+```
+
+---
+
+## 4. Per-Session Org Isolation and switch_org
+
+```mermaid
+sequenceDiagram
+    participant DeviceA as Device A (Session 1)
+    participant DeviceB as Device B (Session 2)
+    participant Hook as custom_access_token_hook
+    participant DB as user_sessions table
+    participant Profiles as profiles.org_id
+
+    Note over DeviceA,Profiles: Initial state: both devices on Org A
+
+    DeviceA->>DB: user_sessions row: supabase_session_id=S1, active_org_id=Org A
+    DeviceB->>DB: user_sessions row: supabase_session_id=S2, active_org_id=Org A
+
+    Note over DeviceA: Device A switches to Org B
+
+    DeviceA->>DB: RPC switch_org(Org B)\nUPSERT user_sessions SET active_org_id=Org B WHERE supabase_session_id=S1
+    DeviceA->>Profiles: UPDATE profiles SET org_id=Org B (default for future new sessions)
+    DeviceA->>Hook: refreshSession() triggers hook with session_id=S1
+    Hook->>DB: Resolve active_org_id via user_sessions WHERE supabase_session_id=S1
+    DB-->>Hook: active_org_id = Org B
+    Hook-->>DeviceA: JWT with org_id=Org B, org_slug=org-b
+
+    Note over DeviceB: Device B is unaffected
+
+    DeviceB->>Hook: Next token refresh (supabase_session_id=S2)
+    Hook->>DB: Resolve active_org_id WHERE supabase_session_id=S2
+    DB-->>Hook: active_org_id = Org A (unchanged)
+    Hook-->>DeviceB: JWT still has org_id=Org A
+
+    Note over DeviceA,DeviceB: Per-session isolation: each device keeps its own org context
+    Note over DeviceA,DeviceB: switch_org does NOT start a trial (only genuine login flow does)
+    Note over DeviceA,DeviceB: switch_org rejects archived or suspended target orgs
+```
+
+---
+
+## 5. Trial Activation
+
+```mermaid
+flowchart TD
+    subgraph Login["Org Login Flow (OrgLogin component)"]
+        SIGNIN["signInWithPassword succeeds"]
+        DECODE["Decode JWT: read org_slug, org_id"]
+        SWITCHCHECK{"org_slug matches\nsubdomain?"}
+        SWITCHORG["switch_org + refreshBrowserSession\nsignedInOrgId = switched org"]
+        TRIALCALL["POST /api/auth/start-trial with orgId\nbest-effort, non-blocking try/catch"]
+    end
+
+    subgraph TrialRoute["POST /api/auth/start-trial"]
+        AUTH["Verify caller session"]
+        RPC["RPC start_trial_for_org(p_org_id)"]
+    end
+
+    subgraph TrialRPC["start_trial_for_org RPC (SECURITY DEFINER)"]
+        GATE{"caller org_role = super_admin\nfor p_org_id?"}
+        TRIALING{"subscription_status = trialing\nAND trial_ends_at IS NULL\nAND org not archived/suspended?"}
+        UPDATE["UPDATE organizations\nSET trial_started_at = NOW()\ntrial_ends_at = NOW() + 14 days"]
+        NOOP["No-op (idempotent)\nalready started or not super_admin"]
+    end
+
+    subgraph BillingState["Resulting Billing Access States"]
+        S1["trial_pending: trialing status, trial_ends_at IS NULL\nNon-super-admins gated at middleware"]
+        S2["trialing: active trial, more than 7 days left"]
+        S3["trial_ending_soon: trialing, 7 days or fewer left"]
+        S4["trial_grace: expired, within 3-day grace period"]
+        S5["locked: expired past grace period, or canceled/unpaid/incomplete_expired"]
+        S6["active: paid subscription active"]
+    end
+
+    SIGNIN --> DECODE --> SWITCHCHECK
+    SWITCHCHECK -->|No match| SWITCHORG --> TRIALCALL
+    SWITCHCHECK -->|Match| TRIALCALL
+    TRIALCALL --> AUTH --> RPC
+    RPC --> GATE
+    GATE -->|Not super_admin| NOOP
+    GATE -->|Is super_admin| TRIALING
+    TRIALING -->|No| NOOP
+    TRIALING -->|Yes| UPDATE
+    UPDATE --> S2
+    NOOP --> S1
+
+    S1 --> S2 --> S3 --> S4 --> S5
+    S6 -.->|separate path via Stripe| S5
+
+    style Login fill:#dbeafe,stroke:#2563eb
+    style TrialRoute fill:#fef3c7,stroke:#d97706
+    style TrialRPC fill:#f5f3ff,stroke:#7c3aed
+    style BillingState fill:#f0fdf4,stroke:#16a34a
+    style S5 fill:#fee2e2,stroke:#dc2626
+    style S6 fill:#bbf7d0,stroke:#16a34a
+```
+
+---
+
+## 6. RBAC Hierarchy and Permission Model
 
 ```mermaid
 flowchart TB
     subgraph PlatformLevel["Platform Level (platform_role)"]
-        GM["<b>GRIDMASTER</b><br/>Tier 4 — God Mode<br/>━━━━━━━━━━━━━━<br/>All orgs, all data<br/>Bypasses all RLS<br/>Impersonation<br/>No org_id (null)"]
+        GM["GRIDMASTER\nTier 4 - God Mode\nAll orgs, all data\nBypasses all RLS\nImpersonation\nNo org_id (null)"]
     end
 
     subgraph OrgLevel["Organization Level (org_role)"]
-        SA["<b>SUPER_ADMIN</b><br/>Tier 3 — Org Owner<br/>━━━━━━━━━━━━━━<br/>All org permissions<br/>canManageUsers<br/>canConfigureAdminPermissions<br/>canManageOrgSettings"]
+        SA["SUPER_ADMIN\nTier 3 - Org Owner\nAll org permissions\ncanManageUsers\ncanConfigureAdminPermissions\ncanManageOrgSettings"]
 
-        AD["<b>ADMIN</b><br/>Tier 2 — Configurable<br/>━━━━━━━━━━━━━━<br/>Per-user permissions<br/>set by super_admin<br/>(see permission matrix)"]
+        AD["ADMIN\nTier 2 - Configurable\nPer-user permissions\nset by super_admin\nstored in admin_permissions JSONB"]
 
-        US["<b>USER</b><br/>Tier 0 — Read Only<br/>━━━━━━━━━━━━━━<br/>canViewSchedule ✓<br/>canViewStaff ✓<br/>All else denied"]
+        US["USER\nTier 0 - Read Only\ncanViewSchedule always true\ncanViewStaff always true\nAll else denied"]
     end
 
-    GM -.->|"can impersonate<br/>any org user"| SA
-    SA -->|"configures permissions for"| AD
-    AD -.->|"elevated from"| US
+    GM -.->|can impersonate any org user| SA
+    SA -->|configures permissions for| AD
+    AD -.->|elevated from| US
 
-    subgraph PermMatrix["Admin Permission Matrix — 25 permissions (JSONB)"]
+    subgraph PermMatrix["Admin Permission Matrix - 25 permissions (JSONB in organization_memberships)"]
         direction LR
         subgraph Schedule["Schedule (4)"]
-            P1["canViewSchedule ✓ always<br/>canEditShifts<br/>canPublishSchedule<br/>canApplyRecurringSchedule"]
+            P1["canViewSchedule always-true\ncanEditShifts\ncanPublishSchedule\ncanApplyRecurringSchedule"]
         end
-        subgraph Indicators["Notes & Indicators (3)"]
-            P2["canEditNotes<br/>canEditScheduleIndicators<br/>canManageIndicatorTypes<br/>(+ canViewIndicatorTypes)"]
+        subgraph Indicators["Notes + Indicators (3)"]
+            P2["canEditNotes\ncanEditScheduleIndicators\ncanManageIndicatorTypes + canViewIndicatorTypes"]
         end
         subgraph Recurring["Recurring (3)"]
-            P3["canViewRecurringShifts<br/>canManageRecurringShifts<br/>canManageShiftSeries"]
+            P3["canViewRecurringShifts\ncanManageRecurringShifts\ncanManageShiftSeries"]
         end
         subgraph Staff["Staff (3)"]
-            P4["canViewStaff ✓ always<br/>canViewEmployeeDetails<br/>canManageEmployees"]
+            P4["canViewStaff always-true\ncanViewEmployeeDetails\ncanManageEmployees"]
         end
         subgraph Config["Configuration (8)"]
-            P5["canViewFocusAreas / canManageFocusAreas<br/>canViewScheduleDefinitions / canManageScheduleDefinitions<br/>canViewOrgLabels / canManageOrgLabels<br/>canManageOrgSettings (SA-only)"]
+            P5["canViewFocusAreas / canManageFocusAreas\ncanViewScheduleDefinitions / canManageScheduleDefinitions\ncanViewOrgLabels / canManageOrgLabels\ncanManageOrgSettings (super_admin-only)"]
         end
-        subgraph Coverage["Coverage & Requests (3)"]
-            P6["canViewCoverageRequirements<br/>canManageCoverageRequirements<br/>canApproveShiftRequests"]
+        subgraph Coverage["Coverage + Requests (3)"]
+            P6["canViewCoverageRequirements\ncanManageCoverageRequirements\ncanApproveShiftRequests"]
         end
         subgraph Dashboard["Dashboard (1)"]
             P7["canViewDashboardAnalytics"]
         end
     end
 
-    AD -->|"permissions stored in<br/>organization_memberships.admin_permissions"| PermMatrix
+    AD -->|permissions stored per-person, NOT per-department| PermMatrix
 
-    Note1["25 total perms. canManage* implies canView* (view<br/>implications applied by @dubgrid/authz). canViewSchedule +<br/>canViewStaff always true. Never delegable (super_admin only):<br/>canManageUsers, canConfigureAdminPermissions, canManageOrgSettings.<br/>Management departments define templates; members inherit via union."]
-    PermMatrix -.-> Note1
+    NOTE1["25 total perms. canManage* implies canView*.\nPermissions are PER-PERSON (admin_permissions field on organization_memberships).\nDepartments do NOT grant permissions.\nSuper-admin-only (non-delegable): canManageUsers, canConfigureAdminPermissions, canManageOrgSettings."]
+    PermMatrix -.-> NOTE1
 
     style GM fill:#dc2626,color:#fff
     style SA fill:#ea580c,color:#fff
@@ -145,39 +389,42 @@ flowchart TB
 
 ---
 
-## 3. Request Lifecycle (Browser to Database)
+## 7. Request Lifecycle (Browser to Database)
 
 ```mermaid
 flowchart TD
-    REQ["Browser Request<br/><i>GET calmhaven.localhost/schedule</i>"]
+    REQ["Browser Request\nGET calmhaven.dubgrid.com/schedule"]
 
     subgraph MW["Edge Middleware (apps/web/middleware.ts)"]
         direction TB
-        PUB{"Public route?<br/>/login, /api, /,<br/>/accept-invite"}
-        SESS["Extract session<br/>from sb-*-auth-token cookies<br/>(multi-chunk reconstruction)"]
-        NOSESS{"Session<br/>exists?"}
-        JWT["Verify JWT signature<br/>jwtVerify(token, JWKS)"]
-        CLAIMS["Extract claims:<br/>platform_role, org_role,<br/>org_id, org_slug"]
-        FALLBACK{"Claims<br/>complete?"}
-        DBFALLBACK["Fallback: Query DB<br/>profiles + organization_memberships<br/>+ organizations"]
-        EFFROLE["Calculate effective role:<br/>gridmaster > super_admin > admin > user"]
-        SUBDOMAIN{"Subdomain matches<br/>org_slug?"}
-        ROUTEGUARD{"Route access<br/>allowed?"}
-        HEADERS["Inject headers:<br/>x-dubgrid-role<br/>x-dubgrid-org-id<br/>x-dubgrid-org-slug"]
+        PUB{"Public route?\n/login, /forgot-password,\n/accept-invite, /api, etc."}
+        SESS["createServerClient.getSession()\nRead + reconstruct multi-chunk sb-*-auth-token cookie"]
+        NOSESS{"Session\nexists?"}
+        JWT["jwtVerify(access_token, JWKS)\nES256 via createRemoteJWKSet"]
+        FALLBACK{"jwtVerify\nfailed?"}
+        DECODE["decodeJwt fallback (unverified)\nGridmaster claim in unverified token = redirect to /login"]
+        CLAIMS["Extract top-level claims:\nplatform_role, org_role,\norg_id, org_slug"]
+        MISSINGCLAIMS{"Claims incomplete\nor subdomain mismatch?"}
+        DBFALLBACK["Redis-cached DB fallback:\nquery profiles + organization_memberships (30s TTL)"]
+        EFFROLE["calculateEffectiveRole:\ngridmaster > org_role"]
+        SANDBOX["Check dubgrid-sandbox cookie:\nverify ownership against DB, override org_id"]
+        ORGCHECK["cacheThrough org access:\narchived_at, suspended_at, subscription_status, trial_ends_at (30s TTL)"]
+        ROUTEGUARD{"Route access\nallowed?"}
+        HEADERS["Inject headers:\nx-dubgrid-role\nx-dubgrid-org-id\nx-dubgrid-org-slug\nx-dubgrid-sandbox (if active)"]
     end
 
     subgraph PAGE["Next.js Page Render"]
         direction TB
-        LAYOUT["Root Layout<br/>(AuthProvider + AppShell)"]
-        COMPONENT["Page Component<br/>(Client or Server)"]
-        PERMS["usePermissions() hook<br/>Decode JWT → extract role<br/>Admin? → fetch admin_permissions"]
-        RENDER["Render with RBAC context<br/>(show/hide UI based on perms)"]
+        LAYOUT["Root Layout: AuthProvider + OnboardingGate"]
+        COMPONENT["Page Component"]
+        PERMS["usePermissions()\nDecodeJWT from session, extract role\nAdmin: fetch admin_permissions from DB"]
+        RENDER["Render with RBAC context\nshow/hide UI based on perms"]
     end
 
-    subgraph ACTION["Server Action / Data Mutation"]
+    subgraph ACTION["Server Action / Route Handler"]
         direction TB
-        AUTHCHECK["Server-side auth check<br/>getSession() + verify user"]
-        MUTATION["Execute DB query<br/>(parameterized)"]
+        AUTHCHECK["requireOrgPermissions()\ngetSession() + verify membership + check permission"]
+        MUTATION["Execute DB query (parameterized)"]
     end
 
     subgraph RLS["PostgreSQL RLS Layer"]
@@ -185,27 +432,32 @@ flowchart TD
         RLSCHECK{"RLS Policy Check"}
         ISGM["is_gridmaster()?"]
         ORGMATCH["caller_org_id() = row.org_id?"]
-        PERMCHECK["check_admin_permission()<br/>(e.g., 'canEditShifts')"]
-        ALLOW["✓ Allow"]
-        DENY["✗ Deny"]
+        PERMCHECK["check_admin_permission()"]
+        ALLOW["Allow"]
+        DENY["Deny"]
     end
 
     REQ --> PUB
     PUB -->|Yes| PASS1["NextResponse.next()"]
     PUB -->|No| SESS
     SESS --> NOSESS
-    NOSESS -->|No session| REDIR1["Redirect → /login"]
+    NOSESS -->|No session| REDIR1["Redirect to /login"]
     NOSESS -->|Yes| JWT
-    JWT --> CLAIMS
-    CLAIMS --> FALLBACK
-    FALLBACK -->|Yes| EFFROLE
-    FALLBACK -->|No| DBFALLBACK
-    DBFALLBACK --> EFFROLE
-    EFFROLE --> SUBDOMAIN
-    SUBDOMAIN -->|No| REDIR2["Redirect → correct subdomain"]
-    SUBDOMAIN -->|Yes| ROUTEGUARD
-    ROUTEGUARD -->|"/people, /settings<br/>but role < admin"| REDIR3["Redirect → /schedule"]
-    ROUTEGUARD -->|"/gridmaster<br/>but not gridmaster"| REDIR4["Redirect → /schedule"]
+    JWT --> FALLBACK
+    FALLBACK -->|No| CLAIMS
+    FALLBACK -->|Yes| DECODE
+    DECODE --> CLAIMS
+    CLAIMS --> MISSINGCLAIMS
+    MISSINGCLAIMS -->|Yes| DBFALLBACK --> EFFROLE
+    MISSINGCLAIMS -->|No| EFFROLE
+    EFFROLE --> SANDBOX
+    SANDBOX --> ORGCHECK
+    ORGCHECK --> ROUTEGUARD
+    ROUTEGUARD -->|Org archived| REDIR2["Redirect to /login?deleted=true"]
+    ROUTEGUARD -->|Org suspended| REDIR3["Redirect to /login?suspended=true"]
+    ROUTEGUARD -->|Billing locked, super_admin| REDIR4["Redirect to /settings?section=org-billing"]
+    ROUTEGUARD -->|Billing locked or trial_pending, non-admin| REDIR5["Redirect to /billing-required"]
+    ROUTEGUARD -->|/settings but role < admin| REDIR6["Redirect to /schedule"]
     ROUTEGUARD -->|Allowed| HEADERS
 
     HEADERS --> LAYOUT
@@ -213,7 +465,7 @@ flowchart TD
     COMPONENT --> PERMS
     PERMS --> RENDER
 
-    RENDER -->|"User action<br/>(e.g., edit shift)"| AUTHCHECK
+    RENDER -->|User action| AUTHCHECK
     AUTHCHECK --> MUTATION
 
     MUTATION --> RLSCHECK
@@ -233,13 +485,15 @@ flowchart TD
     style REDIR2 fill:#fee2e2,stroke:#dc2626
     style REDIR3 fill:#fee2e2,stroke:#dc2626
     style REDIR4 fill:#fee2e2,stroke:#dc2626
+    style REDIR5 fill:#fee2e2,stroke:#dc2626
+    style REDIR6 fill:#fee2e2,stroke:#dc2626
     style ALLOW fill:#bbf7d0,stroke:#16a34a
     style DENY fill:#fecaca,stroke:#dc2626
 ```
 
 ---
 
-## 4. Data Model (Entity Relationship Diagram)
+## 8. Data Model (Entity Relationship Diagram)
 
 ```mermaid
 erDiagram
@@ -262,68 +516,84 @@ erDiagram
         text certification_label "custom terminology"
         text role_label "custom terminology"
         text timezone
-        timestamptz suspended_at "soft delete / suspension"
+        timestamptz suspended_at "soft suspension"
+        timestamptz archived_at "soft delete - revokes all access"
         jsonb feature_overrides "per-org feature flags"
         text stripe_customer_id "billing"
         text stripe_subscription_id "billing"
         text subscription_status "billing state"
-        text workspace_kind "production | sandbox (default production)"
-        uuid sandbox_source_org_id FK "→ organizations (nullable)"
-        uuid sandbox_owner_user_id FK "→ auth.users (nullable)"
+        timestamptz trial_started_at "set by start_trial_for_org on first super_admin login"
+        timestamptz trial_ends_at "NULL = trial_pending state"
+        text workspace_kind "production or sandbox"
+        uuid sandbox_source_org_id FK "organizations (nullable)"
+        uuid sandbox_owner_user_id FK "auth.users (nullable)"
         timestamptz sandbox_expires_at "30-day TTL"
         text sandbox_template_version
     }
 
     profiles {
-        uuid id PK,FK "→ auth.users"
-        uuid org_id FK "→ organizations"
-        platform_role platform_role "gridmaster | none"
+        uuid id PK_FK "auth.users"
+        uuid org_id FK "organizations - default for new sessions"
+        platform_role platform_role "gridmaster or none"
         bigint version "optimistic lock"
         boolean role_locked
+        timestamptz last_sign_in_at
+        timestamptz deactivated_at
     }
 
     organization_memberships {
         bigint id PK
-        uuid user_id FK "→ auth.users"
-        uuid org_id FK "→ organizations"
-        org_role org_role "super_admin | admin | user"
-        jsonb admin_permissions "fine-grained perms (25)"
-        bigint_arr department_ids "→ departments[]"
-        timestamptz landing_card_dismissed_at "PersonaLandingCard dismissed"
+        uuid user_id FK "auth.users"
+        uuid org_id FK "organizations"
+        org_role org_role "super_admin or admin or user"
+        jsonb admin_permissions "fine-grained perms - 25 total, per-person"
+        bigint_arr department_ids "departments[]"
+        timestamptz landing_card_dismissed_at
         jsonb onboarding_step_telemetry "default {}"
         timestamptz archived_at "soft removal"
     }
 
+    user_sessions {
+        uuid id PK
+        uuid user_id FK "auth.users"
+        uuid supabase_session_id UK "drives per-session org isolation"
+        uuid active_org_id FK "organizations - per-device org context"
+        text device_label
+        inet ip_address
+        text refresh_token_hash UK
+        timestamptz last_active_at
+    }
+
     departments {
         bigint id PK
-        uuid org_id FK "→ organizations"
-        text type "scheduled | management"
+        uuid org_id FK "organizations"
+        text type "scheduled or management"
         text name
         text abbr
-        bigint parent_department_id FK "→ departments (nullable)"
-        jsonb permissions "management depts: perm template"
+        bigint parent_department_id FK "departments (nullable)"
+        jsonb permissions "management depts: vestigial template"
         integer sort_order
     }
 
     employees {
         uuid id PK
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         text first_name
         text last_name
         integer seniority
         text email
         text phone
-        bigint certification_id FK "→ certifications"
-        bigint_arr role_ids "→ organization_roles[]"
-        bigint_arr focus_area_ids "→ focus_areas[]"
-        employee_status status "active | benched | terminated"
-        uuid user_id FK "→ auth.users (nullable)"
+        bigint certification_id FK "certifications"
+        bigint_arr role_ids "organization_roles[]"
+        bigint_arr focus_area_ids "focus_areas[]"
+        employee_status status "active or benched or terminated"
+        uuid user_id FK "auth.users (nullable)"
     }
 
     focus_areas {
         bigint id PK
-        uuid org_id FK "→ organizations"
-        bigint department_id FK "→ departments (scheduled parent)"
+        uuid org_id FK "organizations"
+        bigint department_id FK "departments (scheduled parent)"
         text name
         text color_bg
         text color_text
@@ -333,7 +603,7 @@ erDiagram
 
     certifications {
         bigint id PK
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         text name
         text abbr
         integer sort_order
@@ -341,7 +611,7 @@ erDiagram
 
     organization_roles {
         bigint id PK
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         text name
         text abbr
         integer sort_order
@@ -349,18 +619,18 @@ erDiagram
 
     shift_categories {
         bigint id PK
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         text name
         text color
         time start_time
         time end_time
-        bigint focus_area_id FK "→ focus_areas (nullable)"
+        bigint focus_area_id FK "focus_areas (nullable)"
         integer break_minutes
     }
 
     absence_types {
         bigint id PK
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         text label "e.g. X, V, S"
         text name "e.g. Day Off, PTO, Sick"
         text color
@@ -371,26 +641,26 @@ erDiagram
 
     schedule_cells {
         uuid id PK
-        uuid emp_id FK "→ employees"
+        uuid emp_id FK "employees"
         date date
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         bigint version "optimistic lock"
-        uuid series_id FK "→ shift_series"
+        uuid series_id FK "shift_series"
         boolean from_recurring
-        bigint focus_area_id FK "→ focus_areas"
+        bigint focus_area_id FK "focus_areas"
     }
 
     schedule_cell_snapshots {
         uuid id PK
-        uuid cell_id FK "→ schedule_cells"
+        uuid cell_id FK "schedule_cells"
         text snapshot_kind
         text state_kind
-        bigint absence_type_id FK "→ absence_types"
+        bigint absence_type_id FK "absence_types"
     }
 
     schedule_cell_segments {
         uuid id PK
-        uuid snapshot_id FK "→ schedule_cell_snapshots"
+        uuid snapshot_id FK "schedule_cell_snapshots"
         integer position
         bigint shift_id
         bigint job_id
@@ -398,8 +668,8 @@ erDiagram
 
     recurring_shifts {
         uuid id PK
-        uuid emp_id FK "→ employees"
-        uuid org_id FK "→ organizations"
+        uuid emp_id FK "employees"
+        uuid org_id FK "organizations"
         smallint day_of_week "0=Sun 6=Sat"
         jsonb state "ScheduleCellState"
         date effective_from
@@ -408,9 +678,9 @@ erDiagram
 
     shift_series {
         uuid id PK
-        uuid emp_id FK "→ employees"
-        uuid org_id FK "→ organizations"
-        shift_series_frequency frequency "daily|weekly|biweekly"
+        uuid emp_id FK "employees"
+        uuid org_id FK "organizations"
+        shift_series_frequency frequency "daily or weekly or biweekly"
         smallint_arr days_of_week
         date start_date
         date end_date
@@ -419,25 +689,25 @@ erDiagram
 
     schedule_notes {
         bigint id PK
-        uuid org_id FK "→ organizations"
-        uuid emp_id FK "→ employees"
+        uuid org_id FK "organizations"
+        uuid emp_id FK "employees"
         date date
-        integer indicator_type_id FK "→ indicator_types"
-        text status "published | draft | draft_deleted"
+        integer indicator_type_id FK "indicator_types"
+        text status "published or draft or draft_deleted"
     }
 
     indicator_types {
         integer id PK
-        uuid org_id FK "→ organizations"
+        uuid org_id FK "organizations"
         text name
         text color
     }
 
     coverage_requirements {
         bigint id PK
-        uuid org_id FK "→ organizations"
-        bigint focus_area_id FK "→ focus_areas"
-        bigint preferred_shift_id FK "→ shift_categories"
+        uuid org_id FK "organizations"
+        bigint focus_area_id FK "focus_areas"
+        bigint preferred_shift_id FK "shift_categories"
         bigint preferred_job_id
         smallint day_of_week "nullable = all days"
         integer min_staff
@@ -445,22 +715,18 @@ erDiagram
 
     shift_requests {
         uuid id PK
-        uuid org_id FK "→ organizations"
-        shift_request_type type "pickup | swap"
+        uuid org_id FK "organizations"
+        shift_request_type type "pickup or swap"
         shift_request_status status
-        uuid requester_emp_id FK "→ employees"
+        uuid requester_emp_id FK "employees"
         date requester_shift_date
         jsonb requester_state
-        bigint requester_focus_area_id FK "→ focus_areas"
-        time requester_custom_start_time
-        time requester_custom_end_time
-        uuid target_emp_id FK "→ employees (swap)"
+        bigint requester_focus_area_id FK "focus_areas"
+        uuid target_emp_id FK "employees (swap)"
         date target_shift_date
         jsonb target_state
-        bigint target_focus_area_id FK "→ focus_areas"
-        time target_custom_start_time
-        time target_custom_end_time
-        uuid admin_user_id FK "→ auth.users"
+        bigint target_focus_area_id FK "focus_areas"
+        uuid admin_user_id FK "auth.users"
         text admin_note
         timestamptz expires_at "72h default"
         timestamptz resolved_at
@@ -469,68 +735,60 @@ erDiagram
 
     invitations {
         uuid id PK
-        uuid org_id FK "→ organizations"
-        uuid invited_by FK "→ auth.users"
+        uuid org_id FK "organizations"
+        uuid invited_by FK "auth.users"
         text email
         org_role role_to_assign
         uuid token UK "secret link"
         timestamptz expires_at "72h default"
-        uuid employee_id FK "→ employees"
+        uuid employee_id FK "employees"
     }
 
     role_change_log {
         uuid id PK
-        uuid target_user_id FK "→ auth.users"
-        uuid changed_by_id FK "→ auth.users"
+        uuid target_user_id FK "auth.users"
+        uuid changed_by_id FK "auth.users"
         text from_role
         text to_role
         text idempotency_key UK
-        text change_type "role_change | permission_change"
+        text change_type "role_change or permission_change"
         jsonb permissions_before
         jsonb permissions_after
     }
 
     jwt_refresh_locks {
-        uuid user_id PK,FK "→ auth.users"
+        uuid user_id PK_FK "auth.users"
         timestamptz locked_until
         text reason
     }
 
     impersonation_sessions {
         uuid session_id PK
-        uuid gridmaster_id FK "→ auth.users"
-        uuid target_user_id FK "→ auth.users"
-        uuid target_org_id FK "→ organizations"
+        uuid gridmaster_id FK "auth.users"
+        uuid target_user_id FK "auth.users"
+        uuid target_org_id FK "organizations"
         timestamptz expires_at "30min default"
-    }
-
-    user_sessions {
-        uuid id PK
-        uuid user_id FK "→ auth.users"
-        text device_label
-        inet ip_address
-        text refresh_token_hash UK
     }
 
     schedule_draft_sessions {
         uuid id PK
-        uuid org_id FK,UK "→ organizations (one per org)"
-        uuid saved_by FK "→ auth.users"
+        uuid org_id FK_UK "organizations (one per org)"
+        uuid saved_by FK "auth.users"
         date start_date
         date end_date
     }
 
     recurring_shifts_draft_sessions {
         uuid id PK
-        uuid org_id FK,UK "→ organizations (one per org)"
-        uuid saved_by FK "→ auth.users"
+        uuid org_id FK_UK "organizations (one per org)"
+        uuid saved_by FK "auth.users"
         jsonb draft_data
     }
 
     publish_history {
         uuid id PK
-        uuid org_id FK "→ organizations"
-        uuid published_by FK "→ auth.users"
+        uuid org_id FK "organizations"
+        uuid published_by FK "auth.users"
         date start_date
         date end_date
         integer change_count
@@ -562,10 +820,10 @@ erDiagram
     organizations ||--o{ publish_history : "has publishes"
     organizations ||--o| impersonation_sessions : "target org"
 
-    profiles }o--o| organizations : "primary org"
+    profiles }o--o| organizations : "default org for new sessions"
 
-    departments ||--o{ departments : "management → scheduled (parent/child)"
-    departments ||--o{ focus_areas : "scheduled dept → focus areas (children)"
+    departments ||--o{ departments : "management to scheduled parent/child"
+    departments ||--o{ focus_areas : "scheduled dept to focus areas"
     departments }o--o{ organization_memberships : "membership department_ids[]"
 
     employees ||--o{ schedule_cells : "assigned schedule cells"
@@ -584,70 +842,72 @@ erDiagram
     indicator_types ||--o{ schedule_notes : "note type"
 
     invitations }o--o| employees : "links to employee"
+
+    user_sessions }o--o| organizations : "active org per session"
 ```
 
 ---
 
-## 5. Organization Routing & Multi-Tenancy
+## 9. Organization Routing and Multi-Tenancy
 
 ```mermaid
 flowchart TD
-    REQ["Browser Request<br/><i>https://calmhaven.dubgrid.com/schedule</i>"]
+    REQ["Browser Request\nhttps://calmhaven.dubgrid.com/schedule"]
 
     subgraph Parse["Host Parsing (parseHost)"]
-        SPLIT["Split hostname<br/>calmhaven.dubgrid.com"]
-        EXTRACT["Extract:<br/>subdomain = 'calmhaven'<br/>rootDomain = 'dubgrid.com'"]
-        RESERVED{"Reserved subdomain?<br/>www, login, api,<br/>admin, status, app"}
+        SPLIT["Split hostname:\ncalmhaven.dubgrid.com"]
+        EXTRACT["Extract:\nsubdomain = calmhaven\nrootDomain = dubgrid.com"]
+        RESERVED{"Reserved subdomain?\ngridmaster, www, etc."}
     end
 
     subgraph Resolve["Org Resolution"]
-        JWTCLAIMS["Read JWT claims<br/>org_slug from token"]
-        MATCH{"JWT org_slug<br/>== subdomain?"}
-        DBQUERY["Fallback DB query:<br/>SELECT org_id, slug<br/>FROM organizations<br/>WHERE slug = subdomain"]
-        MEMBERSHIP["Verify user has<br/>organization_membership<br/>for this org"]
+        JWTCLAIMS["Read JWT top-level claims:\norg_slug from custom_access_token_hook"]
+        MATCH{"JWT org_slug\nmatches subdomain?"}
+        DBFALLBACK["Redis-cached DB fallback:\nprofiles + organization_memberships\nfor this subdomain (30s TTL)"]
+        MEMBERCHECK{"User has active\nmembership?"}
     end
 
     subgraph Enforce["Tenant Isolation"]
-        GMCHECK{"User is<br/>gridmaster?"}
-        FORCESUB["Force redirect to<br/>user's org subdomain"]
-        ALLOWCROSS["Allow cross-org<br/>access (godmode)"]
-        INJECT["Set org context:<br/>x-dubgrid-org-id<br/>x-dubgrid-org-slug"]
+        GMCHECK{"platform_role =\ngridmaster?"}
+        FORCESUB["Redirect to user's\norg subdomain"]
+        ALLOWGM["Gridmaster: allow cross-org\n(RLS enforces data scope)"]
+        INJECT["Set request headers:\nx-dubgrid-org-id\nx-dubgrid-org-slug"]
     end
 
     subgraph DataScope["Data Scoping"]
         direction TB
-        RLS["RLS policies enforce:<br/><code>org_id = caller_org_id()</code>"]
-        TABLES["All org-scoped tables:<br/>employees, departments, focus_areas,<br/>certifications, schedule_notes,<br/>schedule_cells, etc."]
-        ZERO["Zero cross-tenant<br/>data leakage"]
+        RLS["RLS policies enforce:\norg_id = caller_org_id()"]
+        TABLES["All org-scoped tables:\nemployees, departments, focus_areas,\nschedule_cells, etc."]
+        ZERO["Zero cross-tenant\ndata leakage"]
     end
 
     subgraph MultiOrg["Multi-Org Support"]
         direction TB
-        MEMBERSHIPS["User can belong to<br/>multiple organizations"]
-        SWITCH["switch_org(target_org_id)<br/>RPC function"]
-        REFRESH["refreshSession()<br/>Get new JWT with<br/>new org context"]
-        NEWDOMAIN["Redirect to<br/>new-org.dubgrid.com"]
+        MEMBERSHIPS["User can belong to\nmultiple organizations"]
+        SWITCH["switch_org(target_org_id) RPC\nWrites user_sessions.active_org_id\nfor caller's session only"]
+        REFRESH["refreshBrowserSession\nHook reads user_sessions.active_org_id\nNew JWT with new org claims"]
+        NEWDOMAIN["Hard nav to new-org.dubgrid.com\n(soft nav leaves stale org context)"]
     end
 
     REQ --> SPLIT
     SPLIT --> EXTRACT
     EXTRACT --> RESERVED
-    RESERVED -->|"Yes (gridmaster)"| GM_ROUTE["Route to /gridmaster<br/>No org context needed"]
-    RESERVED -->|"Yes (www, etc.)"| NULL_SUB["subdomain = null<br/>Root domain access"]
-    RESERVED -->|"No"| JWTCLAIMS
+    RESERVED -->|gridmaster| GM_ROUTE["Route to gridmaster portal\nNo org context"]
+    RESERVED -->|www or none| NULL_SUB["subdomain = null\nRoot domain / marketing"]
+    RESERVED -->|No| JWTCLAIMS
 
     JWTCLAIMS --> MATCH
     MATCH -->|Yes| GMCHECK
-    MATCH -->|No| DBQUERY
-    DBQUERY --> MEMBERSHIP
-    MEMBERSHIP -->|"Not a member"| REJECT["Redirect → /login<br/>'No access to this organization'"]
-    MEMBERSHIP -->|"Is a member"| GMCHECK
+    MATCH -->|No| DBFALLBACK
+    DBFALLBACK --> MEMBERCHECK
+    MEMBERCHECK -->|Not a member| REJECT["Redirect to /login\n(no access to this org)"]
+    MEMBERCHECK -->|Is a member| GMCHECK
 
-    GMCHECK -->|Yes| ALLOWCROSS
-    GMCHECK -->|"No + subdomain<br/>mismatch"| FORCESUB
-    GMCHECK -->|"No + subdomain<br/>matches"| INJECT
+    GMCHECK -->|Yes| ALLOWGM
+    GMCHECK -->|No + mismatch| FORCESUB
+    GMCHECK -->|No + matches| INJECT
 
-    ALLOWCROSS --> INJECT
+    ALLOWGM --> INJECT
     INJECT --> RLS
     RLS --> TABLES
     TABLES --> ZERO
@@ -667,223 +927,216 @@ flowchart TD
 
 ---
 
-## 6. Role Change & JWT Lock Mechanism
+## 10. Role Change and JWT Lock Mechanism
 
 ```mermaid
 sequenceDiagram
-    actor Admin as Super Admin
+    actor Admin as Super Admin / Gridmaster
     participant UI as Admin UI
-    participant RPC as change_user_role()
+    participant RPC as change_user_role() RPC
     participant DB as PostgreSQL
     participant Lock as jwt_refresh_locks
     participant Hook as custom_access_token_hook
     participant Target as Target User's Browser
 
-    Admin->>UI: Change user role<br/>(e.g., user → admin)
-    UI->>RPC: RPC change_user_role<br/>(target_user_id, new_role, idempotency_key)
+    Admin->>UI: Change user role (e.g., user to admin)
+    UI->>RPC: RPC change_user_role(target_user_id, new_role, idempotency_key)
+
+    Note over RPC: Self-action guard: p_target_user_id = p_changed_by_id raises exception
+    Note over RPC: Admin tier guard: admin cannot touch admin/super_admin/gridmaster roles
+    Note over RPC: pg_advisory_xact_lock prevents concurrent role changes for same user
 
     RPC->>DB: BEGIN TRANSACTION
-    RPC->>DB: UPDATE organization_memberships<br/>SET org_role = 'admin'
-    RPC->>DB: UPDATE profiles<br/>SET version = version + 1
-    RPC->>DB: INSERT role_change_log<br/>(from_role, to_role, idempotency_key)
-    RPC->>Lock: INSERT jwt_refresh_locks<br/>(user_id, locked_until = NOW() + 5s,<br/>reason = 'role_change')
+    RPC->>DB: CHECK idempotency_key not already in role_change_log
+    RPC->>DB: UPDATE organization_memberships SET org_role = new_role
+    RPC->>DB: UPDATE profiles SET version = version + 1
+    RPC->>DB: INSERT role_change_log (from_role, to_role, idempotency_key)
+    RPC->>Lock: INSERT/UPDATE jwt_refresh_locks (locked_until = NOW() + 5s, reason = role_change)
     RPC->>DB: COMMIT
 
     RPC-->>UI: Success
 
-    Note over Target,Hook: Meanwhile, target user's token expires...
+    Note over Target,Hook: Target user's token expires or refreshes
 
-    Target->>Hook: Token refresh attempt<br/>(automatic by Supabase client)
-    Hook->>Lock: SELECT * FROM jwt_refresh_locks<br/>WHERE user_id = target AND locked_until > NOW()
+    Target->>Hook: Token refresh attempt (automatic by Supabase client)
+    Hook->>Lock: DELETE expired locks, SELECT active lock for user_id
 
     alt Lock is active (within 5s window)
-        Note over Hook: Hook does NOT return HTTP 403. It issues a<br/>minimal/stripped JWT — platform_role / org_role /<br/>org_id / org_slug claims are omitted so the stale<br/>role cannot be acted on.
-        Hook-->>Target: Stripped JWT (no role/org claims)
-        Target->>Target: Missing claims detected →<br/>back off, retry refresh after lock window
-        Target->>Hook: refreshSession() once locked_until passes
-        Hook->>Lock: DELETE expired lock
+        Hook-->>Target: HTTP 403 - token issuance blocked
+        Target->>Target: Supabase client surfaces auth error
+        Target->>Hook: Retry refreshSession once lock expires
+        Hook->>Lock: No active lock found
         Hook->>DB: Resolve fresh claims (new role = admin)
-        Hook-->>Target: New JWT with org_role = 'admin'
-    else Lock expired (after 5s)
-        Hook->>Lock: DELETE expired lock
+        Hook-->>Target: New JWT with org_role = admin
+    else Lock already expired
         Hook->>DB: Resolve fresh claims normally
-        Hook-->>Target: New JWT with org_role = 'admin'
+        Hook-->>Target: New JWT with org_role = admin
     end
 
-    Note over Admin,Target: User now operates with new role.<br/>change_user_role() also hard-blocks self-role-change (P0001).
+    Note over Admin,Target: Target user now operates with new role
 ```
 
 ---
 
-## 7. Schedule Draft/Publish Workflow
+## 11. Org Soft-Delete and Access Revocation
+
+```mermaid
+flowchart TD
+    subgraph Delete["Super Admin Self-Delete (Settings Danger Zone)"]
+        CONFIRM["Super Admin confirms org deletion\n(must type org name)"]
+        ARCHIVE["POST /api/organizations/archive\nSets organizations.archived_at = NOW()"]
+        NOTIF["notify_gridmasters_of_org_event trigger\nfires org_archived notification to all gridmasters"]
+    end
+
+    subgraph Revoke["Access Revocation - Multiple Layers"]
+        direction TB
+        HOOK["custom_access_token_hook:\nLEFT JOIN organizations WHERE archived_at IS NULL\nArchived org strips org claims from next JWT"]
+        MIDDLEWARE["Edge Middleware:\ncacheThrough checks archived_at on every request\narchived_at IS NOT NULL → redirect to /login?deleted=true"]
+        GETMYORGS["get_my_organizations RPC:\nJOIN organizations WHERE archived_at IS NULL\nArchived org never appears in org switcher"]
+        SWITCHORG["switch_org RPC:\nblocks switching into archived org for non-gridmasters"]
+    end
+
+    subgraph Gridmaster["Gridmaster Oversight"]
+        VIEW["Gridmaster can still view and manage\narchived orgs (no archived_at filter for GM)"]
+        RESTORE["Gridmaster can restore org\n(archived_at = NULL)"]
+    end
+
+    CONFIRM --> ARCHIVE
+    ARCHIVE --> NOTIF
+    ARCHIVE --> HOOK
+    ARCHIVE --> MIDDLEWARE
+    ARCHIVE --> GETMYORGS
+    ARCHIVE --> SWITCHORG
+    ARCHIVE --> VIEW
+    VIEW --> RESTORE
+
+    style Delete fill:#fce7f3,stroke:#db2777
+    style Revoke fill:#fef3c7,stroke:#d97706
+    style Gridmaster fill:#dbeafe,stroke:#2563eb
+```
+
+---
+
+## 12. Test Sandbox (Cookie-Based Mode)
 
 ```mermaid
 flowchart LR
-    subgraph Draft["Draft Phase"]
-        EDIT["Admin edits shifts<br/>(drag/drop/type)"]
-        DRAFTCODES["draft snapshot + segments<br/>updated in schedule_cells"]
-        SAVE["Auto-save draft session<br/>(schedule_draft_sessions)"]
-        PREVIEW["Visual diff:<br/>draft vs published"]
+    subgraph Enter["Entering Sandbox Mode"]
+        SA["Super Admin clicks 'Enter Sandbox'"]
+        CREATE["POST /api/test-sandbox\nCreate or retrieve sandbox org\n(workspace_kind = sandbox,\nsandbox_owner_user_id = caller,\nsandbox_source_org_id = real org)"]
+        SETCOOKIE["Set dubgrid-sandbox cookie:\n{ sandboxOrgId, userId }\nUser stays on SAME subdomain\nNo JWT refresh, no navigation"]
     end
 
-    subgraph Publish["Publish Phase"]
-        PUB["Admin clicks Publish"]
-        VALIDATE["Validate changes<br/>(coverage requirements)"]
-        COPY["Replace published snapshot<br/>with current draft snapshot"]
-        CLEAR["Delete draft snapshot<br/>after publish"]
-        LOG["Insert publish_history<br/>(changes JSONB, date range)"]
+    subgraph Active["Active Sandbox State"]
+        COOKIE["Browser carries dubgrid-sandbox cookie"]
+        MW["Middleware reads cookie:\ngetSandboxFromCookie()\nVerifies: workspace_kind=sandbox,\nsandbox_owner_user_id = session.user.id,\narchived_at IS NULL via service client"]
+        OVERRIDE["Override claims.org_id to sandboxOrgId\nclaims.org_slug intentionally KEPT as real org\n(user stays on real-org subdomain)"]
+        HEADER["Inject x-dubgrid-sandbox: true header"]
+        APIGATE["requireOrgPermissions (api-auth.ts):\nsandbox org_id replaces real org_id\nfor all reads and writes\nMutation-only endpoints blocked with 403"]
     end
 
-    subgraph Realtime["Realtime Updates"]
-        RT["Supabase Realtime<br/>broadcasts changes"]
-        USERS["All connected users<br/>see updated schedule"]
+    subgraph Exit["Exiting Sandbox"]
+        EXITBTN["User clicks 'Exit Sandbox'"]
+        CLEARCOOKIE["DELETE /api/test-sandbox\nClear dubgrid-sandbox cookie"]
+        RESTORE["Next request: no sandbox cookie\nMiddleware uses real org_id from JWT"]
     end
 
-    EDIT --> DRAFTCODES
-    DRAFTCODES --> SAVE
-    SAVE --> PREVIEW
-    PREVIEW --> PUB
-    PUB --> VALIDATE
-    VALIDATE --> COPY
-    COPY --> CLEAR
-    CLEAR --> LOG
-    LOG --> RT
-    RT --> USERS
+    subgraph Isolation["Isolation Guarantees"]
+        OWNED["Cookie verified against DB: only owner can use their sandbox"]
+        NOSWITCH["sandbox is NOT switch_org: no JWT change, no subdomain hop"]
+        MUTATIONS["Destructive mutations blocked in sandbox mode"]
+        MOBILEBLOCKED["Mobile login rejects sandbox workspaces"]
+    end
 
-    style Draft fill:#fef3c7,stroke:#d97706
-    style Publish fill:#dbeafe,stroke:#2563eb
-    style Realtime fill:#dcfce7,stroke:#16a34a
+    SA --> CREATE --> SETCOOKIE
+    SETCOOKIE --> COOKIE
+    COOKIE --> MW --> OVERRIDE --> HEADER --> APIGATE
+    EXITBTN --> CLEARCOOKIE --> RESTORE
+    ISOLATION -.-> Isolation
+
+    style Enter fill:#dbeafe,stroke:#2563eb
+    style Active fill:#fef3c7,stroke:#d97706
+    style Exit fill:#dcfce7,stroke:#16a34a
+    style Isolation fill:#f5f3ff,stroke:#7c3aed
 ```
 
 ---
 
-## 8. Password Reset & Email Verification Flow
+## 13. Onboarding Flow (Role-Aware Composite Wizard)
 
-```mermaid
-sequenceDiagram
-    actor User
-    participant ForgotPage as /forgot-password
-    participant SupaAuth as Supabase Auth
-    participant Email as Email (Resend)
-    participant ResetPage as /reset-password
-    participant VerifyPage as /verify-email
-
-    Note over User,VerifyPage: === PASSWORD RESET FLOW ===
-
-    User->>ForgotPage: Navigate to /forgot-password
-    User->>ForgotPage: Enter email address
-    ForgotPage->>SupaAuth: resetPasswordForEmail(email,<br/>redirectTo: /reset-password)
-
-    Note over ForgotPage: Email enumeration protection:<br/>Always shows "Check your email"<br/>regardless of email existence
-
-    ForgotPage-->>User: "Check Your Email" confirmation
-    SupaAuth->>Email: Send password reset link
-    Email-->>User: Email with reset link
-
-    User->>ResetPage: Click link → /reset-password?token=...
-    ResetPage->>SupaAuth: Listen for PASSWORD_RECOVERY event
-
-    alt Valid token (event fires)
-        SupaAuth-->>ResetPage: PASSWORD_RECOVERY event received
-        ResetPage-->>User: Show reset form
-        User->>ResetPage: Enter new password (min 10 chars)
-        ResetPage->>ResetPage: Validate: strength meter,<br/>confirmation match
-        ResetPage->>SupaAuth: updateUser({ password })
-        SupaAuth-->>ResetPage: Success
-        ResetPage->>SupaAuth: signOut({ scope: 'local' })
-        ResetPage-->>User: "Password reset successful"<br/>Redirect to /login
-    else Invalid/expired token (5s timeout)
-        ResetPage-->>User: "Invalid or expired link"<br/>Link to /forgot-password
-    end
-
-    Note over User,VerifyPage: === EMAIL VERIFICATION FLOW ===
-
-    User->>VerifyPage: Redirected after invitation acceptance
-    VerifyPage-->>User: "Verify your email" message
-    VerifyPage->>SupaAuth: Listen for SIGNED_IN event
-
-    alt User clicks resend
-        User->>VerifyPage: Click "Resend Verification Email"
-        VerifyPage->>SupaAuth: resend({ type: 'signup', email })
-        Note over VerifyPage: 60-second cooldown<br/>before next resend
-    end
-
-    SupaAuth-->>VerifyPage: SIGNED_IN event (email confirmed)
-    VerifyPage-->>User: Auto-redirect to /dashboard
-```
-
----
-
-## 9. Onboarding Flow (Role-Aware Composite Wizard)
-
-> The old standalone 8-step wizard and the `/setup` route are **deleted**. Onboarding
+> The old standalone 8-step wizard and the `/setup` route are deleted. Onboarding
 > now renders inline via `OnboardingGate`, which wraps the authenticated app and
 > hands off to a role-aware `OnboardingWizard`. Components live in
 > `apps/web/src/components/onboarding/`.
 
 ```mermaid
 flowchart TD
-    INVITE["Super Admin sends invitation<br/>(employee_id + email + role)"]
-    EMAIL["Invitation email sent<br/>via /api/send-invite-email"]
-    ACCEPT["User clicks link →<br/>/accept-invite?token=uuid"]
-    VALIDATE{"Token valid?<br/>Not expired? Not accepted?"}
-    CREATE["Create Supabase auth user<br/>Set employees.user_id<br/>Create organization_membership"]
-    VERIFY["Redirect → /verify-email<br/>Wait for email confirmation"]
+    INVITE["Super Admin sends invitation\n(employee_id + email + role)"]
+    EMAIL["Invitation email sent\nvia /api/send-invite-email"]
+    ACCEPT["User clicks link →\n/accept-invite?token=uuid"]
+    VALIDATE{"Token valid?\nNot expired? Not accepted?"}
+    CREATE["Create Supabase auth user\nSet employees.user_id\nCreate organization_membership"]
+    VERIFY["Redirect to /verify-email\nWait for email confirmation"]
 
-    subgraph Gate["OnboardingGate (client gate wrapping the app)"]
+    subgraph Gate["OnboardingGate (client component wrapping every authenticated route)"]
         direction TB
-        BILLING{"Billing lock<br/>active?"}
-        BILLLOCK["Render billing-required gate<br/>(see §11 Stripe flow)"]
-        ONBSTATUS{"Onboarding<br/>complete?<br/>(complete_onboarding, idempotent)"}
-        ORGSETUP{"Org configured?"}
-        PENDING["Non-admin on unconfigured org →<br/>SetupPendingScreen<br/>'Your workspace is being set up'"]
+        AUTHTRANS{"isAuthTransitionPending?\n(sessionStorage dg_auth_transition)"}
+        SPLASH_A["Render AuthSplash\n(bridges post-login settle gap)"]
+        BILLING{"Super admin:\nBilling locked?"}
+        BILLLOCK["Redirect to /settings?section=org-billing\n(super_admin)\nor /billing-required (others)"]
+        TRIAL_PENDING{"trial_pending state?\n(trialing + trial_ends_at IS NULL)"}
+        TRIALLOCK["Non-super-admins → /billing-required\n(held until super_admin starts trial by logging in)"]
+        ONBSTATUS{"Onboarding\ncomplete?\n(isOnboardingComplete)"}
+        ORGSETUP{"Org configured?\n(setupStatus.isComplete)"}
+        PENDING["Non-manager on unconfigured org:\nSetupPendingScreen\n(wait for super_admin to finish setup)"]
     end
 
-    subgraph Wizard["OnboardingWizard — role-aware step lists"]
+    subgraph Wizard["OnboardingWizard - role-aware step lists"]
         direction TB
-        SHELL["WizardShell — full-screen overlay chrome<br/>(brand gradient, logo, StepperBar)"]
-        SASETUP["super_admin + unconfigured org → SETUP:<br/>welcome → identity → structure →<br/>schedule → invite-team → completion"]
-        SAORIENT["super_admin + configured org → ORIENTATION:<br/>welcome → sa-orientation → completion"]
-        ADMIN["admin →<br/>welcome → orientation → completion"]
-        USER["user →<br/>welcome → completion"]
-        STATE["useOnboardingState — step state machine,<br/>persists step to localStorage;<br/>completeOnboarding() seeds React Query cache"]
+        SHELL["WizardShell - full-screen overlay\n(brand gradient, logo, StepperBar)"]
+        FREEZE["freezeOnboardingPhase in localStorage\n(prevents config-to-orientation switch mid-flow)"]
+        SASETUP["super_admin + unconfigured org - SETUP:\nwelcome, identity, structure,\nschedule, invite-team, completion"]
+        SAORIENT["super_admin + configured org - ORIENTATION:\nwelcome, sa-orientation, completion"]
+        ADMIN["admin:\nwelcome, orientation, completion"]
+        USER["user:\nwelcome, completion"]
     end
 
-    subgraph SetupSteps["Composite SETUP steps (CompositeSection cards)"]
+    subgraph SetupSteps["Composite SETUP steps"]
         direction TB
-        S_IDENTITY["IdentityStep<br/>OrganizationGeneral + OrganizationLabels"]
-        S_STRUCTURE["StructureStep<br/>DepartmentsSettings + roles + certifications<br/>(requires ≥1 department)"]
-        S_SCHEDULE["ScheduleStep<br/>display-mode + ShiftCategories + Jobs<br/>(requires ≥1 category + ≥1 job)"]
-        S_INVITE["InviteTeamStep → points to /people"]
+        S_IDENTITY["IdentityStep:\nOrganizationGeneral + OrganizationLabels"]
+        S_STRUCTURE["StructureStep:\nDepartments + roles + certifications\n(requires at least 1 department)"]
+        S_SCHEDULE["ScheduleStep:\nShiftCategories + Jobs\n(requires at least 1 category + 1 job)"]
+        S_INVITE["InviteTeamStep: points to /people"]
     end
 
-    DASHBOARD["/dashboard — fully operational<br/>PersonaLandingCard 'Next steps' card<br/>(dismiss persists to<br/>organization_memberships.landing_card_dismissed_at)"]
+    DASHBOARD["/dashboard - fully operational\nPersonaLandingCard shows next steps\n(dismiss persists to organization_memberships.landing_card_dismissed_at)"]
 
     INVITE --> EMAIL --> ACCEPT --> VALIDATE
-    VALIDATE -->|No| REJECT["Error: Invalid/expired invite"]
-    VALIDATE -->|Yes| CREATE --> VERIFY --> BILLING
+    VALIDATE -->|No| REJECT["Error: Invalid or expired invite"]
+    VALIDATE -->|Yes| CREATE --> VERIFY --> AUTHTRANS
 
-    BILLING -->|Yes| BILLLOCK
-    BILLING -->|No| ONBSTATUS
-    ONBSTATUS -->|Yes| ORGSETUP
-    ONBSTATUS -->|No| SHELL
-    ORGSETUP -->|"No + non-admin"| PENDING
-    ORGSETUP -->|Yes| DASHBOARD
+    AUTHTRANS -->|Yes| SPLASH_A -->|auth settles| BILLING
+    AUTHTRANS -->|No| BILLING
 
-    SHELL --> SASETUP
-    SHELL --> SAORIENT
-    SHELL --> ADMIN
-    SHELL --> USER
-    SHELL --- STATE
+    BILLING -->|Locked| BILLLOCK
+    BILLING -->|Not locked| TRIAL_PENDING
+    TRIAL_PENDING -->|Pending, non-admin| TRIALLOCK
+    TRIAL_PENDING -->|No or super_admin| ONBSTATUS
+    ONBSTATUS -->|Complete| DASHBOARD
+    ONBSTATUS -->|Not complete| ORGSETUP
+    ORGSETUP -->|No + cannot manage| PENDING
+    ORGSETUP -->|Yes or can manage| SHELL
 
-    SASETUP --> S_IDENTITY --> S_STRUCTURE --> S_SCHEDULE --> S_INVITE
-    S_INVITE --> DASHBOARD
+    SHELL --> FREEZE
+    FREEZE --> SASETUP
+    FREEZE --> SAORIENT
+    FREEZE --> ADMIN
+    FREEZE --> USER
+
+    SASETUP --> S_IDENTITY --> S_STRUCTURE --> S_SCHEDULE --> S_INVITE --> DASHBOARD
     SAORIENT --> DASHBOARD
     ADMIN --> DASHBOARD
     USER --> DASHBOARD
-
-    NOTE_TEL["Telemetry: apps/web/src/lib/onboarding-telemetry.ts →<br/>PostHog onboarding_started / step_completed / step_skipped /<br/>completed / abandoned, persona_landing_dismissed.<br/>Step telemetry also stored in<br/>organization_memberships.onboarding_step_telemetry."]
-    STATE -.-> NOTE_TEL
 
     style REJECT fill:#fee2e2,stroke:#dc2626
     style DASHBOARD fill:#bbf7d0,stroke:#16a34a
@@ -891,32 +1144,33 @@ flowchart TD
     style Wizard fill:#dbeafe,stroke:#2563eb
     style SetupSteps fill:#fef3c7,stroke:#d97706
     style BILLLOCK fill:#fee2e2,stroke:#dc2626
+    style TRIALLOCK fill:#fee2e2,stroke:#dc2626
 ```
 
 ---
 
-## 10. Monorepo Layout & Package Graph
+## 14. Monorepo Layout and Package Graph
 
-> npm workspaces (`apps/*`, `packages/*`) orchestrated by **Turborepo**. Node 22.13,
+> npm workspaces (`apps/*`, `packages/*`) orchestrated by Turborepo. Node 22.13,
 > npm 10.9.2. Two apps, nine private `0.1.0` ESM packages (built via `tsc` to `dist/`).
 
 ```mermaid
 flowchart TD
     subgraph Apps["apps/"]
-        WEB["@dubgrid/web<br/>Next.js 16 App Router<br/>React 19, Tailwind v4"]
-        MOBILE["@dubgrid/mobile<br/>Expo SDK 54 / React Native<br/>Expo Router"]
+        WEB["@dubgrid/web\nNext.js 16 App Router\nReact 19, Tailwind v4"]
+        MOBILE["@dubgrid/mobile\nExpo SDK 54 / React Native\nExpo Router"]
     end
 
     subgraph Packages["packages/"]
-        DOMAIN["@dubgrid/domain<br/>Platform-neutral types/enums<br/>+ pure logic, self-guard"]
-        CONTRACTS["@dubgrid/contracts<br/>Zod schemas + inferred types<br/>(./mobile subpath)"]
-        DBTYPES["@dubgrid/db-types<br/>DB-row TS types"]
-        AUTHZ["@dubgrid/authz<br/>Permission logic<br/>(ROLE_LEVEL, unionPermissions,<br/>buildPerms, extractJwtClaims)"]
-        SCHEDCORE["@dubgrid/schedule-core<br/>Schedule transform/calc"]
-        DATAACCESS["@dubgrid/data-access<br/>Supabase query + mapping<br/>(shared mobile data layer)"]
-        MOBAPICORE["@dubgrid/mobile-api-core<br/>Framework-neutral mobile<br/>backend orchestration"]
-        APICLIENT["@dubgrid/api-client<br/>Platform-neutral HTTP<br/>client primitives"]
-        TOKENS["@dubgrid/design-tokens<br/>Design values"]
+        DOMAIN["@dubgrid/domain\nPlatform-neutral types/enums\n+ pure logic, self-guard, billing eval"]
+        CONTRACTS["@dubgrid/contracts\nZod schemas + inferred types\n(./mobile subpath)"]
+        DBTYPES["@dubgrid/db-types\nDB-row TS types"]
+        AUTHZ["@dubgrid/authz\nPermission logic\nROLE_LEVEL, unionPermissions,\nbuildPerms, extractJwtClaims"]
+        SCHEDCORE["@dubgrid/schedule-core\nSchedule transform/calc"]
+        DATAACCESS["@dubgrid/data-access\nSupabase query + mapping\n(shared mobile data layer)"]
+        MOBAPICORE["@dubgrid/mobile-api-core\nFramework-neutral mobile\nbackend orchestration"]
+        APICLIENT["@dubgrid/api-client\nPlatform-neutral HTTP\nclient primitives"]
+        TOKENS["@dubgrid/design-tokens\nDesign values"]
     end
 
     WEB --> AUTHZ
@@ -932,7 +1186,7 @@ flowchart TD
     MOBILE --> TOKENS
     MOBILE --> SCHEDCORE
 
-    CONTRACTS --> DOMAIN_Z["zod"]
+    CONTRACTS --> ZOD["zod"]
     DBTYPES --> CONTRACTS
     DBTYPES --> DOMAIN
     AUTHZ --> DOMAIN
@@ -953,7 +1207,7 @@ flowchart TD
 
 ---
 
-## 11. Mobile App ↔ `/api/mobile/v1` Data Flow
+## 15. Mobile App to /api/mobile/v1 Data Flow
 
 > `apps/mobile` never touches Supabase data tables directly. All traffic goes through
 > the web app's versioned mobile Route Handlers, which delegate to
@@ -962,21 +1216,21 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph Mobile["apps/mobile (Expo / React Native)"]
-        SCREEN["Feature screen<br/>(auth, schedule, people,<br/>profile, shift-requests, notifications)"]
-        APILIB["src/shared/lib/api.ts<br/>bearer auth, 15s timeout,<br/>onAuthFailure hook"]
-        CLIENT["@dubgrid/api-client<br/>createHeaders, appendQueryParams,<br/>createJsonApiRequest, ApiResponseError"]
-        ZODPARSE["Zod response parsing<br/>via @dubgrid/contracts (./mobile)"]
+        SCREEN["Feature screen\n(auth, schedule, people,\nprofile, shift-requests, notifications)"]
+        APILIB["src/shared/lib/api.ts\nbearer auth, 15s timeout,\nonAuthFailure hook"]
+        CLIENT["@dubgrid/api-client\ncreateHeaders, appendQueryParams,\ncreateJsonApiRequest, ApiResponseError"]
+        ZODPARSE["Zod response parsing\nvia @dubgrid/contracts (./mobile)"]
     end
 
-    subgraph Web["apps/web — Route Handlers"]
-        ROUTE["/api/mobile/v1/*<br/>(bootstrap, auth/login, auth/organization,<br/>me/schedule, org/schedule, people,<br/>shift-requests, notifications,<br/>profile, push-tokens, session-presence)"]
+    subgraph Web["apps/web - Route Handlers"]
+        ROUTE["/api/mobile/v1/*\n(bootstrap, auth/login, auth/organization,\nme/schedule, org/schedule, people,\nshift-requests, notifications,\nprofile, push-tokens, session-presence)"]
     end
 
     subgraph Core["@dubgrid/mobile-api-core"]
-        MODULES["Modules: auth, people-status, push,<br/>read, shift-requests, setup, workspace, write<br/>(rejects sandbox workspaces for mobile login)"]
+        MODULES["Modules: auth, organization, people-status,\npush, read, setup, shift-requests, write\n(rejects sandbox orgs for mobile login)"]
     end
 
-    SUPA[("Supabase<br/>(auth + Postgres + RLS)")]
+    SUPA[("Supabase\n(auth + Postgres + RLS)")]
 
     SCREEN --> APILIB
     APILIB --> CLIENT
@@ -997,47 +1251,55 @@ flowchart LR
 
 ---
 
-## 12. Stripe Billing & Subscription Flow
+## 16. Stripe Billing and Subscription Flow
 
 ```mermaid
 flowchart TD
     subgraph Checkout["Checkout"]
-        START["Super Admin starts billing<br/>(billing-required gate or settings)"]
-        CREATE["POST /api/stripe/create-checkout<br/>Create Stripe Checkout Session"]
-        STRIPE["Stripe-hosted checkout page<br/>(user enters payment)"]
-        COMPLETE["POST /api/stripe/checkout-complete<br/>Confirm session, return to app"]
-        PORTAL["POST /api/stripe/billing-portal<br/>Manage existing subscription"]
+        START["Super Admin starts billing\n(billing-required gate or Settings → Billing)"]
+        CREATE["POST /api/stripe/create-checkout\nCreate Stripe Checkout Session"]
+        STRIPE["Stripe-hosted checkout\n(user enters payment)"]
+        COMPLETE["POST /api/stripe/checkout-complete\nConfirm session, return to app"]
+        PORTAL["POST /api/stripe/billing-portal\nManage existing subscription"]
     end
 
     subgraph Webhook["Webhook (source of truth)"]
-        HOOK["POST /api/stripe/webhook<br/>Verify signature"]
-        EVENTS["Handle events:<br/>checkout.session.completed,<br/>customer.subscription.updated/deleted,<br/>invoice.payment_succeeded/failed"]
-        UPDATE["Update organizations:<br/>stripe_customer_id,<br/>stripe_subscription_id,<br/>subscription_status"]
+        HOOK["POST /api/stripe/webhook\nVerify Stripe signature"]
+        EVENTS["Handle events:\ncheckout.session.completed,\ncustomer.subscription.updated/deleted,\ninvoice.payment_succeeded/failed"]
+        UPDATE["UPDATE organizations:\nstripe_customer_id,\nstripe_subscription_id,\nsubscription_status"]
     end
 
-    subgraph Gate["Billing Lock Gate"]
-        CHECK{"Org subscription_status<br/>active / trialing?"}
-        LOCKED["Billing lock active →<br/>OnboardingGate renders<br/>billing-required gate<br/>(route: /billing-required)"]
-        UNLOCKED["App accessible →<br/>continue to onboarding / dashboard"]
+    subgraph Gate["Billing Access Gate (middleware + OnboardingGate)"]
+        EVAL["evaluateOrganizationBillingAccess:\nsubscriptionStatus + trialEndsAt → BillingAccessState"]
+        CHECK{"isLocked?"}
+        LOCKED_SA["isLocked + super_admin:\nRedirect to /settings?section=org-billing"]
+        LOCKED_USER["isLocked + non-super_admin:\nRedirect to /billing-required"]
+        TRIAL_PEND["trial_pending + non-super_admin:\nRedirect to /billing-required\n(held until first super_admin login)"]
+        UNLOCKED["App accessible"]
     end
 
-    GM["Gridmaster oversight:<br/>/api/gridmaster/billing,<br/>/subscription, /stripe-sync"]
+    GM["Gridmaster oversight:\n/api/gridmaster/billing,\n/subscription, /stripe-sync"]
 
     START --> CREATE --> STRIPE --> COMPLETE
-    COMPLETE -.->|"async confirmation"| HOOK
-    STRIPE -.->|"Stripe fires events"| HOOK
+    COMPLETE -.->|async confirmation| HOOK
+    STRIPE -.->|Stripe fires events| HOOK
     PORTAL -.-> HOOK
     HOOK --> EVENTS --> UPDATE
-    UPDATE --> CHECK
-    CHECK -->|No| LOCKED
-    CHECK -->|Yes| UNLOCKED
-    LOCKED --> START
+    UPDATE --> EVAL
+    EVAL --> CHECK
+    CHECK -->|Yes - super_admin| LOCKED_SA
+    CHECK -->|Yes - non-admin| LOCKED_USER
+    CHECK -->|No + trial_pending| TRIAL_PEND
+    CHECK -->|No| UNLOCKED
+    LOCKED_SA --> START
     UPDATE -.-> GM
 
     style Checkout fill:#dbeafe,stroke:#2563eb
     style Webhook fill:#fef3c7,stroke:#d97706
     style Gate fill:#f0fdf4,stroke:#16a34a
-    style LOCKED fill:#fee2e2,stroke:#dc2626
+    style LOCKED_SA fill:#fee2e2,stroke:#dc2626
+    style LOCKED_USER fill:#fee2e2,stroke:#dc2626
+    style TRIAL_PEND fill:#fee2e2,stroke:#dc2626
     style UNLOCKED fill:#bbf7d0,stroke:#16a34a
 ```
 
@@ -1048,24 +1310,24 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph L1["Layer 1: Edge"]
-        MW["apps/web/middleware.ts<br/>Route guards<br/>Subdomain enforcement<br/>JWT verification"]
+        MW["apps/web/middleware.ts\nRoute guards\nSubdomain enforcement\njwtVerify + decodeJwt fallback\nOrg archived/suspended check (Redis-cached)\nBilling lock + trial_pending gate\nSandbox cookie override"]
     end
 
     subgraph L2["Layer 2: Application"]
-        PERMS["usePermissions()<br/>UI-level feature flags<br/>Server Action auth checks"]
+        PERMS["usePermissions()\nUI-level feature flags\nServer Action auth checks via requireOrgPermissions\nSelf-action + tier guards on role changes"]
     end
 
     subgraph L3["Layer 3: Database"]
-        RLSP["RLS Policies<br/>is_gridmaster()<br/>caller_org_id()<br/>check_admin_permission()"]
+        RLSP["RLS Policies\nis_gridmaster()\ncaller_org_id()\ncheck_admin_permission()\nchange_user_role RPC with advisory lock"]
     end
 
     subgraph L4["Layer 4: JWT Hook"]
-        HOOK["custom_access_token_hook<br/>Claims injection<br/>Refresh lock → stripped JWT (not 403)<br/>Archived org filtering"]
+        HOOKL["custom_access_token_hook\nClaims injection at JWT top level\nActive lock → HTTP 403\nPer-session org via user_sessions.active_org_id\nArchived/suspended org strips org claims"]
     end
 
-    L1 -->|"passes"| L2
-    L2 -->|"queries"| L3
-    L4 -->|"feeds claims to"| L1
+    L1 -->|passes| L2
+    L2 -->|queries| L3
+    L4 -->|feeds claims to| L1
 
     style L1 fill:#fef3c7,stroke:#d97706
     style L2 fill:#dbeafe,stroke:#2563eb

@@ -60,7 +60,7 @@
 ## 7. Project-Specific Constraints
 
 - **Monorepo**: npm workspaces + Turborepo. The web app lives in `apps/web`, the Expo
-  mobile app in `apps/mobile`, and shared logic in 9 `packages/*` workspaces. Keep
+  mobile app in `apps/mobile`, and shared logic in 10 `packages/*` workspaces. Keep
   `packages/*` platform-neutral — no Next.js, Expo, React Native, DOM, or Node-only
   imports. A shared-package change affects both apps; verify both
 - **Migrations**: All schema lives in exactly 4 files (001-004). NEVER create new migration files

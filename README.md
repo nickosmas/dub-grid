@@ -5,8 +5,9 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 ## Features
 
 - **Schedule Grid** — 1-week, 2-week, and month views with drag-and-drop shift management
-- **Multi-Tenant** — Subdomain-based org isolation (e.g., `acme.dubgrid.com`)
-- **RBAC** — Four-tier role hierarchy (Gridmaster > Super Admin > Admin > User) with 25 granular admin permissions
+- **Multi-Tenant** — Subdomain-based org isolation (e.g., `acme.dubgrid.com`). Per-session org context: switching organizations only affects the calling device.
+- **RBAC** — Four-tier role hierarchy (Gridmaster > Super Admin > Admin > User) with 25 per-person admin permissions, plus self-action and admin-tier guards
+- **Free Trial** — 14-day trial that starts on the first super admin login; non-super-admins are gated until billing is active
 - **Draft/Publish Workflow** — All edits are drafts until published; discard or recover across sessions
 - **Recurring Shifts** — Day-of-week templates and repeating series (daily, weekly, biweekly)
 - **Real-Time Collaboration** — Live sync via Supabase Realtime with cell locks and presence indicators
@@ -14,11 +15,13 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 - **Staff Management** — Full employee lifecycle (add, edit, bench, terminate) with certifications, roles, and focus areas
 - **Staff Detail Pages** — Tabbed views per employee: Overview, Schedule, Activity
 - **Coverage Tracking** — Define minimum staffing requirements; visualize coverage status per section
-- **Shift Requests** — Pickup and swap request workflow with admin approval
-- **Gridmaster Portal** — Platform-wide org management, user impersonation, audit logs, permission configuration
+- **Shift Requests** — Pickup, swap, and call-off request workflow with admin approval and a full request board
+- **Gridmaster Portal** — Platform-wide org management, user impersonation, audit logs, permission configuration, and org-lifecycle notifications
+- **Onboarding Gate** — Role-aware onboarding rendered inline (no standalone route); non-admins on an unconfigured org see a setup-pending screen
+- **Test Sandbox** — Clone an org's config into an isolated, time-limited sandbox you enter via an HttpOnly cookie (no JWT/subdomain hop)
 - **Invite-Only Registration** — No public sign-up; 72-hour invitation tokens linked to employee records
 - **Password Reset & Email Verification** — Forgot password flow, password strength meter, email verification for new accounts
-- **Print Export** — Configurable print layout with legend, focus area selection, and date range
+- **Print & Export** — Configurable print layout with legend, focus area selection, and date range; PDF/CSV export plus an iCalendar (`.ics`) feed
 
 ## Tech Stack
 
@@ -118,9 +121,10 @@ apps/
 │       ├── features/               # auth, schedule, people, requests, profile, notifications, onboarding
 │       └── shared/                 # mobile-wide providers, navigation, API client, theme, UI shells
 │
-packages/                           # Platform-neutral workspaces (built with tsc → dist/)
+packages/                           # 10 platform-neutral workspaces (built with tsc → dist/)
 ├── api-client/                     # HTTP client primitives (headers, JSON requests, errors)
 ├── authz/                          # Permission logic — roles, perms, JWT claim extraction
+├── client-errors/                  # Shared client-facing error translation (web + mobile)
 ├── contracts/                      # Shared Zod schemas + inferred API contract types
 ├── data-access/                    # Supabase queries + data mapping (shared mobile data layer)
 ├── db-types/                       # DB-row TypeScript types
@@ -172,11 +176,20 @@ seed.ts                             # Root seed runner (executes the SQL seed fi
 | `npm run seed`            | Seed the local database (runs `seed.ts` → SQL seed files)|
 | `npm run db:reset`        | Reset local Supabase DB (runs migrations + seed)         |
 | `npm run db:reset:remote` | Reset remote Supabase DB (for staging environments)      |
-| `npm run doctor:mobile`   | Diagnose the mobile app's local environment setup        |
+| `node scripts/doctor-mobile.mjs` | Diagnose the mobile app's local environment setup |
 | `npm run use:local`       | Switch .env.local to local Supabase credentials          |
 | `npm run use:mobile:local`| Generate `apps/mobile/.env.local` for local phone testing|
 | `npm run use:mobile:remote`| Copy remote mobile envs into `apps/mobile/.env.local`   |
 | `npm run use:remote`      | Switch .env.local to remote Supabase credentials         |
+
+## Emails
+
+Transactional and Supabase auth emails are authored as [react-email](https://react.email) components in `apps/web/src/emails/`. From the web workspace:
+
+- `npm --workspace @dubgrid/web run email:dev` — preview email components locally
+- `npm --workspace @dubgrid/web run email:build` — regenerate the Supabase auth templates under `supabase/templates/*.html`
+
+Runtime sending uses Resend; `apps/web/src/lib/email.ts` holds only small helpers (`sanitizeHeaderValue`, `emailBaseUrl`).
 
 ## Turbo Remote Cache
 
@@ -220,7 +233,7 @@ Deployed on **Vercel** with a hosted **Supabase** backend. Edge middleware runs 
 
 Key configuration:
 - All routes are simple pages (no catch-all routes) to enable static prerendering
-- Security headers configured in `apps/web/next.config.ts`
+- Static security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) live in `apps/web/next.config.ts`; the per-request Content-Security-Policy (nonce-based on authenticated pages) is built in `apps/web/middleware.ts`
 - Custom access token hook must be enabled in the Supabase dashboard
 
 ## Mobile On A Real Phone

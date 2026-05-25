@@ -6,7 +6,7 @@
 
 DubGrid is a multi-tenant employee scheduling platform built for care facilities. The system replaces spreadsheet-based scheduling with a real-time collaborative web application plus a companion mobile app, supporting multiple organizations, each isolated by subdomain.
 
-DubGrid is a **monorepo** — npm workspaces orchestrated by Turborepo — containing two apps (`apps/web`, `apps/mobile`), nine shared packages (`packages/*`), and the Supabase project (`supabase/`). The web app is the source of truth for all business logic and the database; the mobile app is a thin client that talks only to a versioned mobile API surface served by the web app.
+DubGrid is a **monorepo** — npm workspaces orchestrated by Turborepo — containing two apps (`apps/web`, `apps/mobile`), ten shared packages (`packages/*`), and the Supabase project (`supabase/`). The web app is the source of truth for all business logic and the database; the mobile app is a thin client that talks only to a versioned mobile API surface served by the web app.
 
 ```
 ┌──────────────────────────────┐      ┌──────────────────────────────┐
@@ -60,7 +60,7 @@ DubGrid uses **npm workspaces** (`apps/*`, `packages/*`) orchestrated by **Turbo
 
 ### Shared Packages
 
-All nine packages are private, versioned `0.1.0`, ESM, and build with `tsc` to `dist/`.
+All ten packages are private, versioned `0.1.0`, ESM, and build with `tsc` to `dist/`.
 
 | Package | Purpose | Depends on |
 | ------- | ------- | ---------- |
@@ -72,14 +72,16 @@ All nine packages are private, versioned `0.1.0`, ESM, and build with `tsc` to `
 | `@dubgrid/data-access` | Supabase query + data-mapping layer; currently powers the shared mobile data layer. | `contracts`, `db-types`, `domain`, `@supabase/supabase-js` |
 | `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes. Modules: `auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`. Rejects sandbox organizations for mobile login. | `authz`, `contracts`, `domain`, `schedule-core`, `@supabase/supabase-js` |
 | `@dubgrid/api-client` | Platform-neutral HTTP client primitives: `createHeaders`, `appendQueryParams`, `createJsonApiRequest`, `ApiResponseError`. | none |
+| `@dubgrid/client-errors` | Shared client-facing error translation: friendly-copy pattern tables, network-error detection, and `formatClientErrorMessage`. Both apps delegate to it so a single source of truth governs which raw errors are rewritten and which are hidden behind a fallback. | none |
 | `@dubgrid/design-tokens` | Shared design values. | none |
 
 ### Dependency Boundaries
 
 ```
-apps/web    consumes →  authz · contracts · data-access · db-types ·
-                        design-tokens · domain · mobile-api-core
-apps/mobile consumes →  api-client · contracts · design-tokens · schedule-core
+apps/web    consumes →  authz · client-errors · contracts · data-access ·
+                        db-types · design-tokens · domain · mobile-api-core
+apps/mobile consumes →  api-client · client-errors · contracts ·
+                        design-tokens · schedule-core
 ```
 
 The mobile app intentionally has **no** dependency on Supabase packages or server-only logic — it reaches the backend exclusively through HTTP. The web app is the only workspace that touches the database directly.
@@ -183,7 +185,7 @@ Model rules:
 
 - `canViewSchedule` and `canViewStaff` (*) are always true for any authenticated user.
 - **View implications** — `canManage*` implies the matching `canView*`. Applied by `applyViewImplications` in `@dubgrid/authz`.
-- **Department template union** — management departments define permission templates; members inherit permissions via union across their departments (most permissive wins, `unionPermissions`).
+- **Per-person, not per-department** — a member's effective permissions are their `org_role` plus the per-person `admin_permissions` set on the People page. Departments do **not** grant permissions; `departments.permissions` is vestigial. (An earlier department-template union model was reverted; `unionPermissions` still exists in `@dubgrid/authz` but no longer drives a member's effective permissions.)
 - Super admins toggle these per user via the AdminPermissionsEditor component.
 - Always super-admin-only and **not delegable**: `canManageUsers`, `canConfigureAdminPermissions`, `canManageOrgSettings`.
 
@@ -198,6 +200,18 @@ The authentication system includes complete self-service flows:
 - **Email Verification** (`/verify-email`) — Verification page with resend button (60-second cooldown). Auto-redirects on successful verification via auth event listener.
 
 All auth pages use the `AuthCard` layout component (`PageShell` + `Card`) and `PasswordInput` / `PasswordStrength` reusable components from `apps/web/src/components/auth/`.
+
+### Post-Login Soft Navigation
+
+Login redirects with a soft `router.replace("/dashboard")` (not a hard `window.location` change). A `markAuthTransition()` flag (`apps/web/src/lib/auth-transition.ts`) plus an `<AuthSplash>` bridge the gap while the auth session settles, so the route guards do not bounce a freshly-authenticated user back to `/login`. Logout is the opposite: fast, no splash, and always redirects to `/login` in a `finally`.
+
+### Trial Activation
+
+A new organization's 14-day trial clock starts on the **first super admin login**, via the idempotent `start_trial_for_org(p_org_id)` RPC called from the web and mobile login flows (it self-gates to super admins). Until the trial starts, the org is in a `trial_pending` billing state that gates non-super-admins. `GET /api/account/.../trial-welcome` (`/api/trial-welcome`) reports whether the one-time welcome modal should show for the super admin and lazily sends the "trial started" email exactly once, claiming the send atomically against `organizations.trial_welcome_email_sent_at` to avoid duplicates under polling. The email is the react-email `TrialWelcomeEmail` component.
+
+### Per-Session Org Isolation
+
+`user_sessions.active_org_id` drives the JWT org claims per session, so the `switch_org` RPC only changes the org context for the calling device. `profiles.org_id` is just the default org applied to new sign-ins. Org soft-delete (super admin self-delete from the Settings danger zone) sets `organizations.archived_at`, which revokes access across middleware, `get_my_organizations`, the JWT hook, and `switch_org`.
 
 ---
 
@@ -269,7 +283,7 @@ publish_history         — schedule publish audit trail
 ### Key Schema Patterns
 
 - **Canonical schedule state** — dated schedule truth lives in `schedule_cells`, `schedule_cell_snapshots`, and `schedule_cell_segments` (there is no flat `shifts` table). Recurring and series templates store only `ScheduleCellState` JSON in `recurring_shifts.state` and `shift_series.state`; derived assignment IDs and labels are read-model compatibility only.
-- **Two-type departments** — `departments.type` is `scheduled` or `management`. Scheduled departments organize the schedule grid; management departments define admin-permission templates. Focus areas are children of departments.
+- **Two-type departments** — `departments.type` is `scheduled` or `management`. Scheduled departments organize the schedule grid; management departments group operations staff. (`departments.permissions` exists for management departments but is vestigial: permissions are per-person, not granted by departments.) Focus areas are children of departments.
 - **Workspace kind / sandboxes** — `organizations.workspace_kind` is `production` or `sandbox`. Sandbox orgs clone a source org's config (`sandbox_source_org_id`), are owned by their creator (`sandbox_owner_user_id`), expire after 30 days (`sandbox_expires_at`), carry a `sandbox_template_version`, and are excluded from mobile login.
 - **Optimistic locking** — `schedule_cells.version` prevents concurrent overwrites. Writes include the expected version; a mismatch means another user edited first.
 - **Idempotency keys** — `role_change_log.idempotency_key` prevents duplicate role/audit writes from network retries.
@@ -355,7 +369,9 @@ Telemetry flows through `apps/web/src/lib/onboarding-telemetry.ts` (PostHog wrap
 
 ### Test Sandbox
 
-`apps/web/src/features/test-sandbox/` + `app/api/test-sandbox/` implement a "test sandbox": cloning an org's config into an isolated `workspace_kind='sandbox'` org with a 30-day TTL. The API route is a `force-dynamic` POST guarded by CSRF + rate limiting (`testSandboxLimiter`); actions are `create` / `reset` / `archive`.
+`apps/web/src/features/test-sandbox/server.ts` + `app/api/test-sandbox/route.ts` implement a cookie-based "test sandbox": it clones a super admin's source org config into an isolated `workspace_kind='sandbox'` org and enters that org via an HttpOnly cookie (`dubgrid-sandbox`), rather than a JWT refresh or subdomain hop. The auth layer rewrites `claims.org_id` to the sandbox while the cookie is present.
+
+The `force-dynamic` POST is guarded by a CSRF origin check, and its actions are `enter` (reuse an existing sandbox or create a fresh clone), `reset` (wipe and re-clone for a clean slate), and `exit` (delete the user's sandboxes and clear the cookie). The sandbox cookie is HttpOnly, `sameSite=lax`, and `secure` in production. Sandboxes are owned by the creating user, carry a 30-day TTL, and are excluded from mobile login.
 
 ### Styling Architecture
 
@@ -366,7 +382,8 @@ Tailwind v4 is the foundation, layered with shared style modules and `@dubgrid/d
 | `apps/web/src/lib/palette.ts` | Static hex values matching CSS custom properties, for JS inline styles. |
 | `apps/web/src/lib/colors.ts` | Color presets for jobs, shifts, focus areas; draft border + designation badge colors. |
 | `apps/web/src/lib/styles.ts` | Shared CSS-in-JS style objects for consistent layouts. |
-| `apps/web/src/lib/email.ts` | Branded HTML email templates with sanitization utilities. |
+| `apps/web/src/emails/` | react-email components for transactional + Supabase auth emails (`email:dev` previews, `email:build` regenerates `supabase/templates/*.html`). |
+| `apps/web/src/lib/email.ts` | Small email helpers (`sanitizeHeaderValue`, `emailBaseUrl`) — the HTML now lives in `src/emails/`. |
 
 Two parallel button/input vocabularies coexist by design: `dg-btn-*` / `dg-input` inside the authenticated app, and `dg-auth-*` for public auth flows. See `CLAUDE.md` for the full design-system conventions.
 
@@ -440,7 +457,7 @@ DubGrid uses Supabase Realtime for three purposes:
 
 - **Edge Middleware** — runs at the CDN edge for low-latency RBAC, subdomain routing, and org-suspension checks.
 - **Static Prerendering** — all routes use simple page files (no catch-all routes) to enable static optimization.
-- **Security Headers** — HSTS, X-Frame-Options, CSP, and others configured in `apps/web/next.config.ts`.
+- **Security Headers** — static headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) are configured in `apps/web/next.config.ts`. The per-request Content-Security-Policy is built in `apps/web/middleware.ts`: authenticated pages get a nonce + `strict-dynamic` policy in production.
 
 ### Supabase
 
@@ -491,7 +508,7 @@ DubGrid uses Supabase Realtime for three purposes:
 | **Subdomain-based multi-tenancy** | Strongest tenant isolation — org context is in the URL, not a query parameter. Prevents accidental cross-tenant data access. |
 | **JWT claims at top level** | Middleware reads `payload.platform_role` directly. Avoids the `app_metadata` nesting Supabase defaults to, which is harder to parse at the edge. |
 | **RLS as the real security boundary** | Middleware is a fast first filter that can fail; RLS at the database is the authoritative gate. Middleware keeps a `decodeJwt` fallback for non-gridmaster users so a `jwtVerify` failure never locks legitimate users out. |
-| **Per-user admin permissions (JSONB)** | More flexible than fixed roles. 25 individually-toggled flags, with `canManage*` implying `canView*` and management-department templates merged by union. Organizations build custom permission profiles without schema changes. |
+| **Per-person admin permissions (JSONB)** | More flexible than fixed roles. 25 individually-toggled flags set per person on the People page, with `canManage*` implying `canView*`. Departments do not grant permissions. Organizations build custom permission profiles without schema changes. |
 | **Browser never touches data tables** | All app data flows browser → `features/*/client/api.ts` → Route Handler → `lib/db/*`. Centralizes authorization and keeps Supabase access server-side; mobile follows the same shape via `/api/mobile/v1/*` → `mobile-api-core`. |
 | **No global state store** | React Query handles server state; local state handles UI. Avoids Redux/Zustand boilerplate for a primarily server-data-driven app. |
 | **Optimistic locking over pessimistic** | Allows concurrent editing without blocking. Lock violations are rare (cell locks reduce conflicts further) and the UX beats waiting for locks. |

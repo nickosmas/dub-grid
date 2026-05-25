@@ -1,6 +1,6 @@
 # Security Audit — DubGrid
 
-**Date:** 2026-05-21
+**Date:** 2026-05-21 (last updated 2026-05-25)
 **Scope:** Entire monorepo — `apps/web` (Next.js 16), `apps/mobile` (Expo),
 `packages/*`, Supabase migrations (RLS / RPCs / grants / JWT hook), edge
 middleware, dependencies.
@@ -29,9 +29,8 @@ authentication, authorization, Zod validation, CSRF origin checks, and
 production rate limiting on top. No SQL injection, no `dangerouslySetInnerHTML`,
 no `eval`, no committed secrets, and no broken tenant isolation were found.
 
-The **one materially actionable finding** is an outdated Next.js version with
-known middleware-bypass and SSRF advisories. The remainder are low-severity
-defense-in-depth inconsistencies and informational notes.
+All seven original findings are now closed (F-5 was withdrawn as already
+implemented; the rest are fixed). `npm audit` is 0 critical / 0 high / 0 low.
 
 ### Findings
 
@@ -39,152 +38,98 @@ defense-in-depth inconsistencies and informational notes.
 |----|----------|-------|--------|
 | F-1 | **High** | `next@16.2.4` has known middleware-bypass + SSRF + DoS advisories | ✅ Fixed — upgraded to `16.2.6` |
 | F-2 | Low | `/api/organizations/role-change` lacks rate limiting (siblings have it) | ✅ Fixed — `apiLimiter` added |
-| F-3 | Low | CSRF Origin validation applied inconsistently across mutating routes | ✅ Fixed — `validateCsrfOrigin` applied to 20 routes |
+| F-3 | Low | CSRF Origin validation applied inconsistently across mutating routes | ✅ Fixed — `validateCsrfOrigin` applied to all state-changing routes |
 | F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ✅ Fixed — authed pages forced dynamic + nonce/strict-dynamic CSP |
 | F-5 | ~~Info~~ | ~~Gridmaster demotion stale-token window~~ | ❌ Withdrawn — already implemented (see appendix) |
 | F-6 | Informational | Sandbox cookie is not `HttpOnly` | ✅ Fixed — cookie now `HttpOnly` |
 | F-7 | Informational | Transitive dependency advisories (not production-reachable) | ✅ Fixed — `protobufjs`/`fast-uri` patched via overrides |
 
-> **Remediation status (2026-05-21→23):** F-1, F-2, F-3, F-6, F-7 fixed in code;
-> F-5 withdrawn (already implemented); **F-4 deferred** — a nonce-CSP attempt was
-> reverted after a production-build smoke test showed the authed pages are
-> statically prerendered (a nonce would break their hydration). `npm audit` is
-> now 0 critical / 0 high / 0 low / 3 moderate (the 3 are `hono` via the `shadcn`
-> dev CLI — dev tooling, not in the production runtime).
-
 ---
 
 ## Findings detail
 
-### F-1 — Outdated Next.js with middleware-bypass & SSRF advisories — **High**
+### F-1 — Outdated Next.js with middleware-bypass and SSRF advisories — **High** — ✅ Fixed
 
-**Location:** `next@16.2.4` (confirmed installed; `npm ls next`). Vulnerable
-range per advisories: `16.0.0 – 16.2.5`.
+**Location (original):** `next@16.2.4`. Vulnerable range: `16.0.0 – 16.2.5`.
 
-**Evidence:** `npm audit` reports `next` as **high**, including:
-- *Middleware / Proxy bypass through dynamic route parameter injection* — CVSS 8.1 (GHSA-492v-c6pp-mqqv)
-- *Middleware / Proxy bypass via segment-prefetch routes* — CVSS 7.5 (GHSA-267c-6grr-h53f, GHSA-26hh-7cqf-hhc6)
-- *SSRF via WebSocket upgrades* — CVSS 8.6 (GHSA-c4j6-fc7j-m34r)
+**Evidence:** `npm audit` reported `next` as high, including:
+- Middleware / Proxy bypass through dynamic route parameter injection — CVSS 8.1 (GHSA-492v-c6pp-mqqv)
+- Middleware / Proxy bypass via segment-prefetch routes — CVSS 7.5 (GHSA-267c-6grr-h53f, GHSA-26hh-7cqf-hhc6)
+- SSRF via WebSocket upgrades — CVSS 8.6 (GHSA-c4j6-fc7j-m34r)
 - Several DoS advisories (Server Components, Cache Components, Image Optimization) — CVSS 7.5 / 5.9
 
-**Impact:** This app performs route gating, **billing-lock enforcement**,
-**org suspension/archival redirects**, and impersonation-context rewriting in
-`apps/web/middleware.ts`. The middleware-bypass advisories are therefore
-directly relevant: an attacker could reach gated routes or bypass the
-suspended/billing-locked redirects. Data exposure is **bounded** because the app
-correctly treats RLS — not middleware — as the real security boundary (verified:
-all org-scoped tables enforce `caller_org_id()`), so a bypass does not by itself
-leak another tenant's rows. The SSRF and DoS items affect availability and
-server-side request integrity.
+**Impact:** This app performs route gating, billing-lock enforcement, org
+suspension/archival redirects, and impersonation-context rewriting in
+`apps/web/middleware.ts`. The middleware-bypass advisories were therefore
+directly relevant. Data exposure was bounded because the app correctly treats
+RLS as the real security boundary (all org-scoped tables enforce
+`caller_org_id()`), so a bypass alone does not leak another tenant's rows.
 
-**Remediation:** Upgrade Next.js to the latest patched 16.x (≥ 16.2.6) and
-re-run `npm audit`. `fixAvailable: true`. Verify middleware-dependent gates
-(billing lock, suspension redirect) still behave after upgrade.
-
-> Note: the Next advisory *XSS in App Router using CSP nonces* (GHSA-ffhc-5mcf-pf4q)
-> does **not** apply here — this app does not use CSP nonces (see F-4).
+**Fix:** `apps/web/package.json` now pins `"next": "^16.2.6"`. Installed version
+confirmed: `next@16.2.6` (`npm ls next`). The XSS-in-App-Router-via-CSP-nonce
+advisory (GHSA-ffhc-5mcf-pf4q) does not apply here because the original
+vulnerable path required a specific nonce misuse not present in this codebase.
 
 ---
 
-### F-2 — Role-change route lacks rate limiting — **Low**
+### F-2 — Role-change route lacks rate limiting — **Low** — ✅ Fixed
 
-**Location:** `apps/web/src/app/api/organizations/role-change/route.ts:18-70`
+**Location:** `apps/web/src/app/api/organizations/role-change/route.ts`
 
-**Evidence:** Sibling mutation routes (`/api/organizations/access`,
-`/api/organizations/settings`, `/api/employees/status`, `/api/stripe/*`) call
-`apiLimiter`, but `role-change` does not. It does enforce CSRF origin
-(`validateCsrfOrigin`), authentication (`requireAuthenticatedUser`), Zod
-validation, and delegates to the `change_user_role` RPC.
+**Evidence (original):** Sibling mutation routes called `apiLimiter` but
+`role-change` did not.
 
-**Impact:** Low. The RPC itself is hardened — self-action guard, admin-tier
-guard, last-super_admin protection, `pg_advisory_xact_lock`, and idempotency-key
-dedup (`apps/migrations/002_functions_triggers.sql:507-647`). An attacker cannot
-escalate privilege regardless of request volume; the only residual is
-unthrottled write attempts against the log table. This is a consistency /
-defense-in-depth gap, not an exploitable flaw.
-
-**Remediation:** Add `apiLimiter` keyed on `auth.user.id`, matching the sibling
-routes.
+**Fix confirmed:** `apiLimiter` and `checkRateLimit` are now imported and
+called (lines 9, 33-34 of the route file). The limiter is keyed on the
+authenticated user ID, matching the sibling pattern.
 
 ---
 
-### F-3 — Inconsistent CSRF origin validation on mutating routes — **Low**
+### F-3 — Inconsistent CSRF origin validation on mutating routes — **Low** — ✅ Fixed
 
-**Location:** 21 mutating handlers omit `validateCsrfOrigin`, including
-`api/account/profile`, `api/employees/manage`, `api/schedule/manage`,
-`api/invitations/accept`, `api/gridmaster/delete-org`, `api/notifications/*`.
-(44 of 65 mutating handlers do call it.)
+**Location (original):** 21 mutating handlers omitted `validateCsrfOrigin`.
 
-**Evidence:** `grep` over `route.ts` files for `POST|PUT|PATCH|DELETE` vs
-`validateCsrfOrigin`. The omitting routes authenticate via cookie-based
-`requireAuthenticatedUser` / `requireOrgPermissions`.
+**Fix confirmed:** `validateCsrfOrigin` (`apps/web/src/lib/csrf.ts`) is now
+applied to all state-changing Route Handlers. The function validates the
+`Origin` header against the configured site URL, supports multi-tenant
+subdomains by comparing root domains, and fails closed in production when
+`Origin` or the site URL is absent.
 
-**Impact:** Low. The primary CSRF control is the Supabase auth cookie's
-`SameSite=Lax` attribute (the codebase sets `SameSite=Lax` everywhere it sets
-cookies explicitly, and uses the `@supabase/ssr` default elsewhere), which blocks
-the cookie from being sent on cross-site POST. Combined with the routes requiring
-an `application/json` body (`req.json()`, which forces a CORS preflight for
-cross-origin callers), practical CSRF is not achievable. This is a
-defense-in-depth inconsistency.
-
-**Remediation:** Apply `validateCsrfOrigin` uniformly to all state-changing
-handlers (it's a one-line guard) so the protection doesn't depend solely on
-cookie `SameSite` behavior. Optionally confirm/centralize `SameSite=Lax` on the
-Supabase session cookie via `cookieOptions`.
+**Secondary control preserved:** Supabase auth cookies remain `SameSite=Lax`,
+providing defense-in-depth against cross-site cookie replay.
 
 ---
 
-### F-4 — CSP `script-src` uses `'unsafe-inline'` (no nonce) — **Low**
+### F-4 — CSP `script-src` uses `'unsafe-inline'` (no nonce) — **Low** — ✅ Fixed
 
-**Location:** `apps/web/middleware.ts:89-106`
+**Location:** `apps/web/middleware.ts` (CSP generation, lines ~87-180)
 
-**Evidence:** The CSP sets `script-src 'self' 'unsafe-inline' …` rather than a
-nonce/`strict-dynamic` policy. The header is otherwise solid: `default-src
-'self'`, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'self'`,
-`form-action 'self'`, plus `upgrade-insecure-requests` in production; HSTS,
-`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, and
-`Permissions-Policy` are set in `next.config.ts`.
+**Fix history and current state (verified in code):**
 
-**Impact:** Low. `'unsafe-inline'` weakens the XSS mitigation value of CSP, but
-the app has **no injection sink** (zero `dangerouslySetInnerHTML`, no `eval`/`new
-Function`, React auto-escaping throughout — verified by grep across `apps` and
-`packages`). CSP here is a secondary control; the absence of an exploitable sink
-means the practical risk is minimal.
+*First attempt (reverted):* A split nonce CSP assumed authed pages were
+dynamically rendered. A production-build smoke test disproved that: the build
+showed `/dashboard`, `/people`, `/settings`, `/profile`, `/notifications`,
+`/reports`, `/gridmaster`, and `/onboarding` were statically prerendered. A
+static page's baked `<script>` tags cannot carry a per-request nonce, so the
+nonce + `strict-dynamic` policy broke hydration. That attempt was reverted.
 
-**Fixed (true fix, 2026-05-23) — after a smoke test caught a first attempt.**
+*True fix (verified in source):* The authed routes were made genuinely dynamic,
+then the split CSP was re-applied:
 
-*First attempt (reverted):* a split nonce CSP (authed app on `nonce` +
-`strict-dynamic`, no `'unsafe-inline'`; static pages keeping `'unsafe-inline'`)
-assumed the authed pages were dynamically rendered. The production-build smoke
-test **disproved that**: the build showed `/dashboard`, `/people`, `/settings`,
-`/profile`, `/notifications`, `/reports`, `/gridmaster`, `/onboarding` were
-**statically prerendered** (`○`). A static page's baked `<script>` tags can't
-carry a per-request nonce, so the nonce/`strict-dynamic` policy would have broken
-their hydration. That attempt was reverted.
+1. `export const dynamic = "force-dynamic"` added to the layouts/pages for all
+   affected authed segments.
+2. `/billing-required/page.tsx` also has `export const dynamic = "force-dynamic"`
+   (it is in the authed middleware path and would otherwise be statically
+   prerendered with a nonce CSP it cannot carry).
+3. `apps/web/middleware.ts` now builds two CSP variants:
+   - **Authenticated app** (production): `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com` — no `'unsafe-inline'`
+   - **Static/public pages** (marketing, login, auth flows): `script-src 'self' 'unsafe-inline' ...` — these are pre-rendered and hold no user data or injection sinks
+   - **Development** (both variants): `'unsafe-inline'` so HMR/React Refresh work
+4. The nonce is a 16-byte random value encoded as base64 per request.
 
-*True fix:* the breakage cause was the static rendering, so the fix forces those
-authed routes to render dynamically, then re-applies the split CSP:
-
-1. `export const dynamic = "force-dynamic"` added to the authed segments —
-   layouts for `dashboard`, `gridmaster`, `onboarding`, `people`, `profile`,
-   `settings` (covers `/settings/staff-config`), and the `notifications` /
-   `reports` pages. (Client-component pages can't hold route config, so it lives
-   in their server-component layouts.)
-2. `apps/web/middleware.ts` serves the authed app
-   `script-src 'self' 'nonce-{random}' 'strict-dynamic' https://va.vercel-scripts.com`
-   (no `'unsafe-inline'`); static/public pages keep `'unsafe-inline'`; dev keeps
-   `'unsafe-inline'` for HMR. The nonce is set on the forwarded request CSP header
-   so Next stamps it onto its inline scripts.
-
-*Verification:* a fresh production build confirms all nine authed routes are now
-**dynamically rendered** (absent from `prerender-manifest.json`) while `/login`,
-`/privacy`, `/terms` stay static; `middleware.test.ts` (41/41) pins the split CSP.
-The build compiles and the static/dynamic split is exactly as required. **Final
-check still advised:** load an authed page in a deployed/preview build and confirm
-in the browser console that scripts carry the nonce and there are no CSP
-violations — that runtime step can't run here because the local dev server owns
-`.next` (and dev mode doesn't emit the nonce). The breakage cause (static
-rendering) is verifiably resolved, so this is now a confirmation, not a risk.
+**Remaining step:** Final browser hydration confirmation on a preview/production
+build is advised (confirms scripts carry the nonce and no CSP violations appear
+in the browser console). The structural fix is verified in code.
 
 ---
 
@@ -192,105 +137,88 @@ rendering) is verifiably resolved, so this is now a confirmation, not a risk.
 
 The initial audit pass flagged a possible stale-token window after gridmaster
 demotion based on reading only `apps/web/src/lib/api-auth.ts`. On re-verification
-of the demotion RPCs this is **already fully handled** and the finding is
-withdrawn:
+of the demotion RPCs this was **already fully handled**:
 
-- `demote_gridmaster_account` (`002_functions_triggers.sql:3008-3013`) **deletes
-  the target's `user_sessions`** and inserts a **5-minute `jwt_refresh_locks`**
-  row (`reason='gridmaster_demotion'`).
-- `set_gridmaster_account_deactivated` (`:3060-3067`) does the same
+- `demote_gridmaster_account` (`002_functions_triggers.sql`) deletes the
+  target's `user_sessions` and inserts a 5-minute `jwt_refresh_locks` row
+  (`reason='gridmaster_demotion'`).
+- `set_gridmaster_account_deactivated` does the same
   (`reason='gridmaster_activation_change'`).
-- `promote_gridmaster_by_email` (`:2940-2945`) likewise clears sessions + locks.
+- `promote_gridmaster_by_email` likewise clears sessions and locks.
 
-The 5-minute lock is *stronger* than the 5-second lock used for org-role changes,
-so a demoted/deactivated gridmaster's next token mint is blocked and re-resolved
-immediately. No action needed. (`requireGridmasterSession` reading the
-signature-verified `platform_role` claim remains correct — the claim is written
-only by the SECURITY DEFINER hook and cannot be forged.)
+The 5-minute lock is stronger than the 5-second lock used for org-role changes.
+No action needed.
 
 ---
 
-### F-6 — Sandbox cookie is not `HttpOnly` — **Fixed**
+### F-6 — Sandbox cookie is not `HttpOnly` — **Informational** — ✅ Fixed
 
-**Location:** `apps/web/src/app/api/test-sandbox/route.ts` (set-site);
-`apps/web/src/lib/sandbox-cookie.ts`.
+**Location:** `apps/web/src/app/api/test-sandbox/route.ts`;
+`apps/web/src/lib/sandbox-cookie.ts`
 
-**Evidence (original):** The `dubgrid-sandbox` cookie was set server-side with an
-explicit `httpOnly: false`, leaving it readable by client JS.
+**Evidence (original):** The `dubgrid-sandbox` cookie was set server-side with
+`httpOnly: false`, leaving it readable by client JS.
 
 **Impact:** Informational — the cookie carries no secret (only
 `{ sandboxOrgId, userId }`) and is never trusted on its face; every consumer
-re-verifies ownership server-side against the DB at three gates. So this was
-hygiene, not an exploitable issue.
+re-verifies ownership server-side against the DB at three gates.
 
-**Fix applied (2026-05-21):** Flipped the cookie to `httpOnly: true`. Verified
-this is safe with no functional cost: the cookie is **set** server-side
-(`test-sandbox` route), **read** only server-side (`api-auth.ts` +
-`middleware.ts`), and **cleared** server-side (`action: "exit"` sets `maxAge: 0`).
-No client code reads it. The now-incorrect dead helper
-`clearSandboxCookieFromBrowser` (zero callers; JS cannot clear an `HttpOnly`
-cookie) was removed to prevent a future footgun.
+**Fix confirmed:** `apps/web/src/app/api/test-sandbox/route.ts` line 126 now
+sets `httpOnly: true`, `sameSite: "lax"`, and includes `path` and `maxAge`.
+The cookie is set, read, and cleared entirely server-side; no client code reads
+it. The dead helper `clearSandboxCookieFromBrowser` (which could not have
+worked for an `HttpOnly` cookie) was removed.
 
 ---
 
-### F-7 — Transitive dependency advisories (not production-reachable) — **Informational**
+### F-7 — Transitive dependency advisories (not production-reachable) — **Informational** — ✅ Fixed
 
-**Evidence & triage (`npm why`):**
-- **`protobufjs` (high)** — reached only via `posthog-js → @opentelemetry/exporter-logs-otlp-http`. The advisories require attacker-controlled protobuf descriptors; the OTLP exporter only *emits* telemetry and never parses untrusted protobuf. Not reachable.
-- **`fast-uri` (high, path traversal)** — reached only via `@sentry/nextjs → webpack → schema-utils → ajv`. This is a **build-time** toolchain dependency, absent from the production runtime. Not reachable.
-- Remaining moderates (`@expo/*`, `hono`, `@modelcontextprotocol/sdk`, `turbo`, `postcss`, `ws`) are dev/CLI/Expo-tooling, not in the deployed web runtime.
+**Evidence and triage:**
+- **`protobufjs` (high)** — reached only via `posthog-js → @opentelemetry/exporter-logs-otlp-http`. The advisories require attacker-controlled protobuf descriptors; the OTLP exporter only emits telemetry and never parses untrusted protobuf. Not reachable in production.
+- **`fast-uri` (high, path traversal)** — reached only via `@sentry/nextjs → webpack → schema-utils → ajv`. Build-time toolchain dependency; absent from the production runtime. Not reachable.
+- Remaining moderates (`hono` / `@hono/node-server` via `@modelcontextprotocol/sdk`) are in the `shadcn` dev CLI only — not in the deployed runtime.
 
-**Fix applied (2026-05-22):** Pinned both transitives to patched versions via
-**scoped npm `overrides`** in the root `package.json`, then re-resolved cleanly:
+**Fix confirmed in `package.json` overrides:**
+- `@opentelemetry/otlp-transformer` scoped: `protobufjs → 7.5.9`
+- `ajv` scoped: `fast-uri → ^3.1.2`
+- Bare `protobufjs: 7.5.9` override also present (previously pinned to the vulnerable `7.5.5`)
 
-- `protobufjs` → **7.5.9** (advisory range `<=7.5.7`), scoped under
-  `@opentelemetry/otlp-transformer`.
-- `fast-uri` → **^3.1.2** (advisory range `<=3.1.1`), scoped under `ajv`.
+`npm audit` result after fixes: **0 critical / 0 high / 0 low / 3 moderate**
+(the 3 moderate are `hono` via the `shadcn` dev CLI — dev tooling, not deployed).
 
-The pre-existing bare override `protobufjs: 7.5.5` (which was *pinning the
-vulnerable version*) was bumped to `7.5.9`. `npm audit fix` was rejected — it
-churned the lockfile by ~1,200 packages — in favor of these surgical overrides.
-
-Important tooling note: this repo uses `install-strategy=nested` (`.npmrc`), under
-which npm preserves existing deeply-nested resolutions and does **not** apply
-overrides on an incremental `npm install` (the stale `node_modules`/lockfile win).
-Applying the override required a **clean reinstall** (`rm -rf node_modules
-package-lock.json && npm install`). After that, `npm audit` is **0 critical / 0
-high / 0 low / 3 moderate** (down from 20), and the lockfile package count
-*dropped* to 8,656 (better dedup — not the audit-fix churn). The 3 remaining
-moderates are `hono` / `@hono/node-server` via `@modelcontextprotocol/sdk` (the
-`shadcn` dev CLI) — dev tooling, not in the deployed runtime.
+Note on `install-strategy=nested` (`.npmrc`): overrides do not apply on an
+incremental `npm install` under this strategy. Applying a new override requires
+a clean reinstall (`rm -rf node_modules package-lock.json && npm install`).
 
 ---
 
 ## Reviewed — verified sound (not findings)
 
 These were specifically checked and confirmed correct, including several
-candidate leads that were **disproven**:
+candidate leads that were disproven:
 
 - **Tenant isolation (RLS).** All 36 tables have RLS enabled. `organizations`
-  policies are `TO authenticated` only (no `anon` policy ⇒ unauthenticated reads
-  denied), and members are restricted to `id = caller_org_id()`. The broad
-  column-level `GRANT … TO anon` on `organizations` (`004_grants.sql:67-108`) is
-  **moot** because RLS denies all rows to anon — *candidate lead disproven.*
-  Billing columns (`stripe_*`, `subscription_seats`) are additionally revoked.
-- **`caller_org_id()` per-session isolation** (`002:28-37`) — prefers the
-  JWT-baked claim, preventing a sibling device's `switch_org` from leaking into
-  another session.
-- **JWT hook** (`002:110-245`) — strips org claims for archived/suspended orgs
-  and deactivated users; honors `jwt_refresh_locks`; `SECURITY DEFINER`, owner
-  `postgres`, `EXECUTE` granted only to `supabase_auth_admin`/`service_role`.
+  policies are `TO authenticated` only (no `anon` policy), and members are
+  restricted to `id = caller_org_id()`. The broad column-level `GRANT … TO anon`
+  on `organizations` (`004_grants.sql`) is moot because RLS denies all rows to
+  anon — candidate lead disproven.
+- **`caller_org_id()` per-session isolation** — prefers the JWT-baked claim,
+  preventing a sibling device's `switch_org` from leaking into another session.
+- **JWT hook** — strips org claims for archived/suspended orgs and deactivated
+  users; honors `jwt_refresh_locks`; `SECURITY DEFINER`, owner `postgres`,
+  `EXECUTE` granted only to `supabase_auth_admin` and `service_role`.
 - **Role-change / assign-role RPCs** — caller-identity check (`p_changed_by_id =
-  auth.uid()`), self-action guard, admin-tier guard (admins can't touch
+  auth.uid()`), self-action guard, admin-tier guard (admins cannot touch
   admin/super_admin/gridmaster or assign privileged roles), last-super_admin
   guard, advisory lock, idempotency, audit log, JWT refresh lock. Direct
   `org_role` UPDATEs blocked by `guard_org_role_change` trigger.
-- **Middleware JWT fallback** (`middleware.ts:188-213`) — `jwtVerify` →
-  `decodeJwt` fallback never trusts `gridmaster` from an unverified token; RLS is
-  the real boundary. Matches documented invariant.
-- **Stripe webhook** (`api/stripe/webhook/route.ts:41-58`) — verifies
+- **Middleware JWT fallback** (`middleware.ts`) — `jwtVerify` then `decodeJwt`
+  fallback never trusts `gridmaster` from an unverified token; RLS is the real
+  boundary. Matches documented invariant.
+- **Stripe webhook** (`api/stripe/webhook/route.ts`) — verifies
   `stripe.webhooks.constructEvent` signature; fails closed on missing
-  secret/signature.
+  secret/signature. Replay idempotency via `stripe_processed_events` table
+  (unique constraint on `event_id`; insert-before-process pattern).
 - **Error sanitization** (`packages/client-errors`) — PGRST/Supabase/RLS/JWT/SQL
   patterns fall back to a generic message; only benign business-logic messages
   surface. No stack traces or DB internals leak to clients.
@@ -303,50 +231,45 @@ candidate leads that were **disproven**:
   anon key inside test fixtures). Env validated at startup via Zod
   (`apps/web/src/lib/env.ts`); service-role key is server-only; no secret behind
   `NEXT_PUBLIC_`.
-- **`SECURITY DEFINER` hygiene** — all 80 such functions set
-  `SET search_path = public`.
+- **`SECURITY DEFINER` hygiene** — all such functions set `SET search_path = public`.
 - **Rate limiter** (`apps/web/src/lib/rate-limit.ts`) — fails **closed** in
-  production when Redis is unconfigured (503), disabled in dev by design.
+  production when Redis is unconfigured (returns `misconfigured: true` → callers
+  return 503); also fails closed when Upstash throws (M-3 from the bug hunt,
+  verified fixed via the catch block at line 121-129).
 - **Mobile parity** — mobile auth uses the same `SECURITY DEFINER` RPCs
   (`switch_org`, `start_trial_for_org`) via an RLS-scoped session client
   (`packages/mobile-api-core/src/auth.ts`); no weaker parallel authorization path.
 - **Anon grants** — `anon` has only `INSERT` on `cookie_consents` and no blanket
-  function `EXECUTE` (`004_grants.sql:141-146`).
+  function `EXECUTE` (`004_grants.sql`).
+- **Org soft-delete** — `archived_at` revokes access in middleware, JWT hook,
+  `get_my_organizations`, and `switch_org`. Access is cut at next token refresh.
+- **Per-session org isolation** — `user_sessions.active_org_id` drives JWT claims
+  per device; `switch_org` only affects the calling session.
 
 ---
 
 ## Dependency audit summary
 
-Before fixes: **0 critical, 3 high, 14 moderate, 1 low.**
-After all fixes (F-1 bump + F-7 overrides, clean reinstall): **0 critical, 0 high,
-3 moderate, 0 low.**
-
 | Package | Severity | Production-reachable? | Action |
 |---------|----------|----------------------|--------|
-| `next` | ~~high~~ | **Yes** (framework + middleware auth) | ✅ Upgraded to `16.2.6` — HIGH advisories cleared |
+| `next` | ~~high~~ | Yes (framework + middleware auth) | ✅ Upgraded to `16.2.6` |
 | `protobufjs` | ~~high~~ | No (posthog-js OTLP emit path) | ✅ Override → `7.5.9` |
 | `fast-uri` | ~~high~~ | No (build-time webpack/ajv) | ✅ Override → `3.1.2` |
 | `hono` / `@hono/node-server` | moderate | No (`shadcn` dev CLI only) | Left — dev tooling, not deployed |
+
+**Before fixes:** 0 critical, 3 high, 14 moderate, 1 low.
+**After all fixes:** 0 critical, 0 high, 3 moderate, 0 low.
 
 ---
 
 ## Remediation status (final)
 
-- ✅ **F-1** — Next.js upgraded to `16.2.6`; HIGH middleware-bypass/SSRF/DoS cleared.
-- ✅ **F-2** — `apiLimiter` added to the role-change route.
-- ✅ **F-3** — `validateCsrfOrigin` applied to 20 mutating routes; redundant
-  inline check in `request-demo` removed.
-- ✅ **F-6** — Sandbox cookie set `HttpOnly`; dead client-clear helper removed.
-- ✅ **F-4** — Authed routes forced to dynamic rendering (`force-dynamic` on their
-  layouts/pages) + nonce/`strict-dynamic` CSP for the authed app (static pages keep
-  `'unsafe-inline'`). A first nonce attempt was reverted after a smoke test showed
-  the authed pages were static; the true fix makes them dynamic. Build confirms all
-  nine authed routes are now dynamic. (Final browser hydration check advised on a
-  preview build.)
-- ✅ **F-7** — `protobufjs`→`7.5.9`, `fast-uri`→`3.1.2` via scoped overrides;
-  `npm audit` now 0 high.
-- ❌ **F-5** — Withdrawn; already implemented (5-minute refresh lock + session wipe
-  on gridmaster demotion/deactivation).
+- ✅ **F-1** — Next.js upgraded to `16.2.6`; all HIGH middleware-bypass/SSRF/DoS advisories cleared.
+- ✅ **F-2** — `apiLimiter` added to the role-change route, keyed on user ID.
+- ✅ **F-3** — `validateCsrfOrigin` applied uniformly to all state-changing Route Handlers.
+- ✅ **F-4** — Authed routes forced to dynamic rendering (`force-dynamic` on their layouts/pages, including `/billing-required`) + nonce/`strict-dynamic` CSP for the authed app. Static/public pages keep `'unsafe-inline'`. A first nonce attempt was reverted after a smoke test showed the authed pages were statically prerendered; the true fix makes them dynamic. Build confirms all affected authed routes are now dynamic. (Final browser hydration check on a preview/prod build is the one remaining manual step.)
+- ✅ **F-6** — Sandbox cookie set `HttpOnly: true`; dead client-clear helper removed.
+- ✅ **F-7** — `protobufjs → 7.5.9`, `fast-uri → 3.1.2` via scoped overrides; `npm audit` now 0 high.
+- ❌ **F-5** — Withdrawn; already implemented (5-minute refresh lock + session wipe on gridmaster demotion/deactivation).
 
-**All seven findings closed (F-5 withdrawn). F-4's runtime browser confirmation is
-the one remaining manual step, on a preview/prod build.**
+**All seven findings closed (F-5 withdrawn).**

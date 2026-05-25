@@ -44,9 +44,10 @@ DubGrid is an **npm workspaces** monorepo orchestrated by **Turborepo** (Node 22
 | `packages/data-access` | `@dubgrid/data-access` | Supabase query + data mapping; shared mobile data layer            |
 | `packages/mobile-api-core` | `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes |
 | `packages/api-client` | `@dubgrid/api-client` | Platform-neutral HTTP client primitives                             |
+| `packages/client-errors` | `@dubgrid/client-errors` | Shared client-facing error translation (friendly copy + fallbacks) for web and mobile |
 | `packages/design-tokens` | `@dubgrid/design-tokens` | Shared design values                                            |
 
-All packages are private `0.1.0`, ESM, and build via `tsc` to `dist/`. `apps/web` consumes authz, contracts, data-access, db-types, design-tokens, domain, and mobile-api-core. `apps/mobile` consumes api-client, contracts, design-tokens, and schedule-core.
+All ten packages are private `0.1.0`, ESM, and build via `tsc` to `dist/`. `apps/web` consumes authz, client-errors, contracts, data-access, db-types, design-tokens, domain, and mobile-api-core. `apps/mobile` consumes api-client, client-errors, contracts, design-tokens, and schedule-core.
 
 ### 2.2 Web Application (`apps/web`)
 
@@ -108,8 +109,8 @@ Many care facilities manage employee scheduling through manually maintained spre
 
 DubGrid supports multiple organizations via subdomain-based routing, each with their own configurable structure:
 
-- **Organizations** — Each tenant is an independent organization with its own data, staff, settings, and subdomain (e.g., `acme.dubgrid.com`). An organization is either a `production` workspace or a time-limited `sandbox` workspace (see §7.6, FR-67).
-- **Departments** — A two-type model: `scheduled` departments group focus areas, while `management` departments define permission templates. Focus areas are children of departments.
+- **Organizations** — Each tenant is an independent organization with its own data, staff, settings, and subdomain (e.g., `acme.dubgrid.com`). The `organizations.workspace_kind` column flags an org as `real` or `sandbox` (the sole place "workspace" survives in code; see §7.6, FR-67).
+- **Departments** — A two-type model: `scheduled` departments group focus areas, while `management` departments group operations staff. Focus areas are children of departments. (Departments do not grant permissions; permissions are per-person.)
 - **Focus Areas** — Each organization defines its own schedule sections (e.g., nursing wings, departments, shift groups). The label "Focus Areas" is customizable per org.
 - **Schedule Definitions** — Organizations configure shifts and jobs, with derived labels, colors, and timing metadata used throughout the schedule
 - **Shift Categories** — Tally buckets with optional time windows for grouping shift counts
@@ -175,7 +176,7 @@ Admins receive a configurable set of permissions stored as JSONB in `organizatio
 | 24 | Requests   | `canApproveShiftRequests`        | Yes         | Approve or reject shift pickup/swap requests          |
 | 25 | Dashboard  | `canViewDashboardAnalytics`      | Yes         | View the organization dashboard and analytics         |
 
-Management departments define permission templates; members inherit permissions via union (most permissive wins).
+Permissions are **per-person**, set on the People page, not granted by departments. A member's effective permissions are their `org_role` plus their own `admin_permissions`. (`departments.permissions` exists for management departments but is vestigial; an earlier department-template union model was reverted.)
 
 **Super Admin-only (never delegatable to admins):** `canManageUsers`, `canConfigureAdminPermissions`, `canManageOrgSettings`
 
@@ -189,6 +190,9 @@ Management departments define permission templates; members inherit permissions 
 - Self-service password reset via email (forgot password → reset password flow)
 - Email verification for new accounts with resend capability (60s cooldown)
 - Password strength meter (4 levels: too short, weak, fair, strong; minimum 10 characters)
+- Post-login soft navigation: `router.replace` + an `<AuthSplash>` bridge while the session settles, so route guards do not bounce a freshly-authenticated user back to login. Logout is fast and always redirects to `/login`.
+- 14-day trial starts on the **first super admin login** via the idempotent `start_trial_for_org` RPC. Until then the org sits in a `trial_pending` billing state that gates non-super-admins. A one-time welcome modal and "trial started" email (`/api/trial-welcome`, react-email `TrialWelcomeEmail`) fire once for the super admin.
+- Per-session org isolation: `user_sessions.active_org_id` drives JWT org claims per device, so `switch_org` only affects the calling device; `profiles.org_id` is just the default for new sign-ins.
 
 ---
 
@@ -309,7 +313,7 @@ Status: ✅ = Implemented, 🔨 = Partially Implemented, ❌ = Not Yet Implement
 | FR-64 | Invited-User Onboarding | Must     | ✅     | Polling page for newly invited users awaiting org assignment. Non-admins on an unconfigured org see a `SetupPendingScreen`. |
 | FR-65 | Demo Request Form       | Should   | ✅     | Landing page contact form with Zod validation, CSRF protection, and branded email notification via Resend.            |
 | FR-66 | MFA Status              | Should   | 🔨     | `/api/account/mfa-status` reports per-account MFA enrollment state and surfaces it in the profile/security UI. Full TOTP enrollment + enforcement for elevated roles not yet complete. |
-| FR-67 | Test Sandbox            | Could    | ✅     | Clone an organization's configuration into an isolated `workspace_kind='sandbox'` org with a 30-day TTL. `/api/test-sandbox` (force-dynamic POST, CSRF + rate limited) supports `create` / `reset` / `archive`. Sandboxes are owned by the creating user and are excluded from mobile login. |
+| FR-67 | Test Sandbox            | Could    | ✅     | Clone a super admin's org config into an isolated `workspace_kind='sandbox'` org (30-day TTL) and enter it via an HttpOnly cookie (`dubgrid-sandbox`), not a JWT/subdomain hop. `/api/test-sandbox` (force-dynamic POST, CSRF-guarded) supports `enter` (reuse-or-clone), `reset` (wipe + re-clone), and `exit` (delete + clear cookie). Sandboxes are owned by the creating user and excluded from mobile login. |
 
 #### 7.6.1 Onboarding Wizard Step Lists
 
@@ -358,6 +362,7 @@ SETUP steps group legacy settings panels onto single wizard screens via `steps/C
 | FR-42 | Shift Pickup Requests   | Could    | ✅     | Employees can request to pick up open shifts. Admins approve/reject via shift request board.                           |
 | FR-43 | Shift Swap Requests     | Could    | ✅     | Employees can propose shift swaps with colleagues. Lifecycle: open → pending_approval → approved/rejected/cancelled/expired. |
 | FR-44 | Shift Request Board     | Could    | ✅     | Admin view for managing all shift requests with filtering by status and type.                                           |
+| FR-47 | Shift Call-Off Requests | Could    | ✅     | Employees can request to call off a scheduled shift (an absence type is required). Admins approve/reject. Request types are pickup, swap, and calloff. |
 
 ### 7.11 Coverage & Staffing
 
@@ -383,7 +388,7 @@ The Expo / React Native mobile app (`apps/mobile`) is a first-class product surf
 
 | ID    | Feature                 | Priority | Status | Description                                                                                                            |
 | ----- | ----------------------- | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
-| FR-70 | Mobile Auth & Workspace | Must     | ✅     | Email/password login and workspace selection against `/api/mobile/v1/auth/*` and `/bootstrap`. `onAuthFailure` hook handles token expiry. |
+| FR-70 | Mobile Auth & Org Selection | Must     | ✅     | Email/password login and organization selection against `/api/mobile/v1/auth/*` and `/bootstrap`. `onAuthFailure` hook handles token expiry. |
 | FR-71 | Mobile Schedule         | Must     | ✅     | "My schedule" and org schedule views (`me/`, `team/` tab stacks); per-shift detail screen at `shift/[employeeId]/[date]`. |
 | FR-72 | Mobile People           | Should   | ✅     | People roster and person-detail screens with status and invitation actions (`people/` tab stack).                      |
 | FR-73 | Mobile Shift Requests   | Should   | ✅     | View, create, and act on shift pickup/swap requests, including swap-option lookup (`requests/` tab stack).              |
@@ -418,7 +423,7 @@ The Expo / React Native mobile app (`apps/mobile`) is a first-class product surf
 | `shift_series`              | id, org_id, emp_id, state (JSONB), frequency (daily/weekly/biweekly), days_of_week[], start_date, end_date, max_occurrences |
 | `coverage_requirements`     | id, org_id, focus_area_id, preferred_shift_id, preferred_job_id, day_of_week, min_staff                                    |
 | `absence_types`             | id, org_id, label (X/V/S), name, color, border_color, text_color, sort_order                        |
-| `shift_requests`            | id, org_id, type (pickup/swap), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, admin_user_id, expires_at |
+| `shift_requests`            | id, org_id, type (pickup/swap/calloff), status (open/pending_approval/approved/rejected/cancelled/expired), requester_emp_id, target_emp_id, target_shift_date, absence_type_id (required for calloff + targeted pickup), admin_user_id, expires_at |
 | `recurring_shifts_draft_sessions` | id, org_id, saved_by, ... — concurrent-edit cell locks for the recurring-shifts editor                       |
 | `schedule_draft_sessions`   | id, org_id, saved_by, start_date, end_date, saved_at — concurrent-edit cell locks for the schedule grid       |
 | `publish_history`           | id, org_id, published_by, start_date, end_date, change_count, changes (JSONB), published_at         |
@@ -517,8 +522,9 @@ Everything for the web app lives under `apps/web/`. UI features are organized in
 | `apps/web/src/features/test-sandbox/`         | Test-sandbox feature (org config cloning into a sandbox workspace) |
 | `apps/web/src/components/forms/`              | Shared form primitives: `CountrySelect`, `UsStateSelect`, `EmailInput`, `PhoneInput`, `PostalCodeInput` |
 | `apps/web/src/lib/supabase.ts`                | Lazy browser Supabase client via Proxy pattern            |
-| `apps/web/src/lib/email.ts`                   | Branded HTML email templates + sanitization utilities     |
-| `apps/web/src/lib/rate-limit.ts`              | Upstash Redis rate limiters (API, invite, demo, test-sandbox) |
+| `apps/web/src/emails/`                        | react-email components for transactional + Supabase auth emails (incl. `TrialWelcomeEmail`); `email:build` regenerates `supabase/templates/*.html` |
+| `apps/web/src/lib/email.ts`                   | Small email helpers (`sanitizeHeaderValue`, `emailBaseUrl`) |
+| `apps/web/src/lib/rate-limit.ts`              | Upstash Redis rate limiters (API, schedule review, invite, demo, password reset, login, per-recipient email) |
 | `apps/web/src/lib/onboarding-telemetry.ts`    | PostHog onboarding telemetry wrappers                     |
 | `apps/web/src/lib/timezone-from-coords.ts`    | Offline timezone lookup from coordinates (`tz-lookup`)    |
 | `apps/web/src/lib/us-states.ts` / `us-state-timezones.ts` | US state list + default-timezone map          |
@@ -788,9 +794,9 @@ The web app exposes roughly **110 Route Handlers** under `apps/web/src/app/api/`
 
 All API routes include:
 - **Input validation** via Zod schemas (cross-app contracts in `@dubgrid/contracts`)
-- **Rate limiting** via Upstash Redis (`apps/web/src/lib/rate-limit.ts`)
-- **CSRF protection** via Origin header validation (where applicable)
-- **HTML sanitization** via `escapeHtml()` and `sanitizeHeaderValue()` from `apps/web/src/lib/email.ts`
+- **Rate limiting** via Upstash Redis (`apps/web/src/lib/rate-limit.ts`), including a per-recipient email limiter (`emailTargetLimiter`) on email-sending routes
+- **CSRF protection** via Origin header validation (where applicable; e.g. demo, test-sandbox, trial-welcome)
+- **Email-header safety** via `sanitizeHeaderValue()` from `apps/web/src/lib/email.ts`; email bodies are rendered from react-email components (`apps/web/src/emails/`)
 
 Server-side data access flows through the `apps/web/src/lib/db/*` barrel; mobile orchestration flows through `@dubgrid/mobile-api-core`. The browser does not query Supabase data tables directly for these domains.
 
@@ -830,16 +836,16 @@ These items were open questions in previous PRD versions and have been resolved 
 | Authentication & RBAC?           | Fully implemented. Four-tier role hierarchy with granular admin permissions. JWT-based claims. |
 | Dashboard analytics?             | Implemented with stat cards, charts, coverage tracking, and expandable detail views.          |
 | Staff detail views?              | Implemented with tabs: Overview, Schedule, Activity.                                          |
-| Shift requests?                  | Pickup and swap requests implemented with admin approval workflow.                            |
+| Shift requests?                  | Pickup, swap, and call-off requests implemented with admin approval workflow.                 |
 | Coverage tracking?               | Coverage requirements and status visualization implemented.                                   |
 | Password reset flow?             | Implemented. Forgot password → email link → reset form with strength meter → sign out.        |
 | Email verification?              | Implemented. Verification page with resend button (60s cooldown), auto-redirect on confirm.    |
 | Org setup/onboarding?            | Implemented. Role-aware composite onboarding wizard rendered inline via `OnboardingGate` (the old 8-step wizard and `/setup` route were removed) + invited-user polling page. |
 | Rate limiting?                   | Implemented via Upstash Redis on all public API routes.                                        |
-| Branded emails?                  | Shared email template system in `apps/web/src/lib/email.ts` with header, wrapper, sanitization. |
+| Branded emails?                  | Authored as react-email components in `apps/web/src/emails/`; `email:build` regenerates the Supabase auth templates. `apps/web/src/lib/email.ts` keeps only header-safety helpers. |
 | Mobile app?                      | Native Expo / React Native app (`apps/mobile`) covering schedule, people, requests, profile, and notifications, talking to `/api/mobile/v1/*`. |
 | Schedule export?                 | Implemented. PDF/CSV export, iCalendar (`.ics`) feed, and operations-report export.            |
-| Monorepo structure?              | npm workspaces + Turborepo. `apps/web`, `apps/mobile`, and nine shared `packages/*`.            |
+| Monorepo structure?              | npm workspaces + Turborepo. `apps/web`, `apps/mobile`, and ten shared `packages/*`.             |
 | Third-party integrations?        | Stripe, Resend, PostHog, Sentry, Upstash Redis, Vercel Analytics, and Expo push.               |
 
 ---
