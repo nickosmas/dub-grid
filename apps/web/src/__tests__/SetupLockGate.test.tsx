@@ -66,6 +66,11 @@ vi.mock("@/hooks", () => ({
 
 vi.mock("@/features/onboarding/client", () => ({
   fetchOnboardingStatus: vi.fn(),
+  // Same-session completion/phase guards are sessionStorage-backed; default them
+  // off so these scenarios exercise the setupStatus-driven gate logic.
+  isOnboardingComplete: vi.fn(() => false),
+  getOnboardingPhase: vi.fn(() => null),
+  freezeOnboardingPhase: vi.fn(),
 }));
 
 vi.mock("@/features/billing/client", () => ({
