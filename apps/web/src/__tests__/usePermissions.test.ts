@@ -15,7 +15,7 @@ function setAuth(next: Partial<MockAuth>): void {
   currentAuth = { ...currentAuth, ...next };
 }
 
-vi.mock("@/components/AuthProvider", () => ({
+vi.mock("@/lib/auth-context", () => ({
   useAuth: () => currentAuth,
 }));
 

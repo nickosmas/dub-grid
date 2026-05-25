@@ -1,8 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { setSentryUser } from "@/lib/sentry";
+import { AuthContext } from "@/lib/auth-context";
+export { useAuth } from "@/lib/auth-context";
 import {
   clearBrowserAuthState,
   getBrowserAuthSession,
@@ -11,15 +13,6 @@ import {
   signOutFromBrowser,
   subscribeToBrowserAuthChanges,
 } from "@/features/account/client";
-
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  signOut: () => Promise<void>;
-  isLoading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Track session via API route so the server can capture the client IP address.
@@ -52,14 +45,6 @@ function parseUserAgent(ua: string): string {
   else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
 
   return `${browser} on ${os}`;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
 }
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
