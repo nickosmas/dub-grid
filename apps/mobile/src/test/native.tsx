@@ -269,6 +269,18 @@ export function createReactNativeModule(React: ReactModule) {
         },
       }),
     },
+    Dimensions: {
+      get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+      addEventListener: () => ({
+        remove() {
+          return undefined;
+        },
+      }),
+    },
+    TurboModuleRegistry: {
+      get: () => null,
+      getEnforcing: () => new Proxy({}, { get: () => () => undefined }),
+    },
     KeyboardAvoidingView,
     Image,
     LayoutAnimation: {

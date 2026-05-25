@@ -57,6 +57,30 @@ export default defineConfig(async () => {
             "./src/test/react-native-shim.ts",
           ),
         },
+        // Expo native modules eagerly import expo-modules-core + native bindings
+        // that vitest can't resolve/run in jsdom. Shim them to test stubs (same
+        // approach as the react-native shim above). expo-notifications is
+        // type-only in src, so it needs no runtime shim.
+        ...["haptics", "constants", "secure-store", "network", "tracking-transparency"].map(
+          (m) => ({
+            find: new RegExp(`^expo-${m}$`),
+            replacement: path.resolve(__dirname, `./src/test/shims/expo-${m}.ts`),
+          }),
+        ),
+        // Catch-all: any other Expo package (expo-font, expo-asset, ...) pulled
+        // transitively imports its native bridge from expo-modules-core. Stub it
+        // so those packages load with native calls no-op'd.
+        {
+          find: /^expo-modules-core$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/expo-modules-core.ts"),
+        },
+        // @expo/vector-icons pulls expo-font -> expo-asset (native font loading);
+        // shim the icons to a name-carrying stub. Covers the barrel import and
+        // the per-family subpaths (@expo/vector-icons/Ionicons, etc.).
+        {
+          find: /^@expo\/vector-icons(\/.*)?$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/vector-icons.tsx"),
+        },
       ],
     },
     test: {
