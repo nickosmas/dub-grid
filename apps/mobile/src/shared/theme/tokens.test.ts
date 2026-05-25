@@ -57,6 +57,7 @@ describe("shared design token derivation", () => {
           "brand": "#2563EB",
           "cardRadius": 16,
           "screenTitle": {
+            "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
             "fontWeight": "700",
             "lineHeight": 28,
@@ -68,6 +69,7 @@ describe("shared design token derivation", () => {
           "brand": "#2563EB",
           "cardRadius": 16,
           "screenTitle": {
+            "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
             "fontWeight": "700",
             "lineHeight": 28,

@@ -57,6 +57,18 @@ export default defineConfig(async () => {
             "./src/test/react-native-shim.ts",
           ),
         },
+        // react-native-reanimated eagerly evaluates react-native-worklets, whose
+        // native bindings throw under jsdom ("Native part of Worklets doesn't
+        // seem to be initialized"). Any screen importing it (AppSplashScreen,
+        // OnboardingScreen) crashed at module-eval. Route it to the passthrough
+        // stub so animated components render as plain RN primitives.
+        {
+          find: /^react-native-reanimated$/,
+          replacement: path.resolve(
+            __dirname,
+            "./src/test/reanimated-stub.tsx",
+          ),
+        },
         // Expo native modules eagerly import expo-modules-core + native bindings
         // that vitest can't resolve/run in jsdom. Shim them to test stubs (same
         // approach as the react-native shim above). expo-notifications is

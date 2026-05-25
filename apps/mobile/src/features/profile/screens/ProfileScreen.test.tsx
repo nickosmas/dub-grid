@@ -31,6 +31,7 @@ vi.mock("expo-router", () => ({
   router: {
     push: routerPush,
   },
+  Stack: Object.assign(() => null, { Screen: () => null }),
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -255,6 +256,14 @@ describe("ProfileScreen", () => {
   it("hides organization switching when the user belongs to one organization", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
+      if (key.includes("change-requests")) {
+        return {
+          data: { requests: [] },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
       if (key.includes("profile")) {
         return {
           data: profileData,

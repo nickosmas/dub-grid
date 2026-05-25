@@ -209,7 +209,7 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(8);
+    expect(stackScreenMock).toHaveBeenCalledTimes(9);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
     const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
@@ -263,6 +263,7 @@ describe("TabsLayout", () => {
       "work",
       "security",
       "notifications",
+      "privacy",
     ]);
   });
 

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createQueryStateCardModule,
@@ -7,6 +7,7 @@ import {
 } from "../../../test/native";
 
 const useInfiniteQuery = vi.fn();
+const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const markAllNotificationsRead = vi.fn();
 const markNotificationRead = vi.fn();
@@ -25,6 +26,7 @@ vi.mock("@tanstack/react-query", () => ({
     isOnline: () => true,
   },
   useInfiniteQuery,
+  useQuery,
 }));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
@@ -48,6 +50,7 @@ vi.mock("../../../shared/components/QueryStateCard", async () =>
 vi.mock("../../../shared/lib/api", () => ({
   bulkUpdateNotifications,
   getNotifications: vi.fn(),
+  getNotificationFacets: vi.fn(),
   markAllNotificationsRead,
   markNotificationRead,
 }));
@@ -123,6 +126,7 @@ function buildInfiniteQueryResult(
 describe("NotificationsScreen", () => {
   beforeEach(() => {
     useInfiniteQuery.mockReset();
+    useQuery.mockReset();
     useAccessToken.mockReset();
     markAllNotificationsRead.mockReset();
     markNotificationRead.mockReset();
@@ -132,6 +136,12 @@ describe("NotificationsScreen", () => {
     pushToast.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isLoading: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
   });
 
   it("shows the empty state when no alerts exist", () => {
@@ -185,6 +195,11 @@ describe("NotificationsScreen", () => {
     render(<NotificationsScreen />);
 
     fireEvent.click(screen.getByText("Mark all read"));
+
+    const confirmDialog = await screen.findByRole("alert");
+    fireEvent.click(
+      within(confirmDialog).getByRole("button", { name: "Mark all read" }),
+    );
 
     await waitFor(() => {
       expect(markAllNotificationsRead).toHaveBeenCalledWith("token-123");

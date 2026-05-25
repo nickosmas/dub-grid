@@ -456,7 +456,9 @@ describe("ShiftDetailScreen", () => {
     expect(mentoredJobPill).not.toHaveTextContent("(MENTORED)");
     expect(screen.getByText("ICU")).toBeInTheDocument();
     expect(screen.getByLabelText("Focus area ICU")).toBeInTheDocument();
-    expect(screen.getByText("Assignment: Training, Float")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Assignment: Training, Float/),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Indicators")).not.toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();

@@ -564,7 +564,7 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("This Week's Hours")).not.toBeInTheDocument();
   });
 
-  it("spells out published schedule indicators as text", () => {
+  it("does not surface published schedule indicators in the Me week list", () => {
     meScheduleEntries = [
       createScheduleEntry({
         indicators: [
@@ -580,10 +580,10 @@ describe("ScheduleScreen", () => {
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.getAllByText("Assignment: Training, Float").length).toBeGreaterThan(
-      0,
-    );
-    expect(screen.getByText("Assignment: New hire")).toBeInTheDocument();
+    expect(screen.queryByText(/Assignment:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Training")).not.toBeInTheDocument();
+    expect(screen.queryByText("Float")).not.toBeInTheDocument();
+    expect(screen.queryByText("New hire")).not.toBeInTheDocument();
     expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
   });
 

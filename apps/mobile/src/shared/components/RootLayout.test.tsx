@@ -23,6 +23,32 @@ vi.mock("expo-status-bar", () => ({
   StatusBar: () => null,
 }));
 
+vi.mock("expo-splash-screen", () => ({
+  preventAutoHideAsync: () => Promise.resolve(),
+  hideAsync: () => Promise.resolve(),
+}));
+
+vi.mock("@expo-google-fonts/dm-sans", () => ({
+  useFonts: () => [true, null],
+  DMSans_400Regular: "DMSans_400Regular",
+  DMSans_500Medium: "DMSans_500Medium",
+  DMSans_600SemiBold: "DMSans_600SemiBold",
+  DMSans_700Bold: "DMSans_700Bold",
+}));
+
+vi.mock("../../features/consent/components/ConsentGate", async () => {
+  const React = await import("react");
+
+  return {
+    ConsentGate: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        "div",
+        { "data-testid": "consent-gate" },
+        children,
+      ),
+  };
+});
+
 vi.mock("@react-navigation/native", async () => {
   const React = await import("react");
 
