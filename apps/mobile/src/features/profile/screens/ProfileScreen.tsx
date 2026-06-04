@@ -380,7 +380,7 @@ export default function ProfileScreen() {
               value={formatProfileValue(profile.linkedEmployee?.phone)}
             />
             <ProfileHeroMeta
-              label="Member since"
+              label="Date joined"
               value={formatDate(profile.user.createdAt)}
             />
           </ProfileHero>

@@ -14,7 +14,7 @@ import {
   freezeOnboardingPhase,
 } from "@/features/onboarding/client";
 import AuthSplash from "@/components/AuthSplash";
-import { isAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
+import { useAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
 import { queryKeys } from "@/lib/query-keys";
 
 /** Routes where the onboarding gate should never intercept. */
@@ -56,6 +56,7 @@ export default function OnboardingGate({
   const perms = usePermissions();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const authTransitionPending = useAuthTransitionPending();
 
   // Pass through for: loading, unauthenticated, public routes,
   // gridmaster, no org, impersonating
@@ -64,7 +65,7 @@ export default function OnboardingGate({
     // flashing the app/blank while perms resolve and the onboarding decision is
     // made (this route bypasses ProtectedRoute's splash). Normal in-app nav has
     // perms cached, so this branch isn't hit and nothing changes there.
-    if (isAuthTransitionPending() && !isPublicRoute(pathname)) return <AuthSplash />;
+    if (authTransitionPending && !isPublicRoute(pathname)) return <AuthSplash />;
     return <>{children}</>;
   }
   if (!user) return <>{children}</>;

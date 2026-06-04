@@ -97,6 +97,7 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
     suspendedAt: null,
     suspendedReason: null,
     enforceConflictPrevention: false,
+    openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
     stripeCustomerId: null,
     subscriptionStatus: "active",
     trialEndsAt: null,

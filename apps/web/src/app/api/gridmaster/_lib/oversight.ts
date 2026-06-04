@@ -56,9 +56,14 @@ const NORMAL_OPERATION_ACTION_PREFIXES = [
 const NORMAL_OPERATION_ACTIONS = new Set([
   "certifications.saved",
   "employee.activated",
+  // Historical keys ("employee.archived" before terminate→remove rename,
+  // "employee.benched" before bench→deactivate rename) stay in the allow-list
+  // so older audit rows continue to classify as normal operation.
   "employee.archived",
   "employee.benched",
   "employee.created",
+  "employee.deactivated",
+  "employee.removed",
   "employee.updated",
   "org_roles.saved",
 ]);

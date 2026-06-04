@@ -956,7 +956,7 @@ export function ProfilePageContent() {
                             value={ROLE_LABELS[role] ?? "User"}
                           />
                         )}
-                        <Field label="Member since" value={createdAt} />
+                        <Field label="Date joined" value={createdAt} />
                         <Field label="Last sign in" value={lastSignIn} />
                       </div>
                     </div>

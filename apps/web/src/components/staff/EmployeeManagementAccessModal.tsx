@@ -16,12 +16,7 @@ import {
   InvitationAccessConflictError,
   updateAppOnlyUser,
 } from "@/features/organization/client";
-import {
-  linkEmployeeToUser,
-  reconcileEmployeeNameAndLinkUser,
-} from "@/features/employees/client";
-import { NameMismatchError } from "@/lib/account-linking";
-import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
+import { useIsInSandbox } from "@/hooks";
 import { validateEmail } from "@/components/FormField";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
@@ -33,7 +28,6 @@ import type {
   DirectoryPerson,
   Employee,
   Invitation,
-  NameMismatchDetails,
   OrganizationUser,
 } from "@/types";
 
@@ -63,6 +57,7 @@ export function EmployeeManagementAccessModal({
   onClose,
   onCompleted,
 }: EmployeeManagementAccessModalProps) {
+  const isInSandbox = useIsInSandbox();
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,7 +66,6 @@ export function EmployeeManagementAccessModal({
     pendingInvitation?.roleToAssign
       ?? (directoryPerson?.orgRole === "admin" ? "admin" : "user"),
   );
-  const [nameMismatch, setNameMismatch] = useState<NameMismatchDetails | null>(null);
   const [managementDepartmentIds, setManagementDepartmentIds] = useState<number[]>(
     pendingInvitation?.departmentIds
       ?? directoryPerson?.managementDepartmentIds
@@ -100,13 +94,11 @@ export function EmployeeManagementAccessModal({
     [employee.userId, orgUsers],
   );
 
-  const emailMatch = useMemo(() => {
-    if (linkedUser || !email.trim()) return null;
-    const normalized = email.trim().toLowerCase();
-    return orgUsers.find((user) => user.email?.toLowerCase() === normalized) ?? null;
-  }, [email, linkedUser, orgUsers]);
-
-  const matchedUser = linkedUser ?? emailMatch;
+  // With account linking removed, the only path that can resolve to an
+  // existing org user is when the employee row already has a user_id. We
+  // intentionally don't surface an "email-matches-another-user" sidecar
+  // anymore — that path silently rewrote someone else's membership.
+  const matchedUser = linkedUser;
   useEffect(() => {
     if (matchedUser?.orgRole === "admin" || matchedUser?.orgRole === "user") {
       setRole(matchedUser.orgRole);
@@ -121,9 +113,6 @@ export function EmployeeManagementAccessModal({
   }, [matchedUser?.orgRole]);
 
   const effectiveEmail = linkedUser?.email ?? email;
-  useEffect(() => {
-    setNameMismatch(null);
-  }, [employee.id, effectiveEmail, matchedUser?.id]);
   const baseRole: AssignableOrganizationRole =
     linkedUser?.orgRole === "admin" || linkedUser?.orgRole === "user"
       ? linkedUser.orgRole
@@ -158,6 +147,7 @@ export function EmployeeManagementAccessModal({
     || (directoryPerson?.managementDepartmentIds.length ?? 0) > 0;
   const emailError = !effectiveEmail.trim() ? "Email address is required" : validateEmail(effectiveEmail);
   const canSubmit =
+    !isInSandbox &&
     !loadingUsers &&
     !emailError &&
     (managementDepartmentIds.length > 0 || hasExistingManagementAccess) &&
@@ -191,24 +181,15 @@ export function EmployeeManagementAccessModal({
     }
   }
 
-  async function applyMatchedUserAccess(reconcileName: boolean): Promise<Employee | null> {
+  async function applyMatchedUserAccess(): Promise<Employee | null> {
+    // matchedUser only fires when employee.userId is already set (linkedUser)
+    // — account linking has been removed, so we no longer link a new user to
+    // an unlinked employees row from this surface. The remaining work is to
+    // sync role + management departments on the existing membership.
     if (!matchedUser) return null;
 
-    let updatedEmployee: Employee | null = null;
+    const updatedEmployee: Employee | null = null;
 
-    if (!employee.userId) {
-      if (reconcileName) {
-        await reconcileEmployeeNameAndLinkUser(employee.id, matchedUser.id, orgId);
-      } else {
-        await linkEmployeeToUser(employee.id, matchedUser.id, orgId);
-      }
-      updatedEmployee = {
-        ...employee,
-        firstName: reconcileName && nameMismatch ? nameMismatch.accountFirstName : employee.firstName,
-        lastName: reconcileName && nameMismatch ? nameMismatch.accountLastName : employee.lastName,
-        userId: matchedUser.id,
-      };
-    }
     if (pendingInvitation) {
       if (!pendingInvitation.updatedAt) {
         throw new Error("Invitation data is out of date. Refresh and try again.");
@@ -243,7 +224,7 @@ export function EmployeeManagementAccessModal({
     setSaving(true);
     try {
       if (matchedUser) {
-        const updatedEmployee = await applyMatchedUserAccess(false);
+        const updatedEmployee = await applyMatchedUserAccess();
         toast.success("Management access updated");
         await onCompleted(updatedEmployee);
       } else {
@@ -292,30 +273,6 @@ export function EmployeeManagementAccessModal({
         toast.error("Access changed elsewhere. Review the latest values and try again.");
         return;
       }
-      if (err instanceof NameMismatchError && matchedUser && !employee.userId) {
-        setNameMismatch(err.details);
-        return;
-      }
-      toast.error(formatClientErrorMessage(err, "We couldn't update management access."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleReconcileLink() {
-    if (!matchedUser || !nameMismatch) return;
-
-    setSaving(true);
-    try {
-      const updatedEmployee = await applyMatchedUserAccess(true);
-      toast.success("Management access updated");
-      await onCompleted(updatedEmployee);
-      onClose();
-    } catch (err) {
-      if (err instanceof OrganizationAccessConflictError || err instanceof InvitationAccessConflictError) {
-        toast.error("Access changed elsewhere. Review the latest values and try again.");
-        return;
-      }
       toast.error(formatClientErrorMessage(err, "We couldn't update management access."));
     } finally {
       setSaving(false);
@@ -330,18 +287,6 @@ export function EmployeeManagementAccessModal({
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
       >
-      {nameMismatch ? (
-        <AccountNameMismatchPanel
-          details={nameMismatch}
-          title="Name mismatch found"
-          description="This person's name doesn't match their existing account. If the account name is right, update it to match and continue adding them to management."
-          confirmLabel="Use Account Name and Add to Management"
-          dismissLabel={EDITOR_ACTION_LABELS.close}
-          onCancel={handleRequestClose}
-          onConfirm={handleReconcileLink}
-          confirming={saving}
-        />
-      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
           <label style={fieldLabelStyle}>Login email</label>
@@ -356,11 +301,6 @@ export function EmployeeManagementAccessModal({
           {linkedUser && (
             <div style={{ marginTop: 4, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
               This employee is already linked to an org member. Their login email is managed on that account.
-            </div>
-          )}
-          {!linkedUser && emailMatch && (
-            <div style={{ marginTop: 4, fontSize: "var(--dg-fs-footnote)", color: "var(--color-info-text)" }}>
-              Existing org member found for this email. Submitting will link the employee instead of sending a new invite.
             </div>
           )}
           {emailError && <FieldError message={emailError} />}
@@ -427,6 +367,23 @@ export function EmployeeManagementAccessModal({
           )}
         </div>
 
+        {isInSandbox && (
+          <p
+            style={{
+              color: "var(--color-info-text)",
+              fontSize: "var(--dg-fs-body-sm)",
+              margin: 0,
+              padding: "8px 12px",
+              background: "var(--color-info-bg)",
+              border: "1px solid var(--color-info-border)",
+              borderRadius: "var(--dg-radius-md)",
+            }}
+          >
+            Granting management access isn't available in sandbox mode. Exit the
+            sandbox to update access on your real organization.
+          </p>
+        )}
+
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
             {EDITOR_ACTION_LABELS.close}
@@ -452,7 +409,6 @@ export function EmployeeManagementAccessModal({
           </button>
         </div>
       </div>
-      )}
       </Modal>
       {unsavedChangesDialog}
     </>

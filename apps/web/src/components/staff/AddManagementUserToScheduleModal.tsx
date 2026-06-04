@@ -5,23 +5,23 @@ import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { NameMismatchError } from "@/lib/account-linking";
 import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
 import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { toast } from "sonner";
-import type { DirectoryPerson, Employee, FocusArea, NameMismatchDetails, NamedItem } from "@/types";
-import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
+import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import {
-  createEmployeeFromOrgUser,
-  reconcileEmployeeFromOrgUser,
-} from "@/features/employees/client";
+import { updateEmployee } from "@/features/employees/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface AddManagementUserToScheduleModalProps {
   orgId: string;
   person: DirectoryPerson;
+  /** The existing employees row for this management member. Every org member
+   *  carries an employees row (post-Flow-B), so the parent always has one
+   *  to pass; this modal patches its scheduling attributes in place rather
+   *  than creating a new row. */
+  employee: Employee;
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
@@ -35,6 +35,7 @@ interface AddManagementUserToScheduleModalProps {
 export function AddManagementUserToScheduleModal({
   orgId,
   person,
+  employee,
   focusAreas,
   certifications,
   roles,
@@ -54,7 +55,6 @@ export function AddManagementUserToScheduleModal({
   const [contactNotes, setContactNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [nameMismatch, setNameMismatch] = useState<NameMismatchDetails | null>(null);
   const initialDraftSnapshot = useMemo(
     () =>
       JSON.stringify({
@@ -94,7 +94,10 @@ export function AddManagementUserToScheduleModal({
     () => ({
       firstName: touched.firstName ? validateRequired(firstName, "First name") : null,
       lastName: touched.lastName ? validateRequired(lastName, "Last name") : null,
-      email: touched.email ? (email.trim() ? validateEmail(email) : "Email address is required") : null,
+      // Email is optional — admin can schedule someone before onboarding
+      // (no email yet) and fill it in later when inviting. Validate only
+      // when a value is present.
+      email: touched.email && email.trim() ? validateEmail(email) : null,
       phone: touched.phone ? validatePhone(phone) : null,
       focusAreaIds:
         touched.focusAreaIds && focusAreaIds.length === 0
@@ -108,8 +111,7 @@ export function AddManagementUserToScheduleModal({
     !!person.userId &&
     !validateRequired(firstName, "First name") &&
     !validateRequired(lastName, "Last name") &&
-    !!email.trim() &&
-    !validateEmail(email) &&
+    (!email.trim() || !validateEmail(email)) &&
     !validatePhone(phone) &&
     focusAreaIds.length > 0 &&
     !saving;
@@ -135,21 +137,6 @@ export function AddManagementUserToScheduleModal({
     );
   }
 
-  function buildInput() {
-    return {
-      orgId,
-      userId: person.userId!,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      phone: normalizeOptionalUsPhone(phone),
-      certificationId,
-      focusAreaIds,
-      roleIds,
-      contactNotes: contactNotes.trim(),
-    };
-  }
-
   async function handleSubmit() {
     if (!person.userId || !canSubmit) {
       setTouched({
@@ -164,29 +151,23 @@ export function AddManagementUserToScheduleModal({
 
     setSaving(true);
     try {
-      const employee = await createEmployeeFromOrgUser(buildInput());
+      // PATCH the existing employees row with scheduling attributes.
+      // employee_number / id / user_id / status / employmentType / etc.
+      // are preserved by spreading the existing row.
+      const updated: Employee = {
+        ...employee,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: normalizeOptionalUsPhone(phone),
+        certificationId,
+        focusAreaIds,
+        roleIds,
+        contactNotes: contactNotes.trim(),
+      };
+      await updateEmployee(updated, orgId, employee.version);
       toast.success("Added to the schedule");
-      onAdded(employee);
-      onClose();
-    } catch (err) {
-      if (err instanceof NameMismatchError) {
-        setNameMismatch(err.details);
-        return;
-      }
-      toast.error(formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleReconcile() {
-    if (!person.userId || !nameMismatch) return;
-
-    setSaving(true);
-    try {
-      const employee = await reconcileEmployeeFromOrgUser(buildInput());
-      toast.success("Added to the schedule");
-      onAdded(employee);
+      onAdded(updated);
       onClose();
     } catch (err) {
       toast.error(formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."));
@@ -203,18 +184,6 @@ export function AddManagementUserToScheduleModal({
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
       >
-      {nameMismatch ? (
-        <AccountNameMismatchPanel
-          details={nameMismatch}
-          title="Name mismatch found"
-          description="The name you entered doesn't match this person's account. If the account name is right, use it and continue."
-          confirmLabel="Use Account Name and Add to Schedule"
-          dismissLabel={EDITOR_ACTION_LABELS.close}
-          onCancel={handleRequestClose}
-          onConfirm={handleReconcile}
-          confirming={saving}
-        />
-      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div
           style={{
@@ -256,7 +225,12 @@ export function AddManagementUserToScheduleModal({
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label style={fieldLabelStyle}>Email</label>
+            <label style={fieldLabelStyle}>
+              Email{" "}
+              <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                (optional)
+              </span>
+            </label>
             <input
               className="dg-input"
               type="email"
@@ -372,7 +346,6 @@ export function AddManagementUserToScheduleModal({
           </button>
         </div>
       </div>
-      )}
       </Modal>
       {unsavedChangesDialog}
     </>

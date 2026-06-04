@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
@@ -14,7 +13,6 @@ export default function CreateSandboxDialog({
   orgName,
   onClose,
 }: CreateSandboxDialogProps) {
-  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,15 +36,16 @@ export default function CreateSandboxDialog({
         setIsLoading(false);
         return;
       }
-      // The sandbox cookie was set by the server response. No navigation —
-      // middleware reads the cookie on the next request and overrides
-      // org_id. clear() purges any pre-sandbox cache so the page can't
-      // briefly show real-org data after the AppShell remount; the
-      // subsequent invalidateQueries kicks off fresh fetches for any
-      // query that still has active subscribers.
-      queryClient.clear();
-      await queryClient.invalidateQueries();
-      onClose();
+      // The sandbox cookie was set by the server response. Hard-reload the
+      // same page (URL unchanged, so it doesn't feel like a logout) to
+      // guarantee every view resets to the sandbox org: the reloaded page's
+      // first bootstrap fetch sees the cookie and returns the sandbox org, so
+      // the grid and any form-local state can't keep showing real-org data.
+      // This mirrors the exit/reset flow in SandboxBanner — a soft
+      // queryClient.clear() + invalidate left stale values in components whose
+      // state lives outside React Query (and still showed real-org schedule
+      // data until the AppShell remounted).
+      window.location.reload();
     } catch {
       setError("We couldn't reach the server. Try again in a moment.");
       setIsLoading(false);

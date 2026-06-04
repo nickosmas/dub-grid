@@ -16,6 +16,7 @@ import type {
 } from "@/types";
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
+import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { DAY_LABELS } from "@/lib/constants";
 import {
   formatShiftRequestStatusLabel,
@@ -466,7 +467,11 @@ export function ScheduleTab({
                     <TableRow key={request.id}>
                       <TableCell className="text-[13px] font-medium">{formatShiftRequestTypeLabel(request.type)}</TableCell>
                       <TableCell className="text-[13px]">{request.requesterShiftDate}</TableCell>
-                      <TableCell className="text-[13px] font-semibold">{request.requesterShiftLabel}</TableCell>
+                      <TableCell className="text-[13px] font-semibold">
+                        {request.requesterSegments?.length
+                          ? joinShiftJobSegmentNames(request.requesterSegments)
+                          : request.requesterShiftLabel}
+                      </TableCell>
                       <TableCell>
                         <span
                           className="text-[12px] font-semibold capitalize"

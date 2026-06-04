@@ -54,9 +54,9 @@ vi.mock("@/features/employees/client", () => ({
   fetchEmployeeInvitations: vi.fn(),
   fetchEmployeeRoleHistory: vi.fn(),
   updateEmployee: vi.fn(),
-  benchEmployee: vi.fn(),
+  deactivateEmployee: vi.fn(),
   activateEmployee: vi.fn(),
-  deleteEmployee: vi.fn(),
+  removeEmployee: vi.fn(),
 }));
 
 vi.mock("@/features/schedule/client", () => ({
@@ -253,8 +253,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByText("Staffing actions")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Bench" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
     expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
   });
 
@@ -342,8 +341,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Bench" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
     expect(screen.getByText("Management access modal")).toBeInTheDocument();

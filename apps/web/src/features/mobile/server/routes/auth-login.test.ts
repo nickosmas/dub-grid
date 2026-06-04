@@ -29,45 +29,8 @@ function createServiceClientMock(input?: {
   profile?: {
     platform_role: string | null;
   } | null;
-  factors?: Array<{
-    id: string;
-    friendly_name?: string | null;
-    factor_type: "totp";
-    status: "verified";
-    created_at?: string;
-    updated_at?: string;
-  }>;
-  signInError?: { message: string } | null;
 }) {
   return {
-    auth: {
-      signInWithPassword: vi.fn().mockResolvedValue({
-        data: input?.signInError
-          ? {
-              session: null,
-              user: null,
-            }
-          : {
-              session: {
-                access_token: "access-token",
-                refresh_token: "refresh-token",
-                expires_in: 3600,
-                token_type: "bearer",
-              },
-              user: {
-                id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
-                email: "manager@dubgrid.com",
-                email_confirmed_at: "2026-04-17T00:00:00.000Z",
-                factors: input?.factors ?? [],
-                user_metadata: {
-                  first_name: "Mina",
-                  last_name: "Diaz",
-                },
-              },
-            },
-        error: input?.signInError ?? null,
-      }),
-    },
     from: vi.fn((table: string) => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
@@ -113,6 +76,15 @@ function createSessionClientMock(input?: {
     expires_in: number;
     token_type: string;
   } | null;
+  factors?: Array<{
+    id: string;
+    friendly_name?: string | null;
+    factor_type: "totp";
+    status: "verified";
+    created_at?: string;
+    updated_at?: string;
+  }>;
+  signInError?: { message: string } | null;
 }) {
   const rpc = vi.fn(async (fn: string) => {
     if (fn === "get_my_organizations") {
@@ -143,9 +115,31 @@ function createSessionClientMock(input?: {
   return {
     rpc,
     auth: {
-      setSession: vi.fn().mockResolvedValue({
-        data: {},
-        error: null,
+      signInWithPassword: vi.fn().mockResolvedValue({
+        data: input?.signInError
+          ? {
+              session: null,
+              user: null,
+            }
+          : {
+              session: {
+                access_token: "access-token",
+                refresh_token: "refresh-token",
+                expires_in: 3600,
+                token_type: "bearer",
+              },
+              user: {
+                id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+                email: "manager@dubgrid.com",
+                email_confirmed_at: "2026-04-17T00:00:00.000Z",
+                factors: input?.factors ?? [],
+                user_metadata: {
+                  first_name: "Mina",
+                  last_name: "Diaz",
+                },
+              },
+            },
+        error: input?.signInError ?? null,
       }),
       refreshSession: vi.fn().mockResolvedValue({
         data: {
@@ -168,6 +162,36 @@ describe("mobile auth login route", () => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+  });
+
+  it("returns 403 ACCOUNT_DISABLED when the JWT hook refuses a terminated employee", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    createClient.mockReturnValue(
+      createSessionClientMock({
+        signInError: {
+          message: "Your account has been disabled. Contact your organization admin.",
+        },
+      }),
+    );
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          orgSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "Your account has been disabled. Contact your organization admin.",
+      code: "ACCOUNT_DISABLED",
+    });
   });
 
   it("returns 429 when the mobile login rate limit is hit", async () => {
@@ -323,8 +347,9 @@ describe("mobile auth login route", () => {
 
   it("returns an MFA-required login payload without rejecting verified TOTP users", async () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
-    getServiceClient.mockReturnValue(
-      createServiceClientMock({
+    getServiceClient.mockReturnValue(createServiceClientMock());
+    createClient.mockReturnValue(
+      createSessionClientMock({
         factors: [
           {
             id: "factor-123",
@@ -335,7 +360,6 @@ describe("mobile auth login route", () => {
         ],
       }),
     );
-    createClient.mockReturnValue(createSessionClientMock());
 
     const { POST } = await import("./auth-login");
     const response = await POST(
@@ -365,6 +389,42 @@ describe("mobile auth login route", () => {
         slug: "dubgrid-health",
       },
     });
+  });
+
+  it("never invokes auth methods on the shared service client (poisoning regression guard)", async () => {
+    checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
+
+    // Trap every access to `auth.*` on the service client. The shared
+    // singleton must only see `.from()` reads + `auth.admin.*`; any other
+    // auth call would set a session on it and downgrade every subsequent
+    // service-role query to that user's RLS scope.
+    const serviceAuthAccess = vi.fn();
+    const sneakyServiceClient = {
+      ...createServiceClientMock(),
+      auth: new Proxy({} as Record<string, unknown>, {
+        get: (_target, prop) => {
+          serviceAuthAccess(prop);
+          return undefined;
+        },
+      }),
+    };
+    getServiceClient.mockReturnValue(sneakyServiceClient);
+    createClient.mockReturnValue(createSessionClientMock());
+
+    const { POST } = await import("./auth-login");
+    const response = await POST(
+      new Request("http://localhost/api/mobile/v1/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          orgSlug: "dubgrid-health",
+          email: "manager@dubgrid.com",
+          password: "super-secret",
+        }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(serviceAuthAccess).not.toHaveBeenCalled();
   });
 
   it("returns 404 when the requested organization slug does not exist", async () => {

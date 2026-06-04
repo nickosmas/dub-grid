@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { ApiResponseError } from "@dubgrid/api-client";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
+import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
 import {
   KeyboardAvoidingView,
@@ -262,6 +264,25 @@ export default function LoginScreen() {
 
       await finishLogin(response);
     } catch (loginError) {
+      // The JWT hook refuses terminated employees with a sentinel message
+      // (ACCOUNT_DISABLED_CODE) — surface a friendly disabled-account message
+      // instead of the generic invalid-credentials fallback.
+      if (
+        loginError instanceof ApiResponseError &&
+        loginError.status === 403 &&
+        loginError.payload &&
+        typeof loginError.payload === "object" &&
+        (loginError.payload as { code?: unknown }).code === ACCOUNT_DISABLED_CODE
+      ) {
+        setError(ACCOUNT_DISABLED_MESSAGE);
+        pushToast({
+          title: "Account disabled",
+          message: ACCOUNT_DISABLED_MESSAGE,
+          tone: "error",
+        });
+        setPassword("");
+        return;
+      }
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: loginError,
         fallbackMessage:

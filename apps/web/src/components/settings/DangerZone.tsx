@@ -7,12 +7,14 @@ import { SectionCard } from "./shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { signOutFromBrowser } from "@/features/account/client/auth";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { useIsInSandbox } from "@/hooks";
 
 interface DangerZoneProps {
   organization: Organization;
 }
 
 export default function DangerZone({ organization }: DangerZoneProps) {
+  const isInSandbox = useIsInSandbox();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -88,6 +90,12 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           <button
             className="dg-btn dg-btn-danger-filled"
             onClick={() => setConfirmOpen(true)}
+            disabled={isInSandbox}
+            title={
+              isInSandbox
+                ? "Deleting the organization isn't available in sandbox mode."
+                : undefined
+            }
           >
             Delete organization
           </button>

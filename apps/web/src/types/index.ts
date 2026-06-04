@@ -622,6 +622,9 @@ export interface DirectoryPerson {
   personId: string;
   source: 'employee' | 'user_only' | 'pending_invite';
   employeeId: string | null;
+  /** Per-org employee ID badge. Null for app-only members without an employee
+   *  row yet (user_only / pending_invite). */
+  employeeNumber: number | null;
   userId: string | null;
   firstName: string;
   lastName: string;

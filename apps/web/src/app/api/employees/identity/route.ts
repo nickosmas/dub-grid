@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { optionalUsPhoneSchema, staffNameSchema } from "@dubgrid/contracts";
+import {
+  optionalStaffEmailSchema,
+  optionalUsPhoneSchema,
+  staffNameSchema,
+} from "@dubgrid/contracts";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -18,6 +22,7 @@ const patchSchema = z.object({
   firstName: staffNameSchema,
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema,
+  email: optionalStaffEmailSchema.optional(),
 });
 
 export async function PATCH(req: NextRequest) {
@@ -45,7 +50,8 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const { employeeId, orgId, userId, firstName, lastName, phone } = parsed.data;
+  const { employeeId, orgId, userId, firstName, lastName, phone, email } =
+    parsed.data;
   const serviceClient = getServiceClient();
 
   try {
@@ -67,6 +73,9 @@ export async function PATCH(req: NextRequest) {
         first_name: firstName,
         last_name: lastName,
         phone,
+        // Only PATCH the email when the caller explicitly sent one — keeps
+        // legacy callers (which don't set email) from clearing the field.
+        ...(email !== undefined ? { email } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("org_id", orgId)

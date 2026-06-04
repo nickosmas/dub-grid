@@ -40,6 +40,7 @@ import type {
   ShiftCategory,
 } from "@/types";
 import type { Organization } from "@dubgrid/domain";
+import { DEFAULT_OPEN_SHIFT_VISIBILITY } from "@dubgrid/domain";
 import {
   buildScheduleAssignmentOptions,
   buildShiftDisplayParts,
@@ -124,6 +125,14 @@ type MobilePublishHistoryEntry = {
   publishedByName: string | null;
 };
 
+function toMobileOrgRole(
+  value: string | null | undefined,
+): MobilePerson["orgRole"] {
+  return value === "super_admin" || value === "admin" || value === "user"
+    ? value
+    : null;
+}
+
 type MobilePeopleRow = Pick<
   Employee,
   | "id"
@@ -145,8 +154,12 @@ type MobilePeopleRow = Pick<
   | "userId"
   | "version"
 > & {
+  // employeeNumber is optional on Employee (test fixtures may omit it), but DB
+  // rows always have one — narrow back to required here.
+  employeeNumber: number;
   managementDepartmentIds: number[];
   managementDeptAdminIds: number[];
+  orgRole: MobilePerson["orgRole"];
   pendingInvitation: MobilePerson["pendingInvitation"];
 };
 
@@ -1681,6 +1694,7 @@ export async function fetchMobilePeople(
 
   return rows.map((row) => ({
     id: row.id,
+    employeeNumber: row.employee_number,
     firstName: row.first_name,
     lastName: row.last_name,
     employmentType: row.employment_type ?? "full_time",
@@ -1710,6 +1724,11 @@ export async function fetchMobilePeople(
         : null) ??
       invitationByEmployeeId.get(row.id)?.dept_admin_ids ??
       [],
+    orgRole: toMobileOrgRole(
+      row.user_id
+        ? managementMembershipByUserId.get(row.user_id)?.org_role
+        : null,
+    ),
     pendingInvitation: invitationByEmployeeId.get(row.id)
       ? {
           id: invitationByEmployeeId.get(row.id)!.id,
@@ -1753,6 +1772,7 @@ export function mapOrganizationToMobileConfig(org: Organization) {
       role: org.roleLabel,
       department: org.departmentLabel,
     },
+    openShiftVisibility: org.openShiftVisibility ?? DEFAULT_OPEN_SHIFT_VISIBILITY,
     featureFlags: org.featureOverrides ?? {},
   };
 }

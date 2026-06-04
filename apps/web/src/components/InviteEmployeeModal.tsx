@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
-import { Employee, OrganizationUser, NamedItem, Department, NameMismatchDetails } from "@/types";
+import { Employee, NamedItem, Department } from "@/types";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
-import {
-  formatClientErrorMessage,
-  formatOrganizationRoleLabel,
-} from "@/lib/client-facing";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { validateEmail, validatePhone, validateRequired } from "@/components/FormField";
 import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
 import { toast } from "sonner";
@@ -17,16 +14,12 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import { NameMismatchError } from "@/lib/account-linking";
-import { AccountNameMismatchPanel } from "@/components/AccountNameMismatchPanel";
 import {
-  fetchOrganizationUsers,
   createOrganizationInvitation,
+  checkUserExistsByEmail,
+  type UserExistsByEmailResult,
 } from "@/features/organization/client";
-import {
-  linkEmployeeToUser,
-  reconcileEmployeeNameAndLinkUser,
-} from "@/features/employees/client";
+import { useIsInSandbox } from "@/hooks";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
@@ -44,8 +37,6 @@ interface InviteEmployeeModalProps {
   departments?: (NamedItem | Department)[];
 }
 
-type ModalMode = "loading" | "link" | "invite";
-
 export default function InviteEmployeeModal({
   employee,
   orgId,
@@ -55,6 +46,7 @@ export default function InviteEmployeeModal({
   departments = [],
 }: InviteEmployeeModalProps) {
   const isManagementInvite = !employee;
+  const isInSandbox = useIsInSandbox();
   const [email, setEmail] = useState(employee?.email || "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -65,7 +57,8 @@ export default function InviteEmployeeModal({
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [nameMismatch, setNameMismatch] = useState<NameMismatchDetails | null>(null);
+  const [emailLookup, setEmailLookup] = useState<UserExistsByEmailResult | null>(null);
+  const [emailLookupLoading, setEmailLookupLoading] = useState(false);
 
   // Management departments only (filtered from all departments — only Department has .type)
   const managementDepts = useMemo(
@@ -73,42 +66,6 @@ export default function InviteEmployeeModal({
     [departments],
   );
 
-  // Existing user detection
-  const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
-  const [orgUsersLoaded, setOrgUsersLoaded] = useState(false);
-
-  // On mount, fetch org users (only needed when linking an employee)
-  useEffect(() => {
-    if (isManagementInvite) {
-      setOrgUsersLoaded(true);
-      return;
-    }
-    fetchOrganizationUsers(orgId)
-      .then((users) => {
-        setOrgUsers(users);
-      })
-      .catch(() => {
-        // fallback — leave empty
-      })
-      .finally(() => setOrgUsersLoaded(true));
-  }, [orgId, isManagementInvite]);
-
-  // Derive mode and matchedUser inline
-  const matchedUser = !isManagementInvite && orgUsersLoaded && email.trim()
-    ? orgUsers.find(
-        (u) => u.email && u.email.toLowerCase() === email.trim().toLowerCase()
-      ) ?? null
-    : null;
-
-  useEffect(() => {
-    setNameMismatch(null);
-  }, [employee?.id, email, matchedUser?.id]);
-
-  const mode: ModalMode = !orgUsersLoaded
-    ? "loading"
-    : matchedUser
-      ? "link"
-      : "invite";
   const initialDraftSnapshot = useMemo(
     () =>
       JSON.stringify({
@@ -141,8 +98,48 @@ export default function InviteEmployeeModal({
   }, [onClose, requestClose, sending]);
   const trimmedEmail = email.trim();
   const requiredEmailError = trimmedEmail ? validateEmail(trimmedEmail) : "Email address is required";
+
+  // Pre-flight: when the email is a valid format, check whether it already
+  // maps to a DubGrid user (any org). Debounced to avoid spamming the
+  // endpoint on every keystroke. Three outcomes drive the UI:
+  //   - existsInThisOrg → block submission (red banner; admin should open
+  //     the existing record instead).
+  //   - exists && !existsInThisOrg → info banner (cross-org reuse); admin
+  //     can still send the invite. Note that the roster will show the
+  //     existing user's profile name after they accept.
+  //   - !exists → no banner; standard new-user invitation.
+  useEffect(() => {
+    if (requiredEmailError) {
+      setEmailLookup(null);
+      setEmailLookupLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setEmailLookupLoading(true);
+    const timer = setTimeout(() => {
+      checkUserExistsByEmail(trimmedEmail, orgId)
+        .then((result) => {
+          if (!cancelled) setEmailLookup(result);
+        })
+        .catch(() => {
+          // Soft fail — pre-flight is advisory; the DB trigger still
+          // enforces correctness on submit.
+          if (!cancelled) setEmailLookup(null);
+        })
+        .finally(() => {
+          if (!cancelled) setEmailLookupLoading(false);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [trimmedEmail, requiredEmailError, orgId]);
+
   const canSend =
+    !isInSandbox &&
     !requiredEmailError &&
+    !(emailLookup?.existsInThisOrg) &&
     (!isManagementInvite || (!!firstName.trim() && !!lastName.trim())) &&
     (!isManagementInvite || managementDepts.length === 0 || departmentIds.length > 0) &&
     (!isManagementInvite || !validatePhone(phone)) &&
@@ -182,54 +179,6 @@ export default function InviteEmployeeModal({
       touched,
     ],
   );
-
-  async function handleLink() {
-    if (!matchedUser || !employee) return;
-    setSending(true);
-    setError(null);
-
-    try {
-      await linkEmployeeToUser(employee.id, matchedUser.id, orgId);
-      const updatedEmployee: Employee = {
-        ...employee,
-        userId: matchedUser.id,
-      };
-      toast.success(`${getEmployeeDisplayName(employee)} linked to ${matchedUser.email}`);
-      await onInvited(updatedEmployee);
-      onClose();
-    } catch (err) {
-      if (err instanceof NameMismatchError) {
-        setNameMismatch(err.details);
-        return;
-      }
-      setError(formatClientErrorMessage(err, "Failed to link user"));
-    } finally {
-      setSending(false);
-    }
-  }
-
-  async function handleReconcileLink() {
-    if (!matchedUser || !employee || !nameMismatch) return;
-    setSending(true);
-    setError(null);
-
-    try {
-      await reconcileEmployeeNameAndLinkUser(employee.id, matchedUser.id, orgId);
-      const updatedEmployee: Employee = {
-        ...employee,
-        firstName: nameMismatch.accountFirstName,
-        lastName: nameMismatch.accountLastName,
-        userId: matchedUser.id,
-      };
-      toast.success(`${getEmployeeDisplayName(employee)} updated to match ${matchedUser.email} and linked`);
-      await onInvited(updatedEmployee);
-      onClose();
-    } catch (err) {
-      setError(formatClientErrorMessage(err, "Failed to reconcile and link user"));
-    } finally {
-      setSending(false);
-    }
-  }
 
   async function handleSend() {
     if (!canSend) {
@@ -303,74 +252,17 @@ export default function InviteEmployeeModal({
     }
   }
 
-  const userName = matchedUser
-    ? [matchedUser.firstName, matchedUser.lastName].filter(Boolean).join(" ") || matchedUser.email
-    : null;
-
   return (
     <>
       <Modal
-        title={isManagementInvite ? "Invite Management Staff" : mode === "link" ? `Link ${getEmployeeDisplayName(employee)}` : `Invite ${getEmployeeDisplayName(employee)}`}
+        title={isManagementInvite ? "Invite Management Staff" : `Invite ${getEmployeeDisplayName(employee)}`}
         onClose={onClose}
         onRequestClose={() => !sending && requestClose()}
         style={{ maxWidth: 480 }}
       >
-      {nameMismatch ? (
-        <AccountNameMismatchPanel
-          details={nameMismatch}
-          title="Name mismatch found"
-          description="This employee record does not match the existing user account name. If the account name is correct, you can update the employee record to match it and complete the link."
-          confirmLabel="Use Account Name and Link"
-          dismissLabel={EDITOR_ACTION_LABELS.close}
-          onCancel={handleRequestClose}
-          onConfirm={handleReconcileLink}
-          confirming={sending}
-        />
-      ) : mode === "loading" ? (
-        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--color-text-muted, #4D6080)", fontSize: "var(--dg-fs-body-sm)" }}>
-          Checking for existing users...
-        </div>
-      ) : mode === "link" && matchedUser ? (
-        /* Direct link mode — user already exists in this org */
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            style={{
-              padding: "16px",
-              background: "var(--color-info-bg)",
-              borderRadius: 8,
-              border: "1px solid var(--color-info-border)",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: "var(--dg-fs-body-sm)", fontWeight: 600, color: "var(--color-info-text)" }}>
-              Existing user found
-            </p>
-            <p style={{ margin: "8px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-info-text)" }}>
-              <strong>{userName}</strong> ({matchedUser.email}) is already a member of this
-              organization as <strong>{formatOrganizationRoleLabel(matchedUser.orgRole)}</strong>.
-              You can link them directly — no invitation needed.
-            </p>
-          </div>
-
-          {/* Error */}
-          {error && <ErrorBanner message={error} />}
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
-              {EDITOR_ACTION_LABELS.close}
-            </button>
-            <button
-              className="dg-btn dg-btn-primary"
-              onClick={handleLink}
-              disabled={sending}
-              style={{ opacity: sending ? 0.5 : 1 }}
-            >
-              <ButtonLoading loading={sending} spinnerSize={16}>{`Link to ${userName}`}</ButtonLoading>
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Invite mode — new user */
+        {/* Single-state: invite-only. accept_invitation handles whether the
+            recipient already has an account elsewhere (cross-org case) or
+            needs a fresh signup. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Employee context */}
           <div
@@ -481,6 +373,47 @@ export default function InviteEmployeeModal({
                 {fieldErrors.email}
               </div>
             )}
+            {!fieldErrors.email && !emailLookupLoading && emailLookup?.existsInThisOrg && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 8,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  background: "var(--color-danger-bg)",
+                  color: "var(--color-danger-text)",
+                  fontSize: "var(--dg-fs-footnote)",
+                }}
+              >
+                <strong>{emailLookup.displayName ?? trimmedEmail}</strong> is
+                already on your team. Find them in the People list to update
+                their record instead of inviting again.
+              </div>
+            )}
+            {!fieldErrors.email
+              && !emailLookupLoading
+              && emailLookup?.exists
+              && !emailLookup.existsInThisOrg && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 12px",
+                  borderRadius: 6,
+                  background: "var(--color-info-bg)",
+                  color: "var(--color-info-text)",
+                  fontSize: "var(--dg-fs-footnote)",
+                }}
+              >
+                <strong>{emailLookup.displayName ?? trimmedEmail}</strong>
+                {" "}already has a DubGrid account. They&apos;ll join your
+                organization when they accept the invite
+                {emailLookup.displayName ? (
+                  <> — your roster will show their name as <strong>{emailLookup.displayName}</strong>.</>
+                ) : (
+                  <>.</>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Phone (management staff mode, optional) */}
@@ -573,6 +506,11 @@ export default function InviteEmployeeModal({
             />
           </div>
 
+          {/* Sandbox notice */}
+          {isInSandbox && (
+            <SandboxNotice message="Sending invitations isn't available in sandbox mode. Exit the sandbox to invite people to your real organization." />
+          )}
+
           {/* Error */}
           {error && <ErrorBanner message={error} />}
 
@@ -591,7 +529,6 @@ export default function InviteEmployeeModal({
             </button>
           </div>
         </div>
-      )}
       </Modal>
       {unsavedChangesDialog}
     </>
@@ -607,6 +544,24 @@ function ErrorBanner({ message }: { message: string }) {
         margin: 0,
         padding: "8px 12px",
         background: "var(--color-danger-bg)",
+        borderRadius: "var(--dg-radius-md)",
+      }}
+    >
+      {message}
+    </p>
+  );
+}
+
+function SandboxNotice({ message }: { message: string }) {
+  return (
+    <p
+      style={{
+        color: "var(--color-info-text)",
+        fontSize: "var(--dg-fs-body-sm)",
+        margin: 0,
+        padding: "8px 12px",
+        background: "var(--color-info-bg)",
+        border: "1px solid var(--color-info-border)",
         borderRadius: "var(--dg-radius-md)",
       }}
     >

@@ -12,6 +12,7 @@ function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
     personId: "u:user-1",
     source: "user_only",
     employeeId: null,
+    employeeNumber: null,
     userId: "user-1",
     firstName: "Jordan",
     lastName: "Lee",

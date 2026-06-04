@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
         personId: row.person_id as string,
         source: row.source as "employee" | "user_only" | "pending_invite",
         employeeId: (row.employee_id as string | null) ?? null,
+        employeeNumber: (row.employee_number as number | null) ?? null,
         userId: (row.user_id as string | null) ?? null,
         firstName: (row.first_name as string) ?? "",
         lastName: (row.last_name as string) ?? "",

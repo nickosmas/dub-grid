@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
-  benchEmployee,
-  deleteEmployee,
+  deactivateEmployee,
   EmployeeStatusConflictError,
   fetchEmployees,
   insertEmployee,
+  removeEmployee,
   updateEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
@@ -22,13 +22,13 @@ import type { Employee } from "@/types";
 
 export interface EmployeesData {
   employees: Employee[];
-  benchedEmployees: Employee[];
-  terminatedEmployees: Employee[];
+  inactiveEmployees: Employee[];
+  removedEmployees: Employee[];
   loading: boolean;
   handleAddEmployee: (dataList: Omit<Employee, "id" | "seniority">[]) => Promise<Employee[] | undefined>;
   handleSaveEmployee: (emp: Employee) => Promise<void>;
-  handleDeleteEmployee: (empId: string) => Promise<void>;
-  handleBenchEmployee: (empId: string, note?: string) => Promise<void>;
+  handleRemoveEmployee: (empId: string, note?: string) => Promise<void>;
+  handleDeactivateEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
 }
 
@@ -45,7 +45,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
   // Fetch all employees via React Query
   const employeesQuery = useQuery({
     queryKey: queryKeys.employees.all(orgId!),
-    queryFn: () => fetchEmployees(orgId!, ["active", "benched", "terminated"]),
+    queryFn: () => fetchEmployees(orgId!, ["active", "inactive", "removed"]),
     enabled: !!orgId,
     staleTime: 2 * 60_000, // 2 min — mutations invalidate immediately
   });
@@ -63,8 +63,8 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   // Derive filtered arrays — no extra re-renders, no separate state.
   const employees = useMemo(() => allLocal.filter((e) => e.status === "active"), [allLocal]);
-  const benchedEmployees = useMemo(() => allLocal.filter((e) => e.status === "benched"), [allLocal]);
-  const terminatedEmployees = useMemo(() => allLocal.filter((e) => e.status === "terminated"), [allLocal]);
+  const inactiveEmployees = useMemo(() => allLocal.filter((e) => e.status === "inactive"), [allLocal]);
+  const removedEmployees = useMemo(() => allLocal.filter((e) => e.status === "removed"), [allLocal]);
 
   const loading = employeesQuery.isLoading;
 
@@ -138,7 +138,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
-  const handleDeleteEmployee = useCallback(async (empId: string) => {
+  const handleRemoveEmployee = useCallback(async (empId: string, note?: string) => {
     const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
     if (!targetEmployee || !orgId) return;
 
@@ -147,15 +147,15 @@ export function useEmployees(orgId: string | null): EmployeesData {
     setAllLocal((prev) => {
       prevAll = prev;
       return prev.map((e) =>
-        e.id === empId ? { ...e, status: "terminated" as const, statusChangedAt: now } : e,
+        e.id === empId ? { ...e, status: "removed" as const, statusChangedAt: now } : e,
       );
     });
     try {
-      const updatedEmployee = await deleteEmployee(empId, orgId, targetEmployee.version);
+      const updatedEmployee = await removeEmployee(empId, orgId, targetEmployee.version, note);
       setAllLocal((prev) => prev.map((employee) => (
         employee.id === empId ? updatedEmployee : employee
       )));
-      toast.success("Employee terminated");
+      toast.success("Employee removed");
       invalidateEmployees();
     } catch (err) {
       if (err instanceof EmployeeStatusConflictError) {
@@ -170,12 +170,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
         toast.error(err.message);
         return;
       }
-      toast.error("Failed to terminate employee");
+      toast.error("Failed to remove employee");
       Sentry.captureException(err);
     }
   }, [orgId, invalidateEmployees]);
 
-  const handleBenchEmployee = useCallback(async (empId: string, note?: string) => {
+  const handleDeactivateEmployee = useCallback(async (empId: string, note?: string) => {
     const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
     if (!targetEmployee || !orgId) return;
 
@@ -184,12 +184,12 @@ export function useEmployees(orgId: string | null): EmployeesData {
       prevAll = prev;
       return prev.map((e) =>
         e.id === empId
-          ? { ...e, status: "benched" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() }
+          ? { ...e, status: "inactive" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() }
           : e,
       );
     });
     try {
-      const updatedEmployee = await benchEmployee(
+      const updatedEmployee = await deactivateEmployee(
         empId,
         note,
         orgId,
@@ -198,7 +198,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
       setAllLocal((prev) => prev.map((employee) => (
         employee.id === empId ? updatedEmployee : employee
       )));
-      toast.success("Employee benched");
+      toast.success("Employee marked inactive");
       invalidateEmployees();
     } catch (err) {
       if (err instanceof EmployeeStatusConflictError) {
@@ -213,7 +213,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         toast.error(err.message);
         return;
       }
-      toast.error("Failed to bench employee");
+      toast.error("Failed to update employee status");
       Sentry.captureException(err);
     }
   }, [orgId, invalidateEmployees]);
@@ -259,13 +259,13 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   return {
     employees,
-    benchedEmployees,
-    terminatedEmployees,
+    inactiveEmployees,
+    removedEmployees,
     loading,
     handleAddEmployee,
     handleSaveEmployee,
-    handleDeleteEmployee,
-    handleBenchEmployee,
+    handleRemoveEmployee,
+    handleDeactivateEmployee,
     handleActivateEmployee,
   };
 }

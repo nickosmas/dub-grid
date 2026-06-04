@@ -11,19 +11,6 @@ import type {
   ShiftMap,
 } from "@/types";
 
-export interface CreateEmployeeFromOrgUserInput {
-  orgId: string;
-  userId: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  certificationId: number | null;
-  focusAreaIds: number[];
-  roleIds: number[];
-  contactNotes?: string;
-}
-
 export interface UpdateEmployeeIdentityInput {
   employeeId: string;
   orgId: string;
@@ -31,6 +18,8 @@ export interface UpdateEmployeeIdentityInput {
   firstName: string;
   lastName: string;
   phone: string;
+  /** Optional. Omit to leave the existing email untouched. */
+  email?: string;
 }
 
 export class OptimisticLockError extends Error {
@@ -101,7 +90,6 @@ async function requestEmployeesJson<T>(
       payload.field,
     );
   }
-
   if (!response.ok) {
     throw new Error(formatClientErrorMessage(payload?.error, "Employee request failed."));
   }
@@ -117,61 +105,6 @@ async function requestEmployeeAction<T>(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-}
-
-export async function createEmployeeFromOrgUser(
-  input: CreateEmployeeFromOrgUserInput,
-): Promise<Employee> {
-  const payload = await requestEmployeesJson<{ employee: Employee }>(
-    "/api/employees/from-user",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.employee;
-}
-
-export async function reconcileEmployeeFromOrgUser(
-  input: CreateEmployeeFromOrgUserInput,
-): Promise<Employee> {
-  const payload = await requestEmployeesJson<{ employee: Employee }>(
-    "/api/employees/from-user/reconcile",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    },
-  );
-  return payload.employee;
-}
-
-export async function linkEmployeeToUser(
-  employeeId: string,
-  userId: string,
-  orgId: string,
-): Promise<{ status: string }> {
-  return requestEmployeesJson<{ status: string }>("/api/employees/link-user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ employeeId, userId, orgId }),
-  });
-}
-
-export async function reconcileEmployeeNameAndLinkUser(
-  employeeId: string,
-  userId: string,
-  orgId: string,
-): Promise<{ status: string }> {
-  return requestEmployeesJson<{ status: string }>(
-    "/api/employees/link-user/reconcile",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ employeeId, userId, orgId }),
-    },
-  );
 }
 
 export async function updateEmployeeIdentity(
@@ -322,7 +255,7 @@ export function fetchEmployeeRoleHistory(
 async function updateEmployeeStatus(input: {
   empId: string;
   orgId: string;
-  action: "bench" | "activate" | "terminate";
+  action: "deactivate" | "activate" | "remove";
   expectedVersion: number;
   note?: string;
 }): Promise<Employee> {
@@ -351,20 +284,22 @@ async function updateEmployeeStatus(input: {
   return body.employee;
 }
 
-export function deleteEmployee(
+export function removeEmployee(
   empId: string,
   orgId: string,
   expectedVersion: number,
+  note?: string,
 ): Promise<Employee> {
   return updateEmployeeStatus({
     empId,
     orgId,
-    action: "terminate",
+    action: "remove",
     expectedVersion,
+    note,
   });
 }
 
-export function benchEmployee(
+export function deactivateEmployee(
   empId: string,
   note: string | undefined,
   orgId: string,
@@ -373,7 +308,7 @@ export function benchEmployee(
   return updateEmployeeStatus({
     empId,
     orgId,
-    action: "bench",
+    action: "deactivate",
     note,
     expectedVersion,
   });

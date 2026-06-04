@@ -62,6 +62,7 @@ interface DashboardHeaderProps {
   periodEnd: Date;
   viewMode: ViewMode;
   showViewModeTabs?: boolean;
+  availableViewModes?: ViewMode[];
   onPrev: () => void;
   onNext: () => void;
   onToday: () => void;
@@ -73,11 +74,15 @@ export default function DashboardHeader({
   periodEnd,
   viewMode,
   showViewModeTabs = true,
+  availableViewModes,
   onPrev,
   onNext,
   onToday,
   onViewModeChange,
 }: DashboardHeaderProps) {
+  const viewModeOptions = availableViewModes
+    ? VIEW_MODES.filter((mode) => availableViewModes.includes(mode.value))
+    : VIEW_MODES;
   const isMobile = useMediaQuery(MOBILE);
   const todayLabel =
     viewMode === "day"
@@ -173,6 +178,7 @@ export default function DashboardHeader({
 
         {showViewModeTabs ? (
           <ViewModeTabs
+            modes={viewModeOptions}
             viewMode={viewMode}
             onViewModeChange={onViewModeChange}
             style={{ alignSelf: "flex-start" }}
@@ -297,6 +303,7 @@ export default function DashboardHeader({
 
         {showViewModeTabs ? (
           <ViewModeTabs
+            modes={viewModeOptions}
             viewMode={viewMode}
             onViewModeChange={onViewModeChange}
           />
@@ -308,10 +315,12 @@ export default function DashboardHeader({
 }
 
 function ViewModeTabs({
+  modes,
   viewMode,
   onViewModeChange,
   style,
 }: {
+  modes: { value: ViewMode; label: string }[];
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   style?: CSSProperties;
@@ -322,9 +331,9 @@ function ViewModeTabs({
       className="dg-span-tabs dg-span-tabs--light"
       style={style}
     >
-      {VIEW_MODES.map((m, i) => {
+      {modes.map((m, i) => {
         const isActive = viewMode === m.value;
-        const prevActive = i > 0 && viewMode === VIEW_MODES[i - 1].value;
+        const prevActive = i > 0 && viewMode === modes[i - 1].value;
         const showDivider = i > 0 && !isActive && !prevActive;
         return (
           <Fragment key={m.value}>

@@ -353,7 +353,7 @@ export default function AllUsersView({
                   <th style={thStyle}>Mobile</th>
                   <th style={thStyle}>Memberships</th>
                   <th style={thStyle}>Last Login</th>
-                  <th style={thStyle}>Joined</th>
+                  <th style={thStyle}>Date Joined</th>
                 </tr>
               </thead>
               <tbody>
@@ -521,7 +521,7 @@ export default function AllUsersView({
                     <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{formatRelativeDate(u.lastSignInAt)}</div>
                   </div>
                   <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Joined</span>
+                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Date Joined</span>
                     <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
                   </div>
                   {u.orgName && (
@@ -573,7 +573,7 @@ export default function AllUsersView({
                           <tr>
                             <th style={thStyle}>Organization</th>
                             <th style={thStyle}>Role</th>
-                            <th style={thStyle}>Joined</th>
+                            <th style={thStyle}>Date Joined</th>
                           </tr>
                         </thead>
                         <tbody>

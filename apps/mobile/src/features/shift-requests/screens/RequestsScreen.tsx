@@ -368,6 +368,8 @@ export default function RequestsScreen() {
     useState<RequestActionConfirmation>(null);
   const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
+  const openShiftVisibility =
+    bootstrapQuery.data?.currentOrg.openShiftVisibility;
   const todayDate = useMemo(
     () => getIsoDateInTimeZone(now, timeZone),
     [now, timeZone],
@@ -493,6 +495,8 @@ export default function RequestsScreen() {
         now,
         showAll: canViewAllRequests,
         timeZone,
+        coverageGapVisibility: openShiftVisibility?.coverageGap,
+        calloffVisibility: openShiftVisibility?.calloff,
       }),
     [
       availabilityScheduleEntries,
@@ -502,6 +506,7 @@ export default function RequestsScreen() {
       requests,
       canViewAllRequests,
       timeZone,
+      openShiftVisibility,
     ],
   );
   const myRequests = useMemo(

@@ -9,11 +9,12 @@ describe("InlineRoleSelect self-guard", () => {
     expect(screen.getByRole("button", { expanded: false })).toBeTruthy();
   });
 
-  it("renders a read-only badge (no editable control) for the current user", () => {
+  it("renders a disabled dropdown (grayed) for the current user", () => {
     render(<InlineRoleSelect orgRole="admin" onChange={vi.fn()} isSelf />);
-    // The role label is shown, but no listbox trigger exists — you can't
-    // change your own role.
+    // The dropdown still renders so the column reads consistently, but the
+    // trigger is aria-disabled so the user can't change their own role.
+    const trigger = screen.getByRole("button");
+    expect(trigger.getAttribute("aria-disabled")).toBe("true");
     expect(screen.getByText(/admin/i)).toBeTruthy();
-    expect(screen.queryByRole("button", { expanded: false })).toBeNull();
   });
 });

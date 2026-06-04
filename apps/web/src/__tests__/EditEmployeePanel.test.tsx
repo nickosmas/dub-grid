@@ -57,6 +57,7 @@ const focusAreas: FocusArea[] = [
 
 const employee: Employee = {
   id: "emp-42",
+  employeeNumber: 1042,
   firstName: "Alice",
   lastName: "Smith",
   employmentType: "full_time",
@@ -74,6 +75,7 @@ const employee: Employee = {
   departmentIds: [],
   deptAdminIds: [],
   version: 0,
+  createdAt: null,
 };
 
 // ---------------------------------------------------------------------------

@@ -122,7 +122,7 @@ export async function updateMobilePersonStatus(
   }
 
   // Self-action guard: you can't change your own staffing status
-  // (bench / terminate / activate). Another admin must act.
+  // (deactivate / remove / activate). Another admin must act.
   if (isSelfAction(auth.user.id, currentEmployee.userId)) {
     return {
       kind: "self_action_forbidden",
@@ -145,18 +145,18 @@ export async function updateMobilePersonStatus(
 
   const now = new Date().toISOString();
   const nextStatus =
-    input.body.action === "bench"
-      ? "benched"
-      : input.body.action === "terminate"
-        ? "terminated"
+    input.body.action === "deactivate"
+      ? "inactive"
+      : input.body.action === "remove"
+        ? "removed"
         : "active";
   const nextStatusNote =
-    input.body.action === "bench" ? (input.body.note ?? "") : "";
+    input.body.action === "deactivate" ? (input.body.note ?? "") : "";
   const action =
-    input.body.action === "bench"
-      ? "employee.benched"
-      : input.body.action === "terminate"
-        ? "employee.archived"
+    input.body.action === "deactivate"
+      ? "employee.deactivated"
+      : input.body.action === "remove"
+        ? "employee.removed"
         : "employee.activated";
 
   const updatedEmployee = await deps.updateEmployeeStatus(auth.serviceClient, {
@@ -169,7 +169,7 @@ export async function updateMobilePersonStatus(
     archivedAt:
       input.body.action === "activate"
         ? null
-        : input.body.action === "terminate"
+        : input.body.action === "remove"
           ? now
           : undefined,
   });

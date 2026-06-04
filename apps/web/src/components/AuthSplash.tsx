@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatedDubGridLogo } from "@/components/Logo";
+import { AnimatedDubGridLogo } from "@/components/AnimatedDubGridLogo";
 
 /**
  * Full-screen branded splash shown during auth navigations (post-login arrival
@@ -26,7 +26,7 @@ export default function AuthSplash() {
         animation: "fade-in var(--dg-duration-standard) ease",
       }}
     >
-      <AnimatedDubGridLogo size={56} color="var(--color-brand)" />
+      <AnimatedDubGridLogo color="var(--color-brand)" />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import PermissionsEditor from "@/components/PermissionsEditor";
 const ROLE_LABELS: Record<OrganizationRole, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
-  user: "Member",
+  user: "User",
 };
 
 // Matches the panels' field labels (e.g. First name / Phone) so the access
@@ -73,7 +73,7 @@ export function MemberAccessControls({
               if (value !== orgRole) setPendingRole(value);
             }}
             options={[
-              { value: "user", label: "Member" },
+              { value: "user", label: "User" },
               { value: "admin", label: "Admin" },
               { value: "super_admin", label: "Super Admin" },
             ]}

@@ -7,6 +7,7 @@ import {
   formatShiftRequestStatusLabel,
   formatShiftRequestTypeLabel,
 } from "@/lib/client-facing";
+import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import type { ShiftRequest } from "@/types";
 
 interface ShiftRequestsSummaryCardProps {
@@ -47,6 +48,9 @@ function RequestRow({
   actions?: React.ReactNode;
 }) {
   const statusStyle = STATUS_STYLES[request.status] ?? STATUS_STYLES.open;
+  const requesterLabel = request.requesterSegments?.length
+    ? joinShiftJobSegmentNames(request.requesterSegments)
+    : request.requesterShiftLabel;
 
   return (
     <div
@@ -82,7 +86,7 @@ function RequestRow({
           )}
         </div>
         <div style={{ fontSize: 10, color: "var(--color-text-subtle)", marginTop: 1 }}>
-          {request.requesterShiftLabel} &middot; {request.requesterShiftDate}
+          {requesterLabel} &middot; {request.requesterShiftDate}
           {" \u00B7 "}
           {formatRelativeTime(request.createdAt)}
         </div>

@@ -281,7 +281,7 @@ export default function GridmasterAccountsView({
                   <th style={thStyle}>Email</th>
                   <th style={thStyle}>Role</th>
                   <th style={thStyle}>Last Login</th>
-                  <th style={thStyle}>Joined</th>
+                  <th style={thStyle}>Date Joined</th>
                   <th style={thStyle}>Actions</th>
                 </tr>
               </thead>

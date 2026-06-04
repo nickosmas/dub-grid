@@ -143,4 +143,46 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.isSuperAdmin).toBe(false);
     expect(body.permissions.isGridmaster).toBe(false);
   });
+
+  it("drops an inactive admin to read-only permissions", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "admin", orgId: ORG_ID });
+    enqueue("employees", { data: { status: "inactive" } });
+    enqueue("organization_memberships", {
+      data: {
+        org_role: "admin",
+        admin_permissions: {
+          canManageEmployees: true,
+          canPublishSchedule: true,
+          canEditShifts: true,
+        },
+      },
+    });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.isInactive).toBe(true);
+    expect(body.permissions.role).toBe("user");
+    expect(body.permissions.level).toBe(0);
+    expect(body.permissions.actualLevel).toBe(2);
+    expect(body.permissions.canManageEmployees).toBe(false);
+    expect(body.permissions.canPublishSchedule).toBe(false);
+    expect(body.permissions.canEditShifts).toBe(false);
+    expect(body.permissions.canViewSchedule).toBe(true);
+    expect(body.permissions.orgId).toBe(ORG_ID);
+  });
+
+  it("does not consult employee status for super_admin or gridmaster", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.isInactive).toBe(false);
+    expect(body.permissions.canManageEmployees).toBe(true);
+    // No employees table read for privileged roles
+    expect(serviceFrom).not.toHaveBeenCalledWith("employees");
+  });
 });

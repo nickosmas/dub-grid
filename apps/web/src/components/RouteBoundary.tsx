@@ -35,7 +35,7 @@ export function ErrorBoundary({
   error,
   reset,
   title = "Something went wrong",
-  message = "We couldn't load this page. Try again or head back home.",
+  message = "We couldn't load this page. Please try again.",
 }: {
   error: Error & { digest?: string };
   reset: () => void;

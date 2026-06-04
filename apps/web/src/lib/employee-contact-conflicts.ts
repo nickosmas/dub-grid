@@ -52,5 +52,21 @@ export function getEmployeeContactConflict(
     };
   }
 
+  // employee_email_belongs_to_user / employee_email_belongs_to_other_user:
+  // the BEFORE trigger raised because the email matches a different auth
+  // user's account email. Surface as a contact conflict so the existing
+  // EmployeeContactConflictError path on the client picks it up.
+  if (
+    text.includes("employee_email_belongs_to_user") ||
+    text.includes("employee_email_belongs_to_other_user")
+  ) {
+    return {
+      code: EMPLOYEE_CONTACT_CONFLICT_CODE,
+      error: "That email belongs to a different user account.",
+      field: "email",
+      message: "That email belongs to a different user account.",
+    };
+  }
+
   return null;
 }

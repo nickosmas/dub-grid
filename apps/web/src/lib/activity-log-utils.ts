@@ -188,10 +188,15 @@ export function describeAction(entry: FullAuditLogEntry): string {
     // Employee
     case "employee.created": return name ? `Added employee ${name}` : "Added a new employee";
     case "employee.updated": return name ? `Updated employee ${name}` : "Updated an employee";
-    case "employee.archived": return name ? `Terminated employee ${name}` : "Terminated an employee";
+    case "employee.removed":
+    // Historical key (was "terminated" before the rename) — keep rendering.
+    case "employee.archived":
+      return name ? `Removed employee ${name}` : "Removed an employee";
+    case "employee.deactivated":
+    // Historical key (was "benched" before the rename) — keep rendering.
     case "employee.benched": {
       const note = details.note ? ` — ${details.note}` : "";
-      return `Benched employee${name ? ` ${name}` : ""}${note}`;
+      return `Marked employee${name ? ` ${name}` : ""} inactive${note}`;
     }
     case "employee.activated": return name ? `Activated employee ${name}` : "Activated an employee";
 
@@ -435,8 +440,10 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
     "invitation.sent",          // email + role in description
     "employee.created",         // name in description
     "employee.updated",         // name in description
-    "employee.archived",        // name in description
-    "employee.benched",         // name + note in description
+    "employee.removed",         // name in description
+    "employee.archived",        // historical alias — name in description
+    "employee.deactivated",     // name + note in description
+    "employee.benched",         // historical alias — name + note in description
     "employee.activated",       // name in description
     "org.updated",              // name in description
     "org.created",              // name in description

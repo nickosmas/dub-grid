@@ -24,6 +24,7 @@ import {
   type GestureResponderEvent,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnchoredPopupSurface } from "../../../shared/components/AnchoredPopupSurface";
@@ -137,6 +138,11 @@ const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const ME_HERO_CARD_BACKGROUND = "#2946C7";
 const ME_HERO_COLLABORATOR_BACKGROUND = "#3A55CB";
+// Matches the web hero gradient: dark bottom-left → light top-right.
+const ME_HERO_CARD_GRADIENT = ["#142579", "#2C49CC", "#6E90FF"] as const;
+const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
+const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
+const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
 
 if (
   Platform.OS === "android" &&
@@ -1008,6 +1014,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const weekStripTranslateX = useRef(new Animated.Value(0)).current;
   const weekTransitionRef = useRef<Animated.CompositeAnimation | null>(null);
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
+  const openShiftVisibility =
+    bootstrapQuery.data?.currentOrg.openShiftVisibility;
   const todayDate = getIsoDateInTimeZone(now, timeZone);
   const selectedDate = selectedDateOverride ?? todayDate;
   selectedDateRef.current = selectedDate;
@@ -2012,6 +2020,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 requestsError={requestsQuery.error}
                 scheduleEntries={scheduleEntries}
                 timeZone={timeZone}
+                openShiftVisibility={openShiftVisibility}
               />
               <UpcomingShiftsSection
                 items={meUpcomingItems}
@@ -3227,6 +3236,17 @@ function MeHeroCard({
     </View>
   );
 
+  const heroGradient = (
+    <LinearGradient
+      colors={ME_HERO_CARD_GRADIENT}
+      locations={ME_HERO_CARD_GRADIENT_LOCATIONS}
+      start={ME_HERO_CARD_GRADIENT_START}
+      end={ME_HERO_CARD_GRADIENT_END}
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+    />
+  );
+
   return (
     <View style={styles.meSectionBlock}>
       {onPress ? (
@@ -3239,10 +3259,12 @@ function MeHeroCard({
           ]}
           testID="me-hero-card"
         >
+          {heroGradient}
           {cardContent}
         </Pressable>
       ) : (
         <View style={styles.meHeroCard} testID="me-hero-card">
+          {heroGradient}
           {cardContent}
         </View>
       )}
@@ -3462,6 +3484,7 @@ function OpenShiftsSection({
   now,
   requestsError,
   timeZone,
+  openShiftVisibility,
   onClaim,
   onVolunteer,
   onSeeAll,
@@ -3475,6 +3498,10 @@ function OpenShiftsSection({
   now: Date;
   requestsError: unknown;
   timeZone?: string | null;
+  openShiftVisibility?: {
+    coverageGap: "hidden" | "matched" | "always";
+    calloff: "hidden" | "matched" | "always";
+  };
   onClaim: (requestId: string) => void;
   onVolunteer: (openShift: MobileOpenShift) => void;
   onSeeAll: () => void;
@@ -3494,8 +3521,18 @@ function OpenShiftsSection({
         requests,
         now,
         timeZone,
+        coverageGapVisibility: openShiftVisibility?.coverageGap,
+        calloffVisibility: openShiftVisibility?.calloff,
       }),
-    [linkedEmployeeId, now, openShifts, requests, scheduleEntries, timeZone],
+    [
+      linkedEmployeeId,
+      now,
+      openShifts,
+      requests,
+      scheduleEntries,
+      timeZone,
+      openShiftVisibility,
+    ],
   );
   const dateGroups = availableOpenShiftFeed.groups;
   const noteStackCardHeight = useCallback((date: string, height: number) => {

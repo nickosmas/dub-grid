@@ -1,3 +1,12 @@
+export {
+  BRAND_ANIMATED_LOGO_SIZE,
+  ANIMATED_LOGO_OPACITY_MIN,
+  ANIMATED_LOGO_OPACITY_MAX,
+  ANIMATED_LOGO_DURATION_MIN_S,
+  ANIMATED_LOGO_DURATION_MAX_S,
+  ANIMATED_LOGO_DELAY_MAX_S,
+} from "./animated-logo";
+
 export const colorTokens = {
   background: "#F8FAFC",
   surface: "#FFFFFF",

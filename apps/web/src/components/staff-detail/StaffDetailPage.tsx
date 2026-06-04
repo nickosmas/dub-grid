@@ -15,13 +15,13 @@ import { isSelfAction, SelfActionForbiddenError } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
-  benchEmployee,
+  deactivateEmployee,
   fetchEmployeeById,
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
   fetchEmployeeShifts,
   updateEmployee,
-  deleteEmployee,
+  removeEmployee,
   EmployeeContactConflictError,
   EmployeeStatusConflictError,
   OptimisticLockError,
@@ -278,13 +278,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   }, [employee, orgId, refreshDirectory, syncEmployeeCaches]);
 
   // ── Status action handlers ──────────────────────────────────────────────────
-  const handleBench = useCallback(async (empId: string, note?: string) => {
+  const handleDeactivate = useCallback(async (empId: string, note?: string) => {
     if (!orgId || !employee) return;
-    setEmployee((prev) => prev ? { ...prev, status: "benched" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() } : prev);
+    setEmployee((prev) => prev ? { ...prev, status: "inactive" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() } : prev);
     try {
-      const updatedEmployee = await benchEmployee(empId, note, orgId, employee.version);
+      const updatedEmployee = await deactivateEmployee(empId, note, orgId, employee.version);
       syncEmployeeCaches(updatedEmployee);
-      toast.success("Employee benched");
+      toast.success("Employee marked inactive");
     } catch (err) {
       if (err instanceof EmployeeStatusConflictError) {
         setEmployee(err.latestEmployee);
@@ -298,7 +298,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.error(err.message);
         return;
       }
-      toast.error("Failed to bench employee");
+      toast.error("Failed to update employee status");
     }
   }, [employee, orgId, syncEmployeeCaches]);
 
@@ -317,7 +317,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.error("Employee status changed elsewhere. Review the latest values and try again.");
         return;
       }
-      setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "benched" } : prev);
+      setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "inactive" } : prev);
       if (err instanceof SelfActionForbiddenError) {
         toast.error(err.message);
         return;
@@ -326,14 +326,14 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     }
   }, [employee, orgId, syncEmployeeCaches]);
 
-  const handleTerminate = useCallback(async (empId: string) => {
+  const handleRemove = useCallback(async (empId: string, note?: string) => {
     if (!orgId || !employee) return;
     const prevStatus = employee?.status;
-    setEmployee((prev) => prev ? { ...prev, status: "terminated" as const, statusChangedAt: new Date().toISOString() } : prev);
+    setEmployee((prev) => prev ? { ...prev, status: "removed" as const, statusChangedAt: new Date().toISOString() } : prev);
     try {
-      const updatedEmployee = await deleteEmployee(empId, orgId, employee.version);
+      const updatedEmployee = await removeEmployee(empId, orgId, employee.version, note);
       syncEmployeeCaches(updatedEmployee);
-      toast.success("Employee terminated");
+      toast.success("Employee removed");
     } catch (err) {
       if (err instanceof EmployeeStatusConflictError) {
         setEmployee(err.latestEmployee);
@@ -346,7 +346,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.error(err.message);
         return;
       }
-      toast.error("Failed to terminate employee");
+      toast.error("Failed to remove employee");
     }
   }, [employee, orgId, syncEmployeeCaches]);
 
@@ -524,7 +524,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         </button>
                       )}
 
-                      {canManageManagementAccess && employee.status !== "terminated" && (
+                      {canManageManagementAccess && employee.status !== "removed" && (
                         <button
                           type="button"
                           onClick={() => setShowManagementAccessModal(true)}
@@ -547,9 +547,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           canEdit={perms.canManageEmployees}
                           isSelf={isSelfAction(currentUser?.id, employee.userId)}
                           pendingInvitation={pendingInvite ?? undefined}
-                          onBench={handleBench}
+                          onDeactivate={handleDeactivate}
                           onActivate={handleActivate}
-                          onTerminate={handleTerminate}
+                          onRemove={handleRemove}
                           onRevokeAccess={perms.isSuperAdmin ? handleRevokeAccess : undefined}
                           onInvite={orgId ? () => setShowInviteModal(true) : undefined}
                           onRevoke={handleRevokeInvitation}

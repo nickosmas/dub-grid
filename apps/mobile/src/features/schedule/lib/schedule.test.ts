@@ -1808,6 +1808,261 @@ describe("mobile schedule helpers", () => {
     ]);
   });
 
+  const makeOpenShiftVisibilityFixture = () => ({
+    linkedEmployeeId: "emp-1",
+    scheduleEntries: [
+      {
+        employeeId: "emp-1",
+        employeeName: "Alex Kim",
+        date: "2026-04-18",
+        shiftIds: [1],
+        jobIds: [10],
+        shiftLabel: "D",
+        assignmentLabel: "D",
+        shiftName: "Day Shift",
+        absenceTypeId: null,
+        focusAreaId: 2,
+        focusAreaName: "ICU",
+        startTime: "07:00:00",
+        endTime: "15:00:00",
+        customStartTime: null,
+        customEndTime: null,
+        segments: [
+          {
+            shiftId: 1,
+            jobId: 10,
+            shiftName: "Day Shift",
+            jobName: "Nurse",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            displayFocusAreaName: "ICU",
+          },
+        ],
+      },
+    ] as never,
+    openShifts: [
+      {
+        id: "open-conflict",
+        date: "2026-04-18",
+        focusAreaId: 2,
+        focusAreaName: "ICU",
+        needed: 1,
+        state: {
+          kind: "worked",
+          segments: [{ shiftId: 1, jobId: 10, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        presentation: {
+          label: "Conflicting Open",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          segments: [],
+        },
+      },
+      {
+        id: "open-clear",
+        date: "2026-04-18",
+        focusAreaId: 2,
+        focusAreaName: "ICU",
+        needed: 1,
+        state: {
+          kind: "worked",
+          segments: [{ shiftId: 2, jobId: 11, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        presentation: {
+          label: "Clear Open",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "15:00:00",
+          endTime: "23:00:00",
+          segments: [],
+        },
+      },
+    ] as never,
+    requests: [
+      {
+        id: "request-conflict",
+        orgId: "org-1",
+        type: "pickup",
+        status: "open",
+        requesterEmpId: "emp-2",
+        requesterName: "Jordan Lee",
+        requesterShiftDate: "2026-04-18",
+        requesterShiftIds: [3],
+        requesterJobIds: [12],
+        requesterSegments: [],
+        requesterShiftLabel: "Conflicting Pickup",
+        requesterFocusAreaId: 2,
+        requesterCustomStartTime: "07:00:00",
+        requesterCustomEndTime: "15:00:00",
+        targetEmpId: null,
+        targetName: null,
+        targetShiftDate: null,
+        targetShiftIds: null,
+        targetJobIds: null,
+        targetSegments: null,
+        targetShiftLabel: null,
+        targetFocusAreaId: null,
+        targetCustomStartTime: null,
+        targetCustomEndTime: null,
+        absenceTypeId: null,
+        parentRequestId: null,
+        adminUserId: null,
+        adminNote: null,
+        expiresAt: "2026-04-19T00:00:00.000Z",
+        resolvedAt: null,
+        createdAt: "2026-04-15T00:00:00.000Z",
+        updatedAt: "2026-04-15T00:00:00.000Z",
+        requesterPresentation: {
+          label: "Conflicting Pickup",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "07:00:00",
+          endTime: "15:00:00",
+          segments: [],
+        },
+        requesterState: {
+          kind: "worked",
+          segments: [{ shiftId: 3, jobId: 12, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: "07:00:00",
+          customEndTime: "15:00:00",
+          seriesId: null,
+          fromRecurring: false,
+        },
+        targetPresentation: null,
+        targetState: null,
+      },
+      {
+        id: "request-clear",
+        orgId: "org-1",
+        type: "pickup",
+        status: "open",
+        requesterEmpId: "emp-3",
+        requesterName: "Ivy Stone",
+        requesterShiftDate: "2026-04-18",
+        requesterShiftIds: [4],
+        requesterJobIds: [13],
+        requesterSegments: [],
+        requesterShiftLabel: "Clear Pickup",
+        requesterFocusAreaId: 2,
+        requesterCustomStartTime: "15:00:00",
+        requesterCustomEndTime: "23:00:00",
+        targetEmpId: null,
+        targetName: null,
+        targetShiftDate: null,
+        targetShiftIds: null,
+        targetJobIds: null,
+        targetSegments: null,
+        targetShiftLabel: null,
+        targetFocusAreaId: null,
+        targetCustomStartTime: null,
+        targetCustomEndTime: null,
+        absenceTypeId: null,
+        parentRequestId: null,
+        adminUserId: null,
+        adminNote: null,
+        expiresAt: "2026-04-19T00:00:00.000Z",
+        resolvedAt: null,
+        createdAt: "2026-04-15T00:00:00.000Z",
+        updatedAt: "2026-04-15T00:00:00.000Z",
+        requesterPresentation: {
+          label: "Clear Pickup",
+          focusAreaId: 2,
+          focusAreaName: "ICU",
+          displayFocusAreaName: "ICU",
+          startTime: "15:00:00",
+          endTime: "23:00:00",
+          segments: [],
+        },
+        requesterState: {
+          kind: "worked",
+          segments: [{ shiftId: 4, jobId: 13, position: 0 }],
+          absenceTypeId: null,
+          customStartTime: "15:00:00",
+          customEndTime: "23:00:00",
+          seriesId: null,
+          fromRecurring: false,
+        },
+        targetPresentation: null,
+        targetState: null,
+      },
+    ] as never,
+    now: new Date("2026-04-16T18:00:00.000Z"),
+    timeZone: "America/Los_Angeles",
+  });
+
+  it("defaults open-shift visibility to availability-matched (legacy behavior)", () => {
+    const feed = buildAvailableOpenShiftFeed(makeOpenShiftVisibilityFixture());
+
+    // The conflicting open shift and pickup overlap emp-1's own 07:00-15:00
+    // shift, so only the clear (non-overlapping) items survive.
+    expect(feed.openShifts.map((shift) => shift.id)).toEqual(["open-clear"]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
+      "request-clear",
+    ]);
+  });
+
+  it("shows every eligible open shift regardless of availability when visibility is 'always'", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      ...makeOpenShiftVisibilityFixture(),
+      coverageGapVisibility: "always",
+      calloffVisibility: "always",
+    });
+
+    // Availability filtering is bypassed, so the conflicting items reappear.
+    // Hard eligibility (canVolunteer) and own-request exclusion still apply,
+    // but neither is present in this fixture.
+    expect(feed.openShifts.map((shift) => shift.id)).toEqual([
+      "open-conflict",
+      "open-clear",
+    ]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
+      "request-conflict",
+      "request-clear",
+    ]);
+  });
+
+  it("hides each open-shift source when its visibility is 'hidden'", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      ...makeOpenShiftVisibilityFixture(),
+      coverageGapVisibility: "hidden",
+      calloffVisibility: "hidden",
+    });
+
+    expect(feed.openShifts).toEqual([]);
+    expect(feed.openShiftRequests).toEqual([]);
+    expect(feed.totalCount).toBe(0);
+  });
+
+  it("scopes 'hidden' to one source without affecting the other", () => {
+    const feed = buildAvailableOpenShiftFeed({
+      ...makeOpenShiftVisibilityFixture(),
+      coverageGapVisibility: "hidden",
+      calloffVisibility: "always",
+    });
+
+    expect(feed.openShifts).toEqual([]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
+      "request-conflict",
+      "request-clear",
+    ]);
+  });
+
   it("replaces a volunteered open shift with the user's pending approval request", () => {
     const feed = buildAvailableOpenShiftFeed({
       linkedEmployeeId: "emp-1",

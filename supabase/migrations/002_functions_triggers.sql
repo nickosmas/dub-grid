@@ -167,22 +167,27 @@ BEGIN
     ON CONFLICT (supabase_session_id) DO NOTHING;
   END IF;
 
-  -- Resolve profile, effective org, membership, and org status in a single
-  -- statement (previously a separate session lookup fed a second join query).
-  -- Effective org = per-session active_org_id (if set) else profiles.org_id;
-  -- the correlated subquery resolves it inline so the membership/organization
-  -- joins key off it in the same round-trip. When no session_id is present the
+  -- Resolve profile, effective org, membership, org status, and the caller's
+  -- employee row for the effective org in a single statement (previously a
+  -- separate session lookup fed a second join query). Effective org =
+  -- per-session active_org_id (if set) else profiles.org_id; the correlated
+  -- subquery resolves it inline so the membership/organization/employee joins
+  -- key off it in the same round-trip. When no session_id is present the
   -- subquery matches nothing and COALESCE falls back to profiles.org_id.
   -- Archived orgs (o.archived_at), suspended orgs (o.suspended_at), and
   -- deactivated users (p.deactivated_at) are filtered out. org_role is NOT
   -- coalesced — a NULL value means no membership, which must yield no org
   -- claims (prevents read access to an org the user has no membership for).
+  -- e.status is read so the hook can refuse 'removed' employees and expose
+  -- 'inactive' downstream as an employee_status claim. Gridmaster / unlinked
+  -- super_admin users have no employees row → status is NULL → unaffected.
   SELECT
     eff.org_id              AS org_id,
     p.platform_role::TEXT   AS platform_role,
     cm.org_role::TEXT       AS org_role,
     o.slug                  AS org_slug,
-    o.name                  AS org_name
+    o.name                  AS org_name,
+    e.status::TEXT          AS employee_status
   INTO user_profile
   FROM public.profiles p
   CROSS JOIN LATERAL (
@@ -202,11 +207,29 @@ BEGIN
     ON o.id = eff.org_id
    AND o.archived_at IS NULL
    AND o.suspended_at IS NULL
+  LEFT JOIN public.employees e
+    ON e.user_id = p.id
+   AND e.org_id = eff.org_id
   WHERE p.id = uid
     AND p.deactivated_at IS NULL;
 
+  -- Removed employees are denied at the hook. This mirrors the
+  -- jwt_refresh_locks 403 envelope above and kills both fresh sign-ins (the
+  -- hook fires on signInWithPassword) and silent token refreshes in one place.
+  -- The message string is the sentinel the login routes pattern-match on to
+  -- surface a friendly "account disabled" UI — keep it stable.
+  IF user_profile.employee_status = 'removed' THEN
+    RETURN jsonb_build_object(
+      'error', jsonb_build_object(
+        'http_code', 403,
+        'message', 'Your account has been disabled. Contact your organization admin.'
+      )
+    );
+  END IF;
+
   IF FOUND THEN
     claims := jsonb_set(claims, '{platform_role}', to_jsonb(COALESCE(user_profile.platform_role, 'none')));
+    claims := jsonb_set(claims, '{employee_status}', to_jsonb(COALESCE(user_profile.employee_status, 'none')));
 
     IF user_profile.org_id IS NOT NULL
        AND user_profile.org_role IS NOT NULL
@@ -236,8 +259,9 @@ BEGIN
     -- the first super_admin LOGIN via the start_trial_for_org RPC, called from the
     -- genuine web/mobile login flow. See trial_started_at in 001.
   ELSE
-    claims := jsonb_set(claims, '{platform_role}', '"none"');
-    claims := jsonb_set(claims, '{org_role}',      '"user"');
+    claims := jsonb_set(claims, '{platform_role}',  '"none"');
+    claims := jsonb_set(claims, '{org_role}',       '"user"');
+    claims := jsonb_set(claims, '{employee_status}', '"none"');
     claims := claims - 'org_id' - 'org_slug' - 'org_name';
   END IF;
 
@@ -409,12 +433,6 @@ $$;
 CREATE TRIGGER trigger_organizations_audit
   BEFORE INSERT OR UPDATE ON public.organizations
   FOR EACH ROW EXECUTE FUNCTION public.set_audit_fields();
-
--- Notify gridmasters of important org lifecycle events (trial start, create,
--- archive/restore, suspend/unsuspend, subscription conversion/cancel/payment fail)
-CREATE TRIGGER trg_notify_gridmasters_of_org_event
-  AFTER INSERT OR UPDATE ON public.organizations
-  FOR EACH ROW EXECUTE FUNCTION public.notify_gridmasters_of_org_event();
 
 CREATE TRIGGER trigger_focus_areas_audit
   BEFORE INSERT OR UPDATE ON public.focus_areas
@@ -944,6 +962,13 @@ BEGIN
   RETURN NULL;
 END;
 $$;
+
+-- Notify gridmasters of important org lifecycle events (trial start, create,
+-- archive/restore, suspend/unsuspend, subscription conversion/cancel/payment fail).
+-- Attached here (not in section 5) so the trigger is created after its function exists.
+CREATE TRIGGER trg_notify_gridmasters_of_org_event
+  AFTER INSERT OR UPDATE ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.notify_gridmasters_of_org_event();
 
 
 -- ── get_my_organizations ──────────────────────────────────────────────────────
@@ -2204,7 +2229,12 @@ DECLARE
   v_invite   public.invitations;
   v_caller_role TEXT;
 BEGIN
-  IF NOT public.is_gridmaster() THEN
+  -- Trusted backend path: API routes authorize the caller via
+  -- requireOrgPermissions / canManageEmployees and then invoke this RPC
+  -- through the service-role client (where auth.uid() / JWT claims are
+  -- absent). Direct authenticated callers still have to be a gridmaster
+  -- or a super_admin of the target org.
+  IF (auth.jwt() ->> 'role') <> 'service_role' AND NOT public.is_gridmaster() THEN
     v_caller_role := public.caller_org_role()::TEXT;
     IF public.caller_org_id() <> p_org_id OR v_caller_role <> 'super_admin' THEN
       RAISE EXCEPTION 'Unauthorized: only super_admin can send invitations';
@@ -2321,21 +2351,56 @@ BEGIN
       AND org_id = v_invite.org_id
       AND user_id IS NULL;
 
+    -- Cross-org case: if the accepting user already has a profile name
+    -- (they have an account from another org), overwrite the employees row's
+    -- first/last name with the canonical profile name. The admin's typed
+    -- "Margaret Sullivan" gets replaced by Alice's real "Alice Smith" so
+    -- the roster doesn't lie about who's actually scheduled.
+    UPDATE public.employees e
+    SET first_name = COALESCE(p.first_name, e.first_name),
+        last_name  = COALESCE(p.last_name,  e.last_name),
+        updated_at = NOW()
+    FROM public.profiles p
+    WHERE e.id = v_invite.employee_id
+      AND e.org_id = v_invite.org_id
+      AND p.id = v_uid
+      AND (p.first_name IS NOT NULL OR p.last_name IS NOT NULL);
+
     SELECT first_name, last_name INTO v_emp_first_name, v_emp_last_name
     FROM public.employees
     WHERE id = v_invite.employee_id AND org_id = v_invite.org_id;
   ELSE
-    -- App-only invite: use name from invitation record
+    -- App-only invite: no employees row was pre-created. Create one now so the
+    -- new member gets a per-org employee_number (every org member has a badge).
+    -- Names are guaranteed populated on the invitation by the send_invitation
+    -- path. Seniority lands at end-of-list; admin can drag to reorder later.
+    -- The BEFORE INSERT trigger stamps employee_number from the org counter.
     v_emp_first_name := v_invite.first_name;
     v_emp_last_name := v_invite.last_name;
+
+    INSERT INTO public.employees (
+      org_id, user_id, first_name, last_name, phone,
+      department_ids, dept_admin_ids,
+      employment_type, status, seniority
+    )
+    VALUES (
+      v_invite.org_id, v_uid, v_invite.first_name, v_invite.last_name, v_invite.phone,
+      v_invite.department_ids, v_invite.dept_admin_ids,
+      'full_time', 'active',
+      COALESCE((SELECT MAX(seniority) FROM public.employees WHERE org_id = v_invite.org_id), 0) + 1
+    );
   END IF;
 
+  -- Existing user's profile name is canonical across orgs and must not be
+  -- overwritten by an invite (admin-typed name in another org is just a
+  -- convenient pre-fill). COALESCE order: keep existing profile fields when
+  -- present; only fall through to the invite-supplied name on insert/null.
   INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name)
   VALUES (v_uid, v_invite.org_id, 'none', v_emp_first_name, v_emp_last_name)
   ON CONFLICT (id) DO UPDATE
     SET org_id     = COALESCE(profiles.org_id, EXCLUDED.org_id),
-        first_name = COALESCE(EXCLUDED.first_name, profiles.first_name),
-        last_name  = COALESCE(EXCLUDED.last_name, profiles.last_name),
+        first_name = COALESCE(profiles.first_name, EXCLUDED.first_name),
+        last_name  = COALESCE(profiles.last_name, EXCLUDED.last_name),
         updated_at = NOW();
 
   -- Bypass guard_org_role_change trigger — this is an authorised role path.
@@ -2446,93 +2511,151 @@ CREATE OR REPLACE TRIGGER trg_expire_shift_requests_on_employee_archive
   EXECUTE FUNCTION public.expire_shift_requests_on_employee_archive();
 
 
--- ── link_employee_to_user ────────────────────────────────────────────────────
--- Directly link an existing org user to an employee record (no invitation needed).
--- Use case: user already has an account and is already a member of this org.
+-- ── employee_number: stamp + immutability ───────────────────────────────────
+-- assign_employee_number: BEFORE INSERT trigger that atomically stamps
+-- NEW.employee_number from organizations.next_employee_number and bumps the
+-- counter. SECURITY DEFINER so it can read/write organizations regardless of
+-- caller RLS. The SELECT … FOR UPDATE row-locks the org row, serialising
+-- concurrent inserts within an org without blocking other orgs. Any value the
+-- caller supplied for employee_number is overwritten (numbers are never chosen
+-- by clients — the trigger is the sole source of truth).
 
-CREATE OR REPLACE FUNCTION public.link_employee_to_user(
-  p_employee_id  UUID,
-  p_user_id      UUID,
-  p_org_id       UUID
-) RETURNS JSONB
+CREATE OR REPLACE FUNCTION public.assign_employee_number()
+RETURNS TRIGGER
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
-  v_membership public.organization_memberships;
+  v_next INTEGER;
 BEGIN
-  -- Authorization: gridmaster, super_admin, or admin with canManageEmployees
-  IF NOT public.is_gridmaster() THEN
-    SELECT *
-      INTO v_membership
-      FROM public.organization_memberships
-     WHERE user_id = auth.uid()
-       AND org_id = p_org_id
-       AND archived_at IS NULL
-     LIMIT 1;
+  SELECT next_employee_number INTO v_next
+  FROM public.organizations
+  WHERE id = NEW.org_id
+  FOR UPDATE;
 
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Unauthorized: org mismatch';
-    END IF;
-
-    IF v_membership.org_role <> 'super_admin'
-       AND NOT (
-         v_membership.org_role = 'admin'
-         AND COALESCE((v_membership.admin_permissions->>'canManageEmployees')::BOOLEAN, FALSE)
-       )
-    THEN
-      RAISE EXCEPTION 'Unauthorized: missing canManageEmployees permission';
-    END IF;
+  IF v_next IS NULL THEN
+    RAISE EXCEPTION 'Organization % not found', NEW.org_id;
   END IF;
 
-  -- Validate org exists
-  IF NOT EXISTS (
-    SELECT 1 FROM public.organizations WHERE id = p_org_id AND archived_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Organization not found or archived';
-  END IF;
+  NEW.employee_number := v_next;
 
-  -- Validate employee belongs to org
-  IF NOT EXISTS (
-    SELECT 1 FROM public.employees
-    WHERE id = p_employee_id AND org_id = p_org_id AND archived_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Employee not found in this organization';
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM public.employees
-    WHERE id = p_employee_id AND user_id IS NOT NULL AND user_id <> p_user_id
-  ) THEN
-    RAISE EXCEPTION 'Employee already has a linked user account';
-  END IF;
+  UPDATE public.organizations
+  SET next_employee_number = next_employee_number + 1
+  WHERE id = NEW.org_id;
 
-  -- Validate user is a member of this org
-  IF NOT EXISTS (
-    SELECT 1 FROM public.organization_memberships
-    WHERE user_id = p_user_id AND org_id = p_org_id AND archived_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'User is not a member of this organization';
-  END IF;
-
-  -- Validate user is not already linked to another employee in this org
-  IF EXISTS (
-    SELECT 1 FROM public.employees
-    WHERE org_id = p_org_id AND user_id = p_user_id AND id <> p_employee_id
-  ) THEN
-    RAISE EXCEPTION 'User is already linked to another employee in this organization';
-  END IF;
-
-  -- Link them
-  UPDATE public.employees
-  SET user_id = p_user_id,
-      updated_at = NOW()
-  WHERE id = p_employee_id AND org_id = p_org_id;
-
-  RETURN jsonb_build_object('status', 'linked', 'employee_id', p_employee_id, 'user_id', p_user_id);
+  RETURN NEW;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.link_employee_to_user(UUID, UUID, UUID) TO authenticated;
+CREATE OR REPLACE TRIGGER trg_employees_assign_number
+  BEFORE INSERT ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.assign_employee_number();
+
+
+-- prevent_employee_number_change: BEFORE UPDATE trigger that enforces
+-- immutability of employee_number. Even super_admins can't change it — a
+-- person's badge ID is a permanent record. Belt-and-suspenders alongside the
+-- API not exposing a write path.
+
+CREATE OR REPLACE FUNCTION public.prevent_employee_number_change()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+  IF NEW.employee_number IS DISTINCT FROM OLD.employee_number THEN
+    RAISE EXCEPTION 'employee_number is immutable (was %, attempted %)',
+      OLD.employee_number, NEW.employee_number;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_employees_immutable_number
+  BEFORE UPDATE ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.prevent_employee_number_change();
+
+
+-- check_employee_email_belongs_to_user: BEFORE INSERT/UPDATE trigger that
+-- enforces "if a linked employees row has an email AND that email exists in
+-- auth.users, the email's owner must be the linked user." The existing
+-- partial UNIQUE index (unique_active_employee_email_per_org) only catches
+-- two employees rows with the same email; it doesn't catch the case where
+-- a management member's row has email = '' but their auth account email
+-- gets accidentally typed onto a different scheduled employee's row.
+--
+-- Pre-created rows (user_id IS NULL) are exempt so the cross-org invite
+-- flow still works: admin pre-creates with alice@example.com, leaves user_id
+-- NULL, sends invite. Once Alice accepts, accept_invitation sets user_id;
+-- this trigger re-validates (BEFORE UPDATE OF user_id) and sees that the
+-- email belongs to Alice — match — allow.
+
+CREATE OR REPLACE FUNCTION public.check_employee_email_belongs_to_user()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_email_owner UUID;
+  v_owner_has_employee_in_org BOOLEAN;
+BEGIN
+  IF btrim(NEW.email) = '' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Look up the auth user (if any) that owns this email.
+  SELECT id INTO v_email_owner
+  FROM auth.users
+  WHERE lower(email::text) = lower(btrim(NEW.email))
+  LIMIT 1;
+
+  -- Unregistered emails are fine (contact-only addresses).
+  IF v_email_owner IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- The canonical case: the row is linked to the email's owner.
+  IF v_email_owner = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- Linked to a DIFFERENT user from the email's owner → always block.
+  -- (E.g. admin types Nic's email onto Margaret's row where Margaret is
+  -- linked to user X.)
+  IF NEW.user_id IS NOT NULL THEN
+    RAISE EXCEPTION 'employee_email_belongs_to_other_user: % belongs to a different account', NEW.email
+      USING ERRCODE = '23505',
+            CONSTRAINT = 'employee_email_belongs_to_user';
+  END IF;
+
+  -- Pre-created row (user_id IS NULL): allowed ONLY when the email's
+  -- owner is NOT already a member of this org with their own employees
+  -- row. Cross-org invites are fine — Alice (Org A only) can be
+  -- pre-created in Org B. Same-org sloppy data entry — Margaret's row
+  -- with Nic's email when Nic is already on the team — is blocked.
+  SELECT EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE org_id = NEW.org_id
+      AND user_id = v_email_owner
+      AND archived_at IS NULL
+      AND id <> NEW.id
+  ) INTO v_owner_has_employee_in_org;
+
+  IF v_owner_has_employee_in_org THEN
+    RAISE EXCEPTION 'employee_email_belongs_to_other_user: % belongs to another active member of this organization', NEW.email
+      USING ERRCODE = '23505',
+            CONSTRAINT = 'employee_email_belongs_to_user';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_employees_email_belongs_to_user
+  BEFORE INSERT OR UPDATE OF email, user_id ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_employee_email_belongs_to_user();
 
 
 -- ── start_impersonation ───────────────────────────────────────────────────────
@@ -6741,6 +6864,7 @@ RETURNS TABLE (
   person_id               TEXT,
   source                  TEXT,
   employee_id             UUID,
+  employee_number         INTEGER,
   user_id                 UUID,
   first_name              TEXT,
   last_name               TEXT,
@@ -6788,6 +6912,7 @@ BEGIN
     e.id::TEXT AS person_id,
     'employee'::TEXT AS source,
     e.id AS employee_id,
+    e.employee_number,
     e.user_id AS user_id,
     e.first_name,
     e.last_name,
@@ -6842,6 +6967,7 @@ BEGIN
     ('u:' || cm2.user_id::TEXT) AS person_id,
     'user_only'::TEXT AS source,
     NULL::UUID AS employee_id,
+    NULL::INTEGER AS employee_number,
     cm2.user_id AS user_id,
     p.first_name,
     p.last_name,
@@ -6880,6 +7006,7 @@ BEGIN
     ('inv:' || inv3.id::TEXT) AS person_id,
     'pending_invite'::TEXT AS source,
     NULL::UUID AS employee_id,
+    NULL::INTEGER AS employee_number,
     NULL::UUID AS user_id,
     COALESCE(inv3.first_name, '') AS first_name,
     COALESCE(inv3.last_name, '') AS last_name,

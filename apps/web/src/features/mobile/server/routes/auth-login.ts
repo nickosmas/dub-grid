@@ -108,7 +108,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
       return json(
-        { error: formatClientErrorMessage(error, "We could not finish signing you in right now.") },
+        {
+          error: formatClientErrorMessage(error, "We could not finish signing you in right now."),
+          ...(error.code ? { code: error.code } : {}),
+        },
         { status: error.status },
       );
     }

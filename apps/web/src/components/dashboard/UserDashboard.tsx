@@ -18,9 +18,12 @@ import { EmptyState } from "@/components/EmptyState";
 import { formatDateKey } from "@/lib/dashboard-stats";
 import { getAvatarInitials } from "@/lib/utils";
 import {
+  getCurrentTimeValueInTimeZone,
+  getIsoDateInTimeZone,
   hasShiftRequestStarted,
   hasShiftStartedAtTimeRanges,
 } from "@dubgrid/schedule-core";
+import type { OpenShiftVisibility } from "@dubgrid/domain";
 import type {
   AbsenceType,
   AssignmentDefinition,
@@ -124,13 +127,23 @@ type DashboardActionItem =
     };
 
 const HERO_MAX_WIDTH = 680;
+// Padding lives inside the desktop scroll panes (not on the outer area) so the
+// panes run edge-to-edge under the sticky header and to the bottom of the
+// screen, while their scrollable content still has breathing room at the very
+// top and bottom of the scroll. Scrolling slides content under the header.
+const PANE_SCROLL_PADDING = 32;
+// Horizontal inset inside the scroll panes so card borders/shadows clear the
+// container's clipping edge (a vertical scroll container also clips the x-axis).
+const PANE_SCROLL_GUTTER = 16;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DASHBOARD_HERO_BG = "#2946C7";
-const DASHBOARD_HERO_COLLABORATOR_BG = "#3A55CB";
+const DASHBOARD_HERO_BG =
+  "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const DASHBOARD_HERO_COLLABORATOR_BG = "rgba(255, 255, 255, 0.16)";
 const DASHBOARD_HERO_AVATAR_OVERLAP = -10;
 
 export default function UserDashboard(props: DashboardContentProps) {
   const {
+    allShifts,
     assignmentById,
     currentEmpId,
     currentEmployee,
@@ -146,9 +159,16 @@ export default function UserDashboard(props: DashboardContentProps) {
     shiftCategories,
     shiftRequests,
     absenceTypeById,
+    viewMode,
   } = props;
+  const isTwoWeekView = viewMode === "2weeks";
   const now = useMinuteNow();
-  const todayKey = formatDateKey(now);
+  // "Today" and the current clock are evaluated in the organization's timezone,
+  // not the viewer's browser timezone, so the hero highlights the right day and
+  // detects an in-progress shift correctly for staff in other timezones.
+  const timeZone = org.timezone ?? null;
+  const todayKey = getIsoDateInTimeZone(now, timeZone);
+  const nowMinutes = hhmmToMinutes(getCurrentTimeValueInTimeZone(now, timeZone));
   const periodStartKey = periodDates[0] ? formatDateKey(periodDates[0]) : "";
   const periodEndKey = periodDates[periodDates.length - 1]
     ? formatDateKey(periodDates[periodDates.length - 1])
@@ -191,22 +211,53 @@ export default function UserDashboard(props: DashboardContentProps) {
         : [],
     [allScheduleItems, currentEmpId],
   );
-  const hero = useMemo(
-    () => getFeaturedHeroItem(myScheduleItems, todayKey, now),
-    [myScheduleItems, now, todayKey],
+  // The hero highlights your current/next shift, which can fall outside the
+  // period being browsed (e.g. next week). Build its candidate pool from the
+  // wider, forward-looking `allShifts` window (see HERO_LOOKAHEAD_DAYS in
+  // DashboardView), anchored to today, so it never falls back to a past shift.
+  const upcomingAllItems = useMemo(
+    () =>
+      buildScheduleItemsFromShiftMap({
+        absenceTypeById,
+        assignmentById,
+        currentPeriodShifts: allShifts,
+        employeeById,
+        focusAreaById,
+        shiftById,
+      }).filter((item) => item.dateKey >= todayKey),
+    [
+      absenceTypeById,
+      allShifts,
+      assignmentById,
+      employeeById,
+      focusAreaById,
+      shiftById,
+      todayKey,
+    ],
   );
-  const hasScheduleItems = myScheduleItems.length > 0;
+  const heroItems = useMemo(
+    () =>
+      currentEmpId
+        ? upcomingAllItems.filter((item) => item.employeeId === currentEmpId)
+        : [],
+    [upcomingAllItems, currentEmpId],
+  );
+  const hero = useMemo(
+    () => getFeaturedHeroItem(heroItems, todayKey, nowMinutes),
+    [heroItems, nowMinutes, todayKey],
+  );
+  const hasScheduleItems = myScheduleItems.length > 0 || heroItems.length > 0;
   const heroTiming = useMemo(
-    () => getHeroTiming(hero.item, now),
-    [hero.item, now],
+    () => getHeroTiming(hero.item, todayKey, nowMinutes),
+    [hero.item, nowMinutes, todayKey],
   );
   const heroShiftmates = useMemo(
-    () => getHeroShiftmates(hero.item, allScheduleItems, currentEmpId),
-    [allScheduleItems, currentEmpId, hero.item],
+    () => getHeroShiftmates(hero.item, upcomingAllItems, currentEmpId),
+    [upcomingAllItems, currentEmpId, hero.item],
   );
   const heroFollowUpItems = useMemo(
-    () => getHeroFollowUpItems(hero.item, myScheduleItems),
-    [hero.item, myScheduleItems],
+    () => getHeroFollowUpItems(hero.item, heroItems),
+    [hero.item, heroItems],
   );
   const weeklyHours = useMemo(
     () => currentHours.find((row) => row.empId === currentEmpId)?.totalHours ?? 0,
@@ -245,6 +296,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         shiftById,
         todayKey,
         timeZone: org.timezone ?? null,
+        visibility: org.openShiftVisibility,
       }),
     [
       assignmentById,
@@ -252,6 +304,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       currentPeriodShifts,
       now,
       openShifts,
+      org.openShiftVisibility,
       org.timezone,
       periodEndKey,
       periodStartKey,
@@ -293,84 +346,169 @@ export default function UserDashboard(props: DashboardContentProps) {
     );
   }
 
+  // Below the tablet breakpoint the dashboard stacks in normal flow and the
+  // page scrolls. Above it, it becomes a viewport-locked two-pane layout: the
+  // main column and the open-shifts rail each scroll on their own and the page
+  // itself never scrolls.
+  const stackLayout = isMobile || isTablet;
+
+  const topGrid = (
+    <div
+      data-testid="user-dashboard-top-grid"
+      style={{
+        alignItems: "stretch",
+        columnGap: "var(--dg-space-xl)",
+        display: "grid",
+        gridTemplateColumns: isMobile
+          ? "minmax(0, 1fr)"
+          : `minmax(0, ${HERO_MAX_WIDTH}px) minmax(320px, 1fr)`,
+        rowGap: "var(--dg-space-lg)",
+      }}
+    >
+      {hero.item ? (
+        <div
+          data-testid="user-dashboard-hero-shell"
+          style={{
+            gridColumn: isMobile ? undefined : "1",
+            gridRow: isMobile ? undefined : "1 / span 2",
+            maxWidth: isMobile ? "none" : `${HERO_MAX_WIDTH}px`,
+            width: "100%",
+          }}
+        >
+          <MeHeroCard
+            isCompact={isTablet}
+            followUpItems={heroFollowUpItems}
+            item={hero.item}
+            shiftmates={heroShiftmates}
+            status={hero.status}
+            timing={heroTiming}
+            stretch={isMobile ? false : true}
+          />
+        </div>
+      ) : null}
+
+      <CoverRequestsSection
+        requests={coverRequests}
+        style={{
+          gridColumn: isMobile ? undefined : "2",
+          gridRow: isMobile ? undefined : "1",
+        }}
+      />
+      <AvailableShiftsSection
+        isTwoWeekView={isTwoWeekView}
+        items={availableShiftItems}
+        style={{
+          gridColumn: isMobile ? undefined : "2",
+          gridRow: isMobile ? undefined : "2",
+        }}
+      />
+    </div>
+  );
+
+  const myWeek = (
+    <MyWeekSection
+      items={myScheduleItems}
+      isTwoWeekView={isTwoWeekView}
+      todayKey={todayKey}
+      weeklyHours={weeklyHours}
+    />
+  );
+
+  const railSection = (
+    <ActionRailSection
+      currentEmpId={currentEmpId}
+      items={dashboardActionItems}
+      onClaim={shiftRequests.claim}
+      onRespond={shiftRequests.respond}
+      onVolunteer={shiftRequests.volunteer}
+      scrollable={!stackLayout}
+      shiftById={shiftById}
+      style={
+        stackLayout
+          ? undefined
+          : {
+              flexShrink: 0,
+              minHeight: 0,
+              paddingTop: PANE_SCROLL_PADDING,
+              width: 360,
+            }
+      }
+    />
+  );
+
   return (
     <div
       data-testid="user-dashboard-me-layout"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--dg-space-xl)",
-      }}
+      style={
+        stackLayout
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--dg-space-xl)",
+            }
+          : { display: "flex", flex: 1, flexDirection: "column", minHeight: 0 }
+      }
     >
-      {hasScheduleItems ? (
-        <>
+      {!hasScheduleItems ? (
+        <ScheduleEmptyState isMobile={isMobile} />
+      ) : stackLayout ? (
+        <div
+          data-testid="user-dashboard-content-grid"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--dg-space-xl)",
+          }}
+        >
+          {topGrid}
+          {railSection}
+          {myWeek}
+        </div>
+      ) : (
+        <div
+          data-testid="user-dashboard-content-grid"
+          style={{
+            columnGap: "var(--dg-space-xl)",
+            display: "flex",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <div
-            data-testid="user-dashboard-top-grid"
+            className="dg-no-scrollbar"
+            data-testid="user-dashboard-main-pane"
             style={{
-              alignItems: "stretch",
-              columnGap: "var(--dg-space-xl)",
-              display: "grid",
-              gridTemplateColumns: isMobile
-                ? "minmax(0, 1fr)"
-                : `minmax(0, ${HERO_MAX_WIDTH}px) minmax(320px, 1fr)`,
-              rowGap: "var(--dg-space-lg)",
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              // Horizontal padding keeps card borders/shadows off the scroll
+              // container's clipping edge (overflow-y:auto also clips x).
+              overflowY: "auto",
+              paddingLeft: PANE_SCROLL_GUTTER,
+              paddingRight: PANE_SCROLL_GUTTER,
+              scrollbarWidth: "none",
             }}
           >
-            {hero.item ? (
-              <div
-                data-testid="user-dashboard-hero-shell"
-                style={{
-                  gridColumn: isMobile ? undefined : "1",
-                  gridRow: isMobile ? undefined : "1 / span 2",
-                  maxWidth: isMobile ? "none" : `${HERO_MAX_WIDTH}px`,
-                  width: "100%",
-                }}
-              >
-                <MeHeroCard
-                  isCompact={isTablet}
-                  followUpItems={heroFollowUpItems}
-                  item={hero.item}
-                  shiftmates={heroShiftmates}
-                  status={hero.status}
-                  timing={heroTiming}
-                  stretch={isMobile ? false : true}
-                />
-              </div>
-            ) : null}
-
-            <CoverRequestsSection
-              requests={coverRequests}
+            {/* An inner block flex column so children keep their natural
+                height; the scroll container itself must not be the flex
+                parent, or its children shrink to fit instead of overflowing.
+                Top/bottom padding give breathing room at the start and end of
+                the scroll while the pane stays flush to the screen edges. */}
+            <div
               style={{
-                gridColumn: isMobile ? undefined : "2",
-                gridRow: isMobile ? undefined : "1",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--dg-space-xl)",
+                paddingBottom: PANE_SCROLL_PADDING,
+                paddingTop: PANE_SCROLL_PADDING,
               }}
-            />
-            <AvailableShiftsSection
-              items={availableShiftItems}
-              style={{
-                gridColumn: isMobile ? undefined : "2",
-                gridRow: isMobile ? undefined : "2",
-              }}
-            />
+            >
+              {topGrid}
+              {myWeek}
+            </div>
           </div>
-
-          <ActionCarouselSection
-            currentEmpId={currentEmpId}
-            items={dashboardActionItems}
-            onClaim={shiftRequests.claim}
-            onRespond={shiftRequests.respond}
-            onVolunteer={shiftRequests.volunteer}
-            shiftById={shiftById}
-          />
-
-          <MyWeekSection
-            items={myScheduleItems}
-            todayKey={todayKey}
-            weeklyHours={weeklyHours}
-          />
-        </>
-      ) : (
-        <ScheduleEmptyState isMobile={isMobile} />
+          {railSection}
+        </div>
       )}
     </div>
   );
@@ -830,12 +968,12 @@ function labelsEqual(
 function getFeaturedHeroItem(
   items: DashboardScheduleItem[],
   todayKey: string,
-  now: Date,
+  nowMinutes: number,
 ): { item: DashboardScheduleItem | null; status: HeroStatus } {
   const todayItems = items.filter((item) => item.dateKey === todayKey);
   const activeItem =
     todayItems.find(
-      (item) => !item.segment.isAbsence && isItemActiveAt(item, now),
+      (item) => !item.segment.isAbsence && isItemActiveAt(item, todayKey, nowMinutes),
     ) ?? null;
 
   if (activeItem) {
@@ -847,8 +985,8 @@ function getFeaturedHeroItem(
       (item) =>
         !item.segment.isAbsence &&
         item.segment.startTime != null &&
-        toAbsoluteMinutes(item.dateKey, item.segment.startTime) >
-          Math.floor(now.getTime() / 60000),
+        toRelativeMinutes(item.dateKey, item.segment.startTime, todayKey) >
+          nowMinutes,
     ) ?? null;
 
   if (upcomingTodayItem) {
@@ -891,26 +1029,30 @@ function getFeaturedHeroItem(
   };
 }
 
-function isItemActiveAt(item: DashboardScheduleItem, now: Date): boolean {
+function isItemActiveAt(
+  item: DashboardScheduleItem,
+  todayKey: string,
+  nowMinutes: number,
+): boolean {
   const start = item.segment.startTime;
   const end = item.segment.endTime;
   if (!start || !end) {
     return false;
   }
 
-  const startMinutes = toAbsoluteMinutes(item.dateKey, start);
-  let endMinutes = toAbsoluteMinutes(item.dateKey, end);
+  const startMinutes = toRelativeMinutes(item.dateKey, start, todayKey);
+  let endMinutes = toRelativeMinutes(item.dateKey, end, todayKey);
   if (endMinutes <= startMinutes) {
     endMinutes += 24 * 60;
   }
 
-  const currentMinutes = Math.floor(now.getTime() / 60000);
-  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
 function getHeroTiming(
   item: DashboardScheduleItem | null,
-  now: Date,
+  todayKey: string,
+  nowMinutes: number,
 ): HeroTiming | null {
   if (!item || item.segment.isAbsence) {
     return null;
@@ -922,25 +1064,24 @@ function getHeroTiming(
     return null;
   }
 
-  const startMinutes = toAbsoluteMinutes(item.dateKey, start);
-  let endMinutes = toAbsoluteMinutes(item.dateKey, end);
+  const startMinutes = toRelativeMinutes(item.dateKey, start, todayKey);
+  let endMinutes = toRelativeMinutes(item.dateKey, end, todayKey);
   if (endMinutes <= startMinutes) {
     endMinutes += 24 * 60;
   }
 
-  const currentMinutes = Math.floor(now.getTime() / 60000);
   const totalMinutes = Math.max(1, endMinutes - startMinutes);
 
-  if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+  if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
     return {
-      label: `Ends in ${formatDurationLabel(endMinutes - currentMinutes)}`,
-      progress: Math.min(1, Math.max(0.08, (currentMinutes - startMinutes) / totalMinutes)),
+      label: `Ends in ${formatDurationLabel(endMinutes - nowMinutes)}`,
+      progress: Math.min(1, Math.max(0.08, (nowMinutes - startMinutes) / totalMinutes)),
     };
   }
 
-  if (currentMinutes < startMinutes) {
+  if (nowMinutes < startMinutes) {
     return {
-      label: `Starts in ${formatDurationLabel(startMinutes - currentMinutes)}`,
+      label: `Starts in ${formatDurationLabel(startMinutes - nowMinutes)}`,
       progress: null,
     };
   }
@@ -948,10 +1089,30 @@ function getHeroTiming(
   return { label: "Completed", progress: 1 };
 }
 
-function toAbsoluteMinutes(dateKey: string, time: string): number {
-  const date = new Date(`${dateKey}T00:00:00`);
+// Minutes relative to today's midnight in the organization's timezone. The
+// shift's calendar day (dateKey) and the current day (todayKey) are both org-tz
+// dates, so the day delta plus the shift's wall-clock time yields a value
+// comparable to the org-tz "now" minutes — no browser-timezone contamination.
+function toRelativeMinutes(
+  dateKey: string,
+  time: string,
+  todayKey: string,
+): number {
+  return isoDayDelta(todayKey, dateKey) * 24 * 60 + hhmmToMinutes(time);
+}
+
+function hhmmToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
-  return Math.floor(date.getTime() / 60000) + hours * 60 + (minutes || 0);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function isoDayDelta(fromKey: string, toKey: string): number {
+  const from = Date.parse(`${fromKey}T00:00:00Z`);
+  const to = Date.parse(`${toKey}T00:00:00Z`);
+  if (Number.isNaN(from) || Number.isNaN(to)) {
+    return 0;
+  }
+  return Math.round((to - from) / 86_400_000);
 }
 
 function formatDurationLabel(totalMinutes: number): string {
@@ -1040,13 +1201,24 @@ function buildAvailableShiftItems(input: {
   shiftById: Map<number, { abbr?: string | null; name: string }>;
   todayKey: string;
   timeZone?: string | null;
+  visibility?: OpenShiftVisibility;
 }): AvailableShiftItem[] {
   const currentEmpId = input.currentEmpId;
   if (!currentEmpId) {
     return [];
   }
 
-  const pickupItems: AvailableShiftItem[] = input.openPickups
+  // Visibility governs the staff view only; this dashboard is never the
+  // scheduler tool. `always` shows every open shift regardless of the viewer's
+  // own schedule; `hidden` drops the source entirely; `matched` (default)
+  // keeps the conflict filter so a user only sees shifts they could take.
+  const coverageGapVisibility = input.visibility?.coverageGap ?? "matched";
+  const calloffVisibility = input.visibility?.calloff ?? "matched";
+
+  const pickupItems: AvailableShiftItem[] =
+    calloffVisibility === "hidden"
+      ? []
+      : input.openPickups
     .filter((request) =>
       isDateInCurrentOrFutureRange(
         request.requesterShiftDate,
@@ -1066,7 +1238,10 @@ function buildAvailableShiftItems(input: {
       title: formatRequestShiftLabel(request, input.shiftById) || "Open shift",
     }));
 
-  const coverageItems: AvailableShiftItem[] = input.openShifts
+  const coverageItems: AvailableShiftItem[] =
+    coverageGapVisibility === "hidden"
+      ? []
+      : input.openShifts
     .filter((openShift) => {
       const dateKey = formatDateKey(openShift.date);
       if (
@@ -1088,6 +1263,9 @@ function buildAvailableShiftItems(input: {
         })
       ) {
         return false;
+      }
+      if (coverageGapVisibility === "always") {
+        return true;
       }
       return !doesOpenShiftConflictWithMySchedule({
         assignmentById: input.assignmentById,
@@ -1285,7 +1463,6 @@ function MeHeroCard({
       data-testid="user-dashboard-hero"
       style={{
         background: DASHBOARD_HERO_BG,
-        border: "1px solid rgba(255,255,255,0.12)",
         borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--shadow-md)",
         color: "#fff",
@@ -1851,7 +2028,13 @@ function CoverRequestsSection({
       />
       <div
         className="dg-card-body"
-        style={{ flex: 1, padding: "4px 18px 16px" }}
+        style={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "16px 18px",
+        }}
       >
         {requests.length === 0 ? (
           <EmptyState
@@ -1873,14 +2056,17 @@ function CoverRequestsSection({
 }
 
 function AvailableShiftsSection({
+  isTwoWeekView = false,
   items,
   style,
 }: {
+  isTwoWeekView?: boolean;
   items: AvailableShiftItem[];
   style?: CSSProperties;
 }) {
   const pickupCount = items.filter((item) => item.kind === "pickup").length;
   const coverageCount = items.length - pickupCount;
+  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   const summaryParts = [
     pickupCount > 0 ? `${pickupCount} pickup${pickupCount === 1 ? "" : "s"}` : null,
     coverageCount > 0
@@ -1902,14 +2088,20 @@ function AvailableShiftsSection({
       <SectionHeader
         subtitle={
           items.length > 0
-            ? `${items.length} available this week`
-            : "Nothing available this week"
+            ? `${items.length} available ${periodLabel}`
+            : `Nothing available ${periodLabel}`
         }
         title="Available shifts"
       />
       <div
         className="dg-card-body"
-        style={{ flex: 1, padding: "4px 18px 16px" }}
+        style={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "16px 18px",
+        }}
       >
         {items.length === 0 ? (
           <EmptyState
@@ -1934,13 +2126,15 @@ function AvailableShiftsSection({
   );
 }
 
-function ActionCarouselSection({
+function ActionRailSection({
   currentEmpId,
   items,
   onClaim,
   onRespond,
   onVolunteer,
+  scrollable = false,
   shiftById,
+  style,
 }: {
   currentEmpId: string;
   items: DashboardActionItem[];
@@ -1952,19 +2146,30 @@ function ActionCarouselSection({
     input: ScheduleCellInput,
     focusAreaId: number,
   ) => Promise<boolean>;
+  scrollable?: boolean;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  style?: CSSProperties;
 }) {
   return (
     <section
-      data-testid="user-dashboard-action-carousel-section"
+      data-testid="user-dashboard-action-rail-section"
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 12,
+        minHeight: 0,
         minWidth: 0,
+        overflow: scrollable ? "hidden" : undefined,
+        ...style,
       }}
     >
-      <div>
+      <div
+        style={{
+          flexShrink: 0,
+          paddingLeft: scrollable ? PANE_SCROLL_GUTTER : undefined,
+          paddingRight: scrollable ? PANE_SCROLL_GUTTER : undefined,
+        }}
+      >
         <div className="dg-card-title">Open shifts &amp; requests</div>
         <div className="dg-card-subtitle">
           {items.length > 0
@@ -1982,16 +2187,20 @@ function ActionCarouselSection({
       ) : (
         <div
           aria-label="Upcoming open shifts and requests"
-          data-testid="user-dashboard-action-carousel"
+          className={scrollable ? "dg-no-scrollbar" : undefined}
+          data-testid="user-dashboard-action-rail"
           role="list"
           style={{
             display: "flex",
+            flexDirection: "column",
             gap: 12,
+            minHeight: 0,
             minWidth: 0,
-            overflowX: "auto",
-            padding: "2px 2px 8px",
-            scrollPaddingLeft: 2,
-            scrollSnapType: "x mandatory",
+            overflowY: scrollable ? "auto" : undefined,
+            paddingBottom: scrollable ? PANE_SCROLL_PADDING : undefined,
+            paddingLeft: scrollable ? PANE_SCROLL_GUTTER : undefined,
+            paddingRight: scrollable ? PANE_SCROLL_GUTTER : undefined,
+            scrollbarWidth: scrollable ? "none" : undefined,
           }}
         >
           {items.map((item) =>
@@ -2022,27 +2231,35 @@ function ActionCarouselSection({
 
 function MyWeekSection({
   items,
+  isTwoWeekView = false,
+  style,
   todayKey,
   weeklyHours,
 }: {
   items: DashboardScheduleItem[];
+  isTwoWeekView?: boolean;
+  style?: CSSProperties;
   todayKey: string;
   weeklyHours: number;
 }) {
   const groups = groupScheduleItemsByDate(items);
-  const hoursLabel = weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h this week` : null;
+  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
+  const hoursLabel =
+    weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h ${periodLabel}` : null;
 
   if (groups.length === 0) {
     return null;
   }
 
   return (
-    <section className="dg-card" data-testid="user-dashboard-my-week">
+    <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">My Week</div>
+          <div className="dg-card-title">
+            {isTwoWeekView ? "My Schedule" : "My Week"}
+          </div>
           <div className="dg-card-subtitle">
-            {hoursLabel ?? "Your published shifts for this week"}
+            {hoursLabel ?? `Your published shifts for ${periodLabel}`}
           </div>
         </div>
       </div>
@@ -2195,13 +2412,11 @@ function ActionCardShell({
         boxShadow: "var(--shadow-sm)",
         boxSizing: "border-box",
         display: "flex",
-        flex: "0 0 clamp(280px, 32vw, 360px)",
         flexDirection: "column",
+        flexShrink: 0,
         gap: 14,
-        maxWidth: "calc(100vw - 48px)",
-        minHeight: 172,
         padding: 16,
-        scrollSnapAlign: "start",
+        width: "100%",
       }}
     >
       <div

@@ -25,6 +25,7 @@ GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.profiles TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organization_memberships TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organizations TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.employees TO supabase_auth_admin;
 
 -- Hook needs to read/delete jwt_refresh_locks to check/clean locks
 GRANT SELECT, DELETE ON TABLE public.jwt_refresh_locks TO supabase_auth_admin;

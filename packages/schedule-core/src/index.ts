@@ -1643,6 +1643,14 @@ function buildScheduleAvailabilityRangesByDate(
   return rangesByDate;
 }
 
+/**
+ * How an open-shift source is surfaced to a regular user. Mirrors
+ * `OpenShiftVisibilityMode` from `@dubgrid/domain` (kept local so schedule-core
+ * stays dependency-light). `matched` only shows shifts that fit the user's
+ * availability; `always` shows them regardless; `hidden` shows none.
+ */
+export type OpenShiftFeedVisibilityMode = "hidden" | "matched" | "always";
+
 export function buildAvailableOpenShiftFeed(input: {
   linkedEmployeeId: string | null;
   scheduleEntries: ReadonlyArray<MobileScheduleEntry>;
@@ -1651,6 +1659,10 @@ export function buildAvailableOpenShiftFeed(input: {
   now?: Date;
   showAll?: boolean;
   timeZone?: string | null;
+  /** Visibility of coverage-shortage open shifts. Defaults to `matched`. */
+  coverageGapVisibility?: OpenShiftFeedVisibilityMode;
+  /** Visibility of call-off (open pickup) vacancies. Defaults to `matched`. */
+  calloffVisibility?: OpenShiftFeedVisibilityMode;
 }): AvailableOpenShiftFeed {
   if (!input.linkedEmployeeId && !input.showAll) {
     return {
@@ -1666,6 +1678,10 @@ export function buildAvailableOpenShiftFeed(input: {
   );
   const now = input.now ?? new Date();
   const showAll = input.showAll ?? false;
+  // The visibility policy governs the regular-user view only. When showAll is
+  // set (a scheduler/admin viewing every open shift), it always wins.
+  const coverageGapVisibility = input.coverageGapVisibility ?? "matched";
+  const calloffVisibility = input.calloffVisibility ?? "matched";
   const pendingVolunteerRequests = input.requests.filter(
     (request) =>
       isPendingVolunteerRequest(request, input.linkedEmployeeId) &&
@@ -1685,7 +1701,11 @@ export function buildAvailableOpenShiftFeed(input: {
         return false;
       }
 
-      if (showAll) {
+      if (!showAll && calloffVisibility === "hidden") {
+        return false;
+      }
+
+      if (showAll || calloffVisibility === "always") {
         return true;
       }
 
@@ -1710,6 +1730,10 @@ export function buildAvailableOpenShiftFeed(input: {
       return [];
     }
 
+    if (!showAll && coverageGapVisibility === "hidden") {
+      return [];
+    }
+
     if (!showAll && openShift.canVolunteer === false) {
       return [];
     }
@@ -1725,7 +1749,7 @@ export function buildAvailableOpenShiftFeed(input: {
       return [];
     }
 
-    if (showAll) {
+    if (showAll || coverageGapVisibility === "always") {
       return [openShift];
     }
 

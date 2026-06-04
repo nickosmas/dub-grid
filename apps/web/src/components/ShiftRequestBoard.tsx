@@ -8,6 +8,8 @@ import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import ProgressBar from "@/components/ProgressBar";
+import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -201,6 +203,12 @@ export default function ShiftRequestBoard({
     const isOwnRequest = currentEmpId === req.requesterEmpId;
     const isTarget = currentEmpId === req.targetEmpId;
     const absenceType = isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
+    const requesterLabel = req.requesterSegments?.length
+      ? joinShiftJobSegmentNames(req.requesterSegments)
+      : req.requesterShiftLabel;
+    const targetLabel = req.targetSegments?.length
+      ? joinShiftJobSegmentNames(req.targetSegments)
+      : req.targetShiftLabel;
 
     return (
       <div
@@ -260,7 +268,7 @@ export default function ShiftRequestBoard({
               color: "var(--color-text-secondary)",
             }}
           >
-            {req.requesterShiftLabel} shift on {formatShiftDate(req.requesterShiftDate)}
+            {requesterLabel} shift on {formatShiftDate(req.requesterShiftDate)}
           </span>
 
           {isSwap && req.targetName && req.targetShiftLabel && req.targetShiftDate && (
@@ -273,7 +281,7 @@ export default function ShiftRequestBoard({
                   color: "var(--color-text-secondary)",
                 }}
               >
-                {req.targetName}: {req.targetShiftLabel} on {formatShiftDate(req.targetShiftDate)}
+                {req.targetName}: {targetLabel} on {formatShiftDate(req.targetShiftDate)}
               </span>
             </>
           )}
@@ -596,6 +604,7 @@ export default function ShiftRequestBoard({
 
   return (
     <>
+      <ProgressBar loading={loading} />
       {pendingConfirmation && (
         <ConfirmDialog
           confirmLabel={pendingConfirmation.confirmLabel}
@@ -770,32 +779,21 @@ export default function ShiftRequestBoard({
             padding: isMobile ? "16px" : "20px 24px",
           }}
         >
-          {loading ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "40px 0",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-              }}
-            >
-              Loading requests...
-            </div>
-          ) : tabData.length === 0 ? (
-            <EmptyState
-              icon={
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-              }
-              title={getEmptyMessage()}
-              style={{ padding: "40px 24px", border: "none", background: "transparent" }}
-            />
+          {tabData.length === 0 ? (
+            loading ? null : (
+              <EmptyState
+                icon={
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                }
+                title={getEmptyMessage()}
+                style={{ padding: "40px 24px", border: "none", background: "transparent" }}
+              />
+            )
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {tabData.map((req) => renderCard(req))}

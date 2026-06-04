@@ -29,14 +29,14 @@ export function ProfileHeroCard({
       color: "var(--color-success-text)",
       borderColor: "var(--color-success-border)",
     },
-    benched: {
-      label: "Benched",
+    inactive: {
+      label: "Inactive",
       background: "var(--color-warning-bg)",
       color: "var(--color-warning-text)",
       borderColor: "var(--color-warning-border)",
     },
-    terminated: {
-      label: "Terminated",
+    removed: {
+      label: "Removed",
       background: "var(--color-danger-bg)",
       color: "var(--color-danger-text)",
       borderColor: "var(--color-danger-border)",
@@ -88,7 +88,7 @@ export function ProfileHeroCard({
           <div className="grid gap-3 text-[13px] md:grid-cols-4">
             <HeroField label="Email" value={email || "—"} />
             <HeroField label="Phone" value={employee?.phone || "—"} />
-            <HeroField label="Member Since" value={createdAt || "—"} />
+            <HeroField label="Date Joined" value={createdAt || "—"} />
             <HeroField label="Last Sign In" value={lastSignIn || "—"} />
           </div>
         </div>

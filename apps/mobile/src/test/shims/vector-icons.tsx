@@ -18,7 +18,7 @@ function Icon({ name, size: _size, color: _color, accessibilityLabel, ...rest }:
   return React.createElement(View, {
     ...rest,
     accessibilityLabel: accessibilityLabel ?? name,
-    "data-icon-name": name,
+    ...({ "data-icon-name": name } as Record<string, unknown>),
   });
 }
 

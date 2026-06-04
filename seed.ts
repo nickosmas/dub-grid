@@ -1787,7 +1787,7 @@ async function main() {
         empFaIds.push(focusAreaIds[(primaryFaIdx + 1) % focusAreaIds.length]);
       }
       const empRoleIds = i % 4 === 0 ? [roleIds[i % roleIds.length]] : [];
-      const status = i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "benched" : "terminated";
+      const status = i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "inactive" : "removed";
       return {
         first_name: firstName,
         last_name: lastName,
@@ -1814,9 +1814,10 @@ async function main() {
          inserted AS (
            INSERT INTO public.employees
              (org_id, first_name, last_name, seniority, phone, email, contact_notes,
-              certification_id, role_ids, focus_area_ids, status, status_note)
+              certification_id, role_ids, focus_area_ids, status, status_note, archived_at)
            SELECT $1, first_name, last_name, seniority, phone, email, '',
-                  certification_id, role_ids, focus_area_ids, status::employee_status, ''
+                  certification_id, role_ids, focus_area_ids, status::employee_status, '',
+                  CASE WHEN status = 'removed' THEN NOW() ELSE NULL END
            FROM input
            RETURNING id, first_name, last_name, seniority, focus_area_ids, status
          )
@@ -1869,7 +1870,7 @@ async function main() {
 
     const seededJobs = await seedJobsForOrg(db, orgId, assignmentRows);
 
-    // 10. Schedule cells (April 19 – May 2, 2026 — 2 weeks of data)
+    // 10. Schedule cells (May 17 – May 30, 2026 — 2 weeks of data)
     const offAbsenceType = absenceTypeRows[0]; // First absence type (e.g., "Off")
     let shiftCount = 0;
 
@@ -1887,7 +1888,7 @@ async function main() {
     }> = [];
 
     for (const emp of employees) {
-      if (emp.status === "terminated") continue;
+      if (emp.status === "removed") continue;
       const primaryFaId = emp.focus_area_ids[0] ?? null;
       const empWorkAssignments = seededJobs.resolvedAssignments.filter(
         (assignment) =>
@@ -1896,7 +1897,7 @@ async function main() {
       );
       if (empWorkAssignments.length === 0) continue;
 
-      const shiftStart = new Date(2026, 3, 19); // April 19, 2026
+      const shiftStart = new Date(2026, 4, 17); // May 17, 2026
       for (let i = 0; i < 14; i++) {
         const d = new Date(shiftStart);
         d.setDate(d.getDate() + i);
@@ -2146,6 +2147,77 @@ async function main() {
   for (const user of memberUsers) {
     console.log(`    ✓ ${user.label}: ${allOrgs.length} organizations`);
   }
+
+  // Every org member must have an employees row so they carry an
+  // employee_number / "ID" in the People directory. The membership insert
+  // above creates memberships directly (bypassing accept_invitation's Flow B
+  // employee-insert path), so backfill an employees row for any membership
+  // that still lacks one. The BEFORE INSERT trigger
+  // (assign_employee_number) stamps the per-org badge automatically.
+  // Seniority lands well past the scheduled-employee range so management
+  // members sort at the end of the list; admins can reorder later.
+  await db.query(`
+    INSERT INTO public.employees (
+      org_id, user_id, first_name, last_name, phone,
+      department_ids, employment_type, status, seniority
+    )
+    SELECT
+      m.org_id,
+      m.user_id,
+      COALESCE(p.first_name, ''),
+      COALESCE(p.last_name, ''),
+      COALESCE(m.phone, ''),
+      m.department_ids,
+      'full_time',
+      'active',
+      1000000 + ROW_NUMBER() OVER (PARTITION BY m.org_id ORDER BY m.user_id)
+    FROM public.organization_memberships m
+    JOIN public.profiles p ON p.id = m.user_id
+    WHERE m.archived_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.employees e
+        WHERE e.user_id = m.user_id AND e.org_id = m.org_id
+      )
+  `);
+  console.log(`    ✓ Backfilled employees rows for management members`);
+
+  // ── Publish history ────────────────────────────────────────────────────
+  // The seed writes published cell snapshots directly via
+  // write_schedule_cell_snapshot_internal, which (unlike the publish_schedule
+  // RPC used in the app) does NOT record a publish_history row. Without that
+  // row the viewer-side "is this period published?" check reports unpublished,
+  // so regular users see the "not published yet" empty state instead of the
+  // grid even though published cells exist. Backfill one publish_history row
+  // per org from the actual published cells so the seeded schedule reads as
+  // published for non-editors too. Runs after memberships exist so each org
+  // has a super_admin/admin to attribute the publish to.
+  console.log("\n  Recording publish history for seeded schedules...");
+  const { rowCount: publishHistoryCount } = await db.query(
+    `INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count, changes)
+     SELECT agg.org_id, publisher.user_id, agg.start_date, agg.end_date, agg.change_count, '[]'::jsonb
+     FROM (
+       SELECT c.org_id,
+              MIN(c.date) AS start_date,
+              MAX(c.date) AS end_date,
+              COUNT(*)    AS change_count
+       FROM public.schedule_cell_snapshots s
+       JOIN public.schedule_cells c ON c.id = s.cell_id
+       WHERE s.snapshot_kind = 'published'
+       GROUP BY c.org_id
+     ) agg
+     JOIN LATERAL (
+       SELECT m.user_id
+       FROM public.organization_memberships m
+       WHERE m.org_id = agg.org_id AND m.user_id IS NOT NULL
+       ORDER BY CASE m.org_role
+                  WHEN 'super_admin' THEN 0
+                  WHEN 'admin' THEN 1
+                  ELSE 2
+                END
+       LIMIT 1
+     ) publisher ON true`,
+  );
+  console.log(`    ✓ ${publishHistoryCount} organizations marked as published`);
 
   console.log("\n✅ All 7 tenants + 3 test users + memberships seeded successfully!");
   await db.end();

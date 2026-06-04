@@ -2,6 +2,10 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Organization } from "@/types";
+import {
+  DEFAULT_OPEN_SHIFT_VISIBILITY,
+  type OpenShiftVisibilityMode,
+} from "@dubgrid/domain";
 import { toast } from "sonner";
 import {
   OrganizationSettingsConflictError,
@@ -30,6 +34,16 @@ export default function ScheduleRules({
   );
   const [mentoredCoverageCreditPercent, setMentoredCoverageCreditPercent] =
     useState(organizationMentoredCredit);
+  const organizationCoverageGapVisibility =
+    organization.openShiftVisibility?.coverageGap ??
+    DEFAULT_OPEN_SHIFT_VISIBILITY.coverageGap;
+  const organizationCalloffVisibility =
+    organization.openShiftVisibility?.calloff ??
+    DEFAULT_OPEN_SHIFT_VISIBILITY.calloff;
+  const [coverageGapVisibility, setCoverageGapVisibility] =
+    useState<OpenShiftVisibilityMode>(organizationCoverageGapVisibility);
+  const [calloffVisibility, setCalloffVisibility] =
+    useState<OpenShiftVisibilityMode>(organizationCalloffVisibility);
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -39,18 +53,24 @@ export default function ScheduleRules({
     setMentoredCoverageCreditPercent(
       organizationMentoredCredit,
     );
+    setCoverageGapVisibility(organizationCoverageGapVisibility);
+    setCalloffVisibility(organizationCalloffVisibility);
   }, [
     organization.coverageRuleConfig,
     organizationMentoredCredit,
     organization.enforceConflictPrevention,
     organization.payPeriodStartDate,
+    organizationCoverageGapVisibility,
+    organizationCalloffVisibility,
     organization.updatedAt,
   ]);
 
   const isModified =
     enforceConflictPrevention !== organization.enforceConflictPrevention
     || payPeriodStartDate !== (organization.payPeriodStartDate ?? "")
-    || mentoredCoverageCreditPercent !== organizationMentoredCredit;
+    || mentoredCoverageCreditPercent !== organizationMentoredCredit
+    || coverageGapVisibility !== organizationCoverageGapVisibility
+    || calloffVisibility !== organizationCalloffVisibility;
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -69,6 +89,10 @@ export default function ScheduleRules({
           ...(organization.coverageRuleConfig ?? {}),
           mentoredCoverageCreditPercent,
         },
+        openShiftVisibility: {
+          coverageGap: coverageGapVisibility,
+          calloff: calloffVisibility,
+        },
       });
       onOrganizationSave(updated);
       toast.success("Schedule rules saved");
@@ -80,6 +104,14 @@ export default function ScheduleRules({
         setMentoredCoverageCreditPercent(
           err.latestOrganization.coverageRuleConfig?.mentoredCoverageCreditPercent ?? 100,
         );
+        setCoverageGapVisibility(
+          err.latestOrganization.openShiftVisibility?.coverageGap ??
+            DEFAULT_OPEN_SHIFT_VISIBILITY.coverageGap,
+        );
+        setCalloffVisibility(
+          err.latestOrganization.openShiftVisibility?.calloff ??
+            DEFAULT_OPEN_SHIFT_VISIBILITY.calloff,
+        );
         toast.error("Schedule rules changed elsewhere. Review the latest values and try again.");
       } else {
         toast.error("Failed to update setting");
@@ -89,6 +121,8 @@ export default function ScheduleRules({
       setConfirmOpen(false);
     }
   }, [
+    calloffVisibility,
+    coverageGapVisibility,
     enforceConflictPrevention,
     mentoredCoverageCreditPercent,
     onOrganizationSave,
@@ -98,6 +132,12 @@ export default function ScheduleRules({
     organization.updatedAt,
     payPeriodStartDate,
   ]);
+
+  const visibilityOptions: { value: OpenShiftVisibilityMode; label: string }[] = [
+    { value: "matched", label: "When it fits their availability" },
+    { value: "always", label: "Always show" },
+    { value: "hidden", label: "Hidden" },
+  ];
 
   return (
     <SectionCard>
@@ -161,6 +201,48 @@ export default function ScheduleRules({
             { value: 0, label: "Does not count" },
           ]}
           style={{ maxWidth: 260, width: "100%" }}
+        />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div>
+          <label
+            htmlFor="open-shift-coverage-visibility"
+            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
+          >
+            Show coverage shortages to staff
+          </label>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
+            Open shifts created when a published schedule is short of its coverage requirements. Schedulers always see these. Always shows them to staff regardless of their own schedule; hidden keeps staff from seeing them even when short-staffed.
+          </div>
+        </div>
+        <CustomSelect
+          id="open-shift-coverage-visibility"
+          value={coverageGapVisibility}
+          onChange={setCoverageGapVisibility}
+          options={visibilityOptions}
+          style={{ maxWidth: 320, width: "100%" }}
+        />
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div>
+          <label
+            htmlFor="open-shift-calloff-visibility"
+            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
+          >
+            Show call-off vacancies to staff
+          </label>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
+            Open shifts left behind when someone calls off and their shift is offered up for pickup. Always shows them to staff regardless of their own schedule; hidden keeps the vacancy off the staff view.
+          </div>
+        </div>
+        <CustomSelect
+          id="open-shift-calloff-visibility"
+          value={calloffVisibility}
+          onChange={setCalloffVisibility}
+          options={visibilityOptions}
+          style={{ maxWidth: 320, width: "100%" }}
         />
       </div>
 

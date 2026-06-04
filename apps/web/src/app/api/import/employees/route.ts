@@ -6,6 +6,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 
 export const dynamic = "force-dynamic";
 
@@ -155,8 +156,14 @@ export async function POST(req: NextRequest) {
             .from("employees")
             .insert(item.record);
           if (insertError) {
+            // Surface the real reason — contact-uniqueness conflicts
+            // (duplicate email/phone, or email belongs to a different
+            // user account) come back via getEmployeeContactConflict so
+            // the admin sees WHICH CSV rows were skipped and why.
+            const contactConflict = getEmployeeContactConflict(insertError);
+            const message = contactConflict?.message ?? "Failed to import this employee";
             logger.error({ error: insertError, row: item.index + 1 }, "Employee insert failed");
-            errors.push({ row: item.index + 1, error: "Failed to import this employee" });
+            errors.push({ row: item.index + 1, error: message });
           } else {
             inserted.push({ row: item.index + 1, name: `${item.record.first_name} ${item.record.last_name}` });
           }

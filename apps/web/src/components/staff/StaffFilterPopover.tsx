@@ -360,6 +360,7 @@ function FilterGroup({
   );
 }
 
+// Interactive sibling of <StatusPill>: same tonal language, but a toggleable button.
 function FilterChip({
   active,
   onClick,
@@ -373,10 +374,10 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-[var(--dg-radius-sm)] border-[1.5px] border-transparent px-3 py-1 text-xs font-semibold transition-all duration-150 ${
+      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ${
         active
-          ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
-          : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
+          ? "border-[var(--color-brand-border)] bg-[var(--color-brand-bg)] text-[var(--color-brand)]"
+          : "border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)]"
       }`}
     >
       {children}

@@ -6,7 +6,7 @@ type OrgRole = NonNullable<DirectoryPerson["orgRole"]>;
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
-  user: "Member",
+  user: "User",
 };
 
 export function getHighlightedOrgRole(

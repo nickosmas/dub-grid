@@ -247,6 +247,7 @@ describe("mobile contracts", () => {
   it("accepts mobile people employment type fields", () => {
     const personResult = mobilePersonSchema.safeParse({
       id: "33333333-3333-4333-8333-333333333333",
+      employeeNumber: 1001,
       firstName: "Alex",
       lastName: "North",
       employmentType: "part_time",
@@ -277,6 +278,7 @@ describe("mobile contracts", () => {
     const result = mobilePersonResponseSchema.safeParse({
       person: {
         id: "33333333-3333-4333-8333-333333333333",
+        employeeNumber: 1042,
         firstName: "Alex",
         lastName: "North",
         employmentType: "full_time",

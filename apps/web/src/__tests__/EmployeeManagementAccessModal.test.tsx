@@ -12,11 +12,12 @@ import {
   updateOrganizationMembershipGuarded,
   updateAppOnlyUser,
 } from "@/features/organization/client";
-import {
-  linkEmployeeToUser,
-  reconcileEmployeeNameAndLinkUser,
-} from "@/features/employees/client";
-import { NameMismatchError } from "@/lib/account-linking";
+import { useIsInSandbox } from "@/hooks/useIsInSandbox";
+
+vi.mock("@/hooks/useIsInSandbox", () => ({
+  useIsInSandbox: vi.fn(() => false),
+  useSandboxSourceOrgId: vi.fn(() => null),
+}));
 
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: vi.fn(),
@@ -47,10 +48,6 @@ vi.mock("@/features/organization/client", () => ({
 }));
 
 vi.mock("@/features/employees/client", () => ({
-  createEmployeeFromOrgUser: vi.fn(),
-  reconcileEmployeeFromOrgUser: vi.fn(),
-  linkEmployeeToUser: vi.fn(),
-  reconcileEmployeeNameAndLinkUser: vi.fn(),
   updateEmployeeIdentity: vi.fn(),
 }));
 
@@ -62,17 +59,17 @@ vi.mock("sonner", () => ({
 }));
 
 const fetchOrganizationUsersMock = vi.mocked(fetchOrganizationUsers);
-const linkEmployeeToUserMock = vi.mocked(linkEmployeeToUser);
-const reconcileEmployeeNameAndLinkUserMock = vi.mocked(reconcileEmployeeNameAndLinkUser);
 const updateAppOnlyUserMock = vi.mocked(updateAppOnlyUser);
 const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
 const updateOrganizationInvitationGuardedMock = vi.mocked(updateOrganizationInvitationGuarded);
 const resendOrganizationInvitationGuardedMock = vi.mocked(resendOrganizationInvitationGuarded);
 const revokeOrganizationInvitationGuardedMock = vi.mocked(revokeOrganizationInvitationGuarded);
 const updateOrganizationMembershipGuardedMock = vi.mocked(updateOrganizationMembershipGuarded);
+const useIsInSandboxMock = vi.mocked(useIsInSandbox);
 
 const employee: Employee = {
   id: "emp-1",
+  employeeNumber: 1001,
   firstName: "Alice",
   lastName: "Smith",
   employmentType: "full_time",
@@ -90,6 +87,7 @@ const employee: Employee = {
   departmentIds: [],
   deptAdminIds: [],
   version: 0,
+  createdAt: null,
 };
 
 const managementDepartments: Department[] = [
@@ -116,6 +114,7 @@ function makeDirectoryPerson(overrides: Partial<DirectoryPerson> = {}): Director
     personId: "emp-1",
     source: "employee",
     employeeId: "emp-1",
+    employeeNumber: 1042,
     userId: null,
     firstName: "Alice",
     lastName: "Smith",
@@ -183,9 +182,8 @@ function makePendingInvitation(overrides: Partial<Invitation> = {}): Invitation 
 
 describe("EmployeeManagementAccessModal", () => {
   beforeEach(() => {
+    useIsInSandboxMock.mockReturnValue(false);
     fetchOrganizationUsersMock.mockResolvedValue([]);
-    linkEmployeeToUserMock.mockResolvedValue({ status: "linked" });
-    reconcileEmployeeNameAndLinkUserMock.mockResolvedValue({ status: "linked" });
     updateAppOnlyUserMock.mockResolvedValue(undefined);
     updateOrganizationMembershipGuardedMock.mockResolvedValue(makeOrganizationUser());
     createOrganizationInvitationMock.mockResolvedValue({
@@ -223,7 +221,7 @@ describe("EmployeeManagementAccessModal", () => {
     vi.unstubAllGlobals();
   });
 
-  it("links an employee to an existing org member with an exact email match and updates management departments", async () => {
+  it("updates management departments on the existing membership when the employee is already linked", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onCompleted = vi.fn();
@@ -231,7 +229,7 @@ describe("EmployeeManagementAccessModal", () => {
 
     render(
       <EmployeeManagementAccessModal
-        employee={{ ...employee, email: "" }}
+        employee={{ ...employee, userId: "user-1" }}
         orgId="org-1"
         orgName="Test Org"
         managementDepartments={managementDepartments}
@@ -240,15 +238,16 @@ describe("EmployeeManagementAccessModal", () => {
       />,
     );
 
-    const emailInput = await screen.findByRole("textbox");
-    await user.type(emailInput, "alice@example.com");
-    await screen.findByText(/existing org member found for this email/i);
+    // Wait for org users to load so linkedUser resolves.
+    await waitFor(() => {
+      expect(fetchOrganizationUsersMock).toHaveBeenCalled();
+    });
 
     await user.click(screen.getByRole("button", { name: "Leadership" }));
     await user.click(screen.getByRole("button", { name: /save access/i }));
 
     await waitFor(() => {
-      expect(linkEmployeeToUserMock).toHaveBeenCalledWith("emp-1", "user-1", "org-1");
+      // No link call — the user is already attached to the employee row.
       expect(updateAppOnlyUserMock).toHaveBeenCalledWith("user-1", "org-1", {
         departmentIds: [10],
       });
@@ -256,6 +255,33 @@ describe("EmployeeManagementAccessModal", () => {
       expect(onCompleted).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();
     });
+  });
+
+  it("disables saving and shows a notice in sandbox mode", async () => {
+    const user = userEvent.setup();
+    useIsInSandboxMock.mockReturnValue(true);
+
+    render(
+      <EmployeeManagementAccessModal
+        employee={employee}
+        orgId="org-1"
+        orgName="Test Org"
+        managementDepartments={managementDepartments}
+        onClose={vi.fn()}
+        onCompleted={vi.fn()}
+      />,
+    );
+
+    const saveButton = await screen.findByRole("button", {
+      name: /save access/i,
+    });
+    await user.click(screen.getByRole("button", { name: "Leadership" }));
+
+    expect(
+      screen.getByText(/isn't available in sandbox mode/i),
+    ).toBeInTheDocument();
+    expect(saveButton).toBeDisabled();
+    expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
   });
 
   it("resends an employee-backed management invitation with updated departments and role", async () => {
@@ -346,61 +372,6 @@ describe("EmployeeManagementAccessModal", () => {
         orgId: "org-1",
         invitationId: "inv-1",
         expectedUpdatedAt: "2026-01-02T00:00:00.000Z",
-      });
-      expect(onCompleted).toHaveBeenCalledOnce();
-      expect(onClose).toHaveBeenCalledOnce();
-    });
-  });
-
-  it("shows a reconcile step when the matched org member name differs and confirms with account name", async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-    const onCompleted = vi.fn();
-
-    fetchOrganizationUsersMock.mockResolvedValue([
-      makeOrganizationUser({
-        firstName: "Alicia",
-        lastName: "Smith",
-      }),
-    ]);
-    linkEmployeeToUserMock.mockRejectedValue(
-      new NameMismatchError({
-        employeeId: "emp-1",
-        userId: "user-1",
-        employeeFirstName: "Alice",
-        employeeLastName: "Smith",
-        accountFirstName: "Alicia",
-        accountLastName: "Smith",
-      }),
-    );
-
-    render(
-      <EmployeeManagementAccessModal
-        employee={{ ...employee, email: "" }}
-        orgId="org-1"
-        orgName="Test Org"
-        managementDepartments={managementDepartments}
-        onClose={onClose}
-        onCompleted={onCompleted}
-      />,
-    );
-
-    const emailInput = await screen.findByRole("textbox");
-    await user.type(emailInput, "alice@example.com");
-    await screen.findByText(/existing org member found for this email/i);
-    await user.click(screen.getByRole("button", { name: "Leadership" }));
-    await user.click(screen.getByRole("button", { name: /save access/i }));
-
-    expect(await screen.findByText("Name mismatch found")).toBeInTheDocument();
-    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("Alicia Smith")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Use Account Name and Add to Management" }));
-
-    await waitFor(() => {
-      expect(reconcileEmployeeNameAndLinkUserMock).toHaveBeenCalledWith("emp-1", "user-1", "org-1");
-      expect(updateAppOnlyUserMock).toHaveBeenCalledWith("user-1", "org-1", {
-        departmentIds: [10],
       });
       expect(onCompleted).toHaveBeenCalledOnce();
       expect(onClose).toHaveBeenCalledOnce();

@@ -68,9 +68,9 @@ describe("Toolbar — schedule mode rendering", () => {
     expect(screen.getByRole("button", { name: "South" })).toBeInTheDocument();
   });
 
-  it("renders staff search input with placeholder Find staff…", () => {
+  it("renders staff search input with placeholder Search staff…", () => {
     render(<Toolbar {...defaultProps} />);
-    expect(screen.getByPlaceholderText("Find staff…")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search staff…")).toBeInTheDocument();
   });
 });
 
@@ -321,7 +321,7 @@ describe("Toolbar — staff search", () => {
   it("typing in search input calls onStaffSearchChange with typed value", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    const input = screen.getByPlaceholderText("Find staff…");
+    const input = screen.getByPlaceholderText("Search staff…");
     await user.type(input, "B");
     // The input is controlled (value=staffSearch stays ""), so each keystroke fires
     // onChange with just that character. Verify the callback was invoked with "B".

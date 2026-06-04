@@ -34,6 +34,7 @@ describe("Dashboard Metrics", () => {
 
   const employee1: Employee = {
     id: "emp1",
+    employeeNumber: 1001,
     userId: "user1",
     firstName: "John",
     lastName: "Doe",
@@ -51,6 +52,7 @@ describe("Dashboard Metrics", () => {
     seniority: 0,
     contactNotes: "",
     version: 0,
+    createdAt: null,
   };
 
   const employee2: Employee = {

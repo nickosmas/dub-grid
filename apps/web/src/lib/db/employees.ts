@@ -127,9 +127,9 @@ export async function fetchEmployees(
     .from("employees")
     .select(EMPLOYEE_COLS)
     .eq("org_id", orgId);
-  // Terminated employees have archived_at set, so skip the filter when fetching them
-  const includesTerminated = statuses?.includes("terminated");
-  if (!includesTerminated) {
+  // Removed employees have archived_at set, so skip the filter when fetching them
+  const includesRemoved = statuses?.includes("removed");
+  if (!includesRemoved) {
     query = query.is("archived_at", null);
   }
   if (statuses && statuses.length > 0) {
@@ -299,7 +299,7 @@ async function updateEmployeeStatus(
   input: {
     empId: string;
     orgId: string;
-    action: "bench" | "activate" | "terminate";
+    action: "deactivate" | "activate" | "remove";
     expectedVersion: number;
     note?: string;
   },
@@ -333,20 +333,20 @@ async function updateEmployeeStatus(
   return body.employee;
 }
 
-export async function deleteEmployee(empId: string, orgId: string, expectedVersion: number): Promise<Employee> {
+export async function removeEmployee(empId: string, orgId: string, expectedVersion: number): Promise<Employee> {
   return updateEmployeeStatus({
     empId,
     orgId,
-    action: "terminate",
+    action: "remove",
     expectedVersion,
   });
 }
 
-export async function benchEmployee(empId: string, note: string | undefined, orgId: string, expectedVersion: number): Promise<Employee> {
+export async function deactivateEmployee(empId: string, note: string | undefined, orgId: string, expectedVersion: number): Promise<Employee> {
   return updateEmployeeStatus({
     empId,
     orgId,
-    action: "bench",
+    action: "deactivate",
     note,
     expectedVersion,
   });

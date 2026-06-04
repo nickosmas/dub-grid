@@ -36,7 +36,7 @@ const NAMED_ITEM_COLS =
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
 const DEPARTMENT_COLS =
@@ -124,7 +124,7 @@ export interface MobileOrganizationMembershipRow
 export interface MobileManagementMembershipRow
   extends Pick<
     DbOrganizationMembership,
-    "user_id" | "department_ids" | "dept_admin_ids"
+    "user_id" | "department_ids" | "dept_admin_ids" | "org_role"
   > {}
 
 export interface MobileEmbeddedEmployeeRow {
@@ -195,6 +195,7 @@ export interface MobileShiftRequestQueryRow {
 
 export interface MobilePeopleQueryRow {
   id: string;
+  employee_number: number;
   first_name: string;
   last_name: string;
   employment_type: DbEmployee["employment_type"] | null;
@@ -441,7 +442,7 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
 
   const { data, error } = await serviceClient
     .from("organization_memberships")
-    .select("user_id, department_ids, dept_admin_ids")
+    .select("user_id, department_ids, dept_admin_ids, org_role")
     .eq("org_id", orgId)
     .in("user_id", uniqueUserIds)
     .is("archived_at", null);
@@ -454,10 +455,12 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
     user_id: string;
     department_ids: number[] | null;
     dept_admin_ids: number[] | null;
+    org_role: string;
   }>).map((row) => ({
     user_id: row.user_id,
     department_ids: row.department_ids ?? [],
     dept_admin_ids: row.dept_admin_ids ?? [],
+    org_role: row.org_role,
   }));
 }
 
@@ -867,7 +870,7 @@ export async function fetchMobilePeopleRows(
   const { data, error } = await serviceClient
     .from("employees")
     .select(
-      "id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
+      "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
     )
     .eq("org_id", orgId)
     .order("first_name", { ascending: true });

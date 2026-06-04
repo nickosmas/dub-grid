@@ -103,8 +103,8 @@ export default function StaffViewMockup() {
         <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
           {[
             { label: "Active", count: 6, active: true },
-            { label: "Benched", count: 0, active: false },
-            { label: "Terminated", count: 0, active: false },
+            { label: "Inactive", count: 0, active: false },
+            { label: "Removed", count: 0, active: false },
           ].map((tab) => (
             <span
               key={tab.label}

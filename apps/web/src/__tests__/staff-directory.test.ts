@@ -10,6 +10,7 @@ const baseDirectoryPerson: DirectoryPerson = {
   personId: "u:user-1",
   source: "user_only",
   employeeId: null,
+  employeeNumber: null,
   userId: "user-1",
   firstName: "Alice",
   lastName: "Smith",
@@ -35,6 +36,7 @@ const baseDirectoryPerson: DirectoryPerson = {
 
 const baseEmployee: Employee = {
   id: "emp-1",
+  employeeNumber: 1001,
   firstName: "Alicia",
   lastName: "Stone",
   employmentType: "full_time",
@@ -52,6 +54,7 @@ const baseEmployee: Employee = {
   departmentIds: [30],
   deptAdminIds: [30],
   version: 1,
+  createdAt: null,
 };
 
 describe("staff directory cache helpers", () => {
@@ -60,6 +63,7 @@ describe("staff directory cache helpers", () => {
       ...baseDirectoryPerson,
       source: "employee",
       employeeId: "emp-1",
+      employeeNumber: 1001,
       userId: "user-1",
       firstName: "Alicia",
       lastName: "Stone",
@@ -80,12 +84,14 @@ describe("staff directory cache helpers", () => {
     expect(applyManagementDirectoryUpdate(baseDirectoryPerson, {
       firstName: "Allie",
       lastName: "Stone",
+      email: "alice@example.com",
       phone: "555-0199",
       managementDepartmentIds: [10],
     })).toEqual({
       ...baseDirectoryPerson,
       firstName: "Allie",
       lastName: "Stone",
+      email: "alice@example.com",
       phone: "555-0199",
       managementDepartmentIds: [10],
       managementDeptAdminIds: [],

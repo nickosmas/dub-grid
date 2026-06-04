@@ -237,6 +237,7 @@ type OrganizationRow = {
 
 type EmployeeReportRow = {
   id: string;
+  employee_number: number | null;
   first_name: string | null;
   last_name: string | null;
   employment_type?: string | null;
@@ -1799,7 +1800,7 @@ export async function loadOperationsReport(
       serviceClient
         .from("employees")
         .select(
-          "id, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id",
+          "id, employee_number, first_name, last_name, employment_type, email, phone, status, seniority, focus_area_ids, certification_id, role_ids, department_ids, user_id",
         )
         .eq("org_id", input.orgId)
         .is("archived_at", null)

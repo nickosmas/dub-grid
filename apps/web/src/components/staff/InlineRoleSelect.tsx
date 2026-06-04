@@ -9,7 +9,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { ORG_ROLE_LABELS, getOrgRoleBadgeStyle } from "./org-role-badges";
 
 const ROLE_OPTIONS: { value: OrganizationRole; label: string }[] = [
-  { value: "user", label: "Member" },
+  { value: "user", label: "User" },
   { value: "admin", label: "Admin" },
   { value: "super_admin", label: "Super Admin" },
 ];
@@ -32,20 +32,26 @@ export function InlineRoleSelect({
   const [pending, setPending] = useState<OrganizationRole | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // You can't change your own role: show a read-only badge regardless of
-  // whether an onChange handler was provided.
-  if (orgRole && (isSelf || !onChange)) {
+  // Self can't change own role: show the dropdown in its disabled state so
+  // the Access column reads consistently across rows. Title explains why.
+  if (orgRole && isSelf) {
     return (
-      <span
-        className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-        style={getOrgRoleBadgeStyle(orgRole)}
-        title={isSelf ? SELF_ACTION_FORBIDDEN_MESSAGE : undefined}
+      <div
+        onClick={(event) => event.stopPropagation()}
+        style={{ minWidth: 132, maxWidth: 168 }}
+        title={SELF_ACTION_FORBIDDEN_MESSAGE}
       >
-        {ORG_ROLE_LABELS[orgRole]}
-      </span>
+        <CustomSelect
+          value={orgRole}
+          disabled
+          onChange={() => undefined}
+          options={ROLE_OPTIONS}
+        />
+      </div>
     );
   }
 
+  // No edit permission / no login: read-only badge or em dash.
   if (!orgRole || !onChange) {
     return orgRole ? (
       <span

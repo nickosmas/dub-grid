@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   SANDBOX_COOKIE_NAME,
@@ -70,10 +71,33 @@ export async function POST(req: NextRequest) {
       return response;
     }
 
-    // action === "enter" or "reset". The auth layer rewrites
-    // claims.org_id to the sandbox when a sandbox cookie is present, so
-    // we can't read the source org from there. Pull it from the auth
-    // user's profile instead.
+    // action === "enter" or "reset". Both clone the source org, which is
+    // far more expensive than exit — rate-limit them (per user) so a client
+    // can't spam reset and hammer the clone path. Exit is intentionally not
+    // throttled: a user must always be able to leave sandbox mode.
+    const { limited, reset, misconfigured } = await checkRateLimit(
+      apiLimiter,
+      auth.user.id,
+    );
+    if (misconfigured) {
+      return NextResponse.json(
+        { error: "Service temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) },
+        },
+      );
+    }
+
+    // The auth layer rewrites claims.org_id to the sandbox when a sandbox
+    // cookie is present, so we can't read the source org from there. Pull it
+    // from the auth user's profile instead.
     const { data: profile } = await serviceClient
       .from("profiles")
       .select("org_id")
@@ -88,18 +112,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // For "reset": wipe any existing sandbox first so the recreate step
-    // gives the user a truly fresh clone. For "enter": reuse the existing
-    // sandbox if there is one (typical case is the user re-clicking enter
-    // from another tab and expecting their in-progress work back).
-    if (parsed.data.action === "reset") {
+    const isReset = parsed.data.action === "reset";
+
+    // For "enter": reuse the existing sandbox if there is one (typical case is
+    // the user re-clicking enter from another tab and expecting their
+    // in-progress work back). For "reset": ignore it — we recreate below.
+    const existing = isReset
+      ? null
+      : await findActiveSandboxForUser(serviceClient, auth.user.id);
+
+    // Defense in depth: when we're about to CLONE (reset, or enter with no
+    // existing sandbox), clone only an org the user is an active member of.
+    // profile.org_id is system-set, but if a membership was archived without
+    // clearing the default it could otherwise point at an org the user no
+    // longer belongs to. Reusing an existing sandbox skips this — its source
+    // was already validated at creation.
+    if (!existing) {
+      const { data: membership } = await serviceClient
+        .from("organization_memberships")
+        .select("id")
+        .eq("user_id", auth.user.id)
+        .eq("org_id", sourceOrgId)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (!membership) {
+        return NextResponse.json(
+          { error: "You don't have access to that organization." },
+          { status: 403 },
+        );
+      }
+    }
+
+    // For "reset": wipe any existing sandbox first so the recreate step gives
+    // the user a truly fresh clone.
+    if (isReset) {
       await deleteSandboxForUser({ serviceClient, actor: auth.user });
     }
 
-    const existing =
-      parsed.data.action === "reset"
-        ? null
-        : await findActiveSandboxForUser(serviceClient, auth.user.id);
     const sandbox =
       existing ??
       (await createSandboxForUser({

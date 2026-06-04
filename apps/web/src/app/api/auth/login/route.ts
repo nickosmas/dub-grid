@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import {
+  ACCOUNT_DISABLED_CODE,
+  ACCOUNT_DISABLED_MESSAGE,
+  isAccountDisabledMessage,
+} from "@dubgrid/domain";
 import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
@@ -101,6 +106,20 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     logger.info({ emailHash, path: "/api/auth/login", errorMsg: error.message }, "Login failed");
+    // The JWT hook refuses terminated employees with a sentinel message
+    // (ACCOUNT_DISABLED_MESSAGE). Surface that as a structured 403 so the
+    // login UI can show a friendly "account disabled" modal instead of the
+    // generic invalid-credentials toast.
+    if (isAccountDisabledMessage(error.message)) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: ACCOUNT_DISABLED_CODE,
+          error: ACCOUNT_DISABLED_MESSAGE,
+        },
+        { status: 403 },
+      );
+    }
     // Return generic error to avoid email enumeration
     return NextResponse.json(
       { success: false, error: "Invalid email or password" },

@@ -16,6 +16,7 @@ import type { ImpersonationData } from "@/lib/impersonation";
 export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: "emp-1",
+    employeeNumber: 1001,
     firstName: "Test",
     lastName: "Employee",
     employmentType: "full_time",
@@ -33,6 +34,7 @@ export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+    createdAt: null,
     ...overrides,
   };
 }

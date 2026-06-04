@@ -132,7 +132,7 @@ function StatusDot({ status }: { status: string }) {
   const color =
     status === "active"
       ? "var(--color-success)"
-      : status === "benched"
+      : status === "inactive"
         ? "var(--color-warning)"
         : "var(--color-danger)";
   return (
@@ -614,12 +614,12 @@ export default function OrganizationDetail({
   const employeesQuery = useQuery({
     queryKey: queryKeys.gridmaster.orgEmployees(organization.id),
     queryFn: async () => {
-      const [active, benched, terminated] = await Promise.all([
+      const [active, inactive, removed] = await Promise.all([
         fetchEmployees(organization.id, ["active"]),
-        fetchEmployees(organization.id, ["benched"]),
-        fetchEmployees(organization.id, ["terminated"]),
+        fetchEmployees(organization.id, ["inactive"]),
+        fetchEmployees(organization.id, ["removed"]),
       ]);
-      return { active, benched, terminated };
+      return { active, inactive, removed };
     },
     enabled: tab === "employees",
     staleTime: 30_000,
@@ -861,8 +861,8 @@ export default function OrganizationDetail({
       {!tabLoading && tab === "employees" && employeesQuery.data && (
         <EmployeesTab
           active={employeesQuery.data.active}
-          benched={employeesQuery.data.benched}
-          terminated={employeesQuery.data.terminated}
+          inactive={employeesQuery.data.inactive}
+          removed={employeesQuery.data.removed}
         />
       )}
       {!tabLoading && tab === "config" && configQuery.data && (
@@ -1881,16 +1881,16 @@ function formatPermissions(p: AdminPermissions): string {
 
 function EmployeesTab({
   active,
-  benched,
-  terminated,
+  inactive,
+  removed,
 }: {
   active: Employee[];
-  benched: Employee[];
-  terminated: Employee[];
+  inactive: Employee[];
+  removed: Employee[];
 }) {
-  const [showStatus, setShowStatus] = useState<"active" | "benched" | "terminated">("active");
+  const [showStatus, setShowStatus] = useState<"active" | "inactive" | "removed">("active");
 
-  const list = showStatus === "active" ? active : showStatus === "benched" ? benched : terminated;
+  const list = showStatus === "active" ? active : showStatus === "inactive" ? inactive : removed;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1898,8 +1898,8 @@ function EmployeesTab({
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
         {([
           { key: "active" as const, label: "Active", count: active.length, color: "var(--color-today-text)" },
-          { key: "benched" as const, label: "Benched", count: benched.length, color: "var(--color-warning)" },
-          { key: "terminated" as const, label: "Terminated", count: terminated.length, color: "var(--color-danger)" },
+          { key: "inactive" as const, label: "Inactive", count: inactive.length, color: "var(--color-warning)" },
+          { key: "removed" as const, label: "Removed", count: removed.length, color: "var(--color-danger)" },
         ]).map((tab) => {
           const isActive = showStatus === tab.key;
           return (
@@ -1950,7 +1950,7 @@ function EmployeesTab({
               <tr>
                 <th style={thStyle}>Name</th>
                 <th style={thStyle}>Status</th>
-                <th style={thStyle}>Seniority</th>
+                <th style={thStyle}>Employee ID</th>
                 <th style={thStyle}>Phone</th>
                 <th style={thStyle}>Email</th>
               </tr>
@@ -1967,7 +1967,7 @@ function EmployeesTab({
                   <tr key={emp.id}>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{getEmployeeDisplayName(emp)}</td>
                     <td style={tdStyle}><StatusDot status={emp.status} /></td>
-                    <td style={{ ...tdStyle, textAlign: "center" }}>{emp.seniority}</td>
+                    <td style={{ ...tdStyle, textAlign: "center" }}>#{emp.employeeNumber}</td>
                     <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>{emp.phone || "—"}</td>
                     <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>{emp.email || "—"}</td>
                   </tr>

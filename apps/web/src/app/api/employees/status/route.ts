@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   empId: z.string().uuid(),
   orgId: z.string().uuid(),
-  action: z.enum(["bench", "activate", "terminate"]),
+  action: z.enum(["deactivate", "activate", "remove"]),
   expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
 });
@@ -159,13 +159,13 @@ export async function POST(req: NextRequest) {
     };
 
     switch (action) {
-      case "bench":
-        update.status = "benched";
+      case "deactivate":
+        update.status = "inactive";
         update.status_note = note ?? "";
-        auditAction = "employee.benched";
+        auditAction = "employee.deactivated";
         auditDetails = {
           ...auditDetails,
-          toStatus: "benched",
+          toStatus: "inactive",
           note: note ?? "",
         };
         break;
@@ -179,13 +179,15 @@ export async function POST(req: NextRequest) {
           toStatus: "active",
         };
         break;
-      case "terminate":
-        update.status = "terminated";
+      case "remove":
+        update.status = "removed";
+        update.status_note = note ?? "";
         update.archived_at = now;
-        auditAction = "employee.archived";
+        auditAction = "employee.removed";
         auditDetails = {
           ...auditDetails,
-          toStatus: "terminated",
+          toStatus: "removed",
+          note: note ?? "",
         };
         break;
     }

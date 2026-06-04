@@ -171,14 +171,21 @@ export function usePermissions(): Permissions {
   // cache and triggers a re-render. (L-2: we no longer subscribe to
   // `departments` — departments don't grant permissions, so those events only
   // caused org-wide perms-refetch storms with zero permission impact.)
+  //
+  // Also subscribe to `employees` for this user: bench/activate flips the
+  // benched override (READ_ONLY_PERMS) in the permissions endpoint, and we
+  // want the open tab to drop into / out of read-only the moment an admin
+  // presses the button — not at next refresh. Terminated users get bounced at
+  // the JWT-hook level on the next token refresh, so no extra wiring needed.
   useEffect(() => {
     if (!accessToken || !userId) return;
 
     let mounted = true;
     let membershipChannel: BrowserRealtimeChannel | null = null;
+    let employeeChannel: BrowserRealtimeChannel | null = null;
     // Unique channel name per effect instance avoids reusing an already-subscribed
     // channel during React strict-mode double-mounts.
-    const channelId = `perms:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    const channelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
     const reResolve = () => {
       clearPermsCache();
@@ -201,7 +208,7 @@ export function usePermissions(): Permissions {
       })();
     };
 
-    membershipChannel = createBrowserRealtimeChannel(channelId)
+    membershipChannel = createBrowserRealtimeChannel(`perms:m:${channelSuffix}`)
       .on(
         "postgres_changes" as "system",
         {
@@ -214,9 +221,23 @@ export function usePermissions(): Permissions {
       )
       .subscribe();
 
+    employeeChannel = createBrowserRealtimeChannel(`perms:e:${channelSuffix}`)
+      .on(
+        "postgres_changes" as "system",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "employees",
+          filter: `user_id=eq.${userId}`,
+        } as Record<string, unknown>,
+        reResolve,
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
       if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
+      if (employeeChannel) void removeBrowserRealtimeChannel(employeeChannel);
     };
   }, [accessToken, userId]);
 
@@ -234,6 +255,7 @@ export function usePermissions(): Permissions {
       isSuperAdmin: false,
       isImpersonating: false,
       isUserViewActive: true,
+      isInactive: false,
       actualLevel: perms.level,
       canManageOrg: false,
       canAccessSettings: false,

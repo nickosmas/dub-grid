@@ -362,7 +362,7 @@ async function requireManageableEmployee(req: NextRequest, employeeId: string) {
       ),
     };
   }
-  if (employee.status === "terminated" || employee.userId) {
+  if (employee.status === "removed" || employee.userId) {
     return {
       response: NextResponse.json(
         { error: "This employee cannot be invited." },

@@ -13,7 +13,7 @@
 CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'none');
 CREATE TYPE public.org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly');
-CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
+CREATE TYPE public.employee_status AS ENUM ('active', 'inactive', 'removed');
 CREATE TYPE public.employee_employment_type AS ENUM ('full_time', 'part_time');
 CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap', 'calloff');
 CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired');
@@ -88,7 +88,13 @@ CREATE TABLE public.organizations (
   sandbox_source_org_id     UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
   enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
   coverage_rule_config JSONB NOT NULL DEFAULT '{"mentoredCoverageCreditPercent":100}'::jsonb,
+  open_shift_visibility JSONB NOT NULL DEFAULT '{"coverageGap":"matched","calloff":"matched"}'::jsonb,
   feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  -- Per-org monotonic counter for employees.employee_number. Stamped by the
+  -- assign_employee_number BEFORE INSERT trigger. Starts at 1001 so the first
+  -- hire reads as a 4-digit badge ID (1001, 1002, …). Numbers are never
+  -- reused, even after termination.
+  next_employee_number INTEGER NOT NULL DEFAULT 1001,
   created_by           UUID,
   updated_by           UUID,
   created_at           TIMESTAMPTZ DEFAULT now(),
@@ -113,6 +119,7 @@ COMMENT ON COLUMN public.organizations.meta_description IS 'Custom SEO meta desc
 COMMENT ON COLUMN public.organizations.theme_config IS 'JSON object containing primary_color, accent_color, etc.';
 COMMENT ON COLUMN public.organizations.landing_page_config IS 'JSON object containing hero_title, features, and pain_points';
 COMMENT ON COLUMN public.organizations.feature_overrides IS 'JSON object of per-org feature flag overrides. Keys are flag names, values are booleans. Checked before PostHog.';
+COMMENT ON COLUMN public.organizations.open_shift_visibility IS 'Controls when open shifts are surfaced to regular users (not editors/admins). Shape {"coverageGap":mode,"calloff":mode} where mode is hidden|matched|always. matched = only when the shift fits the user''s availability (default, legacy behavior); always = regardless of availability (still published + not-started); hidden = never shown even on a shortage.';
 COMMENT ON COLUMN public.organizations.pay_period_start_date IS 'Optional biweekly pay-period anchor date. When set, the 2-week schedule view aligns to 14-day periods starting on this date.';
 COMMENT ON COLUMN public.organizations.coverage_rule_config IS 'Organization-level schedule coverage rules. mentoredCoverageCreditPercent controls how mentored assignments count toward coverage.';
 
@@ -249,6 +256,11 @@ ALTER TABLE ONLY public.departments REPLICA IDENTITY FULL;
 CREATE TABLE public.employees (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id            UUID NOT NULL,
+  -- Per-org immutable badge number. Stamped by the assign_employee_number
+  -- BEFORE INSERT trigger from organizations.next_employee_number; any value
+  -- supplied by the caller is overwritten. Immutability enforced by
+  -- prevent_employee_number_change BEFORE UPDATE trigger.
+  employee_number   INTEGER NOT NULL,
   first_name        TEXT NOT NULL,
   last_name         TEXT NOT NULL,
   seniority         INTEGER NOT NULL,
@@ -286,6 +298,20 @@ CREATE UNIQUE INDEX unique_active_employee_email_per_org
 CREATE UNIQUE INDEX unique_active_employee_phone_per_org
   ON public.employees (org_id, regexp_replace(phone, '[^0-9]+', '', 'g'))
   WHERE archived_at IS NULL AND regexp_replace(phone, '[^0-9]+', '', 'g') <> '';
+
+-- One active employee row per (org, user). Enforces the canonical "one
+-- employees row = one person per org" rule at the DB layer, defending
+-- against accidental duplicate inserts via from-user, link-user, or
+-- direct DB writes. Partial-index so archived (terminated) employees
+-- keep their historical user link without blocking a fresh hire.
+CREATE UNIQUE INDEX unique_active_user_per_org
+  ON public.employees (org_id, user_id)
+  WHERE user_id IS NOT NULL AND archived_at IS NULL;
+
+-- Per-org badge uniqueness. Survives termination (archived_at IS NOT NULL) so
+-- numbers are never reused.
+ALTER TABLE public.employees
+  ADD CONSTRAINT unique_employee_number_per_org UNIQUE (org_id, employee_number);
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
 

@@ -61,6 +61,7 @@ import {
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { normalizePresetBg } from "@/lib/colors";
+import { normalizeOpenShiftVisibility } from "@dubgrid/domain";
 
 const EMPTY_SCHEDULED_JOB_STYLE = {
   color: "",
@@ -161,6 +162,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     sandboxSourceOrgId: row.sandbox_source_org_id ?? null,
     enforceConflictPrevention: row.enforce_conflict_prevention ?? false,
     coverageRuleConfig: normalizeCoverageRuleConfig(row.coverage_rule_config),
+    openShiftVisibility: normalizeOpenShiftVisibility(row.open_shift_visibility),
     stripeCustomerId: row.stripe_customer_id ?? null,
     subscriptionStatus: row.subscription_status ?? null,
     trialEndsAt: row.trial_ends_at ?? null,
@@ -387,6 +389,7 @@ export function rowToAbsenceType(row: DbAbsenceType): AbsenceType {
 export function rowToEmployee(row: DbEmployee): Employee {
   return {
     id: row.id,
+    employeeNumber: row.employee_number,
     firstName: row.first_name,
     lastName: row.last_name,
     employmentType: row.employment_type ?? "full_time",
@@ -405,21 +408,24 @@ export function rowToEmployee(row: DbEmployee): Employee {
     departmentIds: row.department_ids ?? [],
     deptAdminIds: row.dept_admin_ids ?? [],
     version: row.version ?? 0,
+    createdAt: row.created_at ?? null,
   };
 }
 
 export function employeeToRow(
-  emp: Omit<Employee, "id">,
+  emp: Omit<Employee, "id" | "employeeNumber" | "createdAt">,
   orgId: string,
 ): Omit<
   DbEmployee,
   | "id"
+  | "employee_number"
   | "status"
   | "status_changed_at"
   | "status_note"
   | "archived_at"
   | "user_id"
   | "version"
+  | "created_at"
 > {
   return {
     org_id: orgId,

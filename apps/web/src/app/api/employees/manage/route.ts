@@ -32,8 +32,8 @@ import {
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
 import {
+  optionalStaffEmailSchema,
   optionalUsPhoneSchema,
-  requiredStaffEmailSchema,
   staffNameSchema,
   staffNotesSchema,
 } from "@dubgrid/contracts";
@@ -53,7 +53,7 @@ function requireEmployeeSetupPermissions(
   });
 }
 
-const employeeStatusSchema = z.enum(["active", "benched", "terminated"]);
+const employeeStatusSchema = z.enum(["active", "inactive", "removed"]);
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 
 const employeeSchema = z.object({
@@ -69,7 +69,7 @@ const employeeSchema = z.object({
   seniority: z.number().int(),
   focusAreaIds: z.array(z.number().int()),
   phone: optionalUsPhoneSchema,
-  email: requiredStaffEmailSchema,
+  email: optionalStaffEmailSchema,
   contactNotes: staffNotesSchema,
   archivedAt: z.string().datetime({ offset: true }).nullable().optional(),
   userId: z.string().uuid().nullable(),
@@ -168,9 +168,25 @@ function assertDateRange(startDate?: string, endDate?: string): void {
   }
 }
 
+type EmployeeProfileFields = Pick<
+  Employee,
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "contactNotes"
+  | "employmentType"
+  | "certificationId"
+  | "seniority"
+  | "roleIds"
+  | "focusAreaIds"
+  | "departmentIds"
+  | "deptAdminIds"
+>;
+
 function diffEmployeeProfileFields(
-  before: Employee,
-  after: Employee,
+  before: EmployeeProfileFields,
+  after: EmployeeProfileFields,
 ): string[] {
   const fields: string[] = [];
   if (before.firstName !== after.firstName) fields.push("firstName");
@@ -311,7 +327,7 @@ export async function POST(req: NextRequest) {
           .from("employees")
           .select(EMPLOYEE_COLS)
           .eq("org_id", data.orgId);
-        const includesTerminated = data.statuses?.includes("terminated");
+        const includesTerminated = data.statuses?.includes("removed");
         if (!includesTerminated) {
           query = query.is("archived_at", null);
         }
@@ -417,7 +433,7 @@ export async function POST(req: NextRequest) {
         const normalizedFields = normalizeStaffTextFields({
           firstName: data.employee.firstName,
           lastName: data.employee.lastName,
-          email: data.employee.email,
+          optionalEmail: data.employee.email,
           phone: data.employee.phone,
           contactNotes: data.employee.contactNotes,
         });
@@ -427,7 +443,7 @@ export async function POST(req: NextRequest) {
           firstName: normalizedFields.firstName ?? data.employee.firstName,
           lastName: normalizedFields.lastName ?? data.employee.lastName,
           phone: normalizedFields.phone ?? data.employee.phone,
-          email: normalizedFields.email ?? data.employee.email,
+          email: normalizedFields.optionalEmail ?? data.employee.email,
           contactNotes:
             normalizedFields.contactNotes ?? data.employee.contactNotes,
         };

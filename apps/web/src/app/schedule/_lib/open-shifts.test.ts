@@ -27,6 +27,8 @@ function buildEmployee(overrides: Partial<Employee> = {}): Employee {
     userId: null,
     departmentIds: [],
     version: 0,
+    employeeNumber: 1001,
+    createdAt: null,
     ...overrides,
   };
 }

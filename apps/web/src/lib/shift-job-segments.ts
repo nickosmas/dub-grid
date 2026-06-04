@@ -254,3 +254,23 @@ export function deriveAssignmentDefinitionIdsFromSegments(
 export function joinShiftJobSegmentLabels(segments: ShiftJobSegment[]): string {
   return segments.map((segment) => segment.label || "?").join("/");
 }
+
+/**
+ * Full-name sibling of {@link joinShiftJobSegmentLabels}. Spells out shift and
+ * job names for roomy surfaces (request board, dashboard cards, staff detail)
+ * instead of the space-constrained grid abbreviations.
+ */
+export function joinShiftJobSegmentNames(segments: ShiftJobSegment[]): string {
+  return segments
+    .map((segment) => {
+      const shiftName = segment.shiftName?.trim() ?? "";
+      const jobName = segment.jobName?.trim() ?? "";
+      if (!shiftName) return jobName || segment.label || "?"; // shiftless
+      if (segment.isShiftOnly || segment.showJobOnGrid === false || !jobName) {
+        return shiftName; // shift-only
+      }
+      return `${shiftName} · ${jobName}`;
+    })
+    .filter(Boolean)
+    .join("/");
+}

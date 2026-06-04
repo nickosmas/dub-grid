@@ -554,6 +554,7 @@ import type { DbEmployee } from "@/lib/db";
 const baseEmployeeRow: DbEmployee = {
   id: "emp-1",
   org_id: "org-1",
+  employee_number: 1001,
   first_name: "Alice",
   last_name: "Smith",
   employment_type: "part_time",
@@ -572,6 +573,7 @@ const baseEmployeeRow: DbEmployee = {
   dept_admin_ids: [],
   archived_at: null,
   version: 0,
+  created_at: null,
 };
 
 describe("rowToEmployee", () => {
@@ -616,7 +618,7 @@ import { employeeToRow } from "@/lib/db";
 import type { Employee } from "@/types";
 
 describe("employeeToRow", () => {
-  const baseEmployee: Omit<Employee, "id"> = {
+  const baseEmployee: Omit<Employee, "id" | "employeeNumber" | "createdAt"> = {
     firstName: "Bob",
     lastName: "Jones",
     employmentType: "full_time",
@@ -670,10 +672,11 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
   const arbDbEmployee = fc.record({
     id: fc.uuid(),
     org_id: fc.string({ minLength: 1 }),
+    employee_number: fc.integer({ min: 1, max: 99_999 }),
     first_name: fc.string({ minLength: 1 }),
     last_name: fc.string({ minLength: 1 }),
     employment_type: fc.constantFrom("full_time" as const, "part_time" as const),
-    status: fc.constantFrom("active" as const, "benched" as const, "terminated" as const),
+    status: fc.constantFrom("active" as const, "inactive" as const, "removed" as const),
     status_changed_at: fc.oneof(fc.constant(null as string | null), fc.constant("2026-01-01T00:00:00Z")),
     status_note: fc.string(),
     certification_id: fc.oneof(fc.constant(null as number | null), fc.integer({ min: 1 })),
@@ -688,6 +691,7 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     dept_admin_ids: fc.constant([] as number[]),
     archived_at: fc.constant(null as string | null),
     version: fc.constant(0),
+    created_at: fc.constant(null as string | null),
   });
 
   it("rowToEmployee(employeeToRow(rowToEmployee(row))) equals rowToEmployee(row)", () => {
@@ -700,10 +704,12 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
         const reconstructedRow = {
           ...employeeToRow(employee1, row.org_id),
           id: row.id,
+          employee_number: row.employee_number,
           status: row.status,
           status_changed_at: row.status_changed_at,
           status_note: row.status_note,
           archived_at: row.archived_at,
+          created_at: row.created_at,
         };
         const employee2 = rowToEmployee(reconstructedRow as DbEmployee);
         expect(employee2).toEqual(employee1);

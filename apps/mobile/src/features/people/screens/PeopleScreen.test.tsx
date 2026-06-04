@@ -385,7 +385,7 @@ describe("PeopleScreen", () => {
             lastName: "Lee",
             phone: "555-0101",
             email: "owen@dubgrid.com",
-            status: "benched",
+            status: "inactive",
             certificationId: null,
             focusAreaIds: [2],
             roleIds: [],

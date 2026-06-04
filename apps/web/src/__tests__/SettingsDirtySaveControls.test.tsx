@@ -113,6 +113,7 @@ const baseOrganization: Organization = {
   timezone: "America/Los_Angeles",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   dataRetentionDays: 90,
   featureOverrides: {},
   workspaceKind: "real",
@@ -636,7 +637,7 @@ describe("settings dirty save controls", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("coverage edit mode swaps Close for Discard without leaving the editor", async () => {
+  it("coverage edit mode reveals Discard alongside Save once a draft is dirty", async () => {
     const user = userEvent.setup();
     const focusArea = makeFocusArea({ id: 1, orgId: "org-1", name: "ICU" });
     const shiftCategory = makeShiftCategory({
@@ -705,33 +706,28 @@ describe("settings dirty save controls", () => {
     await user.click(coverageToggle!);
 
     const staffInput = await screen.findByRole("spinbutton");
-    const cancelButton = screen.getByRole("button", { name: /^close$/i });
     const saveButton = screen.getByRole("button", { name: /^save$/i });
 
     expect(
-      staffInput.compareDocumentPosition(cancelButton) &
+      staffInput.compareDocumentPosition(saveButton) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      cancelButton.compareDocumentPosition(saveButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: /^discard$/i }),
+    ).not.toBeInTheDocument();
 
     await user.clear(staffInput);
     await user.type(staffInput, "3");
+    const discardButton = screen.getByRole("button", { name: /^discard$/i });
+    expect(discardButton).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+      discardButton.compareDocumentPosition(saveButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: /^discard$/i }));
+    await user.click(discardButton);
 
     expect(screen.getByRole("spinbutton")).toHaveValue(2);
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^discard$/i }),
     ).not.toBeInTheDocument();

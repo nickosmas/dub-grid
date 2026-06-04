@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
@@ -19,6 +20,7 @@ import { SubdomainField } from "@/components/auth/SubdomainField";
 import Modal from "@/components/Modal";
 import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
+  exitSandbox,
   fetchAccessibleOrganizations,
   getBrowserAuthSession,
   refreshBrowserSession,
@@ -52,6 +54,38 @@ function useSessionInvalidToast() {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
+}
+
+// ── Account-disabled modal ─────────────────────────────────────────────────
+// Shown when /api/auth/login returns 403 with code ACCOUNT_DISABLED — the JWT
+// hook refuses terminated employees with a sentinel message that the route
+// translates into this structured response. A modal (not a toast) so the user
+// has to acknowledge it and there's no ambiguity with the generic 401 toast.
+
+function AccountDisabledModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="Account disabled" onClose={onClose} style={{ maxWidth: 400 }}>
+      <p
+        style={{
+          margin: "0 0 20px",
+          fontSize: "var(--dg-fs-body-sm)",
+          lineHeight: 1.5,
+          color: "var(--color-text-secondary)",
+        }}
+      >
+        This account has been disabled by your organization. Please contact your
+        administrator if you believe this is a mistake.
+      </p>
+      <button
+        type="button"
+        onClick={onClose}
+        className="dg-btn dg-btn-primary"
+        style={{ width: "100%" }}
+      >
+        OK
+      </button>
+    </Modal>
+  );
 }
 
 // ── Step 1: Domain selector (root domain) ─────────────────────────────────────
@@ -247,6 +281,7 @@ function GridmasterLogin() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [accountDisabled, setAccountDisabled] = useState(false);
 
   useSessionInvalidToast();
 
@@ -269,6 +304,12 @@ function GridmasterLogin() {
       if (!res.ok) {
         if (res.status === 429) {
           toast.error(extractErrorMessage(result.error, "Too many login attempts. Please try again later."));
+          setLoading(false);
+          return;
+        }
+        if (res.status === 403 && result.code === ACCOUNT_DISABLED_CODE) {
+          setAccountDisabled(true);
+          setPassword("");
           setLoading(false);
           return;
         }
@@ -406,6 +447,9 @@ function GridmasterLogin() {
           </a>
         </div>
       </Card>
+      {accountDisabled && (
+        <AccountDisabledModal onClose={() => setAccountDisabled(false)} />
+      )}
     </PageShell>
   );
 }
@@ -431,6 +475,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [accountDisabled, setAccountDisabled] = useState(false);
   // Seed from the ?name= param forwarded by the domain selector so the heading
   // renders the real org name on first paint (no "organization" flash). Falls back
   // to the slug for direct visits, then the fetch below corrects it.
@@ -476,6 +521,12 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
       if (!res.ok) {
         if (res.status === 429) {
           toast.error(extractErrorMessage(result.error, "Too many login attempts. Please try again later."));
+          setLoading(false);
+          return;
+        }
+        if (res.status === 403 && result.code === ACCOUNT_DISABLED_CODE) {
+          setAccountDisabled(true);
+          setPassword("");
           setLoading(false);
           return;
         }
@@ -564,6 +615,12 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
             // Non-fatal: never block sign-in on trial activation.
           }
         }
+
+        // A fresh login means the previous session ended. Wipe any sandbox left
+        // over from that session (involuntary logout / browser close that never
+        // ran the explicit exit) so stale sandbox data is never resumed.
+        // Fire-and-forget: never block or fail sign-in.
+        void exitSandbox().catch(() => {});
       }
 
       markAuthTransition();
@@ -638,6 +695,10 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               // Non-fatal: never block sign-in on trial activation.
             }
           }
+
+          // Fresh login = previous session ended. Wipe any leftover sandbox
+          // (involuntary logout / browser close) so stale data isn't resumed.
+          void exitSandbox().catch(() => {});
         }
 
         markAuthTransition();
@@ -732,6 +793,9 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
           </button>
         </div>
       </Card>
+      {accountDisabled && (
+        <AccountDisabledModal onClose={() => setAccountDisabled(false)} />
+      )}
     </PageShell>
   );
 }

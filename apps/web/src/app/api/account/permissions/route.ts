@@ -4,11 +4,30 @@ import { buildPerms, extractJwtClaims } from "@/features/permissions/shared";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
 function jsonError(message: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
+}
+
+// True when the caller's employees row in the effective org has status='inactive'.
+// Gridmaster + unlinked super_admin users have no employees row → returns false.
+// Removed users would normally have status='removed', but the JWT hook refuses
+// them at sign-in/refresh — they can't reach this endpoint.
+async function isCallerInactive(
+  serviceClient: SupabaseClient,
+  userId: string,
+  orgId: string,
+): Promise<boolean> {
+  const { data } = await serviceClient
+    .from("employees")
+    .select("status")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  return (data?.status as string | null) === "inactive";
 }
 
 export async function GET(req: NextRequest) {
@@ -49,11 +68,19 @@ export async function GET(req: NextRequest) {
 
     const { effectiveRole, orgId } = extractJwtClaims(auth.session.access_token);
 
+    // Gridmasters always have full access — they don't have an employees row in
+    // the org they're viewing. Super_admins likewise bypass the inactive check
+    // (they're the ones who'd be doing the deactivating, and the people page UI
+    // already prevents deactivating admin/super_admin roles).
     if (effectiveRole === "gridmaster" || effectiveRole === "super_admin") {
       return NextResponse.json({
         permissions: buildPerms(effectiveRole, orgId, false),
       });
     }
+
+    const inactive = orgId
+      ? await isCallerInactive(serviceClient, auth.user.id, orgId)
+      : false;
 
     if (effectiveRole === "admin" && orgId) {
       const { data } = await serviceClient
@@ -70,6 +97,8 @@ export async function GET(req: NextRequest) {
           orgId,
           false,
           (data?.admin_permissions as AdminPermissions | null) ?? null,
+          false,
+          inactive,
         ),
       });
     }
@@ -95,19 +124,25 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (membership) {
+        const profileInactive =
+          profile.org_id === orgId
+            ? inactive
+            : await isCallerInactive(serviceClient, auth.user.id, profile.org_id);
         return NextResponse.json({
           permissions: buildPerms(
             membership.org_role as OrganizationRole,
             profile.org_id,
             false,
             (membership.admin_permissions as AdminPermissions | null) ?? null,
+            false,
+            profileInactive,
           ),
         });
       }
     }
 
     return NextResponse.json({
-      permissions: buildPerms(effectiveRole, orgId, false),
+      permissions: buildPerms(effectiveRole, orgId, false, null, false, inactive),
     });
   } catch (error) {
     console.error("account permissions GET failed", error);

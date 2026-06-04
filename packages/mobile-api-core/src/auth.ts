@@ -12,7 +12,12 @@ import type {
   Organization,
   PlatformRole,
 } from "@dubgrid/domain";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
+import {
+  ACCOUNT_DISABLED_CODE,
+  ACCOUNT_DISABLED_MESSAGE,
+  evaluateOrganizationBillingAccess,
+  isAccountDisabledMessage,
+} from "@dubgrid/domain";
 import {
   createClient,
   type Factor,
@@ -89,11 +94,13 @@ export interface ResolvedMobileAuthContext<
 
 export class MobileApiRequestError extends Error {
   readonly status: number;
+  readonly code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = "MobileApiRequestError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -159,18 +166,37 @@ async function requireMobileOrganization(
 }
 
 async function signInMobileUser(
-  serviceClient: SupabaseClient,
+  authClient: SupabaseClient,
   input: MobileAuthLoginBody,
 ): Promise<{
   session: SignedInSession;
   user: User;
   mfaFactor: Factor<"totp", "verified"> | null;
 }> {
+  // Sign in on the per-request ephemeral client, never the shared service
+  // client. signInWithPassword sets a session on whatever client it runs on,
+  // which rewrites that client's PostgREST Authorization header to the user's
+  // token. The service client is a process-wide singleton reused for
+  // service-role reads/writes; signing in on it would silently downgrade every
+  // later service-role query to the last-logged-in user's RLS scope.
   const { data: authData, error: authError } =
-    await serviceClient.auth.signInWithPassword({
+    await authClient.auth.signInWithPassword({
       email: input.email,
       password: input.password,
     });
+
+  // The JWT hook refuses removed employees with a sentinel message. Surface
+  // it as a structured ACCOUNT_DISABLED error so the mobile UI can render a
+  // friendly disabled-account message instead of a generic invalid-credentials
+  // toast. The hook returns http_code 403; Supabase surfaces it on
+  // authError.status / authError.message.
+  if (authError && isAccountDisabledMessage(authError.message)) {
+    throw new MobileApiRequestError(
+      403,
+      ACCOUNT_DISABLED_MESSAGE,
+      ACCOUNT_DISABLED_CODE,
+    );
+  }
 
   if (
     authError ||
@@ -411,12 +437,25 @@ export async function resolveMobileAuthContext<
     );
   }
 
+  // Inactive employees keep their session but lose every manage capability —
+  // mirror the web behavior. Gridmaster mobile login is blocked earlier, so the
+  // only callers with no employees row are unlinked super_admins (kept as-is).
+  const { data: employeeRow } = await input.serviceClient
+    .from("employees")
+    .select("status")
+    .eq("user_id", user.id)
+    .eq("org_id", currentOrgId)
+    .maybeSingle();
+  const isInactive = (employeeRow?.status as string | null) === "inactive";
+
   return {
     accessToken: input.accessToken,
     user,
     claims,
     currentOrg,
-    permissions: buildPermissionContext(orgRole, currentOrgId, adminPermissions),
+    permissions: buildPermissionContext(orgRole, currentOrgId, adminPermissions, {
+      isInactive,
+    }),
     membership: {
       orgRole,
       adminPermissions,
@@ -443,22 +482,10 @@ export async function loginMobileUser(
     input.orgSlug,
   );
   const { session, user, mfaFactor } = await signInMobileUser(
-    serviceClient,
+    sessionClient,
     input,
   );
   await assertMobileProfileSupported(serviceClient, user.id);
-
-  const { error: setSessionError } = await sessionClient.auth.setSession({
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-  });
-
-  if (setSessionError) {
-    throw new MobileApiRequestError(
-      503,
-      "We could not finish signing you in right now.",
-    );
-  }
 
   const memberships = await loadMobileMemberships(sessionClient);
   const targetMembership = memberships.find(

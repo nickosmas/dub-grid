@@ -3,7 +3,11 @@
 import { useAuth } from "@/components/AuthProvider";
 import { useEffect, useRef } from "react";
 import AuthSplash from "@/components/AuthSplash";
-import { isAuthTransitionPending, consumeAuthTransition } from "@/lib/auth-transition";
+import {
+  isAuthTransitionPending,
+  useAuthTransitionPending,
+  consumeAuthTransition,
+} from "@/lib/auth-transition";
 
 /**
  * Wraps public (unauthenticated) routes such as /login.
@@ -22,6 +26,7 @@ export function PublicRoute({ children }: { children: React.ReactNode }) {
  */
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const authTransitionPending = useAuthTransitionPending();
   // Wall-clock deadline for the "session never materialized" bounce (L-5).
   // Stored in a ref so auth state flapping ([isLoading,user]) during the settle
   // doesn't keep resetting the timeout past the intended 6s hard cap.
@@ -57,7 +62,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   // Bridge a login navigation with the branded splash; otherwise render nothing
   // (a sign-out redirects to /login instantly — no logo flash).
   if (isLoading || !user) {
-    return isAuthTransitionPending() ? <AuthSplash /> : null;
+    return authTransitionPending ? <AuthSplash /> : null;
   }
 
   return <>{children}</>;

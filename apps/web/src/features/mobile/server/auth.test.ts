@@ -36,11 +36,13 @@ function createThenableQuery(result: unknown) {
     select: ReturnType<typeof vi.fn>;
     eq: ReturnType<typeof vi.fn>;
     is: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
     then: Promise<unknown>["then"];
   } = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     is: vi.fn(() => Promise.resolve(result)),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: Promise.resolve(result).then.bind(Promise.resolve(result)),
   };
 

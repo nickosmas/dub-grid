@@ -54,7 +54,7 @@ function makeAuth(linkedUserId: string) {
 }
 
 describe("updateMobilePersonStatus self-action guard", () => {
-  it("rejects bench on self with self_action_forbidden", async () => {
+  it("rejects deactivate on self with self_action_forbidden", async () => {
     const employee = makeEmployee({ userId: "user-self" });
     const deps = makeDeps(employee);
 
@@ -62,7 +62,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
       makeAuth("user-self"),
       {
         employeeId: "emp-1",
-        body: { action: "bench", expectedVersion: 0, note: "" },
+        body: { action: "deactivate", expectedVersion: 0, note: "" },
         requestIp: null,
         userAgent: null,
       },
@@ -73,7 +73,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
     expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
   });
 
-  it("rejects terminate on self with self_action_forbidden", async () => {
+  it("rejects remove on self with self_action_forbidden", async () => {
     const employee = makeEmployee({ userId: "user-self" });
     const deps = makeDeps(employee);
 
@@ -81,7 +81,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
       makeAuth("user-self"),
       {
         employeeId: "emp-1",
-        body: { action: "terminate", expectedVersion: 0 },
+        body: { action: "remove", expectedVersion: 0 },
         requestIp: null,
         userAgent: null,
       },
@@ -92,12 +92,12 @@ describe("updateMobilePersonStatus self-action guard", () => {
     expect(deps.updateEmployeeStatus).not.toHaveBeenCalled();
   });
 
-  it("allows bench on another user", async () => {
+  it("allows deactivate on another user", async () => {
     const employee = makeEmployee({ userId: "user-other" });
     const deps = makeDeps(employee);
     deps.updateEmployeeStatus.mockResolvedValue({
       ...employee,
-      status: "benched",
+      status: "inactive",
       version: 1,
     });
 
@@ -105,7 +105,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
       makeAuth("user-self"),
       {
         employeeId: "emp-1",
-        body: { action: "bench", expectedVersion: 0, note: "" },
+        body: { action: "deactivate", expectedVersion: 0, note: "" },
         requestIp: null,
         userAgent: null,
       },
@@ -117,7 +117,7 @@ describe("updateMobilePersonStatus self-action guard", () => {
   });
 
   it("rejects activate on self with self_action_forbidden", async () => {
-    const employee = makeEmployee({ userId: "user-self", status: "benched" });
+    const employee = makeEmployee({ userId: "user-self", status: "inactive" });
     const deps = makeDeps(employee);
 
     const result = await updateMobilePersonStatus(

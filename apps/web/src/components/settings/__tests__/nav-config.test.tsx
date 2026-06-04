@@ -26,20 +26,19 @@ describe("settings nav config", () => {
 
     const organizationGroup = groups.find((group) => group.id === "organization");
     const staffGroup = groups.find((group) => group.id === "staff");
+    const activityGroup = groups.find((group) => group.id === "activity");
 
     expect(organizationGroup?.items.map((item) => item.id)).toEqual([
       "org-general",
       "org-billing",
       "org-labels",
       "staff-departments",
-      "org-activity",
     ]);
     expect(organizationGroup?.items.map((item) => item.label)).toEqual([
       "Organization Details",
       "Billing",
       "Customization",
       "Departments",
-      "Activity Log",
     ]);
     expect(
       organizationGroup?.items.find((item) => item.id === "staff-departments")?.description,
@@ -50,6 +49,7 @@ describe("settings nav config", () => {
       "staff-roles",
       "staff-certifications",
     ]);
+    expect(activityGroup?.items.map((item) => item.id)).toEqual(["org-activity"]);
   });
 
   it("exposes the activity log and danger zone to super admins only", () => {

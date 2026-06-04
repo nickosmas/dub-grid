@@ -6,7 +6,7 @@ import {
 } from "@dubgrid/contracts";
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import type { AssignableOrganizationRole } from "@/types";
@@ -31,6 +31,9 @@ const postSchema = z.object({
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
@@ -115,6 +118,59 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("organization invitation create POST failed", error);
+    // Surface the known send_invitation RPC errors with friendly messages
+    // and correct status codes. Anything we don't recognize falls through
+    // to a generic 500 so we don't leak internals.
+    const rawMessage =
+      typeof error === "object" && error !== null && "message" in error
+        ? String((error as { message?: unknown }).message ?? "")
+        : "";
+    const text = rawMessage.toLowerCase();
+    if (text.includes("user is already a member")) {
+      return NextResponse.json(
+        {
+          error:
+            "That user is already a member of this organization. Open their existing record to update their access.",
+        },
+        { status: 409 },
+      );
+    }
+    if (text.includes("active invitation already exists")) {
+      return NextResponse.json(
+        {
+          error:
+            "An invitation has already been sent to that email and is still pending. Revoke or resend the existing invitation instead.",
+        },
+        { status: 409 },
+      );
+    }
+    if (text.includes("employee not found")) {
+      return NextResponse.json(
+        { error: "The selected employee record no longer exists." },
+        { status: 404 },
+      );
+    }
+    if (text.includes("employee already has a linked user")) {
+      return NextResponse.json(
+        {
+          error:
+            "That employee record is already linked to a user account.",
+        },
+        { status: 409 },
+      );
+    }
+    if (text.includes("organization not found or archived")) {
+      return NextResponse.json(
+        { error: "This organization is no longer available." },
+        { status: 404 },
+      );
+    }
+    if (text.includes("unauthorized")) {
+      return NextResponse.json(
+        { error: "You don't have permission to send invitations here." },
+        { status: 403 },
+      );
+    }
     return NextResponse.json(
       { error: "Failed to create invitation" },
       { status: 500 },

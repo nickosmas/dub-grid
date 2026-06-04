@@ -71,6 +71,12 @@ async function loadMobilePerson(
       managementMembership?.dept_admin_ids ??
       pendingInvitation?.dept_admin_ids ??
       [],
+    orgRole: (() => {
+      const role = managementMembership?.org_role;
+      return role === "super_admin" || role === "admin" || role === "user"
+        ? role
+        : null;
+    })(),
     pendingInvitation: pendingInvitation
       ? {
           id: pendingInvitation.id,
@@ -183,9 +189,9 @@ export async function PATCH(
   if (!currentPerson) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
-  if (currentPerson.status === "terminated") {
+  if (currentPerson.status === "removed") {
     return NextResponse.json(
-      { error: "Terminated employees cannot be edited." },
+      { error: "Removed employees can't be edited." },
       { status: 400 },
     );
   }

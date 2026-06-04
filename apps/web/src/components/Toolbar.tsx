@@ -470,7 +470,7 @@ export default function Toolbar({
               </svg>
               <input
                 type="text"
-                placeholder="Find staff…"
+                placeholder="Search staff…"
                 value={staffSearch}
                 onChange={(e) => onStaffSearchChange(e.target.value)}
                 className="dg-input"
@@ -708,7 +708,7 @@ export default function Toolbar({
           </svg>
           <input
             type="text"
-            placeholder="Find staff…"
+            placeholder="Search staff…"
             value={staffSearch}
             onChange={(e) => onStaffSearchChange(e.target.value)}
             className="dg-input"

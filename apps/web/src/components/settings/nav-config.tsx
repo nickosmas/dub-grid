@@ -98,7 +98,6 @@ export function buildNavGroups(
     if (perms.isSuperAdmin || perms.isGridmaster) orgItems.push({ id: "org-billing", label: "Billing", icon: iconBilling, helpHint: "Seats are based on active organization users, not employees.", description: "Review subscription status, seats, and Stripe billing access." });
     if (perms.isSuperAdmin || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "org-labels", label: "Customization", icon: iconLabels, helpHint: "Labels rename visible wording across DubGrid but do not change behavior.", description: "Customize the terminology used in your organization. For example, rename 'Focus Areas' to 'Wings' or 'Units'." });
     if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) orgItems.push({ id: "staff-departments", label: "Departments", icon: iconDepartment, helpHint: "Scheduled departments drive the grid; management departments are app-only.", description: "Includes scheduled departments for the grid and management departments for app-only staff." });
-    if (perms.isSuperAdmin) orgItems.push({ id: "org-activity", label: "Activity Log", icon: iconActivity, helpHint: "A record of changes made across your organization.", description: "Review the audit trail of role, membership, billing, and configuration changes across your organization." });
     if (orgItems.length > 0) groups.push({ id: "organization", label: "Organization", items: orgItems });
   }
 
@@ -127,6 +126,16 @@ export function buildNavGroups(
       label: "Platform",
       items: [
         { id: "platform-impersonation", label: "Impersonation", icon: iconImpersonate, description: "Temporarily access an organization's account as any of its users for support or debugging." },
+      ],
+    });
+  }
+
+  if (perms.isSuperAdmin) {
+    groups.push({
+      id: "activity",
+      label: "Activity",
+      items: [
+        { id: "org-activity", label: "Activity Log", icon: iconActivity, helpHint: "A record of changes made across your organization.", description: "Review the audit trail of role, membership, billing, and configuration changes across your organization." },
       ],
     });
   }

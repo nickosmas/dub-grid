@@ -152,6 +152,12 @@ export default function SettingsPage({
     roleLabel,
   }), [perms, focusAreaLabel, certificationLabel, roleLabel]);
 
+  // "activity" and "danger" pin to the sidebar footer (above the collapse button)
+  // rather than scrolling with the rest of the nav.
+  const FOOTER_GROUP_IDS = ["activity", "danger"];
+  const contentGroups = useMemo(() => navGroups.filter(g => !FOOTER_GROUP_IDS.includes(g.id)), [navGroups]);
+  const footerGroups = useMemo(() => navGroups.filter(g => FOOTER_GROUP_IDS.includes(g.id)), [navGroups]);
+
   const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
   const sectionFromPath = resolveSection(searchParams.get("section"));
@@ -199,7 +205,7 @@ export default function SettingsPage({
         {!isMobile && (
           <Sidebar data-tour="settings-sidebar" collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }}>
             <SidebarContent className="pt-2 overscroll-contain">
-              {navGroups.map((group) => (
+              {contentGroups.map((group) => (
                 <SidebarGroup key={group.id}>
                   <SidebarGroupLabel
                     className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0"
@@ -229,6 +235,29 @@ export default function SettingsPage({
               ))}
             </SidebarContent>
             <SidebarFooter>
+              {footerGroups.map((group) => (
+                <SidebarGroup key={group.id} className="p-0">
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={item.id}>
+                          <SidebarMenuButton
+                            render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
+                            isActive={activeSection === item.id}
+                            tooltip={item.label}
+                            className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                          >
+                            <span className={activeSection === item.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                              {item.icon}
+                            </span>
+                            <span className="font-semibold">{item.label}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              ))}
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -237,12 +266,12 @@ export default function SettingsPage({
                     className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
                   >
                     <span className="flex shrink-0 items-center justify-center">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
                         <polyline points="13 17 18 12 13 7" />
                         <polyline points="6 17 11 12 6 7" />
                       </svg>
                     </span>
-                    <span className="font-semibold ml-2">Collapse Menu</span>
+                    <span className="font-semibold">Collapse Menu</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

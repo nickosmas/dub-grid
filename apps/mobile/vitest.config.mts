@@ -93,6 +93,12 @@ export default defineConfig(async () => {
           find: /^@expo\/vector-icons(\/.*)?$/,
           replacement: path.resolve(__dirname, "./src/test/shims/vector-icons.tsx"),
         },
+        // expo-linear-gradient's native color processing can't be parsed by
+        // vitest; render a plain View stub instead.
+        {
+          find: /^expo-linear-gradient$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/expo-linear-gradient.tsx"),
+        },
       ],
     },
     test: {

@@ -56,6 +56,7 @@ import {
   buildActivityFeed,
   computeCoverageTrendData,
 } from "@/lib/dashboard-stats";
+import { getScheduleStartForSpan } from "@/lib/schedule-view";
 
 export type ViewMode = "day" | "week" | "2weeks";
 
@@ -64,6 +65,7 @@ import UserDashboard from "./UserDashboard";
 import AdminDashboard from "./AdminDashboard";
 import SuperAdminDashboard from "./SuperAdminDashboard";
 import { EmptyState } from "@/components/EmptyState";
+import DashboardGreeting from "./DashboardGreeting";
 import DashboardHero from "./DashboardHero";
 import DashboardChecklist from "./DashboardChecklist";
 import DashboardLoading from "./DashboardLoading";
@@ -99,6 +101,11 @@ type ExpandedPanel =
   | null;
 
 export type DashboardRoleVariant = "user" | "admin" | "super-admin";
+
+// On the user dashboard the hero highlights your current/next shift, which may
+// fall outside the period being browsed. Always load this many days forward
+// from today so the hero can find the genuine next upcoming shift.
+const HERO_LOOKAHEAD_DAYS = 21;
 
 interface DashboardViewProps {
   org: Organization;
@@ -218,22 +225,53 @@ export default function DashboardView({
 
   // ─── View mode + period navigation ─────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("week");
-  const effectiveViewMode = isUserDashboardMode ? "week" : viewMode;
+  // The user dashboard is built around a multi-day schedule view, so it offers
+  // Week and 2 Weeks only (no Day); any other selection falls back to Week.
+  const effectiveViewMode = isUserDashboardMode
+    ? viewMode === "2weeks"
+      ? "2weeks"
+      : "week"
+    : viewMode;
   const periodDays =
     effectiveViewMode === "day" ? 1 : effectiveViewMode === "2weeks" ? 14 : 7;
   const periodLabel = getDashboardPeriodLabel(effectiveViewMode);
   const overtimeThreshold = getDashboardOvertimeThreshold(periodDays);
 
+  // The 2-week view aligns to the org's biweekly pay-period anchor (when set),
+  // matching the schedule page, so it shows the full published pay period
+  // rather than an arbitrary "current week + next week" window.
+  const payPeriodStartDate = org.payPeriodStartDate ?? null;
+  const alignPeriodStart = useCallback(
+    (date: Date, mode: ViewMode): Date => {
+      if (mode === "day") {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      if (mode === "2weeks") {
+        return getScheduleStartForSpan({ date, span: 2, payPeriodStartDate });
+      }
+      return getWeekStart(date);
+    },
+    [payPeriodStartDate],
+  );
+
   const [periodStart, setPeriodStart] = useState<Date>(() =>
     getWeekStart(new Date()),
   );
   const currentTime = useMinuteNow();
+  // Day-granular "today" key: changes only at midnight, so it can drive the
+  // fetch window / hero look-ahead without re-running every minute.
+  const todayKey = formatDateKey(currentTime);
 
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    // Snap to appropriate start when changing modes
-    setPeriodStart((d) => (mode === "day" ? d : getWeekStart(d)));
-  }, []);
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode);
+      // Snap to the aligned start for the new mode (pay period for 2 weeks).
+      setPeriodStart((d) => alignPeriodStart(d, mode));
+    },
+    [alignPeriodStart],
+  );
 
   const periodEnd = useMemo(
     () => addDays(periodStart, periodDays - 1),
@@ -287,17 +325,8 @@ export default function DashboardView({
     [periodDays],
   );
   const handleToday = useCallback(() => {
-    const now = new Date();
-    setPeriodStart(
-      effectiveViewMode === "day"
-        ? (() => {
-            const d = new Date(now);
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })()
-        : getWeekStart(now),
-    );
-  }, [effectiveViewMode]);
+    setPeriodStart(alignPeriodStart(new Date(), effectiveViewMode));
+  }, [alignPeriodStart, effectiveViewMode]);
 
   // ─── Data fetching ──────────────────────────────────────
   const [allShifts, setAllShifts] = useState<ShiftMap>({});
@@ -337,9 +366,18 @@ export default function DashboardView({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShiftsLoading(true);
 
-    // Fetch only the date range needed: previous period start → current period end
-    const fetchStart = formatDateKey(prevPeriodStart);
-    const fetchEnd = formatDateKey(periodEnd);
+    // Fetch the date range needed: previous period start → current period end.
+    // On the user dashboard the window is widened to always cover
+    // [today, today + HERO_LOOKAHEAD_DAYS] as well, so the hero can surface the
+    // next upcoming shift even when it falls outside the period being browsed.
+    const today = new Date(`${todayKey}T00:00:00`);
+    const lookaheadEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
+    const fetchStart = formatDateKey(
+      isUserDashboardMode && today < prevPeriodStart ? today : prevPeriodStart,
+    );
+    const fetchEnd = formatDateKey(
+      isUserDashboardMode && lookaheadEnd > periodEnd ? lookaheadEnd : periodEnd,
+    );
     Promise.all([
       fetchShifts(
         orgId,
@@ -376,6 +414,8 @@ export default function DashboardView({
   }, [
     orgId,
     isScheduler,
+    isUserDashboardMode,
+    todayKey,
     periodEnd,
     periodEndKey,
     periodStartKey,
@@ -893,20 +933,42 @@ export default function DashboardView({
   ]);
 
   // ─── Render ─────────────────────────────────────────────
+  // On a wide enough viewport the user dashboard becomes a fixed two-pane
+  // layout: the page itself never scrolls, and each pane scrolls on its own.
+  const userLockLayout = isUserDashboardMode && !isMobile && !isTablet;
   const contentStyle = {
-    padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px",
-    maxWidth: 1300,
+    // In the locked layout each pane owns its scroll, so the outer padding is
+    // dropped: content scrolls flush under the sticky header and runs to the
+    // bottom edge. The panes carry their own padding (incl. horizontal, so card
+    // borders/shadows aren't clipped by the scroll container's edge). A small
+    // outer gutter keeps the panes off the very screen edge.
+    padding: userLockLayout
+      ? "0 24px"
+      : isMobile
+        ? "16px"
+        : isTablet
+          ? "24px"
+          : "32px 40px",
+    maxWidth: isUserDashboardMode ? 1560 : 1300,
     margin: "0 auto",
+    width: "100%" as const,
+    boxSizing: "border-box" as const,
     display: "flex" as const,
     flexDirection: "column" as const,
     gap: "var(--dg-space-xl)",
+    ...(userLockLayout
+      ? { flex: 1, minHeight: 0, overflow: "hidden" as const }
+      : {}),
   };
 
   const headerProps = {
     periodStart,
     periodEnd,
     viewMode: effectiveViewMode,
-    showViewModeTabs: !isUserDashboardMode,
+    showViewModeTabs: true,
+    availableViewModes: isUserDashboardMode
+      ? (["week", "2weeks"] as ViewMode[])
+      : undefined,
     onPrev: handlePrev,
     onNext: handleNext,
     onToday: handleToday,
@@ -982,16 +1044,48 @@ export default function DashboardView({
   }
 
   return (
-    <div style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+    <div
+      style={{
+        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        ...(userLockLayout
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              height: "calc(100vh - var(--app-shell-header-h, 56px))",
+              overflow: "hidden",
+            }
+          : {}),
+      }}
+    >
       {/* Sticky toolbar */}
-      <div className="no-print" style={stickyBarStyle}>
-        <div style={toolbarContainerStyle}>
+      <div
+        className="no-print"
+        style={
+          userLockLayout
+            ? { ...toolbarContainerStyle, flexShrink: 0 }
+            : stickyBarStyle
+        }
+      >
+        {userLockLayout ? (
           <DashboardHeader {...headerProps} />
-        </div>
+        ) : (
+          <div style={toolbarContainerStyle}>
+            <DashboardHeader {...headerProps} />
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div data-tour="dashboard-cards" style={contentStyle}>
+        <DashboardGreeting
+          name={
+            currentEmployee?.firstName?.trim() ||
+            authUser?.email?.split("@")[0] ||
+            null
+          }
+          now={currentTime}
+        />
+
         {!isUserDashboardMode && (
           <DashboardHero
             headline={heroSummary.title}

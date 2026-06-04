@@ -1,4 +1,9 @@
 import type { Organization, ShiftDisplayMode } from "@/types";
+import type {
+  OpenShiftVisibility,
+  OpenShiftVisibilityMode,
+} from "@dubgrid/domain";
+import { DEFAULT_OPEN_SHIFT_VISIBILITY } from "@dubgrid/domain";
 import { formatTimezoneLabel } from "@/lib/timezones";
 
 export type OrganizationSettingsKey =
@@ -18,6 +23,7 @@ export type OrganizationSettingsKey =
   | "shiftDisplayMode"
   | "enforceConflictPrevention"
   | "coverageRuleConfig"
+  | "openShiftVisibility"
   | "payPeriodStartDate"
   | "dataRetentionDays"
   | "featureOverrides";
@@ -28,7 +34,8 @@ type OrganizationSettingsValue =
   | boolean
   | null
   | { mentoredCoverageCreditPercent: number }
-  | Record<string, boolean | number>;
+  | OpenShiftVisibility
+  | Record<string, boolean | number | string>;
 
 export type OrganizationSettingsEditable = Pick<
   Organization,
@@ -57,6 +64,13 @@ const SHIFT_DISPLAY_MODE_LABELS: Record<ShiftDisplayMode, string> = {
 };
 
 const DEFAULT_EMPTY = "Not set";
+
+const OPEN_SHIFT_VISIBILITY_MODE_LABELS: Record<OpenShiftVisibilityMode, string> =
+  {
+    hidden: "Hidden",
+    matched: "When it fits availability",
+    always: "Always",
+  };
 
 const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
   name: { label: "Organization Name", sensitive: true },
@@ -100,9 +114,17 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     label: "Coverage Rules",
     sensitive: true,
     format: (value) =>
-      value && typeof value === "object" && !Array.isArray(value)
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "mentoredCoverageCreditPercent" in value
         ? `Mentored coverage: ${Number(value.mentoredCoverageCreditPercent ?? 100)}%`
         : DEFAULT_EMPTY,
+  },
+  openShiftVisibility: {
+    label: "Open Shift Visibility",
+    sensitive: true,
+    format: (value) => formatOpenShiftVisibility(value),
   },
   dataRetentionDays: {
     label: "Data Retention",
@@ -142,6 +164,8 @@ export function pickOrganizationSettings(
     enforceConflictPrevention: organization.enforceConflictPrevention,
     coverageRuleConfig:
       organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
+    openShiftVisibility:
+      organization.openShiftVisibility ?? DEFAULT_OPEN_SHIFT_VISIBILITY,
     payPeriodStartDate: organization.payPeriodStartDate,
     dataRetentionDays: organization.dataRetentionDays,
     featureOverrides: organization.featureOverrides ?? {},
@@ -158,7 +182,10 @@ function normalizeValue(value: OrganizationSettingsValue): OrganizationSettingsV
       Object.entries(value)
         .sort()
         .map(([key, entry]) => {
-          return [key, typeof entry === "number" ? entry : Boolean(entry)];
+          if (typeof entry === "number" || typeof entry === "string") {
+            return [key, entry];
+          }
+          return [key, Boolean(entry)];
         }),
     );
   }
@@ -187,6 +214,23 @@ function defaultFormat(value: OrganizationSettingsValue): string {
   if (typeof value === "number") return String(value);
   if (typeof value === "boolean") return value ? "Enabled" : "Disabled";
   return typeof value === "string" && value ? value : DEFAULT_EMPTY;
+}
+
+function isOpenShiftVisibility(
+  value: OrganizationSettingsValue,
+): value is OpenShiftVisibility {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "coverageGap" in value &&
+    "calloff" in value
+  );
+}
+
+function formatOpenShiftVisibility(value: OrganizationSettingsValue): string {
+  if (!isOpenShiftVisibility(value)) return DEFAULT_EMPTY;
+  return `Coverage shortages: ${OPEN_SHIFT_VISIBILITY_MODE_LABELS[value.coverageGap]} · Call-offs: ${OPEN_SHIFT_VISIBILITY_MODE_LABELS[value.calloff]}`;
 }
 
 function formatFeatureOverrides(value: OrganizationSettingsValue): string {

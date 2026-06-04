@@ -257,7 +257,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
     marginBottom: 4,
   };
 
-  const canEdit = employee.status === "active" || employee.status === "benched";
+  const canEdit = employee.status === "active" || employee.status === "inactive";
   const readOnly = !canEdit;
 
   return (

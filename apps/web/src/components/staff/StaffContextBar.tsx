@@ -5,7 +5,6 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import type {
   AccountLinkFilter,
   ContactPresenceFilter,
-  EmployeeTab,
   EmploymentTypeFilter,
 } from "./useStaffFilters";
 
@@ -43,14 +42,13 @@ interface StaffContextBarProps {
   // Bulk selection
   selectionCount: number;
   selectedIds: Set<string>;
-  activeTab: EmployeeTab;
   canManageEmployees: boolean;
   displayList: Employee[];
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onBulkInvite: (employees: Employee[]) => void;
-  onBulkBench: (ids: string[]) => void;
+  onBulkDeactivate: (ids: string[]) => void;
   onBulkActivate: (ids: string[]) => void;
-  onBulkTerminate: (ids: string[]) => void;
+  onBulkRemove: (ids: string[]) => void;
   onClearSelection: () => void;
   // Reorder
   isReordering: boolean;
@@ -90,14 +88,13 @@ export function StaffContextBar({
   departmentLabel,
   selectionCount,
   selectedIds,
-  activeTab,
   canManageEmployees,
   displayList,
   pendingInviteByEmployeeId,
   onBulkInvite,
-  onBulkBench,
+  onBulkDeactivate,
   onBulkActivate,
-  onBulkTerminate,
+  onBulkRemove,
   onClearSelection,
   isReordering,
   isDirty,
@@ -140,12 +137,21 @@ export function StaffContextBar({
         : null;
 
   // Bulk action helpers
-  const invitableEmployees =
-    showBulk && activeTab === "active"
-      ? displayList.filter(
-          (e) => selectedIds.has(e.id) && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id),
-        )
-      : [];
+  const selectedEmployees = showBulk
+    ? displayList.filter((e) => selectedIds.has(e.id))
+    : [];
+  const invitableEmployees = selectedEmployees.filter(
+    (e) => e.status === "active" && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id),
+  );
+  const deactivatableIds = selectedEmployees
+    .filter((e) => e.status === "active")
+    .map((e) => e.id);
+  const activatableIds = selectedEmployees
+    .filter((e) => e.status === "inactive" || e.status === "removed")
+    .map((e) => e.id);
+  const removableIds = selectedEmployees
+    .filter((e) => e.status === "active" || e.status === "inactive")
+    .map((e) => e.id);
 
   return (
     <div
@@ -194,19 +200,21 @@ export function StaffContextBar({
               Invite ({invitableEmployees.length})
             </button>
           )}
-          {activeTab === "active" && (
-            <button onClick={() => onBulkBench([...selectedIds])} className="dg-btn dg-btn-secondary dg-btn-sm">
-              Bench
+          {activatableIds.length > 0 && (
+            <button onClick={() => onBulkActivate(activatableIds)} className="dg-btn dg-btn-secondary dg-btn-sm">
+              Activate{activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
             </button>
           )}
-          {activeTab === "benched" && (
-            <button onClick={() => onBulkActivate([...selectedIds])} className="dg-btn dg-btn-secondary dg-btn-sm">
-              Activate
+          {deactivatableIds.length > 0 && (
+            <button onClick={() => onBulkDeactivate(deactivatableIds)} className="dg-btn dg-btn-secondary dg-btn-sm">
+              Deactivate{deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
             </button>
           )}
-          <button onClick={() => onBulkTerminate([...selectedIds])} className="dg-btn dg-btn-danger dg-btn-sm">
-            Terminate
-          </button>
+          {removableIds.length > 0 && (
+            <button onClick={() => onBulkRemove(removableIds)} className="dg-btn dg-btn-danger dg-btn-sm">
+              Remove{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
+            </button>
+          )}
           <button onClick={onClearSelection} className="dg-btn dg-btn-secondary dg-btn-sm">
             Cancel
           </button>
@@ -253,13 +261,15 @@ export function StaffContextBar({
   );
 }
 
+// Applied-filter chip: matches <StatusPill>'s neutral tone + adds a close affordance.
 function FilterPill({ label, onClear }: { label: string; onClear: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[var(--color-bg-secondary)] text-xs font-semibold text-[var(--color-text-secondary)]">
+    <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
       {label}
       <button
         onClick={onClear}
         className="ml-0.5 p-0.5 rounded-sm text-[var(--color-text-faint)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)] transition-colors cursor-pointer"
+        aria-label={`Clear ${label}`}
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
           <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />

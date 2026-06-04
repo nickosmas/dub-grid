@@ -2688,7 +2688,7 @@ export type Database = {
     Enums: {
       department_type: "scheduled" | "management"
       employee_employment_type: "full_time" | "part_time"
-      employee_status: "active" | "benched" | "terminated"
+      employee_status: "active" | "inactive" | "removed"
       org_role: "super_admin" | "admin" | "user"
       platform_role: "gridmaster" | "none"
       profile_change_request_status:
@@ -2838,7 +2838,7 @@ export const Constants = {
     Enums: {
       department_type: ["scheduled", "management"],
       employee_employment_type: ["full_time", "part_time"],
-      employee_status: ["active", "benched", "terminated"],
+      employee_status: ["active", "inactive", "removed"],
       org_role: ["super_admin", "admin", "user"],
       platform_role: ["gridmaster", "none"],
       profile_change_request_status: [

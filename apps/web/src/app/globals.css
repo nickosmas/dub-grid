@@ -245,6 +245,36 @@ textarea {
   filter: brightness(0.9);
 }
 
+/* Buttons that sit ON a solid danger surface (e.g. the sandbox banner).
+   Solid = filled inverse with danger text; outline = inverse border/text. */
+.dg-btn-on-danger-solid {
+  background: var(--color-text-inverse);
+  color: var(--color-danger);
+  border: 1px solid var(--color-text-inverse);
+}
+
+.dg-btn-on-danger-solid:hover {
+  filter: brightness(0.92);
+}
+
+.dg-btn-on-danger-solid:active {
+  filter: brightness(0.85);
+}
+
+.dg-btn-on-danger-outline {
+  background: transparent;
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-text-inverse);
+}
+
+.dg-btn-on-danger-outline:hover {
+  background: color-mix(in srgb, var(--color-text-inverse) 18%, transparent);
+}
+
+.dg-btn-on-danger-outline:active {
+  background: color-mix(in srgb, var(--color-text-inverse) 28%, transparent);
+}
+
 /* Warning filled (bench/attention CTA) */
 .dg-btn-warning-filled {
   background: var(--color-warning);
@@ -476,6 +506,16 @@ textarea {
   display: none;
 }
 
+/* Hide scrollbars while keeping scroll behaviour (Firefox, IE, WebKit) */
+.dg-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dg-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Fade overlays — hidden by default, shown via .visible */
 .dg-scroll-fade {
   position: absolute;
@@ -698,21 +738,21 @@ textarea {
 .dg-staff-directory-header,
 .dg-staff-directory-row {
   display: grid;
-  grid-template-columns: 60px minmax(0, 1fr) 40px;
+  grid-template-columns: 100px minmax(0, 1fr) 110px 110px 40px;
   align-items: stretch;
 }
 
 @media (min-width: 768px) {
   .dg-staff-directory-header,
   .dg-staff-directory-row {
-    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) 40px;
+    grid-template-columns: 100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr) 40px;
   }
 }
 
 @media (min-width: 1024px) {
   .dg-staff-directory-header,
   .dg-staff-directory-row {
-    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 40px;
+    grid-template-columns: 100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
   }
 }
 
@@ -772,10 +812,77 @@ textarea {
 .dg-staff-directory-cell {
   align-items: center;
   min-width: 0;
+  padding-inline: 16px;
+}
+
+/* Headers share the cell padding so column labels line up with cell content. */
+.dg-staff-directory-head-cell {
+  padding-inline: 16px;
+}
+
+/* Vertical dividers between visible columns. The rightmost data cell at
+   each breakpoint drops its right border so the row doesn't end with a
+   hanging line before the empty chevron / utility column. */
+.dg-staff-directory-head-cell:not(:last-child),
+.dg-staff-directory-cell:not(:last-child) {
+  border-right: 1px solid var(--color-border-light);
+}
+
+/* Base (<md): Status (col 4) is the rightmost visible data column. */
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
+  border-right: none;
+}
+
+@media (min-width: 768px) {
+  /* md: Status regains its divider; Certification (col 6) is now rightmost. */
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
+    border-right: 1px solid var(--color-border-light);
+  }
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+    border-right: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* lg: Certification regains its divider; Date Joined (col 10) is the rightmost. */
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+    border-right: 1px solid var(--color-border-light);
+  }
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
+    border-right: none;
+  }
+}
+
+/* Outer column gutters (24px) match the table-mode `pl-6` / `pr-6` so reorder mode aligns with normal mode. */
+.dg-staff-directory-cell--rank,
+.dg-staff-directory-head-cell:first-child {
+  padding-left: 24px;
+}
+
+.dg-staff-directory-cell--chevron,
+.dg-staff-directory-head-cell:last-child {
+  padding-right: 24px;
 }
 
 .dg-staff-directory-cell--rank {
-  width: 60px;
+  width: 100px;
+}
+
+.dg-staff-directory-cell--employment {
+  width: 110px;
+}
+
+.dg-staff-directory-cell--status {
+  width: 110px;
+}
+
+.dg-staff-directory-cell--date-joined {
+  width: 140px;
 }
 
 .dg-staff-directory-cell--name {

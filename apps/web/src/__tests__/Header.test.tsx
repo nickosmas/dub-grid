@@ -1,11 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import Header from "@/components/Header";
 import { fetchOrganizationBilling } from "@/features/billing/client";
+import { exitSandbox } from "@/features/account/client";
+import { queryKeys } from "@/lib/query-keys";
 
-const mockSignOut = vi.fn();
+const mockSignOut = vi.fn().mockResolvedValue(undefined);
+const mockSetUserViewActive = vi.fn();
 let mockPathname = "/schedule";
+let mockAuthUser: { id: string; email: string } | null = null;
 
 const mockPermissions = {
   role: "admin",
@@ -35,13 +40,26 @@ const mockPermissions = {
 vi.mock("@/hooks", () => ({
   usePermissions: () => mockPermissions,
   useLogout: () => ({ signOutLocal: mockSignOut }),
+  setUserViewActive: (active: boolean) => mockSetUserViewActive(active),
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
   TABLET: "(min-width: 768px) and (max-width: 1024px)",
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
-  useAuth: () => ({ user: null, signOut: vi.fn(), isLoading: false }),
+  useAuth: () => ({ user: mockAuthUser, signOut: vi.fn(), isLoading: false }),
+}));
+
+vi.mock("@/features/organization/client/api", () => ({
+  fetchOrganizationBootstrap: vi.fn().mockResolvedValue({
+    org: { workspaceKind: "real" },
+  }),
+}));
+
+// NotificationBell starts a realtime subscription once a user is present; stub
+// it so the sandbox sign-out tests (which set a user) don't hit realtime.
+vi.mock("@/components/NotificationBell", () => ({
+  default: () => null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -63,18 +81,29 @@ vi.mock("@/features/account/client", () => ({
     orgSlug: null,
     hasOrganizationMembership: false,
   }),
+  exitSandbox: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 vi.mock("@/features/billing/client", () => ({
   fetchOrganizationBilling: vi.fn(),
 }));
 
-function renderHeader(ui: React.ReactElement) {
+function renderHeader(
+  ui: React.ReactElement,
+  opts?: { inSandbox?: boolean },
+) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
     },
   });
+
+  if (opts?.inSandbox !== undefined) {
+    // Seed the bootstrap cache so Header's isInSandbox is set synchronously.
+    queryClient.setQueryData(queryKeys.org.bootstrap(null, false), {
+      org: { workspaceKind: opts.inSandbox ? "sandbox" : "real" },
+    });
+  }
 
   return render(
     <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
@@ -109,6 +138,7 @@ beforeEach(() => {
     },
   });
   mockPathname = "/schedule";
+  mockAuthUser = null;
   mockPermissions.role = "admin";
   mockPermissions.isGridmaster = false;
   mockPermissions.isSuperAdmin = false;
@@ -271,6 +301,72 @@ describe("Header permission-based tab visibility", () => {
     renderHeader(<Header />);
 
     expect(fetchOrganizationBilling).not.toHaveBeenCalled();
+  });
+});
+
+describe("Header sign out in sandbox mode", () => {
+  async function openSignOut() {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /account menu/i }));
+    await user.click(screen.getByRole("button", { name: /sign out/i }));
+    return user;
+  }
+
+  it("signs out directly when not in sandbox", async () => {
+    mockAuthUser = { id: "u-1", email: "a@b.com" };
+    renderHeader(<Header />, { inSandbox: false });
+
+    await openSignOut();
+
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSetUserViewActive).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(/exit sandbox to sign out/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("signs out in one sweep from view-as-user, with no confirm prompt", async () => {
+    mockAuthUser = { id: "u-1", email: "a@b.com" };
+    mockPermissions.isUserViewActive = true;
+    renderHeader(<Header />, { inSandbox: false });
+
+    await openSignOut();
+
+    // Logout is a single sweep: signOutLocal tears down the session and clears
+    // the view-as-user flag (dg_user_view) during teardown, so the handler must
+    // not toggle view-as-user off separately — that re-rendered the app back to
+    // the admin context mid-logout and could leave the user still logged in.
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(mockSetUserViewActive).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(/exit sandbox to sign out/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("prompts to exit the sandbox before signing out", async () => {
+    mockAuthUser = { id: "u-1", email: "a@b.com" };
+    renderHeader(<Header />, { inSandbox: true });
+
+    await openSignOut();
+
+    expect(mockSignOut).not.toHaveBeenCalled();
+    expect(vi.mocked(exitSandbox)).not.toHaveBeenCalled();
+    expect(screen.getByText(/exit sandbox to sign out/i)).toBeInTheDocument();
+  });
+
+  it("destroys the sandbox, then signs out, on confirm", async () => {
+    mockAuthUser = { id: "u-1", email: "a@b.com" };
+    renderHeader(<Header />, { inSandbox: true });
+
+    const user = await openSignOut();
+    await user.click(screen.getByRole("button", { name: /exit & sign out/i }));
+
+    await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+    // Sandbox is destroyed before the session is torn down.
+    expect(vi.mocked(exitSandbox)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(exitSandbox).mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0],
+    );
   });
 });
 

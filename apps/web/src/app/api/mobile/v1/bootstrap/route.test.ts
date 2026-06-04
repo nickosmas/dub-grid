@@ -83,6 +83,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         isSuperAdmin: false,
         isImpersonating: false,
         isUserViewActive: false,
+        isInactive: false,
         actualLevel: 2,
         canManageOrg: false,
         canAccessSettings: false,

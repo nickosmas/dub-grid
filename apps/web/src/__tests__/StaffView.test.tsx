@@ -259,6 +259,8 @@ const employees: Employee[] = [
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+    employeeNumber: 1001,
+    createdAt: null,
   },
   {
     id: "emp-2",
@@ -279,6 +281,8 @@ const employees: Employee[] = [
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+    employeeNumber: 1002,
+    createdAt: null,
   },
 ];
 
@@ -340,8 +344,8 @@ const defaultProps = {
   certifications: defaultCertifications,
   roles: defaultRoles,
   onSave: vi.fn(),
-  onDelete: vi.fn(),
-  onBench: vi.fn(),
+  onRemove: vi.fn(),
+  onDeactivate: vi.fn(),
   onActivate: vi.fn(),
   onAdd: vi.fn(),
   canViewEmployeeDetails: true,
@@ -378,8 +382,8 @@ describe("StaffView", () => {
 
     it("renders sortable column headers", async () => {
       renderWithProviders(<StaffView {...defaultProps} />);
-      // The # column header is clickable for seniority sort; the Name column header is clickable for name sort
-      expect(screen.getByText("#")).toBeInTheDocument();
+      // The ID column header is clickable for seniority sort; the Name column header is clickable for name sort.
+      expect(screen.getByText("ID")).toBeInTheDocument();
       expect(screen.getByText("Name")).toBeInTheDocument();
     });
 
@@ -391,6 +395,10 @@ describe("StaffView", () => {
       await waitFor(() => {
         expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
       });
+      // Reorder only shows on the Active tab (reordering rewrites seniority on
+      // active employees only). Default landed on the All tab after the
+      // 4-tab restructure, so switch to Active to assert the disabled state.
+      await userEvent.click(screen.getByRole("button", { name: /^Active/ }));
       expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "Reorder" })).toBeDisabled();
     });
@@ -464,19 +472,19 @@ describe("StaffView", () => {
               employmentType: "part_time",
             },
           ]}
-          benchedEmployees={[
+          inactiveEmployees={[
             {
               ...employees[0],
-              id: "emp-benched",
+              id: "emp-inactive",
               employmentType: "part_time",
-              status: "benched",
+              status: "inactive",
             },
           ]}
-          terminatedEmployees={[
+          removedEmployees={[
             {
               ...employees[1],
-              id: "emp-terminated",
-              status: "terminated",
+              id: "emp-removed",
+              status: "removed",
             },
           ]}
         />,
@@ -855,8 +863,8 @@ describe("Property-based tests", () => {
             certifications={defaultCertifications}
             roles={defaultRoles}
             onSave={vi.fn()}
-            onDelete={vi.fn()}
-            onBench={vi.fn()}
+            onRemove={vi.fn()}
+            onDeactivate={vi.fn()}
             onActivate={vi.fn()}
             onAdd={vi.fn()}
           />,
@@ -913,8 +921,8 @@ describe("Property-based tests", () => {
               certifications={defaultCertifications}
               roles={defaultRoles}
               onSave={vi.fn()}
-              onDelete={vi.fn()}
-              onBench={vi.fn()}
+              onRemove={vi.fn()}
+              onDeactivate={vi.fn()}
               onActivate={vi.fn()}
               onAdd={vi.fn()}
               canViewEmployeeDetails

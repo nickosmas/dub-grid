@@ -70,7 +70,7 @@ import {
 } from "../../profile/components/ProfilePrimitives";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
-type ConfirmAction = "bench" | "activate" | "terminate" | null;
+type ConfirmAction = "deactivate" | "activate" | "remove" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
 type EditDraft = {
@@ -137,7 +137,7 @@ export default function PersonDetailScreen() {
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] =
     useState(false);
-  const [benchNote, setBenchNote] = useState("");
+  const [inactiveNote, setInactiveNote] = useState("");
   const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
@@ -162,7 +162,7 @@ export default function PersonDetailScreen() {
   const isSelf = Boolean(
     currentUserId && person?.userId && person.userId === currentUserId,
   );
-  const canEdit = canManageEmployees && person?.status !== "terminated";
+  const canEdit = canManageEmployees && person?.status !== "removed";
   const contentState = getMobileQueryContentState({
     hasData: personQuery.data !== undefined,
     isLoading: personQuery.isLoading || bootstrapQuery.isLoading,
@@ -178,7 +178,7 @@ export default function PersonDetailScreen() {
   useEffect(() => {
     if (person && !editing) {
       setDraft(makeDraft(person));
-      setBenchNote(person.statusNote);
+      setInactiveNote(person.statusNote);
     }
   }, [editing, person]);
 
@@ -228,7 +228,7 @@ export default function PersonDetailScreen() {
   });
   const statusMutation = useMutation({
     mutationFn: async (input: {
-      action: "bench" | "activate" | "terminate";
+      action: "deactivate" | "activate" | "remove";
       note?: string;
       expectedVersion: number;
     }) =>
@@ -247,16 +247,16 @@ export default function PersonDetailScreen() {
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
       setConfirmAction(null);
-      setBenchNote("");
+      setInactiveNote("");
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
         title:
           variables.action === "activate"
             ? "Person activated"
-            : variables.action === "bench"
-              ? "Person benched"
-              : "Person terminated",
+            : variables.action === "deactivate"
+              ? "Person marked inactive"
+              : "Person removed",
         message: "Staff status was updated.",
       });
     },
@@ -469,7 +469,7 @@ export default function PersonDetailScreen() {
     statusMutation.mutate({
       action: confirmAction,
       expectedVersion: person.version,
-      note: confirmAction === "bench" ? benchNote.trim() : undefined,
+      note: confirmAction === "deactivate" ? inactiveNote.trim() : undefined,
     });
   }
 
@@ -479,23 +479,23 @@ export default function PersonDetailScreen() {
   }
 
   const statusConfirmationTitle =
-    confirmAction === "bench"
-      ? `Bench ${getFullName(person)}?`
+    confirmAction === "deactivate"
+      ? `Mark ${getFullName(person)} inactive?`
       : confirmAction === "activate"
         ? `Activate ${getFullName(person)}?`
-        : `Terminate ${getFullName(person)}?`;
+        : `Remove ${getFullName(person)}?`;
   const statusConfirmationBody =
-    confirmAction === "bench"
+    confirmAction === "deactivate"
       ? "They'll be hidden from active scheduling and shift requests. Their history stays intact."
       : confirmAction === "activate"
         ? "They'll return to active staff lists and scheduling."
-        : "They'll be archived from active staff lists. Their history stays intact.";
+        : "They'll lose access and be removed from active staff lists. Their history stays intact.";
   const statusConfirmationLabel =
-    confirmAction === "bench"
-      ? "Bench"
+    confirmAction === "deactivate"
+      ? "Mark Inactive"
       : confirmAction === "activate"
         ? "Activate"
-        : "Terminate";
+        : "Remove";
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? "Send invitation?"
@@ -740,8 +740,8 @@ export default function PersonDetailScreen() {
               <Button
                 compact
                 disabled={statusMutation.isPending || isSelf}
-                label="Bench"
-                onPress={() => setConfirmAction("bench")}
+                label="Mark Inactive"
+                onPress={() => setConfirmAction("deactivate")}
                 tone="warningFilled"
               />
             ) : null}
@@ -754,17 +754,17 @@ export default function PersonDetailScreen() {
                 tone="success"
               />
             ) : null}
-            {person.status !== "terminated" ? (
+            {person.status !== "removed" ? (
               <Button
                 compact
                 disabled={statusMutation.isPending || isSelf}
-                label="Terminate"
-                onPress={() => setConfirmAction("terminate")}
+                label="Remove"
+                onPress={() => setConfirmAction("remove")}
                 tone="dangerFilled"
               />
             ) : null}
             {!person.userId &&
-            person.status !== "terminated" &&
+            person.status !== "removed" &&
             person.email ? (
               person.pendingInvitation ? (
                 <View style={styles.actionRow}>
@@ -828,7 +828,7 @@ export default function PersonDetailScreen() {
         body={statusConfirmationBody}
         confirmLabel={statusConfirmationLabel}
         confirmTone={
-          confirmAction === "bench"
+          confirmAction === "deactivate"
             ? "warningFilled"
             : confirmAction === "activate"
               ? "primary"
@@ -840,13 +840,13 @@ export default function PersonDetailScreen() {
         title={statusConfirmationTitle}
         visible={confirmAction != null}
       >
-        {confirmAction === "bench" ? (
+        {confirmAction === "deactivate" ? (
           <TextInput
-            onChangeText={setBenchNote}
+            onChangeText={setInactiveNote}
             placeholder="Reason (optional)"
             placeholderTextColor={mobileColors.textSubtle}
             style={styles.input}
-            value={benchNote}
+            value={inactiveNote}
           />
         ) : null}
       </ConfirmationModal>

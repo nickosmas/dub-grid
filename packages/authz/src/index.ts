@@ -113,6 +113,7 @@ export interface PermissionContext extends AdminPermissions {
   isSuperAdmin: boolean;
   isImpersonating: boolean;
   isUserViewActive: boolean;
+  isInactive: boolean;
   actualLevel: number;
   canManageOrg: boolean;
   canAccessSettings: boolean;
@@ -131,11 +132,40 @@ export function buildPermissionContext(
   options?: {
     isImpersonating?: boolean;
     isLoading?: boolean;
+    isInactive?: boolean;
   },
 ): PermissionContext {
   const isImpersonating = options?.isImpersonating ?? false;
   const isLoading = options?.isLoading ?? false;
-  const level = ROLE_LEVEL[role] ?? 0;
+  const isInactive = options?.isInactive ?? false;
+  const actualLevel = ROLE_LEVEL[role] ?? 0;
+
+  // Inactive employees are temporarily sidelined — strip them to read-only
+  // regardless of their underlying org_role. They still see their schedule and
+  // staff list (canViewSchedule + canViewStaff stay true per READ_ONLY_PERMS)
+  // but lose every manage capability + admin perms JSONB grants. Mirror the
+  // User-View override: collapse level/role/flags so atLeast() checks fail.
+  if (isInactive) {
+    return {
+      ...READ_ONLY_PERMS,
+      role: "user",
+      orgId,
+      level: 0,
+      isLoading,
+      isGridmaster: false,
+      isSuperAdmin: false,
+      isImpersonating: false,
+      isUserViewActive: false,
+      isInactive: true,
+      actualLevel,
+      canManageOrg: false,
+      canAccessSettings: false,
+      canManageUsers: false,
+      canConfigureAdminPermissions: false,
+    };
+  }
+
+  const level = actualLevel;
   const isGridmaster = level >= 4;
   const isSuperAdmin = level >= 3;
 
@@ -204,6 +234,7 @@ export function buildPermissionContext(
     isSuperAdmin,
     isImpersonating,
     isUserViewActive: false,
+    isInactive: false,
     actualLevel: level,
     canManageOrg,
     canAccessSettings,
@@ -219,10 +250,12 @@ export function buildPerms(
   isLoading: boolean,
   adminPerms?: AdminPermissions | null,
   isImpersonating = false,
+  isInactive = false,
 ): Permissions {
   const base = buildPermissionContext(role, orgId, adminPerms, {
     isImpersonating,
     isLoading,
+    isInactive,
   });
   return {
     ...base,

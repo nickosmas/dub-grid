@@ -1822,81 +1822,85 @@ export async function GET(req: NextRequest) {
     return authorized.response;
   }
 
+  // Effective (sandbox-redirected) org, not the raw query param. A caller in
+  // sandbox mode must read their sandbox's config, never the real org's.
+  const effectiveOrgId = authorized.orgId;
+
   try {
     switch (action) {
       case "fetchCertifications":
         return NextResponse.json({
-          items: await fetchCertificationsForOrg(orgId, includeArchived),
+          items: await fetchCertificationsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkCertificationDependencies":
         return NextResponse.json(
-          await checkCertificationDependenciesForOrg(Number(itemId), orgId),
+          await checkCertificationDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchOrganizationRoles":
         return NextResponse.json({
-          items: await fetchOrganizationRolesForOrg(orgId, includeArchived),
+          items: await fetchOrganizationRolesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkRoleDependencies":
         return NextResponse.json(
-          await checkRoleDependenciesForOrg(Number(itemId), orgId),
+          await checkRoleDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchDepartments":
         return NextResponse.json({
-          items: await fetchDepartmentsForOrg(orgId, includeArchived),
+          items: await fetchDepartmentsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkDepartmentDependencies":
         return NextResponse.json(
-          await checkDepartmentDependenciesForOrg(Number(itemId), orgId),
+          await checkDepartmentDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchFocusAreas":
         return NextResponse.json({
-          items: await fetchFocusAreasForOrg(orgId, includeArchived),
+          items: await fetchFocusAreasForOrg(effectiveOrgId, includeArchived),
         });
       case "checkFocusAreaDependencies":
         return NextResponse.json(
-          await checkFocusAreaDependenciesForOrg(Number(itemId), orgId),
+          await checkFocusAreaDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchShiftCategories":
         return NextResponse.json({
-          items: await fetchShiftCategoriesForOrg(orgId, includeArchived),
+          items: await fetchShiftCategoriesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkShiftCategoryDependencies":
         return NextResponse.json(
-          await checkShiftCategoryDependenciesForOrg(Number(itemId), orgId),
+          await checkShiftCategoryDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchJobDefinitions":
         return NextResponse.json({
-          items: await fetchJobDefinitionsForOrg(orgId, includeArchived),
+          items: await fetchJobDefinitionsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkJobDependencies":
         return NextResponse.json(
-          await checkJobDependenciesForOrg(Number(itemId), orgId),
+          await checkJobDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchCoverageRequirements":
         return NextResponse.json({
-          items: await fetchCoverageRequirementsForOrg(orgId),
+          items: await fetchCoverageRequirementsForOrg(effectiveOrgId),
         });
       case "fetchAbsenceTypes":
         return NextResponse.json({
-          items: await fetchAbsenceTypesForOrg(orgId, includeArchived),
+          items: await fetchAbsenceTypesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkAbsenceTypeDependencies":
         return NextResponse.json(
-          await checkAbsenceTypeDependenciesForOrg(Number(itemId), orgId),
+          await checkAbsenceTypeDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchIndicatorTypes":
         return NextResponse.json({
-          items: await fetchIndicatorTypesForOrg(orgId, includeArchived),
+          items: await fetchIndicatorTypesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkIndicatorTypeDependencies":
         return NextResponse.json(
-          await checkIndicatorTypeDependenciesForOrg(Number(itemId), orgId),
+          await checkIndicatorTypeDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       default:
         return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
   } catch (error) {
-    console.error("Settings GET failed", { action, orgId, error });
+    console.error("Settings GET failed", { action, orgId: effectiveOrgId, error });
     return NextResponse.json({ error: "Settings request failed" }, { status: 500 });
   }
 }

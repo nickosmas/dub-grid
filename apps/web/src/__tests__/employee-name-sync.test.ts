@@ -65,6 +65,7 @@ describe("linked employee name syncing", () => {
 
     const employee: Employee = {
       id: "emp-1",
+      employeeNumber: 1001,
       firstName: " Alice ",
       lastName: " Smith ",
       employmentType: "full_time",
@@ -82,6 +83,7 @@ describe("linked employee name syncing", () => {
       departmentIds: [],
       deptAdminIds: [],
       version: 3,
+      createdAt: null,
     };
 
     await updateEmployee(employee, "org-1");

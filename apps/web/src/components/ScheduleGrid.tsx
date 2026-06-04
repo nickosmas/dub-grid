@@ -1226,14 +1226,13 @@ const SectionBlock = memo(function SectionBlock({
               gap: 6,
               padding: "8px 10px",
               borderRadius: 999,
-              border: "1px solid rgba(15, 23, 42, 0.12)",
-              background: "rgba(255, 255, 255, 0.96)",
-              color: "var(--color-text-primary)",
-              boxShadow: "0 8px 18px rgba(15, 23, 42, 0.14)",
+              border: "1px solid var(--color-brand)",
+              background: "var(--color-brand)",
+              color: "var(--color-text-inverse)",
+              boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 700,
               cursor: "pointer",
-              backdropFilter: "blur(6px)",
             }}
           >
             More days
@@ -1267,14 +1266,13 @@ const SectionBlock = memo(function SectionBlock({
               gap: 6,
               padding: "8px 10px",
               borderRadius: 999,
-              border: "1px solid rgba(15, 23, 42, 0.12)",
-              background: "rgba(255, 255, 255, 0.96)",
-              color: "var(--color-text-primary)",
-              boxShadow: "0 8px 18px rgba(15, 23, 42, 0.14)",
+              border: "1px solid var(--color-brand)",
+              background: "var(--color-brand)",
+              color: "var(--color-text-inverse)",
+              boxShadow: "0 8px 18px rgba(37, 99, 235, 0.32)",
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 700,
               cursor: "pointer",
-              backdropFilter: "blur(6px)",
             }}
           >
             <svg
@@ -1305,6 +1303,9 @@ const SectionBlock = memo(function SectionBlock({
             aria-label={`${sectionName} schedule grid`}
             style={{
               position: "relative",
+              // Own stacking context so cell z-indexes (incl. diff tint) stay
+              // contained and never paint over the floating scroll buttons.
+              zIndex: 0,
               display: "grid",
               gridTemplateColumns: gridTemplate,
               minWidth: fitToContainer ? undefined : "max-content",
@@ -1318,7 +1319,8 @@ const SectionBlock = memo(function SectionBlock({
                 style={{
                   position: "sticky",
                   left: 0,
-                  zIndex: 4,
+                  // Frozen name column: above all scrolling day cells (max 8).
+                  zIndex: 10,
                   background: "var(--color-bg)",
                   padding: "10px var(--dg-space-md)",
                   fontSize: "var(--dg-fs-footnote)",
@@ -1407,7 +1409,7 @@ const SectionBlock = memo(function SectionBlock({
                   style={{
                     position: "sticky",
                     left: 0,
-                    zIndex: 3,
+                    zIndex: 10,
                     background: "var(--color-warning-bg, #FFF8E1)",
                     display: "flex",
                     alignItems: "center",
@@ -1671,7 +1673,7 @@ const SectionBlock = memo(function SectionBlock({
                     style={{
                       position: "sticky",
                       left: 0,
-                      zIndex: 3,
+                      zIndex: 10,
                       background: rowBg,
                       padding: "7px var(--dg-space-md)",
                       display: "flex",
@@ -3420,7 +3422,7 @@ const SectionBlock = memo(function SectionBlock({
                       style={{
                         position: "sticky",
                         left: 0,
-                        zIndex: 1,
+                        zIndex: 10,
                         background: "var(--color-surface)",
                         padding: "6px 14px",
                         fontSize: "var(--dg-fs-badge)",

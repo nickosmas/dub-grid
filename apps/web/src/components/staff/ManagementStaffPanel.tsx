@@ -5,9 +5,13 @@ import { createPortal } from "react-dom";
 import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { validatePhone, validateRequired } from "@/components/FormField";
-import { normalizeOptionalUsPhone, normalizeStaffName } from "@dubgrid/contracts";
+import {
+  getOptionalStaffEmailError,
+  normalizeOptionalStaffEmail,
+  normalizeOptionalUsPhone,
+  normalizeStaffName,
+} from "@dubgrid/contracts";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
@@ -26,7 +30,7 @@ function hashCode(s: string): number {
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
-  user: "Member",
+  user: "User",
 };
 
 const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
@@ -38,6 +42,7 @@ const ROLE_COLORS: Record<string, { bg: string; text: string }> = {
 interface ManagementStaffDraft {
   firstName: string;
   lastName: string;
+  email: string;
   phone: string;
   managementDepartmentIds: number[];
 }
@@ -46,6 +51,7 @@ function normalizeManagementStaffDraft(draft: ManagementStaffDraft): ManagementS
   return {
     firstName: draft.firstName.trim(),
     lastName: draft.lastName.trim(),
+    email: draft.email.trim(),
     phone: draft.phone.trim(),
     managementDepartmentIds: [...draft.managementDepartmentIds],
   };
@@ -55,6 +61,7 @@ function getManagementStaffDraft(person: DirectoryPerson): ManagementStaffDraft 
   return normalizeManagementStaffDraft({
     firstName: person.firstName,
     lastName: person.lastName,
+    email: person.email,
     phone: person.phone,
     managementDepartmentIds: person.managementDepartmentIds,
   });
@@ -71,6 +78,7 @@ interface ManagementStaffPanelProps {
   onSave: (data: {
     firstName: string;
     lastName: string;
+    email: string;
     phone: string;
     managementDepartmentIds: number[];
   }) => Promise<void>;
@@ -83,9 +91,6 @@ interface ManagementStaffPanelProps {
    *  may manage access and the person has an editable membership. */
   onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
   onAddToSchedule?: (person: DirectoryPerson) => void;
-  onBench?: (empId: string, note?: string) => void;
-  onActivate?: (empId: string) => void;
-  onTerminate?: (empId: string) => void;
   /** True when this panel's subject is the current user — destructive
    *  self-actions (role change, status, remove from management) are hidden. */
   isSelf?: boolean;
@@ -104,9 +109,6 @@ export function ManagementStaffPanel({
   onRoleChange,
   onPermissionsChange,
   onAddToSchedule,
-  onBench,
-  onActivate,
-  onTerminate,
   isSelf = false,
 }: ManagementStaffPanelProps) {
   const [closing, setClosing] = useState(false);
@@ -117,6 +119,7 @@ export function ManagementStaffPanel({
 
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName);
+  const [email, setEmail] = useState(person.email);
   const [phone, setPhone] = useState(person.phone);
   const [deptIds, setDeptIds] = useState<number[]>(person.managementDepartmentIds);
   const [savedDraft, setSavedDraft] = useState<ManagementStaffDraft>(() => getManagementStaffDraft(person));
@@ -128,11 +131,13 @@ export function ManagementStaffPanel({
   const personDraft = useMemo(() => normalizeManagementStaffDraft({
     firstName: person.firstName,
     lastName: person.lastName,
+    email: person.email,
     phone: person.phone,
     managementDepartmentIds: person.managementDepartmentIds,
   }), [
     person.firstName,
     person.lastName,
+    person.email,
     person.phone,
     person.managementDepartmentIds,
   ]);
@@ -141,6 +146,7 @@ export function ManagementStaffPanel({
   useEffect(() => {
     setFirstName(personDraft.firstName);
     setLastName(personDraft.lastName);
+    setEmail(personDraft.email);
     setPhone(personDraft.phone);
     setDeptIds([...personDraft.managementDepartmentIds]);
     setSavedDraft(personDraft);
@@ -163,12 +169,14 @@ export function ManagementStaffPanel({
   const currentDraft = normalizeManagementStaffDraft({
     firstName,
     lastName,
+    email,
     phone,
     managementDepartmentIds: deptIds,
   });
   const hasChanges =
     currentDraft.firstName !== savedDraft.firstName ||
     currentDraft.lastName !== savedDraft.lastName ||
+    currentDraft.email !== savedDraft.email ||
     currentDraft.phone !== savedDraft.phone ||
     JSON.stringify(currentDraft.managementDepartmentIds) !== JSON.stringify(savedDraft.managementDepartmentIds);
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -189,7 +197,15 @@ export function ManagementStaffPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleRequestClose]);
   const isPending = person.invitationStatus !== null && !person.hasAppAccess;
-  const isEmployee = person.source === "employee";
+  // `isEmployee` here means "this person already shows up on the schedule
+  // grid and edits their identity from the on-schedule profile." It's NOT
+  // "has an employees row" — every org member has one of those now (Flow B
+  // + seed backfill), so we'd lock management-only users out of their own
+  // first/last/dept editing if we keyed off `source === "employee"`. The
+  // schedule grid + the People page roster both gate on focusAreaIds, so
+  // use that as the source of truth here too.
+  const isEmployee = person.focusAreaIds.length > 0;
+  const isOnSchedule = isEmployee;
   const isExpired = person.invitationStatus === "expired";
   const fieldErrors = useMemo(
     () => ({
@@ -201,13 +217,19 @@ export function ManagementStaffPanel({
         !isEmployee && touched.lastName
           ? validateRequired(lastName, "Last name")
           : null,
+      // Email is optional everywhere now (so admins can schedule before
+      // onboarding). Only complain about formatting when a value is present.
+      email:
+        touched.email && email.trim()
+          ? getOptionalStaffEmailError(email)
+          : null,
       phone: touched.phone ? validatePhone(phone) : null,
       managementDepartmentIds:
         !isEmployee && touched.managementDepartmentIds && deptIds.length === 0
           ? "People who are not on the schedule must stay assigned to at least one management department."
           : null,
     }),
-    [deptIds.length, firstName, isEmployee, lastName, phone, touched],
+    [deptIds.length, email, firstName, isEmployee, lastName, phone, touched],
   );
 
   const showScheduleOnlyHint = isEmployee && deptIds.length === 0;
@@ -241,9 +263,17 @@ export function ManagementStaffPanel({
       }));
       return;
     }
+    if (email.trim() && getOptionalStaffEmailError(email)) {
+      setTouched((prev) => ({
+        ...prev,
+        email: true,
+      }));
+      return;
+    }
     const nextDraft = {
       firstName: normalizeStaffName(firstName),
       lastName: normalizeStaffName(lastName),
+      email: normalizeOptionalStaffEmail(email),
       phone: normalizeOptionalUsPhone(phone),
       managementDepartmentIds: deptIds,
     };
@@ -267,6 +297,7 @@ export function ManagementStaffPanel({
       await onSave(nextDraft);
       setFirstName(nextDraft.firstName);
       setLastName(nextDraft.lastName);
+      setEmail(nextDraft.email);
       setPhone(nextDraft.phone);
       setDeptIds([...nextDraft.managementDepartmentIds]);
       setSavedDraft(nextDraft);
@@ -321,19 +352,19 @@ export function ManagementStaffPanel({
           dot: "var(--color-warning)",
           label: "Pending",
         }
-    : person.employeeStatus === "terminated"
+    : person.employeeStatus === "removed"
       ? {
           bg: "var(--color-danger-bg)",
           text: "var(--color-danger-text)",
           dot: "var(--color-danger)",
-          label: "Terminated",
+          label: "Removed",
         }
-      : person.employeeStatus === "benched"
+      : person.employeeStatus === "inactive"
         ? {
             bg: "var(--color-warning-bg)",
             text: "var(--color-warning-text)",
             dot: "var(--color-warning)",
-            label: "Benched",
+            label: "Inactive",
           }
         : {
             bg: "var(--color-success-bg)",
@@ -455,7 +486,7 @@ export function ManagementStaffPanel({
                   {displayName}
                 </span>
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                  {isEmployee && (
+                  {isOnSchedule && (
                     <span
                       style={{
                         display: "inline-flex",
@@ -712,6 +743,39 @@ export function ManagementStaffPanel({
                     </div>
                   )}
                 </div>
+              </div>
+
+              <div>
+                <label style={labelStyle}>
+                  Email{" "}
+                  <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => markTouched("email")}
+                  placeholder="name@example.com"
+                  style={
+                    fieldErrors.email
+                      ? { ...inputStyle, borderColor: "var(--color-danger)" }
+                      : inputStyle
+                  }
+                />
+                {fieldErrors.email && (
+                  <div
+                    style={{
+                      color: "var(--color-danger)",
+                      fontSize: "var(--dg-fs-footnote)",
+                      marginTop: 4,
+                    }}
+                    role="alert"
+                  >
+                    {fieldErrors.email}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1071,9 +1135,14 @@ export function ManagementStaffPanel({
                 gap: 10,
               }}
             >
-              {/* Add to Schedule */}
+              {/* Add to Schedule — show for any linked management user who
+                  isn't already on the schedule grid. The old `source ===
+                  "user_only"` check fell apart once every member got an
+                  employees row (Flow B + seed backfill); now we gate on the
+                  same "appears on schedule" signal used everywhere else
+                  (focusAreaIds). */}
               {canManageScheduleEmployees &&
-                person.source === "user_only" &&
+                !isOnSchedule &&
                 person.isManagementUser &&
                 person.userId &&
                 onAddToSchedule && (
@@ -1178,49 +1247,6 @@ export function ManagementStaffPanel({
           )}
         </div>
 
-        {/* Sticky bottom status actions */}
-        {person.employeeId &&
-          canManageScheduleEmployees &&
-          onBench &&
-          onActivate &&
-          onTerminate && (
-            <div
-              style={{
-                flexShrink: 0,
-                padding: "12px 20px",
-                borderTop: "1px solid var(--color-border-light)",
-              }}
-            >
-              <EmployeeStatusActions
-                employee={{
-                  id: person.employeeId,
-                  firstName: person.firstName,
-                  lastName: person.lastName,
-                  employmentType: "full_time",
-                  email: person.email,
-                  phone: person.phone,
-                  status: person.employeeStatus ?? "active",
-                  statusNote: "",
-                  statusChangedAt: null,
-                  userId: person.userId,
-                  focusAreaIds: person.focusAreaIds,
-                  certificationId: person.certificationId,
-                  roleIds: person.roleIds,
-                  departmentIds: person.scheduledDepartmentIds,
-                  deptAdminIds: person.scheduledDeptAdminIds,
-                  seniority: person.seniority ?? 0,
-                  contactNotes: "",
-                  version: 0,
-                }}
-                canEdit
-                isSelf={isSelf}
-                onBench={onBench}
-                onActivate={onActivate}
-                onTerminate={onTerminate}
-                variant="panel"
-              />
-            </div>
-          )}
         {unsavedChangesDialog}
       </div>
     </>,

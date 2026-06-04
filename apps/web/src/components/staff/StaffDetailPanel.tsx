@@ -15,6 +15,13 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+
+function statusTone(status: Employee["status"]): StatusPillTone {
+  if (status === "inactive") return "warning";
+  if (status === "removed") return "danger";
+  return "success";
+}
 
 function hashCode(s: string): number {
   let h = 0;
@@ -38,8 +45,8 @@ interface StaffDetailPanelProps {
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onSave: (emp: Employee) => void;
-  onDelete: (empId: string) => void;
-  onBench: (empId: string, note?: string) => void;
+  onRemove: (empId: string) => void;
+  onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
@@ -69,8 +76,8 @@ export function StaffDetailPanel({
   orgId,
   pendingInviteByEmployeeId,
   onSave,
-  onDelete,
-  onBench,
+  onRemove,
+  onDeactivate,
   onActivate,
   onClose,
   onInvite,
@@ -99,7 +106,7 @@ export function StaffDetailPanel({
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
   const pendingInvitation = canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined;
-  const canEditEmployee = employee.status === "active" || employee.status === "benched";
+  const canEditEmployee = employee.status === "active" || employee.status === "inactive";
   const showInviteActions =
     canEditEmployee &&
     canManageEmployees &&
@@ -107,7 +114,7 @@ export function StaffDetailPanel({
     Boolean(employee.email) &&
     Boolean(pendingInvitation || (orgId && onInvite));
   const showManagementAccessAction =
-    Boolean(canManageManagementAccess && onManageManagementAccess && employee.status !== "terminated");
+    Boolean(canManageManagementAccess && onManageManagementAccess && employee.status !== "removed");
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
 
@@ -168,11 +175,7 @@ export function StaffDetailPanel({
     setHasUnsavedChanges(false);
   }, [employee.id]);
 
-  const statusConfig = {
-    active: { bg: "var(--color-success-bg)", text: "var(--color-success-text)", dot: "var(--color-success)" },
-    benched: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", dot: "var(--color-warning)" },
-    terminated: { bg: "var(--color-danger-bg)", text: "var(--color-danger-text)", dot: "var(--color-danger)" },
-  }[employee.status];
+  const statusLabel = employee.status.charAt(0).toUpperCase() + employee.status.slice(1);
 
   return createPortal(
     <>
@@ -221,23 +224,13 @@ export function StaffDetailPanel({
                 <span style={{ fontWeight: 700, fontSize: "var(--dg-fs-body)", color: "var(--color-text-primary)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {getEmployeeDisplayName(employee)}
                 </span>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 20,
-                    background: statusConfig.bg,
-                    color: statusConfig.text,
-                    flexShrink: 0,
-                  }}
+                <StatusPill
+                  tone={statusTone(employee.status)}
+                  className="shrink-0"
+                  aria-label={`Status: ${statusLabel}`}
                 >
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: statusConfig.dot, flexShrink: 0 }} />
-                  {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
-                </span>
+                  {statusLabel}
+                </StatusPill>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                 {employee.email && (

@@ -49,9 +49,13 @@ const ACTION_LABELS: Record<string, string> = {
   "invitation.resent": "Invitation resent",
   "employee.created": "Employee created",
   "employee.updated": "Employee updated",
-  "employee.benched": "Employee benched",
+  "employee.deactivated": "Employee marked inactive",
   "employee.activated": "Employee activated",
-  "employee.archived": "Employee terminated",
+  "employee.removed": "Employee removed",
+  // Historical keys before the bench→deactivate / terminate→remove rename.
+  // Older audit rows still carry these — keep them rendering with the new copy.
+  "employee.benched": "Employee marked inactive",
+  "employee.archived": "Employee removed",
   "shift.created": "Shift created",
   "shift.updated": "Shift updated",
   "shift.deleted": "Shift deleted",

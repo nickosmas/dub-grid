@@ -13,33 +13,35 @@ export interface EmployeeStatusActionsProps {
   /** When true, this employee is the current user — destructive self-actions are hidden. */
   isSelf?: boolean;
   pendingInvitation?: Invitation;
-  onBench: (empId: string, note?: string) => void;
+  onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
-  onTerminate: (empId: string) => void;
+  onRemove: (empId: string, note?: string) => void;
   onRevokeAccess?: (userId: string) => void;
   onInvite?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   variant: "panel" | "page";
 }
 
+type DeactivateOutcome = "inactive" | "remove";
+
 export function EmployeeStatusActions({
   employee,
   canEdit,
   isSelf = false,
   pendingInvitation,
-  onBench,
+  onDeactivate,
   onActivate,
-  onTerminate,
+  onRemove,
   onRevokeAccess,
   onInvite,
   onRevoke,
   variant,
 }: EmployeeStatusActionsProps) {
-  const [showBenchConfirm, setShowBenchConfirm] = useState(false);
-  const [showActivateConfirm, setShowActivateConfirm] = useState(false);
-  const [benchNote, setBenchNote] = useState(employee.statusNote || "");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
+  const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
+  const [note, setNote] = useState(employee.statusNote || "");
   const [alsoRevokeAccess, setAlsoRevokeAccess] = useState(false);
+  const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [pendingInvitationAction, setPendingInvitationAction] =
     useState<"reinvite" | "revoke" | null>(null);
   const [revoking, setRevoking] = useState(false);
@@ -66,9 +68,15 @@ export function EmployeeStatusActions({
     setPendingInvitationAction(null);
   }
 
+  function resetDeactivateForm() {
+    setShowDeactivateConfirm(false);
+    setOutcome("inactive");
+    setAlsoRevokeAccess(false);
+  }
+
   if (!canEdit) return null;
 
-  // Self-action guard: you can't bench / terminate / activate your own record.
+  // Self-action guard: you can't deactivate / remove / activate your own record.
   if (isSelf) {
     return (
       <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: 0 }}>
@@ -106,83 +114,108 @@ export function EmployeeStatusActions({
     </div>
   ) : null;
 
-  // ── Bench confirmation ──
-  if (isActive && showBenchConfirm) {
+  // ── Unified Deactivate confirmation ──
+  // One modal asks Temporary vs Permanent. The primary button's verb + variant
+  // flips with the radio so the confirm action always echoes the outcome.
+  if (isActive && showDeactivateConfirm) {
+    const isRemove = outcome === "remove";
     return (
-      <>
-        <ConfirmDialog
-          title="Bench Staff Member?"
-          message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <span>
-                Bench {displayName}? They will be hidden from active scheduling and shift requests. Existing and future shift data will be preserved.
-              </span>
+      <ConfirmDialog
+        title={`Deactivate ${displayName}?`}
+        message={
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <label
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                cursor: "pointer",
+              }}
+            >
               <input
-                className="dg-input"
-                value={benchNote}
-                onChange={(e) => setBenchNote(e.target.value)}
-                placeholder="Reason (optional) - e.g. On leave until June"
-                style={{ fontSize: "var(--dg-fs-label)" }}
+                type="radio"
+                name="deactivate-outcome"
+                value="inactive"
+                checked={!isRemove}
+                onChange={() => setOutcome("inactive")}
+                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--color-border)] box-border cursor-pointer relative checked:border-[var(--color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--color-warning)]"
               />
-            </div>
-          }
-          confirmLabel="Bench"
-          variant="warning"
-          onConfirm={() => {
-            onBench(employee.id, benchNote.trim() || undefined);
-            setShowBenchConfirm(false);
-          }}
-          onCancel={() => setShowBenchConfirm(false)}
-        />
-      </>
-    );
-  }
-
-  // ── Terminate confirmation ──
-  if (employee.status !== "terminated" && showDeleteConfirm) {
-    return (
-      <>
-        <ConfirmDialog
-          title="Terminate Staff Member?"
-          message={
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <span>
-                Terminate {displayName}? They will be archived from active staff lists and scheduling. Historical and future shift data will be preserved.
+                <span style={{ display: "block", fontWeight: 600 }}>Mark inactive</span>
+                <span style={{ display: "block", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+                  They&apos;re temporarily off the schedule. You can reactivate them anytime.
+                </span>
               </span>
-              {employee.userId && onRevokeAccess && (
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", fontWeight: 500, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={alsoRevokeAccess}
-                    onChange={(e) => setAlsoRevokeAccess(e.target.checked)}
-                    className="accent-[var(--color-danger)] w-3.5 h-3.5"
-                  />
-                  Also revoke app access
-                </label>
-              )}
-            </div>
-          }
-          confirmLabel="Terminate"
-          variant="danger"
-          onConfirm={() => {
-            onTerminate(employee.id);
+            </label>
+            <label
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="radio"
+                name="deactivate-outcome"
+                value="remove"
+                checked={isRemove}
+                onChange={() => setOutcome("remove")}
+                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--color-border)] box-border cursor-pointer relative checked:border-[var(--color-danger)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--color-danger)]"
+              />
+              <span>
+                <span style={{ display: "block", fontWeight: 600 }}>Remove from staff</span>
+                <span style={{ display: "block", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+                  They lose access and won&apos;t appear in active staff. This can&apos;t be undone.
+                </span>
+              </span>
+            </label>
+            <input
+              className="dg-input"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={
+                isRemove
+                  ? "Reason (optional) - e.g. Left the company"
+                  : "Reason (optional) - e.g. On leave until June"
+              }
+              style={{ fontSize: "var(--dg-fs-label)" }}
+            />
+            {isRemove && employee.userId && onRevokeAccess && (
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", fontWeight: 500, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={alsoRevokeAccess}
+                  onChange={(e) => setAlsoRevokeAccess(e.target.checked)}
+                  className="accent-[var(--color-danger)] w-3.5 h-3.5"
+                />
+                Also revoke app access
+              </label>
+            )}
+          </div>
+        }
+        confirmLabel={isRemove ? "Remove" : "Mark Inactive"}
+        variant={isRemove ? "danger" : "warning"}
+        onConfirm={() => {
+          const trimmedNote = note.trim() || undefined;
+          if (isRemove) {
+            onRemove(employee.id, trimmedNote);
             if (alsoRevokeAccess && employee.userId && onRevokeAccess) {
               onRevokeAccess(employee.userId);
             }
-            setShowDeleteConfirm(false);
-            setAlsoRevokeAccess(false);
-          }}
-          onCancel={() => { setShowDeleteConfirm(false); setAlsoRevokeAccess(false); }}
-        />
-      </>
+          } else {
+            onDeactivate(employee.id, trimmedNote);
+          }
+          resetDeactivateForm();
+        }}
+        onCancel={resetDeactivateForm}
+      />
     );
   }
 
   // ── Default state: action buttons ──
-  const showBench = isActive;
-  const showTerminate = employee.status !== "terminated";
-  const showActivate = employee.status === "benched" || employee.status === "terminated";
-  const hasDangerActions = showBench || showTerminate;
+  const showDeactivate = isActive;
+  const showActivate = employee.status === "inactive" || employee.status === "removed";
   const actionGroupStyle = variant === "page"
     ? { display: "flex", gap: 8, flexWrap: "wrap" as const }
     : { display: "flex", gap: 8 };
@@ -191,7 +224,7 @@ export function EmployeeStatusActions({
     <>
       {invitationSection}
       {showActivate && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: hasDangerActions ? 8 : 0 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: showDeactivate ? 8 : 0 }}>
           <button
             onClick={() => setShowActivateConfirm(true)}
             className={variant === "page" ? "dg-btn dg-btn-secondary dg-btn-sm" : "dg-btn dg-btn-ghost dg-btn-xs"}
@@ -250,38 +283,23 @@ export function EmployeeStatusActions({
           }}
         />
       )}
-      {hasDangerActions && (
+      {showDeactivate && (
         <div style={actionGroupStyle}>
-          {showBench && (
-            <button
-              onClick={() => setShowBenchConfirm(true)}
-              className="dg-btn dg-btn-warning-filled"
-              style={{
-                flex: variant === "page" ? "0 0 auto" : 1,
-                minWidth: variant === "page" ? 132 : undefined,
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              Bench
-            </button>
-          )}
-          {showTerminate && (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="dg-btn dg-btn-danger-filled"
-              style={{
-                flex: variant === "page" ? "0 0 auto" : 1,
-                minWidth: variant === "page" ? 132 : undefined,
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
-              </svg>
-              Terminate
-            </button>
-          )}
+          <button
+            onClick={() => setShowDeactivateConfirm(true)}
+            className="dg-btn dg-btn-warning-filled"
+            style={{
+              flex: variant === "page" ? "0 0 auto" : 1,
+              minWidth: variant === "page" ? 160 : undefined,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            Deactivate
+          </button>
         </div>
       )}
     </>

@@ -33,7 +33,10 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   active: "Active",
   approved: "Approved",
   absence: "Scheduled absence",
-  benched: "Benched",
+  inactive: "Inactive",
+  // Historical key from the old enum — kept so reports against archived data
+  // still render with the current label.
+  benched: "Inactive",
   calloff: "Call-off",
   cancelled: "Cancelled",
   expired: "Expired",
@@ -46,7 +49,10 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   published: "Published",
   rejected: "Rejected",
   swap: "Swap",
-  terminated: "Terminated",
+  removed: "Removed",
+  // Historical key from the old enum — kept so reports against archived data
+  // still render with the current label.
+  terminated: "Removed",
   unknown: "Unknown",
 };
 

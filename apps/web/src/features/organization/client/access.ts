@@ -88,6 +88,32 @@ async function requestOrganizationJson<T>(
   return body as T;
 }
 
+export interface UserExistsByEmailResult {
+  exists: boolean;
+  displayName: string | null;
+  existsInThisOrg: boolean;
+  existingEmployeeId: string | null;
+}
+
+/**
+ * Pre-flight lookup used by AddEmployeeModal to detect whether the typed
+ * email already maps to a DubGrid user. Returns existence + display name
+ * only (never the matched user's org list).
+ */
+export async function checkUserExistsByEmail(
+  email: string,
+  orgId: string,
+): Promise<UserExistsByEmailResult> {
+  return requestOrganizationJson<UserExistsByEmailResult>(
+    "/api/users/check-email",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, orgId }),
+    },
+  );
+}
+
 export function fetchOrganizationUsers(orgId: string): Promise<OrganizationUser[]> {
   const params = new URLSearchParams({ orgId });
   return requestOrganizationJson<{ users: OrganizationUser[] }>(

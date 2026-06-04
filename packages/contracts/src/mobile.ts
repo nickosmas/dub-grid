@@ -125,6 +125,12 @@ export const mobileOrgConfigSchema = z.object({
     role: z.string(),
     department: z.string(),
   }),
+  openShiftVisibility: z
+    .object({
+      coverageGap: z.enum(["hidden", "matched", "always"]),
+      calloff: z.enum(["hidden", "matched", "always"]),
+    })
+    .default({ coverageGap: "matched", calloff: "matched" }),
   featureFlags: z.record(z.boolean()),
 });
 
@@ -133,7 +139,7 @@ export const mobileLinkedEmployeeSchema = z
     id: z.string().uuid(),
     firstName: z.string(),
     lastName: z.string(),
-    status: z.enum(["active", "benched", "terminated"]),
+    status: z.enum(["active", "inactive", "removed"]),
     focusAreaIds: z.array(z.number().int()).default([]),
   })
   .nullable();
@@ -650,12 +656,14 @@ export const mobileUpdateShiftRequestResponseSchema = z.object({
 
 export const mobilePersonSchema = z.object({
   id: z.string().uuid(),
+  employeeNumber: z.number().int(),
   firstName: z.string(),
   lastName: z.string(),
   employmentType: z.enum(["full_time", "part_time"]).default("full_time"),
   phone: z.string(),
   email: z.string(),
-  status: z.enum(["active", "benched", "terminated"]),
+  status: z.enum(["active", "inactive", "removed"]),
+  orgRole: z.enum(["super_admin", "admin", "user"]).nullable().default(null),
   certificationId: z.number().int().nullable().default(null),
   roleIds: z.array(z.number().int()).default([]),
   seniority: z.number().int().default(0),
@@ -708,7 +716,7 @@ export const mobilePersonUpdateResponseSchema = z.object({
 });
 
 export const mobilePersonStatusUpdateBodySchema = z.object({
-  action: z.enum(["bench", "activate", "terminate"]),
+  action: z.enum(["deactivate", "activate", "remove"]),
   expectedVersion: z.number().int().nonnegative(),
   note: z.string().trim().max(500).optional(),
 });

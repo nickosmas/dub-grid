@@ -103,7 +103,7 @@ export function OverviewTab({
     dotColor:
       employee.status === "active"
         ? "var(--color-success)"
-        : employee.status === "benched"
+        : employee.status === "inactive"
           ? "var(--color-warning)"
           : "var(--color-danger)",
   };

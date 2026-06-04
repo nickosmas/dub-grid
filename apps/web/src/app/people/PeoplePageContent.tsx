@@ -27,10 +27,10 @@ function PeopleContent() {
     loading: refLoading, loadError, setupStatus,
   } = useOrganizationData();
   const {
-    employees, benchedEmployees, terminatedEmployees,
+    employees, inactiveEmployees, removedEmployees,
     loading: empLoading,
-    handleAddEmployee, handleSaveEmployee, handleDeleteEmployee,
-    handleBenchEmployee, handleActivateEmployee,
+    handleAddEmployee, handleSaveEmployee, handleRemoveEmployee,
+    handleDeactivateEmployee, handleActivateEmployee,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -72,14 +72,14 @@ function PeopleContent() {
         <>
           <StaffView
             employees={staffEmployees}
-            benchedEmployees={benchedEmployees}
-            terminatedEmployees={terminatedEmployees}
+            inactiveEmployees={inactiveEmployees}
+            removedEmployees={removedEmployees}
             focusAreas={focusAreas}
             certifications={certifications}
             roles={orgRoles}
             onSave={handleSaveEmployee}
-            onDelete={handleDeleteEmployee}
-            onBench={handleBenchEmployee}
+            onRemove={handleRemoveEmployee}
+            onDeactivate={handleDeactivateEmployee}
             onActivate={handleActivateEmployee}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}

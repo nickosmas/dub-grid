@@ -89,12 +89,14 @@ export type MobileNotificationsContext = MobileNotificationContext;
 
 type MobilePersonSource = {
   id: string;
+  employeeNumber: number;
   firstName: string;
   lastName: string;
   employmentType: MobilePerson["employmentType"];
   phone: string;
   email: string;
   status: MobilePerson["status"];
+  orgRole: MobilePerson["orgRole"];
   certificationId: number | null;
   roleIds: number[];
   seniority: number;

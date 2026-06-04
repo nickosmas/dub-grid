@@ -4,15 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { ManagementStaffPanel } from "@/components/staff/ManagementStaffPanel";
 import type { DirectoryPerson } from "@/types";
 
-vi.mock("@/components/staff-detail/EmployeeStatusActions", () => ({
-  EmployeeStatusActions: () => <div data-testid="employee-status-actions" />,
-}));
-
 function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
   return {
     personId: "user-1",
     source: "user_only",
     employeeId: null,
+    employeeNumber: null,
     userId: "user-1",
     firstName: "Jordan",
     lastName: "Lee",
@@ -91,6 +88,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordyn",
         lastName: "Lee",
+        email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [10],
       });
@@ -144,6 +142,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordyn",
         lastName: "Lane",
+        email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [10],
       });
@@ -160,6 +159,10 @@ describe("ManagementStaffPanel", () => {
         userId: "user-1",
         employeeStatus: "active",
         hasAppAccess: true,
+        // "On schedule" is gated on focusAreaIds (matches the schedule
+        // grid's own filter), not just `source === "employee"` — every
+        // member now has an employees row regardless of scheduling.
+        focusAreaIds: [1],
         managementDepartmentIds: [10],
         isManagementUser: true,
       },
@@ -187,6 +190,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordan",
         lastName: "Lee",
+        email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [],
       });

@@ -76,6 +76,7 @@ const assignment: AssignmentDefinition = {
 
 const employee: Employee = {
   id: "emp-1",
+  employeeNumber: 1001,
   userId: "user-1",
   firstName: "Avery",
   lastName: "Stone",
@@ -93,6 +94,7 @@ const employee: Employee = {
   seniority: 1,
   contactNotes: "",
   version: 1,
+  createdAt: null,
 };
 
 const coworker: Employee = {
@@ -131,9 +133,13 @@ const org: Organization = {
   roleLabel: "role",
   departmentLabel: "department",
   shiftDisplayMode: "code",
-  timezone: "America/Los_Angeles",
+  // Default to UTC so "today"/"now" line up with the UTC-pinned browser clock
+  // and the browser-keyed fixtures, keeping time-of-day-agnostic tests
+  // deterministic. Tests that need a real timezone offset set it explicitly.
+  timezone: "UTC",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   coverageRuleConfig: { mentoredCoverageCreditPercent: 50 },
   dataRetentionDays: 365,
   featureOverrides: {},
@@ -431,7 +437,7 @@ describe("UserDashboard", () => {
     );
 
     expect(workingWith).toHaveStyle({
-      background: "#3A55CB",
+      background: "rgba(255, 255, 255, 0.16)",
       borderRadius: "16px",
       justifyContent: "space-between",
     });
@@ -455,7 +461,7 @@ describe("UserDashboard", () => {
     expect(screen.getByText("Cover requests")).toBeInTheDocument();
     expect(screen.getByText("Available shifts")).toBeInTheDocument();
     expect(
-      screen.getByTestId("user-dashboard-action-carousel"),
+      screen.getByTestId("user-dashboard-action-rail"),
     ).toBeInTheDocument();
     expect(screen.queryByText(/carousel below/i)).not.toBeInTheDocument();
     expect(
@@ -724,7 +730,7 @@ describe("UserDashboard", () => {
       />,
     );
 
-    const carousel = screen.getByTestId("user-dashboard-action-carousel");
+    const carousel = screen.getByTestId("user-dashboard-action-rail");
 
     expect(within(carousel).queryByText(/Past request/)).not.toBeInTheDocument();
     expect(within(carousel).queryByText(/Past pickup/)).not.toBeInTheDocument();
@@ -766,6 +772,9 @@ describe("UserDashboard", () => {
         ]),
         assignments: [assignment, lateAssignment],
         currentPeriodShifts: shiftMap,
+        // 18:00 UTC is 11:00 in this zone, so the 15:00 shifts read as not-yet-
+        // started while the early ones have started.
+        org: { ...org, timezone: "America/Los_Angeles" },
         openShifts: [
           {
             ...makeProps().openShifts[0]!,
@@ -822,7 +831,7 @@ describe("UserDashboard", () => {
         />,
       );
 
-      const carousel = screen.getByTestId("user-dashboard-action-carousel");
+      const carousel = screen.getByTestId("user-dashboard-action-rail");
 
       expect(within(carousel).queryByText(/Started gap/)).not.toBeInTheDocument();
       expect(
@@ -893,6 +902,154 @@ describe("UserDashboard", () => {
       expect(within(hero).getByText("Day shift")).toBeInTheDocument();
       expect(within(hero).queryByText("Paid time off")).not.toBeInTheDocument();
       expect(within(hero).queryByText("Away")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("features the next upcoming shift in a later week, not an earlier completed one", () => {
+    vi.useFakeTimers();
+    // Wednesday afternoon: this week's only shift is already finished, and the
+    // next real shift is next week — outside the browsed period.
+    vi.setSystemTime(new Date("2026-05-13T18:00:00.000Z"));
+
+    try {
+      const periodStart = new Date("2026-05-10T00:00:00.000Z"); // Sunday
+      const periodDates = getDatesInRange(periodStart, 7);
+      const periodEnd = periodDates[6] ?? periodStart;
+      const makeWorked = (
+        startTime: string,
+        endTime: string,
+      ): ShiftMap[string] => ({
+        assignmentIds: [101],
+        customEndTime: endTime,
+        customStartTime: startTime,
+        draftKind: null,
+        isDraft: false,
+        label: "Care",
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "Care",
+        segments: [
+          {
+            assignmentId: 101,
+            endTime,
+            focusAreaId: 1,
+            isMentored: false,
+            jobId: 7,
+            jobName: "Care",
+            label: "Care",
+            position: 0,
+            shiftId: 10,
+            shiftName: "Day shift",
+            startTime,
+          },
+        ],
+      });
+      const completedThisWeek: ShiftMap = {
+        "emp-1_2026-05-11": makeWorked("09:00", "15:00"),
+      };
+      const upcomingNextWeek: ShiftMap = {
+        "emp-1_2026-05-20": makeWorked("09:00", "17:00"),
+      };
+
+      render(
+        <UserDashboard
+          {...makeProps({
+            // allShifts spans today → look-ahead (incl. next week); the browsed
+            // period only holds this week's already-finished shift.
+            allShifts: { ...completedThisWeek, ...upcomingNextWeek },
+            currentPeriodShifts: completedThisWeek,
+            openShifts: [],
+            periodDates,
+            periodEnd,
+            periodStart,
+            shiftRequests: {
+              ...makeProps().shiftRequests,
+              badgeCount: 0,
+              myRequests: [],
+              openPickups: [],
+              requests: [],
+            },
+          })}
+        />,
+      );
+
+      const hero = screen.getByTestId("user-dashboard-hero");
+
+      expect(within(hero).getByText("Upcoming")).toBeInTheDocument();
+      expect(within(hero).getByText(/Starts in/)).toBeInTheDocument();
+      // The earlier, already-finished shift must never be the featured hero.
+      expect(within(hero).queryByText("Completed")).not.toBeInTheDocument();
+      expect(within(hero).queryByText("Scheduled")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("evaluates the active shift in the org timezone, not the browser timezone", () => {
+    vi.useFakeTimers();
+    // 20:00 UTC. The org is America/Los_Angeles (UTC-7) → 1:00 PM local, so a
+    // 9-5 shift is in progress. Read in the browser's UTC clock it would look
+    // already finished (20:00 > 17:00); the hero must use the org timezone.
+    vi.setSystemTime(new Date("2026-05-13T20:00:00.000Z"));
+
+    try {
+      const shiftMap: ShiftMap = {
+        "emp-1_2026-05-13": {
+          assignmentIds: [101],
+          customEndTime: "17:00",
+          customStartTime: "09:00",
+          draftKind: null,
+          isDraft: false,
+          label: "Care",
+          publishedAssignmentDefinitionIds: [101],
+          publishedLabel: "Care",
+          segments: [
+            {
+              assignmentId: 101,
+              endTime: "17:00",
+              focusAreaId: 1,
+              isMentored: false,
+              jobId: 7,
+              jobName: "Care",
+              label: "Care",
+              position: 0,
+              shiftId: 10,
+              shiftName: "Day shift",
+              startTime: "09:00",
+            },
+          ],
+        },
+      };
+      const day = new Date("2026-05-13T00:00:00.000Z");
+
+      render(
+        <UserDashboard
+          {...makeProps({
+            allShifts: shiftMap,
+            currentPeriodShifts: shiftMap,
+            openShifts: [],
+            org: { ...org, timezone: "America/Los_Angeles" },
+            periodDates: [day],
+            periodEnd: day,
+            periodStart: day,
+            shiftRequests: {
+              ...makeProps().shiftRequests,
+              badgeCount: 0,
+              myRequests: [],
+              openPickups: [],
+              requests: [],
+            },
+          })}
+        />,
+      );
+
+      const hero = screen.getByTestId("user-dashboard-hero");
+
+      // Org-local 1:00 PM → mid-shift. Browser-UTC math would mark it finished.
+      expect(within(hero).getByText("On Duty")).toBeInTheDocument();
+      expect(within(hero).getByText(/Ends in/)).toBeInTheDocument();
+      expect(within(hero).queryByText("Completed")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

@@ -42,6 +42,7 @@ const originalResendApiKey = process.env.RESEND_API_KEY;
 function makeEmployee(overrides: Record<string, unknown> = {}) {
   return {
     id: "11111111-1111-4111-8111-111111111111",
+    employeeNumber: 1042,
     firstName: "Mina",
     lastName: "Diaz",
     employmentType: "full_time",

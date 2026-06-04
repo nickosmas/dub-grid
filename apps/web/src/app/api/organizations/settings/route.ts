@@ -48,6 +48,12 @@ const bodySchema = z.object({
   coverageRuleConfig: z.object({
     mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
   }).optional(),
+  openShiftVisibility: z
+    .object({
+      coverageGap: z.enum(["hidden", "matched", "always"]),
+      calloff: z.enum(["hidden", "matched", "always"]),
+    })
+    .optional(),
   dataRetentionDays: z.number().int().min(1).max(3650).optional(),
   featureOverrides: z.record(z.string(), z.boolean()).optional(),
 });
@@ -346,6 +352,8 @@ export async function PUT(req: NextRequest) {
         currentOrg.enforceConflictPrevention,
       coverageRuleConfig:
         fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
+      openShiftVisibility:
+        fields.openShiftVisibility ?? currentOrg.openShiftVisibility,
       dataRetentionDays:
         fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
       featureOverrides:
@@ -405,6 +413,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("coverageRuleConfig")) {
       update.coverage_rule_config = nextOrg.coverageRuleConfig;
+    }
+    if (changeKeys.has("openShiftVisibility")) {
+      update.open_shift_visibility = nextOrg.openShiftVisibility;
     }
     if (changeKeys.has("dataRetentionDays")) {
       update.data_retention_days = nextOrg.dataRetentionDays;

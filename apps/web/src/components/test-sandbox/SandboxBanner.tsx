@@ -83,9 +83,9 @@ export default function SandboxBanner() {
         gap: 12,
         flexWrap: "wrap",
         padding: "8px 16px",
-        background: "var(--color-danger-bg)",
-        borderBottom: "1px solid var(--color-danger-border)",
-        color: "var(--color-danger)",
+        background: "var(--color-danger)",
+        borderBottom: "1px solid var(--color-danger-dark)",
+        color: "var(--color-text-inverse)",
         fontSize: "var(--dg-fs-caption)",
         fontWeight: 600,
       }}
@@ -100,7 +100,7 @@ export default function SandboxBanner() {
             width: 18,
             height: 18,
             borderRadius: 9,
-            border: "1.5px solid var(--color-danger)",
+            border: "1.5px solid currentColor",
             fontSize: 11,
             lineHeight: 1,
             flexShrink: 0,
@@ -128,7 +128,7 @@ export default function SandboxBanner() {
           type="button"
           onClick={handleReset}
           disabled={pendingAction != null}
-          className="dg-btn dg-btn-secondary"
+          className="dg-btn dg-btn-on-danger-outline"
           title="Discard all sandbox changes and start over with a fresh clone of your organization."
           style={{
             minHeight: 28,
@@ -142,7 +142,7 @@ export default function SandboxBanner() {
           type="button"
           onClick={handleExit}
           disabled={pendingAction != null}
-          className="dg-btn dg-btn-primary"
+          className="dg-btn dg-btn-on-danger-solid"
           style={{
             minHeight: 28,
             padding: "0 10px",

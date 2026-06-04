@@ -41,6 +41,7 @@ function makeAuth(overrides?: {
 function makeEmployee(overrides: Record<string, unknown> = {}) {
   return {
     id: "d660d308-4e0d-4daf-84fd-6753405e6740",
+    employeeNumber: 1042,
     firstName: "Mina",
     lastName: "Diaz",
     employmentType: "full_time",

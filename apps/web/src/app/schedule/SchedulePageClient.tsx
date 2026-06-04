@@ -2416,14 +2416,33 @@ function SchedulerContent() {
       },
       [],
     );
-    return [...resolvedCalloffOpenShifts, ...gapShifts].filter(
-      (openShift) => !isOpenShiftStarted(openShift),
-    );
+    return [...resolvedCalloffOpenShifts, ...gapShifts].filter((openShift) => {
+      if (isOpenShiftStarted(openShift)) return false;
+      // Schedulers always see every open shift as a filling tool. The
+      // org-level visibility setting only governs the regular-staff view.
+      if (canEditShifts) return true;
+      const mode =
+        openShift.source === "calloff"
+          ? (org?.openShiftVisibility?.calloff ?? "matched")
+          : (org?.openShiftVisibility?.coverageGap ?? "matched");
+      if (mode === "hidden") return false;
+      if (mode === "always") return true;
+      // matched: only show open shifts that fit the viewer's own schedule.
+      return !hasOpenShiftConflict(
+        openShift.assignmentIds ?? [],
+        new Date(`${openShift.date}T00:00:00`),
+        openShift.customStartTime ?? null,
+        openShift.customEndTime ?? null,
+      );
+    });
   }, [
     assignmentById,
+    canEditShifts,
     currentEmpId,
     getActionableCoverageGapAssignmentIds,
+    hasOpenShiftConflict,
     isOpenShiftStarted,
+    org?.openShiftVisibility,
     resolvedCalloffOpenShifts,
     shiftRequests.requests,
     visibleCoverageGaps,
@@ -4751,6 +4770,35 @@ function SchedulerContent() {
     ],
   );
 
+  // Open shifts map to an exact assignment (the shift + job configured in the
+  // coverage requirement). Popups spell that out in full names rather than the
+  // compact code/category label shown in the grid.
+  const spellOutAssignment = useCallback(
+    (assignmentId: number | null | undefined): string | null => {
+      if (assignmentId == null) return null;
+      const assignment = assignments.find((item) => item.id === assignmentId);
+      if (!assignment) return null;
+      const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
+      const shift =
+        shiftId != null
+          ? (shiftCategories.find((item) => item.id === shiftId) ?? null)
+          : null;
+      const job =
+        assignment.jobId != null
+          ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
+          : null;
+      return formatAssignableShiftOptionLabel(
+        buildShiftDisplayParts({
+          shift,
+          job,
+          assignment,
+          shiftDisplayMode: "name",
+        }),
+      );
+    },
+    [assignments, jobs, shiftCategories],
+  );
+
   const handleClaimOpenShift = useMemo<
     ScheduleGridHandlers["onClaimOpenShift"]
   >(
@@ -5930,17 +5978,16 @@ function SchedulerContent() {
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)" }}>
-                      Shift code
+                      Shift and job
                     </span>
                     <CustomSelect
                       value={String(coverageGapSelection.selectedAssignmentDefinitionId)}
                       options={coverageGapSelection.qualifiedAssignmentDefinitions.map((assignment) => ({
                         value: String(assignment.id),
                         label:
+                          spellOutAssignment(assignment.id) ??
                           assignmentLabelMap.get(assignment.id) ??
-                          (org?.shiftDisplayMode === "name"
-                            ? (assignment.name || assignment.label)
-                            : assignment.label),
+                          (assignment.name || assignment.label),
                       }))}
                       onChange={(value) =>
                         setCoverageGapSelection((current) =>
@@ -6070,8 +6117,11 @@ function SchedulerContent() {
                 }
                 message={
                   <>
-                    <strong>{pendingClaimShift.assignmentLabel}</strong> on{" "}
-                    <strong>{pendingClaimShift.date}</strong>
+                    <strong>
+                      {spellOutAssignment(pendingClaimShift.assignmentIds[0]) ??
+                        pendingClaimShift.assignmentLabel}
+                    </strong>{" "}
+                    on <strong>{pendingClaimShift.date}</strong>
                     {pendingClaimShift.calledOffBy && (
                       <> (called off by {pendingClaimShift.calledOffBy})</>
                     )}

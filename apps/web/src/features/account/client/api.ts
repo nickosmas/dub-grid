@@ -313,6 +313,22 @@ export function startBrowserTrial(
   });
 }
 
+/**
+ * Destroys every sandbox the caller owns and clears the sandbox cookie
+ * (the `/api/test-sandbox` "exit" action). Used in two auth paths:
+ * - on the next login, to wipe a sandbox left over from a session that ended
+ *   without an explicit exit (involuntary logout / browser close);
+ * - before a user-initiated sign-out, so the sandbox is gone before logout.
+ * Idempotent and self-gated server-side: a no-op when the user owns no sandbox.
+ */
+export function exitSandbox(): Promise<{ success: true }> {
+  return requestJson("/api/test-sandbox", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "exit" }),
+  });
+}
+
 export function fetchInvitationLookup(
   token: string,
 ): Promise<InvitationLookup> {

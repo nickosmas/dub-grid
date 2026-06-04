@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -88,6 +88,13 @@ function serializeDraft(draft: CoverageDraft): string {
     everyDay: draft.everyDay,
     values: draft.values,
   });
+}
+
+function serializeDrafts(drafts: Record<string, CoverageDraft>): string {
+  return Object.keys(drafts)
+    .sort()
+    .map((key) => `${key}=${serializeDraft(drafts[key])}`)
+    .join("|");
 }
 
 function CoveragePreview({ draft }: { draft: CoverageDraft }) {
@@ -302,69 +309,20 @@ function compareCoverageOptionsByQualificationSeniority(
 }
 
 function CoverageOptionRow({
-  orgId,
-  focusAreaId,
   option,
-  requirements,
-  onSaved,
+  draft,
+  onDraftChange,
   canEdit,
   isLast,
 }: {
-  orgId: string;
-  focusAreaId: number;
   option: AssignableShiftOption;
-  requirements: CoverageRequirement[];
-  onSaved: (saved: CoverageRequirement[], option: AssignableShiftOption) => void;
+  draft: CoverageDraft;
+  onDraftChange: (draft: CoverageDraft) => void;
   canEdit: boolean;
   isLast?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [saving, setSaving] = useState(false);
   const panelId = React.useId();
-  const initialDraft = useMemo(
-    () => buildDraft(requirements, focusAreaId, option),
-    [focusAreaId, option, requirements],
-  );
-  const [draft, setDraft] = useState<CoverageDraft>(initialDraft);
-
-  React.useEffect(() => {
-    if (!expanded) {
-      setDraft(buildDraft(requirements, focusAreaId, option));
-    }
-  }, [expanded, focusAreaId, option, requirements]);
-
-  const isDirty = serializeDraft(draft) !== serializeDraft(initialDraft);
-  const handleClose = () => {
-    if (isDirty) {
-      setDraft(initialDraft);
-      return;
-    }
-    setExpanded(false);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const rows = draft.everyDay
-        ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0 }]
-        : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value }));
-      const saved = await saveCoverageRequirements(
-        orgId,
-        focusAreaId,
-        option.jobId,
-        option.shiftId ?? null,
-        rows,
-      );
-      onSaved(saved, option);
-      setExpanded(false);
-      toast.success("Coverage requirement saved");
-    } catch (error) {
-      Sentry.captureException(error);
-      toast.error("Failed to save coverage requirement");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div className="dg-list-row" style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}>
@@ -393,7 +351,7 @@ function CoverageOptionRow({
             {getCoverageRowTitle(option)}
           </div>
           <div style={{ marginTop: 4 }}>
-            <CoveragePreview draft={initialDraft} />
+            <CoveragePreview draft={draft} />
           </div>
         </div>
         <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
@@ -423,16 +381,16 @@ function CoverageOptionRow({
                 checked={draft.everyDay}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    setDraft((previous) => ({
+                    onDraftChange({
                       everyDay: true,
-                      values: [previous.everyDay ? previous.values[0] ?? 0 : previous.values[1] ?? previous.values[0] ?? 0],
-                    }));
+                      values: [draft.everyDay ? draft.values[0] ?? 0 : draft.values[1] ?? draft.values[0] ?? 0],
+                    });
                     return;
                   }
-                  setDraft((previous) => ({
+                  onDraftChange({
                     everyDay: false,
-                    values: Array.from({ length: 7 }, () => previous.values[0] ?? 0),
-                  }));
+                    values: Array.from({ length: 7 }, () => draft.values[0] ?? 0),
+                  });
                 }}
                 disabled={!canEdit}
               />
@@ -450,7 +408,7 @@ function CoverageOptionRow({
                 min={0}
                 max={999}
                 value={draft.values[0] ?? 0}
-                onChange={(event) => setDraft({ everyDay: true, values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))] })}
+                onChange={(event) => onDraftChange({ everyDay: true, values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))] })}
                 style={{ width: 72, padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
                 disabled={!canEdit}
               />
@@ -470,7 +428,7 @@ function CoverageOptionRow({
                     onChange={(event) => {
                       const nextValues = [...draft.values];
                       nextValues[index] = Math.max(0, Math.min(999, Number(event.target.value) || 0));
-                      setDraft({ everyDay: false, values: nextValues });
+                      onDraftChange({ everyDay: false, values: nextValues });
                     }}
                     style={{ width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
                     disabled={!canEdit}
@@ -479,20 +437,155 @@ function CoverageOptionRow({
               ))}
             </div>
           )}
-
-          <EditorActionRow
-            secondaryAction={(
-              <button onClick={handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-                {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
-              </button>
-            )}
-            primaryAction={(
-              <button onClick={handleSave} disabled={saving || !canEdit || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
-                {getEditorSaveLabel(saving)}
-              </button>
-            )}
-          />
         </div>
+      )}
+    </div>
+  );
+}
+
+function FocusAreaCoverageCard({
+  orgId,
+  focusArea,
+  sections,
+  requirements,
+  canEdit,
+  onBatchSaved,
+}: {
+  orgId: string;
+  focusArea: FocusArea;
+  sections: CoverageOptionSection[];
+  requirements: CoverageRequirement[];
+  canEdit: boolean;
+  onBatchSaved: (
+    focusAreaId: number,
+    results: Array<{ option: AssignableShiftOption; saved: CoverageRequirement[] }>,
+  ) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const initialDrafts = useMemo(() => {
+    const map: Record<string, CoverageDraft> = {};
+    for (const section of sections) {
+      for (const option of section.options) {
+        map[requirementKey(focusArea.id, option)] = buildDraft(requirements, focusArea.id, option);
+      }
+    }
+    return map;
+  }, [sections, requirements, focusArea.id]);
+  const initialKey = useMemo(() => serializeDrafts(initialDrafts), [initialDrafts]);
+
+  const [drafts, setDrafts] = useState<Record<string, CoverageDraft>>(initialDrafts);
+  const [baselineKey, setBaselineKey] = useState(initialKey);
+
+  // Sync drafts to the saved baseline when it changes (after a save, or an
+  // external update). Render-time adjustment per React guidance, not an effect.
+  if (initialKey !== baselineKey) {
+    setDrafts(initialDrafts);
+    setBaselineKey(initialKey);
+  }
+
+  const isDirty = serializeDrafts(drafts) !== initialKey;
+
+  const draftFor = (option: AssignableShiftOption): CoverageDraft =>
+    drafts[requirementKey(focusArea.id, option)] ?? initialDrafts[requirementKey(focusArea.id, option)];
+
+  const handleDiscard = () => setDrafts(initialDrafts);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const allOptions = sections.flatMap((section) => section.options);
+      const dirtyOptions = allOptions.filter((option) => {
+        const key = requirementKey(focusArea.id, option);
+        return serializeDraft(draftFor(option)) !== serializeDraft(initialDrafts[key]);
+      });
+
+      const results = await Promise.all(
+        dirtyOptions.map(async (option) => {
+          const draft = draftFor(option);
+          const rows = draft.everyDay
+            ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0 }]
+            : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value }));
+          const saved = await saveCoverageRequirements(
+            orgId,
+            focusArea.id,
+            option.jobId,
+            option.shiftId ?? null,
+            rows,
+          );
+          return { option, saved };
+        }),
+      );
+
+      onBatchSaved(focusArea.id, results);
+      toast.success(results.length > 1 ? "Coverage requirements saved" : "Coverage requirement saved");
+    } catch (error) {
+      Sentry.captureException(error);
+      toast.error("Failed to save coverage requirements");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+        {focusArea.name}
+      </div>
+
+      {sections.length === 0 ? (
+        <EmptyState
+          size="compact"
+          title="No coverage targets yet"
+          description="Create shifts or scheduled jobs that apply to this focus area before adding coverage."
+          style={{ margin: "12px 16px" }}
+        />
+      ) : (
+        <>
+          <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {sections.map((section) => (
+              <div key={`${focusArea.id}-${section.key}`} style={{ border: "1px solid var(--color-border-light)", borderRadius: "var(--dg-radius-lg)", overflow: "hidden" }}>
+                <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-border-light)" }}>
+                  <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {section.title}
+                  </div>
+                </div>
+                <div style={{ padding: "0 12px" }}>
+                  {section.options.map((option, optionIndex) => (
+                    <CoverageOptionRow
+                      key={`${focusArea.id}-${requirementKey(focusArea.id, option)}`}
+                      option={option}
+                      draft={draftFor(option)}
+                      onDraftChange={(next) =>
+                        setDrafts((previous) => ({
+                          ...previous,
+                          [requirementKey(focusArea.id, option)]: next,
+                        }))
+                      }
+                      canEdit={canEdit}
+                      isLast={optionIndex === section.options.length - 1}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}>
+            <EditorActionRow
+              secondaryAction={isDirty ? (
+                <button onClick={handleDiscard} disabled={saving} className="dg-btn dg-btn-secondary dg-btn-sm">
+                  {EDITOR_ACTION_LABELS.discard}
+                </button>
+              ) : null}
+              primaryAction={(
+                <button onClick={handleSave} disabled={saving || !canEdit || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+                  {getEditorSaveLabel(saving)}
+                </button>
+              )}
+            />
+          </div>
+        </>
       )}
     </div>
   );
@@ -538,29 +631,6 @@ export default function CoverageRequirementsSettings({
     [assignableOptions],
   );
 
-  const optionsByFocusArea = useMemo(() => {
-    return new Map(
-      activeFocusAreas.map((focusArea) => {
-        const localOptions = coverageOptions.filter(
-          (option) => option.focusAreaId === focusArea.id,
-        );
-        return [focusArea.id, localOptions];
-      }),
-    );
-  }, [activeFocusAreas, coverageOptions]);
-
-  if (activeFocusAreas.length === 0 || coverageOptions.length === 0) {
-    return (
-      <EmptyState
-        size="compact"
-        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
-        description={activeFocusAreas.length === 0
-          ? "Create focus areas first to configure coverage."
-          : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."}
-      />
-    );
-  }
-
   const sectionsByFocusArea = useMemo(() => {
     return new Map(
       activeFocusAreas.map((focusArea) => {
@@ -603,66 +673,50 @@ export default function CoverageRequirementsSettings({
     );
   }, [activeFocusAreas, coverageOptions]);
 
-  const handleSaved = (saved: CoverageRequirement[], option: AssignableShiftOption, focusAreaId: number) => {
-    const updated = coverageRequirements.filter(
-      (requirement) =>
-        !(
-          requirement.focusAreaId === focusAreaId &&
-          requirementMatchesOption(requirement, option)
-        ),
-    );
-    onCoverageRequirementsChange([...updated, ...saved]);
+  const handleBatchSaved = (
+    focusAreaId: number,
+    results: Array<{ option: AssignableShiftOption; saved: CoverageRequirement[] }>,
+  ) => {
+    if (results.length === 0) return;
+    let updated = coverageRequirements;
+    for (const { option } of results) {
+      updated = updated.filter(
+        (requirement) =>
+          !(
+            requirement.focusAreaId === focusAreaId &&
+            requirementMatchesOption(requirement, option)
+          ),
+      );
+    }
+    const added = results.flatMap((result) => result.saved);
+    onCoverageRequirementsChange([...updated, ...added]);
   };
+
+  if (activeFocusAreas.length === 0 || coverageOptions.length === 0) {
+    return (
+      <EmptyState
+        size="compact"
+        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
+        description={activeFocusAreas.length === 0
+          ? "Create focus areas first to configure coverage."
+          : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."}
+      />
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {activeFocusAreas.map((focusArea) => {
-        const localOptions = optionsByFocusArea.get(focusArea.id) ?? [];
-        const sections = sectionsByFocusArea.get(focusArea.id) ?? [];
-
-        return (
-          <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              {focusArea.name}
-            </div>
-
-            {localOptions.length === 0 ? (
-              <EmptyState
-                size="compact"
-                title="No coverage targets yet"
-                description="Create shifts or scheduled jobs that apply to this focus area before adding coverage."
-                style={{ margin: "12px 16px" }}
-              />
-            ) : (
-              <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-                {sections.map((section) => (
-                  <div key={`${focusArea.id}-${section.key}`} style={{ border: "1px solid var(--color-border-light)", borderRadius: "var(--dg-radius-lg)", overflow: "hidden" }}>
-                    <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-border-light)" }}>
-                      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        {section.title}
-                      </div>
-                    </div>
-                    <div style={{ padding: "0 12px" }}>
-                      {section.options.map((option, optionIndex) => (
-                        <CoverageOptionRow
-                          key={`${focusArea.id}-${requirementKey(focusArea.id, option)}`}
-                          orgId={orgId}
-                          focusAreaId={focusArea.id}
-                          option={option}
-                          requirements={coverageRequirements}
-                          onSaved={(saved, savedOption) => handleSaved(saved, savedOption, focusArea.id)}
-                          canEdit={canEdit}
-                          isLast={optionIndex === section.options.length - 1}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {activeFocusAreas.map((focusArea) => (
+        <FocusAreaCoverageCard
+          key={focusArea.id}
+          orgId={orgId}
+          focusArea={focusArea}
+          sections={sectionsByFocusArea.get(focusArea.id) ?? []}
+          requirements={coverageRequirements}
+          canEdit={canEdit}
+          onBatchSaved={handleBatchSaved}
+        />
+      ))}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
 import {
   BOX_SHADOW_CARD,
@@ -960,6 +961,7 @@ export function RecurringScheduleSection({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
+      <ProgressBar loading={loading} />
       {hasDirtyChanges && canManage && (
         <div
           style={{
@@ -1121,21 +1123,7 @@ export function RecurringScheduleSection({
         </div>
       </div>
 
-      {loading ? (
-        <div
-          style={{
-            background: "var(--color-surface)",
-            borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border)",
-            padding: "48px 20px",
-            textAlign: "center",
-            color: "var(--color-text-subtle)",
-            fontSize: "var(--dg-fs-label)",
-          }}
-        >
-          Loading recurring schedules...
-        </div>
-      ) : employees.length === 0 ? (
+      {loading ? null : employees.length === 0 ? (
         <EmptyState
           icon={
             <svg
@@ -1191,7 +1179,7 @@ export function RecurringScheduleSection({
               minWidth: isMobile ? 448 : undefined,
               gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
               background: "var(--color-bg)",
-              borderBottom: "2px solid var(--color-dark)",
+              borderBottom: "1px solid var(--color-dark)",
             }}
           >
             <div

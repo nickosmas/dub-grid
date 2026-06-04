@@ -19,6 +19,8 @@ import { MaybeHint } from "@/components/ui/hint";
 import type { OrganizationBillingSummary } from "@/types";
 import SandboxBanner from "@/components/test-sandbox/SandboxBanner";
 import CreateSandboxDialog from "@/components/test-sandbox/CreateSandboxDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { exitSandbox } from "@/features/account/client";
 import {
   fetchOrganizationBootstrap,
   type OrganizationBootstrap,
@@ -376,6 +378,8 @@ export default function Header({ orgName }: HeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [sandboxDialogOpen, setSandboxDialogOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [exitingForLogout, setExitingForLogout] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const sandboxBootstrapQuery = useQuery<OrganizationBootstrap>({
@@ -443,10 +447,46 @@ export default function Header({ orgName }: HeaderProps) {
     (isSuperAdmin || isGridmaster);
 
   const handleSignOut = useCallback(() => {
+    // In sandbox mode, signing out would orphan the sandbox, so confirm the
+    // exit first (it discards the sandbox) and only then complete logout.
+    if (isInSandbox) {
+      setLogoutConfirmOpen(true);
+      return;
+    }
     // Swift sign-out: clear the session and land on the sign-in page.
+    // signOutLocal clears the view-as-user flag (dg_user_view) during teardown,
+    // so view-as-user ends as part of logout. Don't toggle it off here first:
+    // that re-renders the whole app back to the admin context mid-teardown,
+    // which can stall the session sign-out and leave the user logged in.
     // signOutLocal always redirects (even on error), so no splash is needed.
     signOutLocal().catch((err) => Sentry.captureException(err));
+  }, [isInSandbox, signOutLocal]);
+
+  const handleExitAndSignOut = useCallback(async () => {
+    setExitingForLogout(true);
+    try {
+      // Destroy the sandbox before tearing down the session — afterwards the
+      // request would be unauthenticated. If it fails we still sign out; the
+      // next login wipes any leftover sandbox as a backstop.
+      await exitSandbox();
+    } catch (err) {
+      Sentry.captureException(err);
+    }
+    await signOutLocal();
   }, [signOutLocal]);
+
+  const logoutConfirmDialog = logoutConfirmOpen ? (
+    <ConfirmDialog
+      title="Exit sandbox to sign out"
+      message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
+      confirmLabel={exitingForLogout ? "Signing out…" : "Exit & sign out"}
+      cancelLabel="Cancel"
+      variant="danger"
+      isLoading={exitingForLogout}
+      onConfirm={handleExitAndSignOut}
+      onCancel={() => setLogoutConfirmOpen(false)}
+    />
+  ) : null;
 
   /* ── Mobile Header ─────────────────────────────────────── */
   if (isMobile) {
@@ -459,6 +499,7 @@ export default function Header({ orgName }: HeaderProps) {
             onClose={() => setSandboxDialogOpen(false)}
           />
         ) : null}
+        {logoutConfirmDialog}
         <div
           style={{
             background: "var(--color-surface)",
@@ -556,6 +597,7 @@ export default function Header({ orgName }: HeaderProps) {
           onClose={() => setSandboxDialogOpen(false)}
         />
       ) : null}
+      {logoutConfirmDialog}
       <div
       style={{
         background: "var(--color-surface)",
@@ -674,6 +716,9 @@ export default function Header({ orgName }: HeaderProps) {
       <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
         <button
           onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Account menu"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
           style={{
             display: "inline-flex",
             alignItems: "center",

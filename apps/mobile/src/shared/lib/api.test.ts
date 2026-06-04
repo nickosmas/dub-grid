@@ -492,11 +492,12 @@ describe("mobileApiRequest", () => {
         success: true,
         person: {
           id: "00000000-0000-0000-0000-000000000001",
+          employeeNumber: 1042,
           firstName: "Mina",
           lastName: "Diaz",
           phone: "555-0100",
           email: "mina@dubgrid.com",
-          status: "benched",
+          status: "inactive",
           focusAreaIds: [1, 2],
           contactNotes: "Weekend availability",
           statusChangedAt: "2026-04-24T12:00:00.000Z",
@@ -513,7 +514,7 @@ describe("mobileApiRequest", () => {
       "token-123",
       "00000000-0000-0000-0000-000000000001",
       {
-        action: "bench",
+        action: "deactivate",
         expectedVersion: 7,
         note: "Coverage hold",
       },
@@ -528,7 +529,7 @@ describe("mobileApiRequest", () => {
     expect(request.method).toBe("PATCH");
     expect(request.body).toBe(
       JSON.stringify({
-        action: "bench",
+        action: "deactivate",
         expectedVersion: 7,
         note: "Coverage hold",
       }),
@@ -541,6 +542,7 @@ describe("mobileApiRequest", () => {
       json: async () => ({
         person: {
           id: "00000000-0000-0000-0000-000000000001",
+          employeeNumber: 1042,
           firstName: "Mina",
           lastName: "Diaz",
           phone: "555-0100",
@@ -573,6 +575,7 @@ describe("mobileApiRequest", () => {
   it("manages teammate invitations through the mobile people endpoint", async () => {
     const person = {
       id: "00000000-0000-0000-0000-000000000001",
+      employeeNumber: 1042,
       firstName: "Mina",
       lastName: "Diaz",
       phone: "555-0100",

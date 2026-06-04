@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { getEmployeeProfileHref } from "@/lib/profile-links";
 import { useQueryClient } from "@tanstack/react-query";
 import { Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -60,24 +62,24 @@ import { StaffEmptyState } from "./StaffEmptyState";
 import { StaffFilterPopover } from "./StaffFilterPopover";
 import { StaffPagination } from "./StaffPagination";
 import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
-import { useStaffFilters } from "./useStaffFilters";
+import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
 
 const REORDER_SETTLE_MS = 220;
 
-type BulkStaffAction = "bench" | "activate" | "terminate";
+type BulkStaffAction = "deactivate" | "activate" | "remove";
 
 export interface MembersSectionProps {
   employees: Employee[];
-  benchedEmployees: Employee[];
-  terminatedEmployees: Employee[];
+  inactiveEmployees: Employee[];
+  removedEmployees: Employee[];
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
   onSave: (emp: Employee) => void;
-  onDelete: (empId: string) => void;
-  onBench: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void;
+  onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onAdd: () => void;
   canViewEmployeeDetails: boolean;
@@ -96,14 +98,14 @@ export interface MembersSectionProps {
 
 export function MembersSection({
   employees,
-  benchedEmployees,
-  terminatedEmployees,
+  inactiveEmployees,
+  removedEmployees,
   focusAreas,
   certifications,
   roles,
   onSave,
-  onDelete,
-  onBench,
+  onRemove,
+  onDeactivate,
   onActivate,
   onAdd,
   canViewEmployeeDetails,
@@ -133,8 +135,8 @@ export function MembersSection({
 
   const filters = useStaffFilters({
     employees,
-    benchedEmployees,
-    terminatedEmployees,
+    inactiveEmployees,
+    removedEmployees,
   });
   const {
     activeTab,
@@ -440,6 +442,7 @@ export function MembersSection({
     action: BulkStaffAction;
     employeeIds: string[];
   } | null>(null);
+  const [bulkNote, setBulkNote] = useState("");
   const [isBulkActionRunning, setIsBulkActionRunning] = useState(false);
   const [exportConfirm, setExportConfirm] = useState(false);
 
@@ -610,18 +613,20 @@ export function MembersSection({
     if (!bulkConfirm || isBulkActionRunning) return;
 
     const pendingAction = bulkConfirm;
+    const trimmedNote = bulkNote.trim() || undefined;
     setIsBulkActionRunning(true);
     try {
       for (const employeeId of pendingAction.employeeIds) {
-        if (pendingAction.action === "bench") {
-          await onBench(employeeId);
+        if (pendingAction.action === "deactivate") {
+          await onDeactivate(employeeId, trimmedNote);
         } else if (pendingAction.action === "activate") {
           await onActivate(employeeId);
         } else {
-          await onDelete(employeeId);
+          await onRemove(employeeId, trimmedNote);
         }
       }
       setBulkConfirm(null);
+      setBulkNote("");
       clearSelection();
     } finally {
       setIsBulkActionRunning(false);
@@ -671,12 +676,12 @@ export function MembersSection({
     [onSave],
   );
 
-  const handleDelete = useCallback(
+  const handleRemove = useCallback(
     (employeeId: string) => {
-      onDelete(employeeId);
+      onRemove(employeeId);
       setExpandedEmpId(null);
     },
-    [onDelete],
+    [onRemove],
   );
 
   const hasExportableStaffRows = employees.length > 0;
@@ -708,19 +713,25 @@ export function MembersSection({
   );
 
   const tabs: {
-    key: "active" | "benched" | "terminated";
+    key: EmployeeTab;
     label: string;
     count: number;
   }[] = canManageEmployees
     ? [
-        { key: "active", label: "All", count: employees.length },
-        { key: "benched", label: "Benched", count: benchedEmployees.length },
-        { key: "terminated", label: "Terminated", count: terminatedEmployees.length },
+        {
+          key: "all",
+          label: "All",
+          count:
+            employees.length + inactiveEmployees.length + removedEmployees.length,
+        },
+        { key: "active", label: "Active", count: employees.length },
+        { key: "inactive", label: "Inactive", count: inactiveEmployees.length },
+        { key: "removed", label: "Removed", count: removedEmployees.length },
       ]
-    : [{ key: "active", label: "All", count: employees.length }];
+    : [{ key: "active", label: "Active", count: employees.length }];
 
   const selectedEmployee = expandedEmpId
-    ? [...employees, ...benchedEmployees, ...terminatedEmployees].find(
+    ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
         (employee) => employee.id === expandedEmpId,
       ) ?? null
     : null;
@@ -805,33 +816,8 @@ export function MembersSection({
             partTimeCount={employmentSummary.partTime}
           />
 
-          <div className="relative">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--color-text-faint)]"
-              style={{ left: 12 }}
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              className="dg-input w-full"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by name, email, or phone..."
-              style={{ height: 40, paddingLeft: 36 }}
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <div className="flex items-center gap-3 overflow-x-auto">
+            <div className="flex min-w-0 items-center gap-2">
               {canViewManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
                   value={showManagement ? "management" : "schedule"}
@@ -848,7 +834,7 @@ export function MembersSection({
                   onChange={(value) => {
                     setShowManagement(value === "management");
                     if (value === "schedule") {
-                      setActiveTab("active");
+                      setActiveTab("all");
                     }
                   }}
                   style={{ minWidth: 180 }}
@@ -1049,9 +1035,37 @@ export function MembersSection({
                     })}
                 </div>
               )}
+
+              <div
+                className="relative"
+                style={{ flex: "1 1 300px", minWidth: 300, maxWidth: 380 }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-[var(--color-text-faint)]"
+                  style={{ left: 12 }}
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  className="dg-input w-full"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by name, email, or phone..."
+                  style={{ height: 32, paddingLeft: 32, fontSize: 13 }}
+                />
+              </div>
             </div>
 
-            <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="ml-auto flex items-center gap-2">
               {!showManagement && canManageEmployees && orgId && !isMobile && (
                 <button
                   onClick={() => setShowImport(true)}
@@ -1124,7 +1138,6 @@ export function MembersSection({
               departmentLabel={departmentLabel}
               selectionCount={selectedIds.size}
               selectedIds={selectedIds}
-              activeTab={activeTab}
               canManageEmployees={canManageEmployees}
               displayList={displayList}
               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
@@ -1132,14 +1145,17 @@ export function MembersSection({
                 setInviteEmployee(employeesToInvite[0]);
                 setInviteQueue(employeesToInvite.slice(1));
               }}
-              onBulkBench={(employeeIds) => {
-                setBulkConfirm({ action: "bench", employeeIds });
+              onBulkDeactivate={(employeeIds) => {
+                setBulkNote("");
+                setBulkConfirm({ action: "deactivate", employeeIds });
               }}
               onBulkActivate={(employeeIds) => {
+                setBulkNote("");
                 setBulkConfirm({ action: "activate", employeeIds });
               }}
-              onBulkTerminate={(employeeIds) => {
-                setBulkConfirm({ action: "terminate", employeeIds });
+              onBulkRemove={(employeeIds) => {
+                setBulkNote("");
+                setBulkConfirm({ action: "remove", employeeIds });
               }}
               onClearSelection={clearSelection}
               isReordering={isReordering}
@@ -1197,9 +1213,9 @@ export function MembersSection({
                   {isReordering ? (
                     <div className="dg-staff-directory-table">
                       <div className="dg-staff-directory-header bg-[var(--color-bg)]">
-                        <div className="dg-staff-directory-head-cell flex pl-6">
+                        <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex select-none items-center gap-1">
-                            #{" "}
+                            ID{" "}
                             <SortIcon
                               active={sortConfig.key === "seniority"}
                               dir={sortConfig.dir}
@@ -1214,6 +1230,12 @@ export function MembersSection({
                               dir={sortConfig.dir}
                             />
                           </span>
+                        </div>
+                        <div className="dg-staff-directory-head-cell flex">
+                          Employment
+                        </div>
+                        <div className="dg-staff-directory-head-cell flex">
+                          Status
                         </div>
                         <div className="dg-staff-directory-head-cell hidden md:flex">
                           {focusAreaLabel}
@@ -1230,7 +1252,10 @@ export function MembersSection({
                         <div className="dg-staff-directory-head-cell hidden lg:flex">
                           Access
                         </div>
-                        <div className="dg-staff-directory-head-cell flex pr-6" />
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">
+                          Date Joined
+                        </div>
+                        <div className="dg-staff-directory-head-cell flex" />
                       </div>
                       <div className="dg-staff-directory-body">
                         {paginatedList.map((employee, index) => {
@@ -1275,7 +1300,7 @@ export function MembersSection({
                     <Table>
                       <TableHeader>
                         <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
-                          <TableHead className="w-[60px] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                          <TableHead className="w-[100px] border-r border-[var(--color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
                             <div className="flex items-center gap-1.5">
                               {canManageEmployees && (
                                 <input
@@ -1295,7 +1320,7 @@ export function MembersSection({
                                 className="inline-flex cursor-pointer select-none items-center gap-1"
                                 onClick={() => handleSort("seniority")}
                               >
-                                #{" "}
+                                ID{" "}
                                 <SortIcon
                                   active={sortConfig.key === "seniority"}
                                   dir={sortConfig.dir}
@@ -1304,7 +1329,7 @@ export function MembersSection({
                             </div>
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]"
+                            className="cursor-pointer select-none border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]"
                             onClick={() => handleSort("name")}
                           >
                             <span className="inline-flex items-center gap-1">
@@ -1315,20 +1340,29 @@ export function MembersSection({
                               />
                             </span>
                           </TableHead>
-                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell">
+                          <TableHead className="w-[110px] border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                            Employment
+                          </TableHead>
+                          <TableHead className="w-[110px] border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:border-r">
+                            Status
+                          </TableHead>
+                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell md:border-r">
                             {focusAreaLabel}
                           </TableHead>
-                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell">
+                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell lg:border-r">
                             {certificationLabel}
                           </TableHead>
-                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
                             Roles
                           </TableHead>
-                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
                             Account
                           </TableHead>
-                          <TableHead className="hidden text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
                             Access
+                          </TableHead>
+                          <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                            Date Joined
                           </TableHead>
                           <TableHead className="w-[40px] pr-6" />
                         </UITableRow>
@@ -1396,16 +1430,19 @@ export function MembersSection({
                 <Table>
                   <TableHeader>
                     <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
-                      <TableHead className="pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                      <TableHead className="w-[100px] border-r border-[var(--color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        ID
+                      </TableHead>
+                      <TableHead className="border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
                         Name
                       </TableHead>
                       {!isMobile && !isTablet && (
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        <TableHead className="border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
                           {managementDepartmentLabel}
                         </TableHead>
                       )}
                       {!isMobile && !isTablet && (
-                        <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                        <TableHead className="border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
                           Role
                         </TableHead>
                       )}
@@ -1438,22 +1475,22 @@ export function MembersSection({
                         ? person.invitationStatus === "expired"
                           ? "Expired"
                           : "Pending"
-                        : person.employeeStatus === "terminated"
-                          ? "Terminated"
-                          : person.employeeStatus === "benched"
-                            ? "Benched"
+                        : person.employeeStatus === "removed"
+                          ? "Removed"
+                          : person.employeeStatus === "inactive"
+                            ? "Inactive"
                             : "Active";
                       const statusColors = isPending
                         ? {
                             background: "var(--color-warning-bg)",
                             color: "var(--color-warning-text)",
                           }
-                        : person.employeeStatus === "terminated"
+                        : person.employeeStatus === "removed"
                           ? {
                               background: "var(--color-danger-bg)",
                               color: "var(--color-danger-text)",
                             }
-                          : person.employeeStatus === "benched"
+                          : person.employeeStatus === "inactive"
                             ? {
                                 background: "var(--color-warning-bg)",
                                 color: "var(--color-warning-text)",
@@ -1482,7 +1519,15 @@ export function MembersSection({
                           }
                           style={{ opacity: isPending ? 0.7 : 1 }}
                         >
-                          <TableCell className="py-4 pl-6">
+                          <TableCell className="w-[100px] border-r border-[var(--color-border-light)] py-4 pl-6">
+                            <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums text-[var(--color-text-faint)]">
+                              {person.employeeNumber !== null
+                                ? `#${person.employeeNumber}`
+                                : "\u2014"}
+                            </span>
+                          </TableCell>
+
+                          <TableCell className="border-r border-[var(--color-border-light)] py-4">
                             <div className="flex min-w-0 items-center gap-3">
                               <div
                                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
@@ -1499,10 +1544,38 @@ export function MembersSection({
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="truncate text-[14px] font-medium text-[var(--color-text-primary)]">
-                                    {displayName}
-                                  </span>
-                                  {person.source === "employee" && (
+                                  {/* Match the on-schedule roster: the name
+                                      links to the full profile page when an
+                                      employees row exists. Without an
+                                      employeeId (rare legacy data), fall back
+                                      to plain text. Stop row-click propagation
+                                      so the link doesn't also toggle the
+                                      expanded popover. */}
+                                  {person.employeeId ? (
+                                    <Link
+                                      href={getEmployeeProfileHref(
+                                        person.employeeId,
+                                        person.userId,
+                                        currentUserId,
+                                      )}
+                                      onClick={(event) => event.stopPropagation()}
+                                      className="truncate text-[14px] font-medium text-[var(--color-text-primary)] hover:underline"
+                                    >
+                                      {displayName}
+                                    </Link>
+                                  ) : (
+                                    <span className="truncate text-[14px] font-medium text-[var(--color-text-primary)]">
+                                      {displayName}
+                                    </span>
+                                  )}
+                                  {/* "On Schedule" reflects whether the person
+                                      actually appears on the schedule grid,
+                                      which gates on focusAreaIds (see
+                                      ScheduleGrid.tsx + PeoplePageContent's
+                                      `employees` filter). `source === "employee"`
+                                      is no longer a valid signal — every member
+                                      has an employees row post-Flow-B. */}
+                                  {person.focusAreaIds.length > 0 && (
                                     <span
                                       className="inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                                       style={{
@@ -1522,7 +1595,7 @@ export function MembersSection({
                           </TableCell>
 
                           {!isMobile && !isTablet && (
-                            <TableCell className="py-4">
+                            <TableCell className="border-r border-[var(--color-border-light)] py-4">
                               <span className="text-[13px] text-[var(--color-text-muted)]">
                                 {personDepts.length > 0
                                   ? personDepts.map((department) => department.name).join(", ")
@@ -1532,7 +1605,7 @@ export function MembersSection({
                           )}
 
                           {!isMobile && !isTablet && (
-                            <TableCell className="py-4">
+                            <TableCell className="border-r border-[var(--color-border-light)] py-4">
                               <InlineRoleSelect
                                 orgRole={person.orgRole}
                                 onChange={roleChangeHandlerFor(
@@ -1701,8 +1774,8 @@ export function MembersSection({
           orgId={orgId}
           pendingInviteByEmployeeId={pendingInviteByEmployeeId}
           onSave={handleSave}
-          onDelete={handleDelete}
-          onBench={(employeeId, note) => onBench(employeeId, note)}
+          onRemove={handleRemove}
+          onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
           onActivate={(employeeId) => onActivate(employeeId)}
           onClose={() => setExpandedEmpId(null)}
           onInvite={(employee) => setInviteEmployee(employee)}
@@ -1858,6 +1931,7 @@ export function MembersSection({
                 userId: selectedPerson.userId,
                 firstName: data.firstName,
                 lastName: data.lastName,
+                email: data.email,
                 phone: data.phone,
               });
               const pendingInvitation = pendingInviteByEmployeeId.get(
@@ -1871,6 +1945,7 @@ export function MembersSection({
                 await updatePendingInvitation(pendingInvitation.id, orgId, {
                   firstName: data.firstName,
                   lastName: data.lastName,
+                  email: data.email || undefined,
                   phone: data.phone,
                   departmentIds: data.managementDepartmentIds,
                 });
@@ -1878,14 +1953,15 @@ export function MembersSection({
 
               const currentEmployee = [
                 ...employees,
-                ...benchedEmployees,
-                ...terminatedEmployees,
+                ...inactiveEmployees,
+                ...removedEmployees,
               ].find((employee) => employee.id === selectedPerson.employeeId);
               if (currentEmployee) {
                 updatedEmployee = {
                   ...currentEmployee,
                   firstName: data.firstName,
                   lastName: data.lastName,
+                  email: data.email,
                   phone: data.phone,
                 };
               }
@@ -1896,6 +1972,7 @@ export function MembersSection({
                 {
                   firstName: data.firstName,
                   lastName: data.lastName,
+                  email: data.email || undefined,
                   phone: data.phone,
                   departmentIds: data.managementDepartmentIds,
                 },
@@ -1954,38 +2031,45 @@ export function MembersSection({
                 }
               : undefined
           }
-          onBench={canManageEmployees ? onBench : undefined}
-          onActivate={canManageEmployees ? onActivate : undefined}
-          onTerminate={canManageEmployees ? onDelete : undefined}
         />
       )}
 
-      {managementSchedulePerson && orgId && (
-        <AddManagementUserToScheduleModal
-          orgId={orgId}
-          person={managementSchedulePerson}
-          focusAreas={focusAreas}
-          certifications={certifications}
-          roles={roles}
-          focusAreaLabel={focusAreaLabel}
-          certificationLabel={certificationLabel}
-          roleLabel={roleLabel}
-          onClose={() => setManagementSchedulePerson(null)}
-          onAdded={(employee) => {
-            syncManagementScheduleEmployeeInCaches(
-              managementSchedulePerson,
-              employee,
-            );
-            setManagementSchedulePerson(null);
-            void queryClient.invalidateQueries({
-              queryKey: queryKeys.org.directory(orgId),
-            });
-            void queryClient.invalidateQueries({
-              queryKey: queryKeys.employees.all(orgId),
-            });
-          }}
-        />
-      )}
+      {managementSchedulePerson && orgId && (() => {
+        const existingEmployee =
+          managementSchedulePerson.employeeId
+            ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
+                (candidate) => candidate.id === managementSchedulePerson.employeeId,
+              ) ?? null
+            : null;
+        if (!existingEmployee) return null;
+        return (
+          <AddManagementUserToScheduleModal
+            orgId={orgId}
+            person={managementSchedulePerson}
+            employee={existingEmployee}
+            focusAreas={focusAreas}
+            certifications={certifications}
+            roles={roles}
+            focusAreaLabel={focusAreaLabel}
+            certificationLabel={certificationLabel}
+            roleLabel={roleLabel}
+            onClose={() => setManagementSchedulePerson(null)}
+            onAdded={(employee) => {
+              syncManagementScheduleEmployeeInCaches(
+                managementSchedulePerson,
+                employee,
+              );
+              setManagementSchedulePerson(null);
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.org.directory(orgId),
+              });
+              void queryClient.invalidateQueries({
+                queryKey: queryKeys.employees.all(orgId),
+              });
+            }}
+          />
+        );
+      })()}
 
       {managementAccessEmployee && orgId && canManageManagementAccess && (
         <EmployeeManagementAccessModal
@@ -2009,37 +2093,61 @@ export function MembersSection({
         />
       )}
 
-      {bulkConfirm ? (
-        <ConfirmDialog
-          title={
-            bulkConfirm.action === "bench"
-              ? "Bench Selected Staff?"
-              : bulkConfirm.action === "activate"
-                ? "Activate Selected Staff?"
-                : "Terminate Selected Staff?"
-          }
-          message={
-            bulkConfirm.action === "bench"
-              ? `Bench ${bulkConfirm.employeeIds.length} selected staff member${bulkConfirm.employeeIds.length === 1 ? "" : "s"}? They will be hidden from active scheduling.`
-              : bulkConfirm.action === "activate"
-                ? `Activate ${bulkConfirm.employeeIds.length} selected staff member${bulkConfirm.employeeIds.length === 1 ? "" : "s"}? They will return to active scheduling.`
-                : `Terminate ${bulkConfirm.employeeIds.length} selected staff member${bulkConfirm.employeeIds.length === 1 ? "" : "s"}? They will be archived from active staff lists.`
-          }
-          confirmLabel={
-            bulkConfirm.action === "bench"
-              ? "Bench"
-              : bulkConfirm.action === "activate"
-                ? "Activate"
-                : "Terminate"
-          }
-          variant={bulkConfirm.action === "terminate" ? "danger" : "warning"}
-          isLoading={isBulkActionRunning}
-          onConfirm={handleConfirmBulkAction}
-          onCancel={() => {
-            if (!isBulkActionRunning) setBulkConfirm(null);
-          }}
-        />
-      ) : null}
+      {bulkConfirm ? (() => {
+        const count = bulkConfirm.employeeIds.length;
+        const plural = count === 1 ? "" : "s";
+        const showReason = bulkConfirm.action !== "activate";
+        const summary =
+          bulkConfirm.action === "deactivate"
+            ? `Deactivate ${count} selected staff member${plural}? They'll be hidden from active scheduling and can be reactivated anytime.`
+            : bulkConfirm.action === "activate"
+              ? `Activate ${count} selected staff member${plural}? They'll return to active scheduling.`
+              : `Remove ${count} selected staff member${plural}? They'll lose access and won't appear in active staff lists.`;
+        return (
+          <ConfirmDialog
+            title={
+              bulkConfirm.action === "deactivate"
+                ? "Deactivate Selected Staff?"
+                : bulkConfirm.action === "activate"
+                  ? "Activate Selected Staff?"
+                  : "Remove Selected Staff?"
+            }
+            message={
+              showReason ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <span>{summary}</span>
+                  <input
+                    className="dg-input"
+                    value={bulkNote}
+                    onChange={(e) => setBulkNote(e.target.value)}
+                    disabled={isBulkActionRunning}
+                    placeholder="Reason (optional, applies to all selected)"
+                    style={{ fontSize: "var(--dg-fs-label)" }}
+                  />
+                </div>
+              ) : (
+                summary
+              )
+            }
+            confirmLabel={
+              bulkConfirm.action === "deactivate"
+                ? "Deactivate"
+                : bulkConfirm.action === "activate"
+                  ? "Activate"
+                  : "Remove"
+            }
+            variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
+            isLoading={isBulkActionRunning}
+            onConfirm={handleConfirmBulkAction}
+            onCancel={() => {
+              if (!isBulkActionRunning) {
+                setBulkConfirm(null);
+                setBulkNote("");
+              }
+            }}
+          />
+        );
+      })() : null}
 
       {exportConfirm ? (
         <ConfirmDialog

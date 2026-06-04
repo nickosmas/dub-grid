@@ -33,12 +33,27 @@ export async function GET(req: NextRequest) {
     const cutoff =
       parsed.data.since ??
       new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: orgRow } = await auth.serviceClient
+      .from("organizations")
+      .select("timezone")
+      .eq("id", parsed.data.orgId)
+      .single();
+    const tz = (orgRow?.timezone as string | undefined) ?? "UTC";
+    const todayKey = new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
     const { data, error } = await auth.serviceClient
       .from("publish_history")
       .select(
         "id, org_id, published_by, start_date, end_date, change_count, changes, published_at",
       )
       .eq("org_id", parsed.data.orgId)
+      .gte("end_date", todayKey)
       .gte("published_at", cutoff)
       .order("published_at", { ascending: false });
     if (error) {

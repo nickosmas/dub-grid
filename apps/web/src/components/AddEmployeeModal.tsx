@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useCallback, useRef, useMemo, useId } from "react";
-import { getStaffNameError, normalizeStaffName } from "@dubgrid/contracts";
+import {
+  getOptionalStaffEmailError,
+  getStaffNameError,
+  normalizeOptionalStaffEmail,
+  normalizeStaffName,
+} from "@dubgrid/contracts";
 import Modal from "@/components/Modal";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
@@ -14,6 +19,7 @@ type RowEntry = {
   _id: string;
   firstName: string;
   lastName: string;
+  email: string;
   employmentType: Employee["employmentType"];
   certificationId: number | null;
   focusAreaIds: number[];
@@ -29,6 +35,7 @@ function makeRow(
     _id: Math.random().toString(36).slice(2),
     firstName: "",
     lastName: "",
+    email: "",
     employmentType: "full_time",
     certificationId,
     focusAreaIds,
@@ -87,6 +94,7 @@ export default function AddEmployeeModal({
         Array.from({ length: 3 }, () => ({
           firstName: "",
           lastName: "",
+          email: "",
           employmentType: "full_time",
           certificationId: defaultCertId,
           focusAreaIds: [...defaultFocusAreaIds],
@@ -99,6 +107,7 @@ export default function AddEmployeeModal({
       rows.map((row) => ({
         firstName: row.firstName,
         lastName: row.lastName,
+        email: row.email,
         employmentType: row.employmentType,
         certificationId: row.certificationId,
         focusAreaIds: row.focusAreaIds,
@@ -125,6 +134,10 @@ export default function AddEmployeeModal({
           row.lastName.trim().length > 0
             ? getStaffNameError(row.lastName, "Last name")
             : null,
+        email:
+          row.email.trim().length > 0
+            ? getOptionalStaffEmailError(row.email)
+            : null,
         focusAreaIds:
           row.focusAreaIds.length === 0 &&
           (row.firstName.trim().length > 0 || row.lastName.trim().length > 0)
@@ -139,7 +152,8 @@ export default function AddEmployeeModal({
       row.lastName.trim() &&
       row.focusAreaIds.length > 0 &&
       !rowErrors[index]?.firstName &&
-      !rowErrors[index]?.lastName,
+      !rowErrors[index]?.lastName &&
+      !rowErrors[index]?.email,
   );
 
   const updateRow = useCallback(
@@ -195,7 +209,7 @@ export default function AddEmployeeModal({
         focusAreaIds: r.focusAreaIds,
         roleIds: [],
         phone: "",
-        email: "",
+        email: normalizeOptionalStaffEmail(r.email),
         contactNotes: "",
         status: "active" as const,
         statusChangedAt: null,
@@ -476,6 +490,41 @@ export default function AddEmployeeModal({
                         fontSize={12}
                       />
                     </div>
+                  </div>
+
+                  {/* Email (optional). Admins can leave blank to schedule
+                      a new hire before they're onboarded; the invitation
+                      flow fills it in later. */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <label style={fieldLabelStyle}>
+                      Email{" "}
+                      <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                        (optional)
+                      </span>
+                    </label>
+                    <input
+                      className="dg-input"
+                      type="email"
+                      value={row.email}
+                      onChange={(e) => updateRow(row._id, { email: e.target.value })}
+                      placeholder="name@example.com"
+                      style={
+                        errors.email
+                          ? { borderColor: "var(--color-danger)" }
+                          : undefined
+                      }
+                    />
+                    {errors.email ? (
+                      <div
+                        role="alert"
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-danger)",
+                        }}
+                      >
+                        {errors.email}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

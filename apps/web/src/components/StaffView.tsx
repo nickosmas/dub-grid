@@ -97,14 +97,14 @@ type StaffSection = "directory" | "requests" | "access" | "recurring-schedule";
 
 interface StaffViewProps {
   employees: Employee[];
-  benchedEmployees?: Employee[];
-  terminatedEmployees?: Employee[];
+  inactiveEmployees?: Employee[];
+  removedEmployees?: Employee[];
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
   onSave: (emp: Employee) => void;
-  onDelete: (empId: string) => void;
-  onBench: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void;
+  onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onAdd: () => void;
   orgId?: string;
@@ -132,14 +132,14 @@ interface StaffViewProps {
 
 export default function StaffView({
   employees,
-  benchedEmployees = [],
-  terminatedEmployees = [],
+  inactiveEmployees = [],
+  removedEmployees = [],
   focusAreas,
   certifications,
   roles,
   onSave,
-  onDelete,
-  onBench,
+  onRemove,
+  onDeactivate,
   onActivate,
   onAdd,
   orgId,
@@ -323,14 +323,14 @@ export default function StaffView({
         {activeSection === "directory" && (
           <MembersSection
             employees={employees}
-            benchedEmployees={benchedEmployees}
-            terminatedEmployees={terminatedEmployees}
+            inactiveEmployees={inactiveEmployees}
+            removedEmployees={removedEmployees}
             focusAreas={focusAreas}
             certifications={certifications}
             roles={roles}
             onSave={onSave}
-            onDelete={onDelete}
-            onBench={onBench}
+            onRemove={onRemove}
+            onDeactivate={onDeactivate}
             onActivate={onActivate}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}

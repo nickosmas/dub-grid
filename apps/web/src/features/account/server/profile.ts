@@ -73,7 +73,7 @@ const JOB_COLS =
 const ABSENCE_TYPE_COLS =
   "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const RECURRING_SHIFT_COLS =
   "id, emp_id, org_id, day_of_week, state, effective_from, effective_until, created_at, updated_at, archived_at";
 const SCHEDULE_CELL_SELECT =

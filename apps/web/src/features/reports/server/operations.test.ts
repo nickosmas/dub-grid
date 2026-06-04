@@ -29,6 +29,7 @@ function buildSource(
     employees: [
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        employee_number: 1001,
         first_name: "Avery",
         last_name: "Ng",
         employment_type: "full_time",
@@ -44,12 +45,13 @@ function buildSource(
       },
       {
         id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        employee_number: 1002,
         first_name: "Blake",
         last_name: "Diaz",
         employment_type: "part_time",
         email: "blake@example.com",
         phone: "",
-        status: "benched",
+        status: "inactive",
         seniority: 2,
         focus_area_ids: [10],
         certification_id: null,
@@ -462,7 +464,7 @@ describe("operations reports", () => {
     );
     expect(employeeDirectoryCsv).not.toContain("full_time");
     expect(buildOperationsReportCsv(payload, "account-access")).toContain(
-      "Blake Diaz,Benched,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
+      "Blake Diaz,Inactive,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
     );
     expect(buildOperationsReportCsv(payload, "schedule-matrix")).toContain(
       'Employee,"May 3, 2026","May 4, 2026"',

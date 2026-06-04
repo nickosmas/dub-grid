@@ -4,11 +4,18 @@ import { useCallback, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
-import { getInitials, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
+import { getInitials, getCertAbbr, getCertName, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { InlineRoleSelect } from "./InlineRoleSelect";
+
+function statusTone(status: Employee["status"]): StatusPillTone {
+  if (status === "inactive") return "warning";
+  if (status === "removed") return "danger";
+  return "success";
+}
 
 function hashCode(s: string): number {
   let h = 0;
@@ -99,17 +106,30 @@ function StaffRowCells({
   const initials = getInitials(displayName);
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
   const profileHref = getEmployeeProfileHref(emp.id, emp.userId, currentUser?.id ?? null);
-  const rankNumber = isReordering ? globalIndex + 1 : emp.seniority;
+  const rankNumber = isReordering ? globalIndex + 1 : emp.employeeNumber;
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const statusLabel =
+    emp.status === "inactive"
+      ? "Inactive"
+      : emp.status === "removed"
+        ? "Removed"
+        : "Active";
+  const joinedLabel = emp.createdAt
+    ? new Date(emp.createdAt).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
 
   return (
     <>
-      {/* Checkbox / Drag handle / Seniority # */}
+      {/* Checkbox / Drag handle / Employee ID */}
       <StaffCell
         variant={variant}
-        tableClassName="pl-6 py-4 w-[60px]"
-        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex pl-6 py-4"
+        tableClassName="pl-6 py-4 w-[100px] border-r border-[var(--color-border-light)]"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex py-4"
       >
         <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
           {isReordering && (
@@ -131,14 +151,16 @@ function StaffRowCells({
               className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
             />
           )}
-          <span className="text-[var(--dg-fs-footnote)] font-medium">{rankNumber}</span>
+          <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums">
+            {isReordering ? rankNumber : `#${rankNumber}`}
+          </span>
         </div>
       </StaffCell>
 
       {/* Name */}
       <StaffCell
         variant={variant}
-        tableClassName="py-4"
+        tableClassName="py-4 border-r border-[var(--color-border-light)]"
         gridClassName="dg-staff-directory-cell dg-staff-directory-cell--name flex py-4"
       >
         <div className="flex items-center gap-3 min-w-0">
@@ -177,13 +199,6 @@ function StaffRowCells({
               {isYou && (
                 <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">You</span>
               )}
-              <span
-                aria-label={employmentLabel}
-                className="shrink-0 rounded-full border border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] px-1.5 py-px text-[10px] font-bold text-[var(--color-text-muted)]"
-                title={employmentLabel}
-              >
-                {employmentAbbr}
-              </span>
             </div>
             {(emp.email || emp.phone) && (
               <div className="text-[12px] text-[var(--color-text-muted)] truncate mt-0.5">
@@ -194,54 +209,86 @@ function StaffRowCells({
         </div>
       </StaffCell>
 
-      {/* Focus Areas */}
+      {/* Employment */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4"
+        tableClassName="py-4 w-[110px] border-r border-[var(--color-border-light)]"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--employment flex py-4"
+      >
+        <span
+          aria-label={employmentLabel}
+          className="text-[12px] text-[var(--color-text-muted)] whitespace-nowrap"
+        >
+          {employmentLabel}
+        </span>
+      </StaffCell>
+
+      {/* Status — tonal pill with leading dot, always visible. */}
+      <StaffCell
+        variant={variant}
+        tableClassName="py-4 w-[110px] border-[var(--color-border-light)] md:border-r"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--status flex py-4"
+      >
+        <StatusPill tone={statusTone(emp.status)} aria-label={`Status: ${statusLabel}`}>
+          {statusLabel}
+        </StatusPill>
+      </StaffCell>
+
+      {/* Focus Areas — neutral StatusPills, cap at 2 visible + "+N more" overflow chip. */}
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden md:table-cell py-4 border-[var(--color-border-light)] md:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
       >
-        <div className="flex gap-1 flex-wrap">
-          {emp.focusAreaIds.map((faId) => {
-            const fa = focusAreas.find((f) => f.id === faId);
-            if (!fa) return null;
+        <div className="flex gap-1">
+          {(() => {
+            const resolved = emp.focusAreaIds
+              .map((faId) => focusAreas.find((f) => f.id === faId))
+              .filter((fa): fa is FocusArea => !!fa);
+            const visible = resolved.slice(0, 2);
+            const overflow = resolved.slice(2);
             return (
-              <span
-                key={faId}
-                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
-                style={{
-                  background: "var(--color-bg-secondary)",
-                  color: "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border-light)",
-                }}
-              >
-                {fa.name}
-              </span>
+              <>
+                {visible.map((fa) => (
+                  <StatusPill key={fa.id} tone="neutral">
+                    {fa.name}
+                  </StatusPill>
+                ))}
+                {overflow.length > 0 && (
+                  <StatusPill tone="neutral" title={overflow.map((fa) => fa.name).join(", ")}>
+                    +{overflow.length} more
+                  </StatusPill>
+                )}
+              </>
             );
-          })}
+          })()}
         </div>
       </StaffCell>
 
       {/* Certification */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden md:table-cell py-4"
+        tableClassName="hidden md:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 md:flex"
       >
-        <span
-          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
-          style={{
-            background: "var(--color-border-light)",
-            color: "var(--color-text-muted)",
-          }}
-        >
-          {getCertAbbr(emp.certificationId, certifications)}
-        </span>
+        {(() => {
+          const certAbbr = getCertAbbr(emp.certificationId, certifications);
+          const certName = getCertName(emp.certificationId, certifications);
+          return (
+            <span
+              className="text-[12px] text-[var(--color-text-muted)] whitespace-nowrap"
+              title={certName || undefined}
+            >
+              {certAbbr || "None"}
+            </span>
+          );
+        })()}
       </StaffCell>
 
       {/* Roles */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden lg:table-cell py-4"
+        tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
         <span className="text-[12px] text-[var(--color-text-muted)]">
@@ -249,45 +296,56 @@ function StaffRowCells({
         </span>
       </StaffCell>
 
-      {/* Account status */}
+      {/* Account status — tonal StatusPill matching the rest of the row. */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden lg:table-cell py-4"
+        tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
-        {emp.userId ? (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap bg-[var(--color-success-bg)] text-[var(--color-success-text)]">
-            Linked
-          </span>
-        ) : pendingInviteByEmployeeId.has(emp.id) ? (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]">
-            Invited
-          </span>
-        ) : emp.email ? (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap" style={{ background: "var(--color-border-light)", color: "var(--color-text-muted)" }}>
-            Not invited
-          </span>
-        ) : (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap" style={{ background: "var(--color-border-light)", color: "var(--color-text-muted)" }}>
-            No email
-          </span>
-        )}
+        {(() => {
+          const account: { label: string; tone: StatusPillTone } = emp.userId
+            ? { label: "Linked", tone: "success" }
+            : pendingInviteByEmployeeId.has(emp.id)
+              ? { label: "Invited", tone: "warning" }
+              : emp.email
+                ? { label: "Not invited", tone: "neutral" }
+                : { label: "No email", tone: "danger" };
+          return (
+            <StatusPill tone={account.tone} aria-label={`Account: ${account.label}`}>
+              {account.label}
+            </StatusPill>
+          );
+        })()}
       </StaffCell>
 
       {/* Access role (org_role) */}
       <StaffCell
         variant={variant}
-        tableClassName="hidden lg:table-cell py-4"
+        tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
         gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
       >
         <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} isSelf={isYou} />
+      </StaffCell>
+
+      {/* Date Joined — rightmost data column at lg+; no divider before chevron. */}
+      <StaffCell
+        variant={variant}
+        tableClassName="hidden lg:table-cell py-4 w-[140px]"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined hidden py-4 lg:flex"
+      >
+        <span
+          className="text-[12px] tabular-nums text-[var(--color-text-muted)] whitespace-nowrap"
+          title={emp.createdAt ?? undefined}
+        >
+          {joinedLabel}
+        </span>
       </StaffCell>
 
       {/* Chevron */}
       <StaffCell
         variant={variant}
         tableClassName="pr-6 py-4 w-[40px] text-right"
-        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--chevron flex pr-6 py-4"
+        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--chevron flex py-4"
       >
         <div
           className="flex items-center justify-center"

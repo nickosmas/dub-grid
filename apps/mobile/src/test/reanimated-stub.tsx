@@ -38,6 +38,37 @@ export function useSharedValue<T>(initial: T) {
   return { value: initial };
 }
 
+export function useReducedMotion() {
+  return false;
+}
+
+export function withTiming<T>(toValue: T, _config?: unknown, _cb?: unknown) {
+  return toValue;
+}
+
+export function withSequence<T>(...values: readonly T[]) {
+  return values[values.length - 1] as T;
+}
+
+export function withRepeat<T>(
+  value: T,
+  _numberOfReps?: number,
+  _reverse?: boolean,
+) {
+  return value;
+}
+
+export function withDelay<T>(_delay: number, value: T) {
+  return value;
+}
+
+export const Easing = {
+  inOut: (fn: unknown) => fn,
+  ease: () => 0,
+  linear: () => 0,
+  quad: () => 0,
+} as const;
+
 export function useAnimatedScrollHandler() {
   return () => undefined;
 }
