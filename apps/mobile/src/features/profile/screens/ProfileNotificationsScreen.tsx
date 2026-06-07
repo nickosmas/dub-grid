@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
@@ -96,13 +96,14 @@ export default function ProfileNotificationsScreen() {
     queryFn: () => getProfileNotificationPreferences(accessToken!),
   });
 
-  const [localPrefs, setLocalPrefs] = useState<PrefsShape>(DEFAULT_PREFS);
-
-  useEffect(() => {
-    if (prefsQuery.data) {
-      setLocalPrefs(normalizePrefs(prefsQuery.data.prefs));
-    }
-  }, [prefsQuery.data]);
+  // Derived from the query cache — never local state. The toggle handler
+  // writes the new value to the cache BEFORE firing the mutation, so a
+  // concurrent background refetch can't overwrite the user's in-progress
+  // toggles with stale server data.
+  const localPrefs = useMemo<PrefsShape>(
+    () => normalizePrefs(prefsQuery.data?.prefs),
+    [prefsQuery.data],
+  );
 
   const manualRefresh = useManualRefresh(async () => {
     await prefsQuery.refetch();
@@ -131,14 +132,18 @@ export default function ProfileNotificationsScreen() {
   });
 
   const togglePref = (category: CategoryKey, channel: Channel) => {
-    setLocalPrefs((prev) => {
-      const next: PrefsShape = {
-        ...prev,
-        [category]: { ...prev[category], [channel]: !prev[category][channel] },
-      };
-      saveMutation.mutate(next);
-      return next;
-    });
+    const next: PrefsShape = {
+      ...localPrefs,
+      [category]: {
+        ...localPrefs[category],
+        [channel]: !localPrefs[category][channel],
+      },
+    };
+    queryClient.setQueryData(
+      ["mobile", "notification-preferences", accessToken],
+      { prefs: next },
+    );
+    saveMutation.mutate(next);
   };
 
   const togglePush = async () => {

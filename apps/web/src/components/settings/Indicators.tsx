@@ -46,12 +46,15 @@ function IndicatorRow({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
 
+  // Only resync from props when the editor is closed. While the user has the
+  // row expanded, mid-edit changes are preserved across parent re-renders that
+  // pass a new `indicator` reference with identical data.
   useEffect(() => {
-    if (!indicator.isNew) {
+    if (!expanded && !indicator.isNew) {
       setName(indicator.name);
       setColor(indicator.color);
     }
-  }, [indicator]);
+  }, [indicator, expanded]);
 
   const trimmedName = name.trim();
   const isDirty =
@@ -135,6 +138,8 @@ function IndicatorRow({
         color,
         sortOrder: indicator.sortOrder,
       });
+      setName(saved.name);
+      setColor(saved.color);
       setExpanded(false);
       onSaved(saved, indicator.id);
       toast.success("Indicator saved");

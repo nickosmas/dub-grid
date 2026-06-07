@@ -329,6 +329,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
 
     fetchGridmasterFullAuditLog({
       orgId,
@@ -431,7 +432,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                       const description = descriptions.get(entry.id) ?? "";
                       const actorLabel = getAuditActorLabel(entry);
                       const targetLabel = getAuditTargetLabel(entry);
-                      const mobileDescription = `${description} — ${actorLabel} -> ${targetLabel}`;
+                      const mobileDescription = `${description}, ${actorLabel} -> ${targetLabel}`;
 
                       return (
                         <tr key={entry.id} style={{ transition: "background 150ms ease" }}>

@@ -1,20 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import {
   fetchNotificationPreferences,
   saveNotificationPreferences,
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-
-const channelsSchema = z.object({
-  in_app: z.boolean(),
-  email: z.boolean(),
-});
-
-const savePreferencesSchema = z.object({
-  prefs: z.record(z.string(), channelsSchema),
-});
+import { mobileNotificationPreferencesUpdateBodySchema } from "@dubgrid/contracts";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export async function GET(req: NextRequest) {
   try {
@@ -49,12 +41,12 @@ export async function PUT(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
-    const parsed = savePreferencesSchema.safeParse(body);
+    const parsed = mobileNotificationPreferencesUpdateBodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     return NextResponse.json({

@@ -5,9 +5,9 @@ import { toast } from "sonner";
 import type { Organization } from "@/types";
 import { SectionCard } from "./shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { signOutFromBrowser } from "@/features/account/client/auth";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { useIsInSandbox } from "@/hooks";
+import * as Sentry from "@/lib/sentry";
+import { useIsInSandbox, useLogout } from "@/hooks";
 
 interface DangerZoneProps {
   organization: Organization;
@@ -15,6 +15,7 @@ interface DangerZoneProps {
 
 export default function DangerZone({ organization }: DangerZoneProps) {
   const isInSandbox = useIsInSandbox();
+  const { signOut } = useLogout();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -39,14 +40,15 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "Failed to delete organization");
       }
-      // The org is gone for this user. Sign out so the next page load
-      // re-authenticates against a remaining org (or the login screen).
+      // The org is gone for this user. Sign out globally so every device's
+      // session is invalidated; /goodbye handles the teardown.
       try {
-        await signOutFromBrowser("global");
-      } catch {
-        // Session may already be invalid; redirect regardless.
+        signOut({ scope: "global" });
+      } catch (signOutErr) {
+        Sentry.captureException(signOutErr);
+        toast.error("Could not sign out. Please refresh the page.");
+        setIsDeleting(false);
       }
-      window.location.href = "/login?deleted=true";
     } catch (err) {
       toast.error(formatClientErrorMessage(err, "Failed to delete organization"));
       setIsDeleting(false);

@@ -82,11 +82,14 @@ function AbsenceTypeRow({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
 
+  // Only resync from props when the editor is closed. Preserves the user's
+  // in-progress edits across parent re-renders that pass a new `absenceType`
+  // reference with identical data.
   useEffect(() => {
-    if (!absenceType.isNew) {
+    if (!expanded && !absenceType.isNew) {
       setForm(buildFormState(absenceType));
     }
-  }, [absenceType]);
+  }, [absenceType, expanded]);
 
   const isDirty =
     absenceType.isNew ||

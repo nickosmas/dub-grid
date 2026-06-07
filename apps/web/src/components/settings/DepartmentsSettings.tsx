@@ -516,10 +516,16 @@ function DepartmentSection({
 
     setSaving(true);
     setError(null);
+    // Phase 1 (depts) and Phase 2 (focus areas, scheduled only) are not
+    // atomic: depts are one server action; FA upserts/deletes are individual
+    // HTTP calls. If phase 2 fails midway, the saved depts are still committed
+    // server-side, so we promote that state to local immediately so a retry
+    // doesn't re-send the dept save against now-stale `updatedAt` values.
+    let savedDepts: Department[] | null = null;
     try {
       // Phase 1: Save departments
       const otherDepts = allDepartments.filter(d => d.type !== type || !!d.archivedAt);
-      const savedDepts = await saveDepartments(
+      savedDepts = await saveDepartments(
         orgId,
         [...otherDepts, ...cleaned],
         allDepartments,
@@ -612,7 +618,17 @@ function DepartmentSection({
       toast.success(`${title} saved`);
     } catch (err) {
       lastSaveErrorRef.current = err;
-      toast.error(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
+      // Partial-failure case: depts saved but focus-area phase failed. Promote
+      // the saved dept state to the parent so a retry doesn't re-issue Phase 1
+      // and trigger a stale-updatedAt conflict.
+      if (savedDepts) {
+        onDepartmentsChange(savedDepts);
+        toast.error(
+          `${title} saved, but some focus areas didn't update. Review and try again.`,
+        );
+      } else {
+        toast.error(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
+      }
       Sentry.captureException(err);
     } finally {
       setSaving(false);

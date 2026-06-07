@@ -391,6 +391,17 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
       if (e instanceof OrganizationAccessConflictError) {
         replaceUser(e.latestUser);
         setRoleChangeConfirm(null);
+        // Close any open permissions panel and drop the stale draft so the
+        // user can't keep editing against state that's already moved on.
+        if (expandedUserId === userId) {
+          setExpandedUserId(null);
+        }
+        setEditingPerms((prev) => {
+          if (!(userId in prev)) return prev;
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        });
         toast.error("User access changed elsewhere. Review the latest values and try again.");
         return;
       }
