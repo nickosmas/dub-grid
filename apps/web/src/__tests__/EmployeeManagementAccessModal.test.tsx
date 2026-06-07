@@ -51,6 +51,13 @@ vi.mock("@/features/employees/client", () => ({
   updateEmployeeIdentity: vi.fn(),
 }));
 
+vi.mock("@/features/permissions/client", () => ({
+  usePermissions: () => ({
+    isSuperAdmin: true,
+    isGridmaster: false,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),
