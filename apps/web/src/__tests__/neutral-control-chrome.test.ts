@@ -22,7 +22,7 @@ function resolveWebSource(path: string): string {
 
 const globalsCss = readFileSync(resolveWebSource("app/globals.css"), "utf-8");
 const webCssVariables = createWebCssVariables();
-const settingsPage = readFileSync(resolveWebSource("components/settings/SettingsPage.tsx"), "utf-8");
+const settingsShell = readFileSync(resolveWebSource("components/settings/SettingsShell.tsx"), "utf-8");
 const gridmasterPortal = readFileSync(resolveWebSource("components/gridmaster/GridmasterPortal.tsx"), "utf-8");
 const staffView = readFileSync(resolveWebSource("components/StaffView.tsx"), "utf-8");
 const membersSection = readFileSync(resolveWebSource("components/staff/MembersSection.tsx"), "utf-8");
@@ -162,7 +162,9 @@ describe("shared chrome theming", () => {
   });
 
   it("uses the navbar-link highlight recipe for app sidebars", () => {
-    for (const source of [settingsPage, gridmasterPortal, staffView]) {
+    // SettingsPage delegates its sidebar chrome to SettingsShell, so the
+    // highlight recipe lives on the shell now.
+    for (const source of [settingsShell, gridmasterPortal, staffView]) {
       expect(source).toContain("data-[active=true]:bg-[var(--color-brand-bg)]");
       expect(source).toContain("data-[active=true]:text-[var(--color-brand)]");
     }

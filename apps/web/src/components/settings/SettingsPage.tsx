@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
-import Link from "next/link";
+import React, { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Organization, FocusArea, ShiftCategory, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType, JobDefinition } from "@/types";
@@ -12,22 +11,9 @@ import {
   saveOrganizationRoles,
 } from "@/features/settings/client";
 import { toast } from "sonner";
-import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
-import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-} from "@/components/ui/sidebar";
 import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
+import { SettingsShell } from "./SettingsShell";
 import OrganizationGeneral from "./OrganizationGeneral";
 import OrganizationLabels from "./OrganizationLabels";
 import BillingSettings from "./BillingSettings";
@@ -82,6 +68,10 @@ export interface SettingsPageProps {
   onAbsenceTypesChange: (types: AbsenceType[]) => void;
 }
 
+// "danger" pins to the sidebar footer (above the collapse button)
+// rather than scrolling with the rest of the nav.
+const FOOTER_GROUP_IDS = ["danger"];
+
 // ── Main Component ───────────────────────────────────────────────────────────
 export default function SettingsPage({
   organization,
@@ -121,8 +111,6 @@ export default function SettingsPage({
   onAbsenceTypesChange,
 }: SettingsPageProps) {
   const searchParams = useSearchParams();
-  const isMobile = useMediaQuery(MOBILE);
-  const isTablet = useMediaQuery(TABLET);
 
   const perms: NavPermissions = useMemo(() => ({
     canManageOrg,
@@ -152,12 +140,6 @@ export default function SettingsPage({
     roleLabel,
   }), [perms, focusAreaLabel, certificationLabel, roleLabel]);
 
-  // "danger" pins to the sidebar footer (above the collapse button)
-  // rather than scrolling with the rest of the nav.
-  const FOOTER_GROUP_IDS = ["danger"];
-  const contentGroups = useMemo(() => navGroups.filter(g => !FOOTER_GROUP_IDS.includes(g.id)), [navGroups]);
-  const footerGroups = useMemo(() => navGroups.filter(g => FOOTER_GROUP_IDS.includes(g.id)), [navGroups]);
-
   const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
   const sectionFromPath = resolveSection(searchParams.get("section"));
@@ -165,400 +147,231 @@ export default function SettingsPage({
     !sectionFromPath && searchParams.get("billing") ? "org-billing" : null;
   const requestedSection = sectionFromPath ?? billingReturnSection;
   const activeSection: SectionId = requestedSection && allItems.some(i => i.id === requestedSection) ? requestedSection : defaultSection;
-
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return localStorage.getItem("dg-sidebar-manual-collapse") !== "true";
-  });
-
-  const handleSidebarOpenChange = useCallback((open: boolean) => {
-    setSidebarOpen(open);
-    localStorage.setItem("dg-sidebar-manual-collapse", String(!open));
-  }, []);
-
-  // Register sub-nav items for the mobile bottom sheet (with group labels)
-  const subNavItems: SubNavItem[] = useMemo(
-    () =>
-      navGroups.flatMap((group) =>
-        group.items.map((item) => {
-          const isActive = activeSection === item.id;
-          return {
-            id: item.id,
-            label: item.label,
-            icon: <item.Icon active={isActive} />,
-            href: item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`,
-            active: isActive,
-            group: group.label,
-          };
-        })
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [activeSection, canManageOrg, isSuperAdmin, isGridmaster],
-  );
-  useSetMobileSubNav(subNavItems);
-
-  // Get the title for the active section
-  const activeItem = allItems.find(i => i.id === activeSection);
   const maxWidth = getMaxWidth(activeSection);
 
-  return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={handleSidebarOpenChange}>
-      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", height: "calc(100dvh - var(--app-shell-header-h, 56px))", width: "100%", overflow: "hidden", position: "relative" }}>
-        {/* Sidebar — hidden on mobile (shown in bottom sheet), visible on desktop/tablet */}
-        {!isMobile && (
-          <Sidebar data-tour="settings-sidebar" collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: "var(--app-shell-header-h, 56px)", height: "calc(100dvh - var(--app-shell-header-h, 56px))" }}>
-            <SidebarContent className="pt-2 overscroll-contain">
-              {contentGroups.map((group) => (
-                <SidebarGroup key={group.id}>
-                  <SidebarGroupLabel
-                    className="text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0"
-                  >
-                    {group.label}
-                  </SidebarGroupLabel>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {group.items.map((item) => {
-                        const isActive = activeSection === item.id;
-                        return (
-                          <SidebarMenuItem key={item.id}>
-                            <SidebarMenuButton
-                              render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
-                              isActive={isActive}
-                              tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
-                            >
-                              <span className={isActive ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                                <item.Icon active={isActive} />
-                              </span>
-                              <span className="font-semibold">{item.label}</span>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        );
-                      })}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              ))}
-            </SidebarContent>
-            <SidebarFooter>
-              <div className="-mx-2 border-t border-[var(--color-border)]" />
-              {footerGroups.map((group) => (
-                <SidebarGroup key={group.id} className="p-0">
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {group.items.map((item) => {
-                        const isActive = activeSection === item.id;
-                        return (
-                          <SidebarMenuItem key={item.id}>
-                            <SidebarMenuButton
-                              render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
-                              isActive={isActive}
-                              tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
-                            >
-                              <span className={isActive ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                                <item.Icon active={isActive} />
-                              </span>
-                              <span className="font-semibold">{item.label}</span>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        );
-                      })}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              ))}
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => handleSidebarOpenChange(!sidebarOpen)}
-                    tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                    className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
-                  >
-                    <span className="flex shrink-0 items-center justify-center">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: sidebarOpen ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
-                        <polyline points="13 17 18 12 13 7" />
-                        <polyline points="6 17 11 12 6 7" />
-                      </svg>
-                    </span>
-                    <span className="font-semibold">Collapse Menu</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarFooter>
-          </Sidebar>
-        )}
-
-        {/* Content */}
-        <div data-tour="settings-content" style={{ flex: 1, minWidth: 0, height: "100%", overflowY: "auto", padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px", display: "flex", flexDirection: "column" as const, alignItems: "center" }}>
-
-        {activeItem && (
-          <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
-            <h1 style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
-              {activeItem.label}
-            </h1>
-            {activeItem.description && (
-              <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: "5px 0 0", lineHeight: 1.5 }}>
-                {activeItem.description}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Permission info for users with limited access */}
-        {canAccessSettings && !isSuperAdmin && !isGridmaster && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "8px 14px", marginBottom: 16,
-            background: "var(--color-info-bg)", borderRadius: "var(--dg-radius-sm)",
-            border: "1px solid var(--color-info-border)",
-            fontSize: "var(--dg-fs-caption)", color: "var(--color-info-text)",
-            width: "100%", maxWidth,
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            Some settings are read-only based on your permissions. Contact your super admin to request changes.
-          </div>
-        )}
-
-        {/* ── General group ─────────────────────────────────────── */}
-
-        {activeSection === "org-general" && isSuperAdmin && (
-          <div style={{ width: "100%", maxWidth }}>
-            <OrganizationGeneral
-              organization={organization}
-              onSave={onOrganizationSave}
-            />
-          </div>
-        )}
-
-        {activeSection === "org-billing" && (isSuperAdmin || isGridmaster) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <BillingSettings organization={organization} />
-          </div>
-        )}
-
-        {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <OrganizationLabels
-              organization={organization}
-              onSave={onOrganizationSave}
-              readOnly={!isSuperAdmin && !canManageOrgLabels}
-            />
-          </div>
-        )}
-
-        {activeSection === "org-activity" && isSuperAdmin && (
-          <div style={{ width: "100%", maxWidth }}>
-            <OrgActivityLog orgId={organization.id} />
-          </div>
-        )}
-
-        {activeSection === "org-display" && canManageOrgSettings && (
-          <div style={{ width: "100%", maxWidth }}>
-            <DisplayMode
-              organization={organization}
-              shiftCategories={shiftCategories}
-              jobs={jobs}
-              onSave={onOrganizationSave}
-            />
-          </div>
-        )}
-
-        {/* ── Scheduling group ─────────────────────────────────── */}
-
-        {activeSection === "schedule-rules" && isSuperAdmin && (
-          <div style={{ width: "100%", maxWidth }}>
-            <ScheduleRules
-              organization={organization}
-              onOrganizationSave={onOrganizationSave}
-            />
-          </div>
-        )}
-
-        {activeSection === "schedule-shifts" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <ShiftCategories
-              shiftCategories={shiftCategories}
-              focusAreas={focusAreas}
-              orgId={organization.id}
-              onChange={onShiftCategoriesChange}
-              canManageScheduleDefinitions={canManageScheduleDefinitions}
-            />
-          </div>
-        )}
-
-        {activeSection === "schedule-jobs" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <Jobs
-              jobs={jobs}
-              orgId={organization.id}
-              orgRoles={orgRoles}
-              certifications={certifications}
-              departments={departments}
-              focusAreas={focusAreas}
-              shiftCategories={shiftCategories}
-              roleLabel={roleLabel}
-              certificationLabel={certificationLabel}
-              onChange={onJobsChange}
-              canManageScheduleDefinitions={canManageScheduleDefinitions}
-              shiftDisplayMode={organization.shiftDisplayMode}
-            />
-          </div>
-        )}
-
-        {activeSection === "schedule-absence-types" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <AbsenceTypes
-              absenceTypes={absenceTypes}
-              orgId={organization.id}
-              onChange={onAbsenceTypesChange}
-              canManageScheduleDefinitions={canManageScheduleDefinitions}
-              shiftDisplayMode={organization.shiftDisplayMode}
-            />
-          </div>
-        )}
-
-        {activeSection === "schedule-coverage" && (canManageCoverageRequirements || canViewCoverageRequirements) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <Coverage
-              orgId={organization.id}
-              focusAreas={focusAreas}
-              shiftCategories={shiftCategories}
-              jobs={jobs}
-              orgRoles={orgRoles}
-              certifications={certifications}
-              coverageRequirements={coverageRequirements}
-              onCoverageRequirementsChange={onCoverageRequirementsChange}
-              canEdit={canManageCoverageRequirements}
-              shiftDisplayMode={organization.shiftDisplayMode}
-            />
-          </div>
-        )}
-
-        {/* ── Staff designations group ─────────────────────────── */}
-
-        {/* Focus areas section removed — now managed under Departments */}
-
-        {activeSection === "staff-certifications" && (canManageOrgLabels || canViewOrgLabels) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <StringListSettings
-              label={certificationLabel}
-              sectionTitle={certificationLabel}
-              maxWidth={maxWidth}
-              wideTable
-              items={certifications}
-              placeholder="e.g. RN"
-              onSave={async (updated, hardDeleteIds) => {
-                try {
-                  const saved = await saveCertifications(
-                    organization.id,
-                    updated,
-                    certifications,
-                    hardDeleteIds,
-                  );
-                  onCertificationsChange(saved);
-                  toast.success("Certifications saved");
-                } catch (err) {
-                  toast.error("Failed to save certifications");
-                  throw err;
-                }
-              }}
-              canEdit={canManageOrgLabels}
-              departments={departments}
-              onCheckDependencies={(id) => checkCertificationDependencies(id, organization.id)}
-            />
-          </div>
-        )}
-
-        {activeSection === "staff-roles" && (canManageOrgLabels || canViewOrgLabels) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <StringListSettings
-              label={roleLabel}
-              sectionTitle={roleLabel}
-              maxWidth={maxWidth}
-              wideTable
-              items={orgRoles}
-              placeholder="e.g. Charge Nurse"
-              onSave={async (updated, hardDeleteIds) => {
-                try {
-                  const saved = await saveOrganizationRoles(
-                    organization.id,
-                    updated,
-                    orgRoles,
-                    hardDeleteIds,
-                  );
-                  onOrgRolesChange(saved);
-                  toast.success("Roles saved");
-                } catch (err) {
-                  toast.error("Failed to save roles");
-                  throw err;
-                }
-              }}
-              canEdit={canManageOrgLabels}
-              departments={departments}
-              showScheduleRoleToggle
-              scheduleEligibilityHelpText="Only schedule-eligible roles can limit jobs."
-              onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
-            />
-          </div>
-        )}
-
-        {activeSection === "staff-departments" && (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <DepartmentsSettings
-              departments={departments}
-              focusAreas={focusAreas}
-              orgId={organization.id}
-              focusAreaLabel={focusAreaLabel}
-              departmentLabel={scheduledDepartmentLabel}
-              canManageFocusAreas={canManageFocusAreas}
-              canManageOrgLabels={canManageOrgLabels}
-              onDepartmentsChange={onDepartmentsChange}
-              onFocusAreasChange={onFocusAreasChange}
-            />
-          </div>
-        )}
-
-        {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
-          <div style={{ width: "100%", maxWidth }}>
-            <Indicators
-              indicatorTypes={indicatorTypes}
-              orgId={organization.id}
-              onChange={onIndicatorTypesChange}
-              canManageIndicatorTypes={canManageIndicatorTypes}
-            />
-          </div>
-        )}
-
-        {/* ── Platform group ──────────────────────────────────── */}
-
-        {activeSection === "platform-impersonation" && isGridmaster && (
-          <div style={{ width: "100%", maxWidth }}>
-            <ImpersonationPanel />
-          </div>
-        )}
-
-        {/* ── Danger Zone group ───────────────────────────────── */}
-
-        {activeSection === "org-danger" && isSuperAdmin && (
-          <div style={{ width: "100%", maxWidth }}>
-            <DangerZone organization={organization} />
-          </div>
-        )}
-
-        {allItems.length === 0 && (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            padding: "60px 20px", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)", textAlign: "center", gap: 12,
-          }}>
-            <span style={{ fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-secondary)" }}>No access</span>
-            <span>You don&apos;t have permission to view settings. Contact your organization admin for access.</span>
-          </div>
-        )}
-      </div>
+  // Permission notice for view-only users.
+  const banner = canAccessSettings && !isSuperAdmin && !isGridmaster ? (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 14px",
+        background: "var(--color-info-bg)",
+        borderRadius: "var(--dg-radius-sm)",
+        border: "1px solid var(--color-info-border)",
+        fontSize: "var(--dg-fs-caption)",
+        color: "var(--color-info-text)",
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+      Some settings are read-only based on your permissions. Contact your super admin to request changes.
     </div>
-    </SidebarProvider>
+  ) : null;
+
+  return (
+    <SettingsShell
+      basePath="/settings"
+      navGroups={navGroups}
+      footerGroupIds={FOOTER_GROUP_IDS}
+      defaultSection={defaultSection}
+      activeSection={activeSection}
+      maxWidth={maxWidth}
+      banner={banner}
+    >
+      {/* ── General group ─────────────────────────────────────── */}
+
+      {activeSection === "org-general" && isSuperAdmin && (
+        <OrganizationGeneral
+          organization={organization}
+          onSave={onOrganizationSave}
+        />
+      )}
+
+      {activeSection === "org-billing" && (isSuperAdmin || isGridmaster) && (
+        <BillingSettings organization={organization} />
+      )}
+
+      {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
+        <OrganizationLabels
+          organization={organization}
+          onSave={onOrganizationSave}
+          readOnly={!isSuperAdmin && !canManageOrgLabels}
+        />
+      )}
+
+      {activeSection === "org-activity" && isSuperAdmin && (
+        <OrgActivityLog orgId={organization.id} />
+      )}
+
+      {activeSection === "org-display" && canManageOrgSettings && (
+        <DisplayMode
+          organization={organization}
+          shiftCategories={shiftCategories}
+          jobs={jobs}
+          onSave={onOrganizationSave}
+        />
+      )}
+
+      {/* ── Scheduling group ─────────────────────────────────── */}
+
+      {activeSection === "schedule-rules" && isSuperAdmin && (
+        <ScheduleRules
+          organization={organization}
+          onOrganizationSave={onOrganizationSave}
+        />
+      )}
+
+      {activeSection === "schedule-shifts" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+        <ShiftCategories
+          shiftCategories={shiftCategories}
+          focusAreas={focusAreas}
+          orgId={organization.id}
+          onChange={onShiftCategoriesChange}
+          canManageScheduleDefinitions={canManageScheduleDefinitions}
+        />
+      )}
+
+      {activeSection === "schedule-jobs" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+        <Jobs
+          jobs={jobs}
+          orgId={organization.id}
+          orgRoles={orgRoles}
+          certifications={certifications}
+          departments={departments}
+          focusAreas={focusAreas}
+          shiftCategories={shiftCategories}
+          roleLabel={roleLabel}
+          certificationLabel={certificationLabel}
+          onChange={onJobsChange}
+          canManageScheduleDefinitions={canManageScheduleDefinitions}
+          shiftDisplayMode={organization.shiftDisplayMode}
+        />
+      )}
+
+      {activeSection === "schedule-absence-types" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+        <AbsenceTypes
+          absenceTypes={absenceTypes}
+          orgId={organization.id}
+          onChange={onAbsenceTypesChange}
+          canManageScheduleDefinitions={canManageScheduleDefinitions}
+          shiftDisplayMode={organization.shiftDisplayMode}
+        />
+      )}
+
+      {activeSection === "schedule-coverage" && (canManageCoverageRequirements || canViewCoverageRequirements) && (
+        <Coverage
+          orgId={organization.id}
+          focusAreas={focusAreas}
+          shiftCategories={shiftCategories}
+          jobs={jobs}
+          orgRoles={orgRoles}
+          certifications={certifications}
+          coverageRequirements={coverageRequirements}
+          onCoverageRequirementsChange={onCoverageRequirementsChange}
+          canEdit={canManageCoverageRequirements}
+          shiftDisplayMode={organization.shiftDisplayMode}
+        />
+      )}
+
+      {/* ── Staff designations group ─────────────────────────── */}
+
+      {activeSection === "staff-certifications" && (canManageOrgLabels || canViewOrgLabels) && (
+        <StringListSettings
+          label={certificationLabel}
+          sectionTitle={certificationLabel}
+          maxWidth={maxWidth}
+          wideTable
+          items={certifications}
+          placeholder="e.g. RN"
+          onSave={async (updated, hardDeleteIds) => {
+            try {
+              const saved = await saveCertifications(
+                organization.id,
+                updated,
+                certifications,
+                hardDeleteIds,
+              );
+              onCertificationsChange(saved);
+              toast.success("Certifications saved");
+            } catch (err) {
+              toast.error("Failed to save certifications");
+              throw err;
+            }
+          }}
+          canEdit={canManageOrgLabels}
+          departments={departments}
+          onCheckDependencies={(id) => checkCertificationDependencies(id, organization.id)}
+        />
+      )}
+
+      {activeSection === "staff-roles" && (canManageOrgLabels || canViewOrgLabels) && (
+        <StringListSettings
+          label={roleLabel}
+          sectionTitle={roleLabel}
+          maxWidth={maxWidth}
+          wideTable
+          items={orgRoles}
+          placeholder="e.g. Charge Nurse"
+          onSave={async (updated, hardDeleteIds) => {
+            try {
+              const saved = await saveOrganizationRoles(
+                organization.id,
+                updated,
+                orgRoles,
+                hardDeleteIds,
+              );
+              onOrgRolesChange(saved);
+              toast.success("Roles saved");
+            } catch (err) {
+              toast.error("Failed to save roles");
+              throw err;
+            }
+          }}
+          canEdit={canManageOrgLabels}
+          departments={departments}
+          showScheduleRoleToggle
+          scheduleEligibilityHelpText="Only schedule-eligible roles can limit jobs."
+          onCheckDependencies={(id) => checkRoleDependencies(id, organization.id)}
+        />
+      )}
+
+      {activeSection === "staff-departments" && (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
+        <DepartmentsSettings
+          departments={departments}
+          focusAreas={focusAreas}
+          orgId={organization.id}
+          focusAreaLabel={focusAreaLabel}
+          departmentLabel={scheduledDepartmentLabel}
+          canManageFocusAreas={canManageFocusAreas}
+          canManageOrgLabels={canManageOrgLabels}
+          onDepartmentsChange={onDepartmentsChange}
+          onFocusAreasChange={onFocusAreasChange}
+        />
+      )}
+
+      {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
+        <Indicators
+          indicatorTypes={indicatorTypes}
+          orgId={organization.id}
+          onChange={onIndicatorTypesChange}
+          canManageIndicatorTypes={canManageIndicatorTypes}
+        />
+      )}
+
+      {/* ── Platform group ──────────────────────────────────── */}
+
+      {activeSection === "platform-impersonation" && isGridmaster && (
+        <ImpersonationPanel />
+      )}
+
+      {/* ── Danger Zone group ───────────────────────────────── */}
+
+      {activeSection === "org-danger" && isSuperAdmin && (
+        <DangerZone organization={organization} />
+      )}
+    </SettingsShell>
   );
 }
