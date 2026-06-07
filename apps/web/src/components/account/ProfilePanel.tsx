@@ -12,7 +12,7 @@ import {
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
 import { toast } from "sonner";
-import { Check, X } from "lucide-react";
+import { Check, Trash2, X } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -40,9 +40,16 @@ interface ProfilePanelProps {
   employee: Employee | null;
   orgId: string | null;
   canEditProfileDirectly: boolean;
+  isGridmaster: boolean;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
 }
+
+type PendingConfirm =
+  | "account-details"
+  | "name-change-request"
+  | "account-deletion"
+  | null;
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -66,6 +73,7 @@ export function ProfilePanel({
   employee,
   orgId,
   canEditProfileDirectly,
+  isGridmaster,
   setProfile,
   setEmployee,
 }: ProfilePanelProps) {
@@ -78,9 +86,7 @@ export function ProfilePanel({
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [saving, setSaving] = useState(false);
-  const [pendingConfirm, setPendingConfirm] = useState<
-    "account-details" | "name-change-request" | null
-  >(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm>(null);
 
   const [changeRequests, setChangeRequests] = useState<ProfileChangeRequest[]>([]);
   const [loadingChangeRequests, setLoadingChangeRequests] = useState(false);
@@ -88,6 +94,7 @@ export function ProfilePanel({
   const [requestLastName, setRequestLastName] = useState("");
   const [requestNote, setRequestNote] = useState("");
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [requestingDeletion, setRequestingDeletion] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const savedFirstName = firstName ?? "";
@@ -119,8 +126,13 @@ export function ProfilePanel({
     requestLastName.trim().length > 0 ? getStaffNameError(requestLastName, "Last name") : null;
   const requestNoteError = getStaffNotesError(requestNote);
 
+  const showDeletion = !isGridmaster && !canEditProfileDirectly;
+
   useEffect(() => {
-    if (!orgId || canEditProfileDirectly) {
+    // Both the name-change request UI and the account-deletion section need
+    // to read change_requests. Fetch once for both.
+    const needsRequests = !canEditProfileDirectly || showDeletion;
+    if (!orgId || !needsRequests) {
       setChangeRequests([]);
       return;
     }
@@ -139,10 +151,11 @@ export function ProfilePanel({
     return () => {
       cancelled = true;
     };
-  }, [canEditProfileDirectly, orgId]);
+  }, [canEditProfileDirectly, orgId, showDeletion]);
 
   const pendingRequests = changeRequests.filter((r) => r.status === "pending");
   const pendingNameRequest = pendingRequests.find((r) => r.type === "profile_update");
+  const pendingDeletion = pendingRequests.find((r) => r.type === "account_deletion");
 
   function startEditing() {
     setEditFirstName(savedFirstName);
@@ -264,6 +277,24 @@ export function ProfilePanel({
     }
   }
 
+  async function sendDeletionRequest() {
+    if (!orgId) return;
+    setRequestingDeletion(true);
+    try {
+      const result = await createOwnProfileChangeRequest({
+        orgId,
+        type: "account_deletion",
+        requestNote: "Account deletion requested from self profile.",
+      });
+      setChangeRequests((cur) => [result.request, ...cur]);
+      toast.success("Account deletion request sent.");
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to request account deletion."));
+    } finally {
+      setRequestingDeletion(false);
+    }
+  }
+
   async function cancelRequest(request: ProfileChangeRequest) {
     if (cancellingId) return;
     setCancellingId(request.id);
@@ -272,7 +303,11 @@ export function ProfilePanel({
       setChangeRequests((cur) =>
         cur.map((r) => (r.id === result.request.id ? result.request : r)),
       );
-      toast.success("Name change request cancelled.");
+      toast.success(
+        request.type === "account_deletion"
+          ? "Account deletion request cancelled."
+          : "Name change request cancelled.",
+      );
     } catch (err) {
       toast.error(extractErrorMessage(err, "Failed to cancel that request."));
     } finally {
@@ -286,6 +321,7 @@ export function ProfilePanel({
     setPendingConfirm(null);
     if (action === "account-details") void saveAccount();
     if (action === "name-change-request") void sendNameChangeRequest();
+    if (action === "account-deletion") void sendDeletionRequest();
   }
 
   const confirmation =
@@ -305,7 +341,16 @@ export function ProfilePanel({
             variant: "info" as const,
             loading: submittingRequest,
           }
-        : null;
+        : pendingConfirm === "account-deletion"
+          ? {
+              title: "Request account deletion?",
+              message:
+                "Confirm that you want to request account deletion. An admin will review and approve before your account is removed.",
+              confirmLabel: "Request deletion",
+              variant: "danger" as const,
+              loading: requestingDeletion,
+            }
+          : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -511,6 +556,55 @@ export function ProfilePanel({
                 Latest request: {formatClientLabel(changeRequests[0].status)}
               </p>
             ) : null}
+          </div>
+        </SectionCard>
+      )}
+
+      {showDeletion && (
+        <SectionCard>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              borderTop: "1px solid var(--color-danger-bg)",
+              paddingTop: 16,
+            }}
+          >
+            <div>
+              <div
+                className="text-[14px] font-semibold"
+                style={{ color: "var(--color-danger)" }}
+              >
+                Delete account
+              </div>
+              <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+                Request that an admin delete your account. This is irreversible.
+              </p>
+            </div>
+            {pendingDeletion ? (
+              <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3 text-[13px] text-[var(--color-warning-text)]">
+                Account deletion request pending admin review.
+                <button
+                  type="button"
+                  onClick={() => void cancelRequest(pendingDeletion)}
+                  disabled={cancellingId === pendingDeletion.id}
+                  className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
+                >
+                  {cancellingId === pendingDeletion.id ? "Cancelling..." : "Cancel request"}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPendingConfirm("account-deletion")}
+                disabled={requestingDeletion || !orgId}
+                className="dg-btn dg-btn-danger self-start"
+              >
+                <Trash2 size={14} style={{ marginRight: 4 }} />
+                {requestingDeletion ? "Requesting..." : "Request account deletion"}
+              </button>
+            )}
           </div>
         </SectionCard>
       )}

@@ -8,7 +8,7 @@ import {
 } from "@/components/profile/profile-nav-config";
 
 describe("profile nav config", () => {
-  it("always renders the Account group with Profile/Security/Notifications/Privacy", () => {
+  it("always renders the Account group with Profile/Security/Notifications", () => {
     for (const hasEmployee of [true, false]) {
       const groups = buildProfileNavGroups({ hasEmployee });
       const account = groups.find((g) => g.id === "account");
@@ -17,9 +17,14 @@ describe("profile nav config", () => {
         "profile",
         "security",
         "notifications",
-        "privacy",
       ]);
     }
+  });
+
+  it("does not expose a Privacy section (account deletion → Profile, cookies → Notifications, policies → Header menu)", () => {
+    const groups = buildProfileNavGroups({ hasEmployee: true });
+    const allIds = groups.flatMap((g) => g.items.map((i) => i.id));
+    expect(allIds).not.toContain("privacy");
   });
 
   it("hides the My work group when the user has no linked employee", () => {
@@ -46,5 +51,6 @@ describe("profile nav config", () => {
     expect(resolveProfileSection("")).toBeNull();
     expect(resolveProfileSection("org-general")).toBeNull();
     expect(resolveProfileSection("settings")).toBeNull();
+    expect(resolveProfileSection("privacy")).toBeNull();
   });
 });

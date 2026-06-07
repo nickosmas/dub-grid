@@ -4,7 +4,6 @@ import {
   ProfileIcon,
   ShieldIcon,
   NotificationsIcon,
-  PrivacyIcon,
   DashboardIcon,
   ScheduleIcon,
 } from "@/components/icons/NavIcons";
@@ -14,7 +13,6 @@ export type ProfileSectionId =
   | "profile"
   | "security"
   | "notifications"
-  | "privacy"
   | "overview"
   | "schedule";
 
@@ -22,7 +20,6 @@ export const VALID_PROFILE_SECTIONS: ProfileSectionId[] = [
   "profile",
   "security",
   "notifications",
-  "privacy",
   "overview",
   "schedule",
 ];
@@ -62,14 +59,7 @@ export function buildProfileNavGroups(
       label: "Notifications",
       Icon: NotificationsIcon,
       description:
-        "Choose how and when DubGrid contacts you across email, push, and in-app.",
-    },
-    {
-      id: "privacy",
-      label: "Privacy & data",
-      Icon: PrivacyIcon,
-      description:
-        "Review policies, manage cookie preferences, and request account deletion.",
+        "Choose how and when DubGrid contacts you, plus cookie preferences for this device.",
     },
   ];
 

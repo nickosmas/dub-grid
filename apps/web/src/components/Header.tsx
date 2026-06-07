@@ -726,6 +726,50 @@ export default function Header({ orgName }: HeaderProps) {
               </>
             )}
             <div className="dg-menu-divider" />
+            <a
+              className="dg-menu-item"
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Privacy policy
+            </a>
+            <a
+              className="dg-menu-item"
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              Terms of service
+            </a>
+            <a
+              className="dg-menu-item"
+              href="/cookie-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMenuOpen(false)}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+                <path d="M8.5 8.5v.01" />
+                <path d="M16 15.5v.01" />
+                <path d="M12 12v.01" />
+                <path d="M11 17v.01" />
+                <path d="M7 14v.01" />
+              </svg>
+              Cookie policy
+            </a>
+            <div className="dg-menu-divider" />
             <button
               className="dg-menu-item dg-menu-item--danger"
               onClick={() => { setMenuOpen(false); handleSignOut(); }}

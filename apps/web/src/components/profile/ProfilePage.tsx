@@ -16,15 +16,16 @@ import { SelfWorkOverview, SelfWorkSchedule } from "./SelfWorkProfile";
 import { ProfilePanel } from "@/components/account/ProfilePanel";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
-import { PrivacyPanel } from "@/components/account/PrivacyPanel";
 
 /**
  * /profile — the user's home for everything about them:
- *   - Account: profile, security, notifications, privacy & data
+ *   - Account: profile (incl. account deletion request), security, notifications
+ *     (incl. cookie preferences)
  *   - My work (employees only): overview, schedule
  *
  * Shares the SettingsShell chrome with /settings so the navigation feels
  * the same across the app. Org admin configuration still lives at /settings.
+ * Legal/policy links live in the Header user menu.
  */
 export function ProfilePage() {
   const searchParams = useSearchParams();
@@ -75,6 +76,7 @@ export function ProfilePage() {
           employee={employee}
           orgId={orgId}
           canEditProfileDirectly={canEditProfileDirectly}
+          isGridmaster={Boolean(isGridmaster)}
           setProfile={setProfile}
           setEmployee={setEmployee}
         />
@@ -86,14 +88,6 @@ export function ProfilePage() {
 
       {activeSection === "notifications" && (
         <NotificationsPanel isGridmaster={Boolean(isGridmaster)} />
-      )}
-
-      {activeSection === "privacy" && (
-        <PrivacyPanel
-          orgId={orgId}
-          canEditProfileDirectly={canEditProfileDirectly}
-          isGridmaster={Boolean(isGridmaster)}
-        />
       )}
 
       {/* ── My work group (employees only) ────────────────────── */}
