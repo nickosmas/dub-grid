@@ -5,6 +5,8 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { getServiceClient } from "@/lib/supabase-service";
+import { isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -12,6 +14,7 @@ import {
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const roleChangeSchema = z.object({
   targetUserId: z.string().uuid(),
@@ -51,12 +54,12 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = roleChangeSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     // Self-action guard: you cannot change your own role. The RPC also blocks
@@ -74,6 +77,21 @@ export async function POST(req: NextRequest) {
     const effectiveOrgId = parsed.data.orgId
       ? await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId)
       : null;
+
+    // Defensive tier guard: only super_admin or gridmaster can promote
+    // another user to super_admin. The change_user_role RPC also enforces
+    // this, but checking at the API layer gives a clean 403 and avoids
+    // round-tripping a forbidden mutation to the DB. (audit L3)
+    if (parsed.data.newRole === "super_admin" && effectiveOrgId) {
+      const allowed = await isOrgSuperAdminOrGridmaster(
+        getServiceClient(),
+        auth.user.id,
+        effectiveOrgId,
+      );
+      if (!allowed) {
+        return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      }
+    }
 
     const supabase = createRequestSupabaseClient(req);
     const result = await supabase.rpc("change_user_role", {

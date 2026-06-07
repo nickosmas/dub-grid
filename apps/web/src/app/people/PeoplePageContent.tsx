@@ -51,9 +51,15 @@ function PeopleContent() {
     [employees],
   );
 
-  // Don't render content until permissions are resolved and access is confirmed
-  if (permsLoading || !canViewStaff) {
+  // While permissions are resolving, show the indicator. Once resolved, if
+  // the viewer can't access People, render nothing — the useEffect above is
+  // already navigating away, so flashing a fake loading bar to an
+  // unauthorized user just wastes a paint. (audit L1)
+  if (permsLoading) {
     return <ProgressBar loading />;
+  }
+  if (!canViewStaff) {
+    return null;
   }
 
   if (loadError && !org) {

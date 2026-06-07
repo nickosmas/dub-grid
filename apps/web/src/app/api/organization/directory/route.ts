@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AdminPermissions, DirectoryPerson, EmployeeStatus, OrganizationRole } from "@/types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
       Object.fromEntries(req.nextUrl.searchParams.entries()),
     );
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const orgAuth = await requireOrgPermissions(
@@ -42,7 +43,15 @@ export async function GET(req: NextRequest) {
     });
     if (error) throw error;
 
-    const directory = (data ?? []).map((row: Record<string, unknown>) => {
+    // The RPC caps at LIMIT 501 (stopgap until real pagination lands). When we
+    // see 501 rows we know the org had >500 members; drop the overflow row and
+    // signal truncation so the UI can warn the user we aren't showing everyone.
+    const DIRECTORY_CAP = 500;
+    const rawRows = (data ?? []) as Record<string, unknown>[];
+    const truncated = rawRows.length > DIRECTORY_CAP;
+    const rows = truncated ? rawRows.slice(0, DIRECTORY_CAP) : rawRows;
+
+    const directory = rows.map((row: Record<string, unknown>) => {
       const scheduledDepartmentIds =
         (row.scheduled_department_ids as number[] | undefined) ??
         (row.employee_department_ids as number[] | undefined) ??
@@ -94,7 +103,10 @@ export async function GET(req: NextRequest) {
       } satisfies DirectoryPerson;
     });
 
-    return NextResponse.json({ directory });
+    return NextResponse.json({
+      directory,
+      ...(truncated ? { truncated: true, cap: DIRECTORY_CAP } : {}),
+    });
   } catch (error) {
     console.error("organization directory GET failed", error);
     return NextResponse.json(

@@ -16,6 +16,7 @@ import {
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -188,12 +189,12 @@ export async function PATCH(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId: requestedOrgId, userId, expectedUpdatedAt, orgRole, adminPermissions } = parsed.data;
@@ -212,11 +213,21 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "User membership not found" }, { status: 404 });
     }
 
-    // Self-action guard: you cannot change your own role. Permission-only
-    // self-edits remain allowed (they're inert for super_admins), so we only
-    // block when the role would actually change.
-    if (userId === user.id && orgRole !== undefined && orgRole !== currentUser.orgRole) {
-      return selfActionForbiddenResponse();
+    // Self-action guard: you cannot change your own access record — neither
+    // role nor admin_permissions. Role self-changes are blocked at the RPC
+    // boundary anyway; permission-only self-edits used to be allowed on the
+    // theory that they were inert for super_admins, but that assumption
+    // depends on UI behavior. Block both at the API boundary so future UI
+    // changes can't accidentally expose this. (audit M1)
+    if (userId === user.id) {
+      const roleWouldChange = orgRole !== undefined && orgRole !== currentUser.orgRole;
+      const permissionsWouldChange =
+        adminPermissions !== undefined &&
+        JSON.stringify(adminPermissions ?? null) !==
+          JSON.stringify(currentUser.adminPermissions ?? null);
+      if (roleWouldChange || permissionsWouldChange) {
+        return selfActionForbiddenResponse();
+      }
     }
 
     if (!timestampsMatch(currentUser.updatedAt, expectedUpdatedAt)) {
@@ -349,12 +360,12 @@ export async function DELETE(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = deleteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId: requestedOrgId, userId, expectedUpdatedAt } = parsed.data;

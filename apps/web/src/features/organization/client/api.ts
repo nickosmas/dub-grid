@@ -75,7 +75,7 @@ export function fetchOrganizationBootstrap(options?: {
 
 export function fetchOrganizationDirectory(
   orgId: string,
-): Promise<{ directory: DirectoryPerson[] }> {
+): Promise<{ directory: DirectoryPerson[]; truncated?: boolean; cap?: number }> {
   const params = new URLSearchParams({ orgId });
   return requestOrganizationJson(`/api/organization/directory?${params}`);
 }

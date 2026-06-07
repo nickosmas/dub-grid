@@ -22,7 +22,6 @@ import * as Sentry from "@/lib/sentry";
 import {
   applyManagementDirectoryUpdate,
   mergeEmployeeIntoDirectoryPerson,
-  upsertEmployeeInList,
 } from "@/lib/staff-directory";
 import type {
   Department,
@@ -471,17 +470,29 @@ export function MembersSection({
     };
   }, [orgId]);
 
+  // Re-derive against "now" on a slow tick so invitations that cross their
+  // 72h expiry while the page is open stop rendering as "Pending". Without
+  // this, refreshInvitations() only runs after revoke/resend/create and the
+  // UI happily shows expired invites with stale CTAs (audit H4).
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const pendingInviteByEmployeeId = useMemo(() => {
     const map = new Map<string, Invitation>();
     for (const inv of pendingInvitations) {
+      if (new Date(inv.expiresAt).getTime() <= nowMs) continue;
       if (inv.employeeId) {
         map.set(inv.employeeId, inv);
       }
     }
     return map;
-  }, [pendingInvitations]);
+  }, [pendingInvitations, nowMs]);
 
-  const { directory } = useDirectory(directoryOrgId);
+  const { directory, truncated: directoryTruncated, cap: directoryCap } =
+    useDirectory(directoryOrgId);
   // Access role (org_role) per linked employee, sourced from the directory.
   // Only populated when the viewer can load directory data; staff with no
   // linked login simply resolve to null and render an em dash.
@@ -614,17 +625,60 @@ export function MembersSection({
 
     const pendingAction = bulkConfirm;
     const trimmedNote = bulkNote.trim() || undefined;
+
+    // Pre-filter the actor's own employee row. The backend rejects self-actions
+    // with a 403; dropping the id up front avoids the predictable failure and
+    // lets us run the rest in parallel without a noisy "1 failed" toast.
+    const cachedEmployees = orgId
+      ? queryClient.getQueryData<Employee[]>(queryKeys.employees.all(orgId))
+      : null;
+    const targetIds = pendingAction.employeeIds.filter((employeeId) => {
+      const emp = cachedEmployees?.find((e) => e.id === employeeId) ?? null;
+      return !emp || !isSelfAction(currentUserId, emp.userId);
+    });
+    const droppedSelfCount = pendingAction.employeeIds.length - targetIds.length;
+
+    if (targetIds.length === 0) {
+      toast.error("You can't run that action on your own account.");
+      setBulkConfirm(null);
+      setBulkNote("");
+      return;
+    }
+
     setIsBulkActionRunning(true);
     try {
-      for (const employeeId of pendingAction.employeeIds) {
-        if (pendingAction.action === "deactivate") {
-          await onDeactivate(employeeId, trimmedNote);
-        } else if (pendingAction.action === "activate") {
-          await onActivate(employeeId);
-        } else {
-          await onRemove(employeeId, trimmedNote);
-        }
+      const results = await Promise.allSettled(
+        targetIds.map((employeeId) => {
+          if (pendingAction.action === "deactivate") {
+            return onDeactivate(employeeId, trimmedNote);
+          }
+          if (pendingAction.action === "activate") {
+            return onActivate(employeeId);
+          }
+          return onRemove(employeeId, trimmedNote);
+        }),
+      );
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failed = results.length - succeeded;
+
+      if (failed === 0 && droppedSelfCount === 0) {
+        toast.success(
+          `${succeeded} ${succeeded === 1 ? "person" : "people"} updated`,
+        );
+      } else if (failed === 0) {
+        toast.success(
+          `${succeeded} updated. Your own account was skipped (you can't run that action on yourself).`,
+        );
+      } else if (succeeded === 0) {
+        toast.error(
+          `Couldn't update ${failed} ${failed === 1 ? "person" : "people"}. Refresh and try again.`,
+        );
+      } else {
+        toast.error(
+          `${succeeded} updated, ${failed} failed. Refresh and retry the ones that didn't go through.`,
+        );
       }
+
       setBulkConfirm(null);
       setBulkNote("");
       clearSelection();
@@ -765,20 +819,17 @@ export function MembersSection({
     (updatedEmployee?: Employee | null) => {
       if (!orgId || !updatedEmployee) return;
 
-      queryClient.setQueryData(
-        queryKeys.employees.all(orgId),
-        (current: Employee[] | undefined) =>
-          current ? upsertEmployeeInList(current, updatedEmployee) : current,
-      );
-      queryClient.setQueryData(
-        queryKeys.org.directory(orgId),
-        (current: DirectoryPerson[] | undefined) =>
-          current?.map((person) =>
-            person.employeeId === updatedEmployee.id
-              ? mergeEmployeeIntoDirectoryPerson(person, updatedEmployee)
-              : person,
-          ) ?? current,
-      );
+      // Invalidate instead of manually patching the cache. The manual patch
+      // had a race: if the directory query refetched between an admin's edit
+      // and the patch, the patch could clobber fresher fields written by a
+      // concurrent admin. Invalidate-and-refetch is slightly slower but
+      // correct under concurrent edits. (audit M3)
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.employees.all(orgId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.org.directory(orgId),
+      });
       setManagementAccessEmployee((current) =>
         current?.id === updatedEmployee.id ? updatedEmployee : current,
       );
@@ -797,18 +848,52 @@ export function MembersSection({
     [orgId, syncDirectoryPersonInCaches, syncExistingEmployeeInCaches],
   );
 
+  // The `employees` prop is the on-schedule list (parent filters out rows with
+  // no focus areas). Management-only members have an employees row but no
+  // focus areas, so they're absent from `employees`/`inactiveEmployees`/
+  // `removedEmployees`. Read the unfiltered list from the React Query cache
+  // (populated by useEmployees) so lookups by id still find them.
+  const findEmployeeById = useCallback(
+    (id: string | null): Employee | null => {
+      if (!id) return null;
+      if (orgId) {
+        const cached = queryClient.getQueryData<Employee[]>(
+          queryKeys.employees.all(orgId),
+        );
+        const hit = cached?.find((employee) => employee.id === id);
+        if (hit) return hit;
+      }
+      return (
+        [...employees, ...inactiveEmployees, ...removedEmployees].find(
+          (employee) => employee.id === id,
+        ) ?? null
+      );
+    },
+    [employees, inactiveEmployees, orgId, queryClient, removedEmployees],
+  );
+
   return (
     <>
       <div className="p-4 md:p-6 lg:px-12 lg:py-10">
         <div className="space-y-8">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-[var(--color-text-primary)]">
+            <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
               Directory
-            </h2>
+            </h1>
             <p className="mt-1 text-[14px] text-[var(--color-text-muted)]">
               View and manage your organization&apos;s staff roster.
             </p>
           </div>
+
+          {directoryTruncated && (
+            <div
+              role="alert"
+              className="rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
+            >
+              Showing the first {directoryCap ?? 500} members. Use search or
+              filters to find specific people. Full pagination is coming soon.
+            </div>
+          )}
 
           <DirectorySummaryCards
             onScheduleCount={employees.length}
@@ -1925,7 +2010,12 @@ export function MembersSection({
               selectedPerson.source === "employee" &&
               selectedPerson.employeeId
             ) {
-              await updateEmployeeIdentity({
+              const currentEmployee = findEmployeeById(selectedPerson.employeeId);
+              if (!currentEmployee) {
+                toast.error("Could not load the latest employee record. Refresh and try again.");
+                return;
+              }
+              const identityResult = await updateEmployeeIdentity({
                 employeeId: selectedPerson.employeeId,
                 orgId,
                 userId: selectedPerson.userId,
@@ -1933,6 +2023,7 @@ export function MembersSection({
                 lastName: data.lastName,
                 email: data.email,
                 phone: data.phone,
+                expectedVersion: currentEmployee.version,
               });
               const pendingInvitation = pendingInviteByEmployeeId.get(
                 selectedPerson.employeeId,
@@ -1951,20 +2042,7 @@ export function MembersSection({
                 });
               }
 
-              const currentEmployee = [
-                ...employees,
-                ...inactiveEmployees,
-                ...removedEmployees,
-              ].find((employee) => employee.id === selectedPerson.employeeId);
-              if (currentEmployee) {
-                updatedEmployee = {
-                  ...currentEmployee,
-                  firstName: data.firstName,
-                  lastName: data.lastName,
-                  email: data.email,
-                  phone: data.phone,
-                };
-              }
+              updatedEmployee = identityResult.employee;
             } else if (selectedPerson.source === "pending_invite") {
               await updatePendingInvitation(
                 selectedPerson.personId.replace("inv:", ""),
@@ -2035,12 +2113,9 @@ export function MembersSection({
       )}
 
       {managementSchedulePerson && orgId && (() => {
-        const existingEmployee =
-          managementSchedulePerson.employeeId
-            ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
-                (candidate) => candidate.id === managementSchedulePerson.employeeId,
-              ) ?? null
-            : null;
+        const existingEmployee = findEmployeeById(
+          managementSchedulePerson.employeeId,
+        );
         if (!existingEmployee) return null;
         return (
           <AddManagementUserToScheduleModal

@@ -20,6 +20,8 @@ export interface UpdateEmployeeIdentityInput {
   phone: string;
   /** Optional. Omit to leave the existing email untouched. */
   email?: string;
+  /** Optimistic-lock token; pass the version the editor was viewing. */
+  expectedVersion: number;
 }
 
 export class OptimisticLockError extends Error {
@@ -109,12 +111,15 @@ async function requestEmployeeAction<T>(
 
 export async function updateEmployeeIdentity(
   input: UpdateEmployeeIdentityInput,
-): Promise<{ success: true }> {
-  return requestEmployeesJson<{ success: true }>("/api/employees/identity", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
-  });
+): Promise<{ success: true; employee: Employee }> {
+  return requestEmployeesJson<{ success: true; employee: Employee }>(
+    "/api/employees/identity",
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function fetchEmployees(

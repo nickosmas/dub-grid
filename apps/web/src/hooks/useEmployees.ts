@@ -130,6 +130,16 @@ export function useEmployees(orgId: string | null): EmployeesData {
         toast.success("Employee saved");
         invalidateEmployees();
       } catch (err) {
+        // On version conflict, swap in the server's latest copy instead of
+        // rolling back to pre-edit state — that way the user sees what
+        // actually exists and can re-edit from the real current row.
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) => prev.map((employee) => (
+            employee.id === emp.id ? err.latestEmployee : employee
+          )));
+          toast.error("Employee changed elsewhere. Review the latest values and try again.");
+          return;
+        }
         setAllLocal(prevAll);
         toast.error(formatClientErrorMessage(err, "Failed to save employee"));
         Sentry.captureException(err);

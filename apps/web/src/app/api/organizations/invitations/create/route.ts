@@ -7,18 +7,23 @@ import {
 import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
-import { canManageEmployees } from "@/app/api/employees/shared";
+import {
+  canManageEmployees,
+  isOrgSuperAdminOrGridmaster,
+} from "@/app/api/employees/shared";
 import type { AssignableOrganizationRole } from "@/types";
 import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrors,
 } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
-  role: z.enum(["user", "admin"]),
+  role: z.enum(["user", "admin", "super_admin"]),
   orgId: z.string().uuid(),
   employeeId: z.string().uuid().optional(),
   firstName: z.string().trim().optional(),
@@ -39,16 +44,27 @@ export async function POST(req: NextRequest) {
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+  if (misconfigured) {
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+  }
+  if (limited) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = postSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const serviceClient = getServiceClient();
@@ -67,7 +83,20 @@ export async function POST(req: NextRequest) {
   try {
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
     if (!hasPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+    }
+
+    // Tier guard: only super_admin or gridmaster can hand out the super_admin
+    // role. Regular admins with canManageEmployees can still invite admin/user.
+    if (role === "super_admin") {
+      const allowed = await isOrgSuperAdminOrGridmaster(
+        serviceClient,
+        user.id,
+        orgId,
+      );
+      if (!allowed) {
+        return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      }
     }
 
     const fieldErrors = getStaffFieldErrors({
