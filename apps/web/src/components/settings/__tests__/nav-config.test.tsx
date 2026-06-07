@@ -21,35 +21,59 @@ const fullSettingsPermissions: NavPermissions = {
 };
 
 describe("settings nav config", () => {
-  it("places the departments page in Organization after customization", () => {
+  it("groups General with org identity + labels only", () => {
     const groups = buildNavGroups(fullSettingsPermissions);
+    const general = groups.find((g) => g.id === "general");
 
-    const organizationGroup = groups.find((group) => group.id === "organization");
-    const staffGroup = groups.find((group) => group.id === "staff");
-    const activityGroup = groups.find((group) => group.id === "activity");
-
-    expect(organizationGroup?.items.map((item) => item.id)).toEqual([
+    expect(general?.label).toBe("General");
+    expect(general?.items.map((item) => item.id)).toEqual([
       "org-general",
-      "org-billing",
       "org-labels",
-      "staff-departments",
     ]);
-    expect(organizationGroup?.items.map((item) => item.label)).toEqual([
+    expect(general?.items.map((item) => item.label)).toEqual([
       "Organization Details",
-      "Billing",
-      "Customization",
-      "Departments",
+      "Labels",
     ]);
-    expect(
-      organizationGroup?.items.find((item) => item.id === "staff-departments")?.description,
-    ).toBe(
-      "Includes scheduled departments for the grid and management departments for app-only staff.",
-    );
-    expect(staffGroup?.items.map((item) => item.id)).toEqual([
+  });
+
+  it("groups Staff designations with Departments first, then Roles and Certifications", () => {
+    const groups = buildNavGroups(fullSettingsPermissions);
+    const staff = groups.find((g) => g.id === "staff");
+
+    expect(staff?.label).toBe("Staff designations");
+    expect(staff?.items.map((item) => item.id)).toEqual([
+      "staff-departments",
       "staff-roles",
       "staff-certifications",
     ]);
-    expect(activityGroup?.items.map((item) => item.id)).toEqual(["org-activity"]);
+  });
+
+  it("breaks Billing into its own group", () => {
+    const groups = buildNavGroups(fullSettingsPermissions);
+    const billing = groups.find((g) => g.id === "billing");
+
+    expect(billing?.label).toBe("Billing");
+    expect(billing?.items.map((item) => item.id)).toEqual(["org-billing"]);
+  });
+
+  it("promotes Audit out of the sidebar footer into its own group", () => {
+    const groups = buildNavGroups(fullSettingsPermissions);
+    const audit = groups.find((g) => g.id === "audit");
+
+    expect(audit?.label).toBe("Audit");
+    expect(audit?.items.map((item) => item.id)).toEqual(["org-activity"]);
+  });
+
+  it("renders the group order: General, Scheduling, Staff designations, Billing, Audit, Danger Zone", () => {
+    const groups = buildNavGroups(fullSettingsPermissions);
+    expect(groups.map((g) => g.id)).toEqual([
+      "general",
+      "scheduling",
+      "staff",
+      "billing",
+      "audit",
+      "danger",
+    ]);
   });
 
   it("exposes the activity log and danger zone to super admins only", () => {
@@ -74,6 +98,13 @@ describe("settings nav config", () => {
 
     expect(allIds).not.toContain("org-activity");
     expect(allIds).not.toContain("org-danger");
+    expect(groups.find((group) => group.id === "audit")).toBeUndefined();
     expect(groups.find((group) => group.id === "danger")).toBeUndefined();
+  });
+
+  it("shows the Platform group with Impersonation for gridmasters", () => {
+    const groups = buildNavGroups({ ...fullSettingsPermissions, isGridmaster: true });
+    const platform = groups.find((g) => g.id === "platform");
+    expect(platform?.items.map((item) => item.id)).toEqual(["platform-impersonation"]);
   });
 });

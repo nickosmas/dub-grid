@@ -152,9 +152,9 @@ export default function SettingsPage({
     roleLabel,
   }), [perms, focusAreaLabel, certificationLabel, roleLabel]);
 
-  // "activity" and "danger" pin to the sidebar footer (above the collapse button)
+  // "danger" pins to the sidebar footer (above the collapse button)
   // rather than scrolling with the rest of the nav.
-  const FOOTER_GROUP_IDS = ["activity", "danger"];
+  const FOOTER_GROUP_IDS = ["danger"];
   const contentGroups = useMemo(() => navGroups.filter(g => !FOOTER_GROUP_IDS.includes(g.id)), [navGroups]);
   const footerGroups = useMemo(() => navGroups.filter(g => FOOTER_GROUP_IDS.includes(g.id)), [navGroups]);
 
@@ -180,14 +180,17 @@ export default function SettingsPage({
   const subNavItems: SubNavItem[] = useMemo(
     () =>
       navGroups.flatMap((group) =>
-        group.items.map((item) => ({
-          id: item.id,
-          label: item.label,
-          icon: item.icon,
-          href: item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`,
-          active: activeSection === item.id,
-          group: group.label,
-        }))
+        group.items.map((item) => {
+          const isActive = activeSection === item.id;
+          return {
+            id: item.id,
+            label: item.label,
+            icon: <item.Icon active={isActive} />,
+            href: item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`,
+            active: isActive,
+            group: group.label,
+          };
+        })
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeSection, canManageOrg, isSuperAdmin, isGridmaster],
@@ -214,46 +217,53 @@ export default function SettingsPage({
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {group.items.map((item) => (
-                        <SidebarMenuItem key={item.id}>
-                          <SidebarMenuButton
-                            render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
-                            isActive={activeSection === item.id}
-                            tooltip={item.label}
-                            className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
-                          >
-                            <span className={activeSection === item.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                              {item.icon}
-                            </span>
-                            <span className="font-semibold">{item.label}</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
+                      {group.items.map((item) => {
+                        const isActive = activeSection === item.id;
+                        return (
+                          <SidebarMenuItem key={item.id}>
+                            <SidebarMenuButton
+                              render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
+                              isActive={isActive}
+                              tooltip={item.label}
+                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                            >
+                              <span className={isActive ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                                <item.Icon active={isActive} />
+                              </span>
+                              <span className="font-semibold">{item.label}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
               ))}
             </SidebarContent>
             <SidebarFooter>
+              <div className="-mx-2 border-t border-[var(--color-border)]" />
               {footerGroups.map((group) => (
                 <SidebarGroup key={group.id} className="p-0">
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {group.items.map((item) => (
-                        <SidebarMenuItem key={item.id}>
-                          <SidebarMenuButton
-                            render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
-                            isActive={activeSection === item.id}
-                            tooltip={item.label}
-                            className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
-                          >
-                            <span className={activeSection === item.id ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                              {item.icon}
-                            </span>
-                            <span className="font-semibold">{item.label}</span>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
+                      {group.items.map((item) => {
+                        const isActive = activeSection === item.id;
+                        return (
+                          <SidebarMenuItem key={item.id}>
+                            <SidebarMenuButton
+                              render={<Link href={item.id === defaultSection ? "/settings" : `/settings?section=${item.id}`} replace />}
+                              isActive={isActive}
+                              tooltip={item.label}
+                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                            >
+                              <span className={isActive ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
+                                <item.Icon active={isActive} />
+                              </span>
+                              <span className="font-semibold">{item.label}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
@@ -284,7 +294,7 @@ export default function SettingsPage({
 
         {activeItem && (
           <div style={{ width: "100%", maxWidth, marginBottom: 32 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+            <h1 style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
               {activeItem.label}
             </h1>
             {activeItem.description && (
@@ -312,7 +322,7 @@ export default function SettingsPage({
           </div>
         )}
 
-        {/* ── Organization group ────────────────────────────────── */}
+        {/* ── General group ─────────────────────────────────────── */}
 
         {activeSection === "org-general" && isSuperAdmin && (
           <div style={{ width: "100%", maxWidth }}>
@@ -427,7 +437,7 @@ export default function SettingsPage({
           </div>
         )}
 
-        {/* ── Staff & Designations group ──────────────────────── */}
+        {/* ── Staff designations group ─────────────────────────── */}
 
         {/* Focus areas section removed — now managed under Departments */}
 

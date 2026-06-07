@@ -1,162 +1,176 @@
 /* ── Settings mockup ──────────────────────────────────────────────────
-   Mirrors the "Custom Labels" section under Settings → Organization. Real
-   component: apps/web/src/components/settings/OrganizationLabels.tsx —
-   three label fields (Focus Areas, Certifications, Roles) plus a
-   save/discard action row. ── */
+   Mirrors Settings → General → Labels. Real components:
+   apps/web/src/components/settings/SettingsPage.tsx (page-title chrome)
+   + apps/web/src/components/settings/OrganizationLabels.tsx
+   (three label fields). Headerless SectionCard with right-aligned
+   Save/Discard. ── */
 
 const FIELDS = [
   {
     label: "FOCUS AREAS LABEL",
     value: "Wings",
+    placeholder: "Focus Areas",
     helper: "e.g. Focus Areas, Departments, Units",
-    note: null as string | null,
     dirty: true,
   },
   {
     label: "CERTIFICATIONS LABEL",
     value: "Designations",
+    placeholder: "Certifications",
     helper: "e.g. Certifications, Designations",
-    note: null,
     dirty: false,
   },
   {
     label: "ROLES LABEL",
     value: "Roles",
+    placeholder: "Roles",
     helper: "e.g. Responsibilities, Positions",
-    note: null,
     dirty: false,
   },
 ];
 
+const ANY_DIRTY = FIELDS.some((f) => f.dirty);
+
 export default function SettingsMockup() {
   return (
-    <div
-      style={{
-        background: "var(--color-surface)",
-        borderRadius: 12,
-        border: "1px solid var(--color-border)",
-        overflow: "hidden",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-        maxWidth: 640,
-        margin: "0 auto",
-      }}
-    >
-      {/* Section header */}
-      <div
-        style={{
-          padding: "14px 20px",
-          borderBottom: "1px solid var(--color-border-light)",
-          fontWeight: 700,
-          fontSize: 14,
-          color: "var(--color-text-secondary)",
-        }}
-      >
-        Custom Labels
-      </div>
-
-      {/* Fields */}
-      <div style={{ padding: 20 }}>
-        <div
+    <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      {/* Page-title chrome (matches SettingsPage.tsx h1 + description) */}
+      <div style={{ marginBottom: 24 }}>
+        <h3
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 16,
-            rowGap: 18,
+            fontSize: 28,
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+            margin: 0,
+            lineHeight: 1.2,
+            letterSpacing: "-0.02em",
           }}
         >
-          {FIELDS.map((field) => (
-            <div key={field.label}>
-              {/* Field label — matches labelStyle: 11px 700 uppercase */}
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase" as const,
-                  marginBottom: 5,
-                }}
-              >
-                {field.label}
-              </div>
+          Labels
+        </h3>
+        <p
+          style={{
+            fontSize: 13,
+            color: "var(--color-text-muted)",
+            margin: "5px 0 0",
+            lineHeight: 1.5,
+          }}
+        >
+          Customize the terminology used in your organization. For example,
+          rename &lsquo;Focus Areas&rsquo; to &lsquo;Wings&rsquo; or &lsquo;Units&rsquo;.
+        </p>
+      </div>
 
-              {field.note && (
+      {/* SectionCard (headerless) */}
+      <div
+        style={{
+          background: "var(--color-surface)",
+          borderRadius: 10,
+          border: "1px solid var(--color-border)",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          padding: 20,
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 16,
+            }}
+          >
+            {FIELDS.map((field) => (
+              <div key={field.label}>
+                {/* Field label — matches labelStyle: 11px 700 uppercase */}
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--color-text-subtle)",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase" as const,
+                    marginBottom: 6,
+                  }}
+                >
+                  {field.label}
+                </div>
+
+                {/* Input — matches dg-input: 38px tall, radius 6, fontSize 13, padding 0 12px */}
+                <div
+                  style={{
+                    height: 38,
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    padding: "0 12px",
+                    border: `1px solid ${field.dirty ? "var(--color-border-focus)" : "var(--color-border)"}`,
+                    borderRadius: 6,
+                    color: "var(--color-text-secondary)",
+                    background: "var(--color-surface)",
+                    boxShadow: field.dirty
+                      ? "0 0 0 3px rgba(59,130,246,0.15)"
+                      : undefined,
+                  }}
+                >
+                  {field.value}
+                </div>
+
                 <div
                   style={{
                     fontSize: 11,
                     color: "var(--color-text-muted)",
-                    margin: "0 0 6px",
+                    marginTop: 4,
                   }}
                 >
-                  {field.note}
+                  {field.helper}
                 </div>
-              )}
-
-              {/* Input — matches dg-input: borderRadius 10px, padding 7px 12px, fontSize 13px */}
-              <div
-                style={{
-                  fontSize: 13,
-                  padding: "7px 12px",
-                  border: `1px solid ${field.dirty ? "var(--color-border-focus)" : "var(--color-border)"}`,
-                  borderRadius: 10,
-                  color: "var(--color-text-secondary)",
-                  background: "var(--color-surface)",
-                  boxShadow: field.dirty ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
-                }}
-              >
-                {field.value}
               </div>
-
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                  marginTop: 4,
-                }}
-              >
-                {field.helper}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Action row — Save / Discard, right-aligned, matches EditorActionRow */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            justifyContent: "flex-end",
-            marginTop: 20,
-            paddingTop: 16,
-            borderTop: "1px solid var(--color-border-light)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "7px 14px",
-              border: "1px solid var(--color-border)",
-              borderRadius: 10,
-              color: "var(--color-text-secondary)",
-              background: "var(--color-surface)",
-            }}
-          >
-            Discard
+            ))}
           </div>
+
+          {/* Action row — right-aligned, no separator. Discard only shows when dirty. */}
           <div
             style={{
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "7px 14px",
-              border: "1px solid var(--color-brand)",
-              borderRadius: 10,
-              color: "#fff",
-              background: "var(--color-brand)",
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              justifyContent: "flex-end",
             }}
           >
-            Save
+            {ANY_DIRTY && (
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  height: 38,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "0 16px",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 6,
+                  color: "var(--color-text-secondary)",
+                  background: "transparent",
+                }}
+              >
+                Discard
+              </div>
+            )}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                height: 38,
+                fontSize: 13,
+                fontWeight: 600,
+                padding: "0 16px",
+                borderRadius: 6,
+                color: "var(--color-text-inverse)",
+                background: "var(--color-brand)",
+              }}
+            >
+              Save
+            </div>
           </div>
         </div>
       </div>
