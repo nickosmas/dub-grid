@@ -4,6 +4,7 @@ import {
   ProfileIcon,
   ShieldIcon,
   NotificationsIcon,
+  DataPrivacyIcon,
   DashboardIcon,
   ScheduleIcon,
 } from "@/components/icons/NavIcons";
@@ -13,6 +14,7 @@ export type ProfileSectionId =
   | "profile"
   | "security"
   | "notifications"
+  | "data-privacy"
   | "overview"
   | "schedule";
 
@@ -20,6 +22,7 @@ export const VALID_PROFILE_SECTIONS: ProfileSectionId[] = [
   "profile",
   "security",
   "notifications",
+  "data-privacy",
   "overview",
   "schedule",
 ];
@@ -63,7 +66,7 @@ export function buildProfileNavGroups(
       label: "Notifications",
       Icon: NotificationsIcon,
       description:
-        "Choose how and when DubGrid contacts you, plus cookie preferences for this device.",
+        "Choose how and when DubGrid contacts you.",
     },
   ];
 
@@ -94,8 +97,26 @@ export function buildProfileNavGroups(
     });
   }
 
+  // Pinned to the sidebar footer by ProfilePage via footerGroupIds.
+  groups.push({
+    id: "legal",
+    label: "Data & privacy",
+    items: [
+      {
+        id: "data-privacy",
+        label: "Data & privacy",
+        Icon: DataPrivacyIcon,
+        description:
+          "Cookie preferences for this device, plus our privacy, terms, and cookie policies.",
+      },
+    ],
+  });
+
   return groups;
 }
+
+/** Nav group IDs that ProfilePage pins to the sidebar footer. */
+export const PROFILE_FOOTER_GROUP_IDS = ["legal"];
 
 export function getDefaultProfileSection(): ProfileSectionId {
   return "profile";

@@ -23,6 +23,7 @@ import {
   ClockIcon as ClockOutline,
   UserGroupIcon as UserGroupOutline,
   PlusCircleIcon as PlusCircleOutline,
+  LockClosedIcon as LockOutline,
 } from "@heroicons/react/24/outline";
 import {
   Squares2X2Icon as DashboardSolid,
@@ -48,6 +49,7 @@ import {
   ClockIcon as ClockSolid,
   UserGroupIcon as UserGroupSolid,
   PlusCircleIcon as PlusCircleSolid,
+  LockClosedIcon as LockSolid,
 } from "@heroicons/react/24/solid";
 
 export interface NavIconProps {
@@ -89,6 +91,7 @@ export const DangerIcon = makeIcon(WarningOutline, WarningSolid, 16);
 /* ── Account sidebar (default size 16) ────────────────────── */
 export const ProfileIcon = makeIcon(UserCircleOutline, UserCircleSolid, 16);
 export const NotificationsIcon = makeIcon(BellOutline, BellSolid, 16);
+export const DataPrivacyIcon = makeIcon(LockOutline, LockSolid, 16);
 
 /* ── Gridmaster sidebar (default size 16) ─────────────────── */
 export const AuditLogIcon = makeIcon(ClipboardListOutline, ClipboardListSolid, 16);

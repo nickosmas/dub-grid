@@ -4,6 +4,7 @@ import {
   buildProfileNavGroups,
   getDefaultProfileSection,
   resolveProfileSection,
+  PROFILE_FOOTER_GROUP_IDS,
   VALID_PROFILE_SECTIONS,
 } from "@/components/profile/profile-nav-config";
 
@@ -21,15 +22,26 @@ describe("profile nav config", () => {
     }
   });
 
-  it("does not expose a Privacy section (account deletion → Profile, cookies → Notifications, policies → Header menu)", () => {
+  it("does not expose a legacy Privacy section (account deletion stays in Profile; cookies + policies live in Data & privacy)", () => {
     const groups = buildProfileNavGroups({ isOnSchedule: true });
     const allIds = groups.flatMap((g) => g.items.map((i) => i.id));
     expect(allIds).not.toContain("privacy");
+    expect(allIds).toContain("data-privacy");
+  });
+
+  it("pins Data & privacy to its own footer group at the end of the sidebar", () => {
+    for (const isOnSchedule of [true, false]) {
+      const groups = buildProfileNavGroups({ isOnSchedule });
+      const last = groups[groups.length - 1];
+      expect(last?.id).toBe("legal");
+      expect(last?.items.map((i) => i.id)).toEqual(["data-privacy"]);
+      expect(PROFILE_FOOTER_GROUP_IDS).toContain("legal");
+    }
   });
 
   it("hides the My work group for users who are not on the schedule (management-only or non-employees)", () => {
     const groups = buildProfileNavGroups({ isOnSchedule: false });
-    expect(groups.map((g) => g.id)).toEqual(["account"]);
+    expect(groups.map((g) => g.id)).toEqual(["account", "legal"]);
   });
 
   it("renders the My work group with Overview and Schedule for on-schedule employees", () => {

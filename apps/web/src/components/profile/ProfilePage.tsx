@@ -11,21 +11,22 @@ import {
   buildProfileNavGroups,
   getDefaultProfileSection,
   resolveProfileSection,
+  PROFILE_FOOTER_GROUP_IDS,
 } from "./profile-nav-config";
 import { SelfWorkOverview, SelfWorkSchedule } from "./SelfWorkProfile";
 import { ProfilePanel } from "@/components/account/ProfilePanel";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
+import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
 
 /**
  * /profile — the user's home for everything about them:
- *   - Account: profile (incl. account deletion request), security, notifications
- *     (incl. cookie preferences)
+ *   - Account: profile (incl. account deletion request), security,
+ *     notifications, data & privacy (cookie preferences + policy links)
  *   - My work (employees only): overview, schedule
  *
  * Shares the SettingsShell chrome with /settings so the navigation feels
  * the same across the app. Org admin configuration still lives at /settings.
- * Legal/policy links live in the Header user menu.
  */
 export function ProfilePage() {
   const searchParams = useSearchParams();
@@ -69,6 +70,7 @@ export function ProfilePage() {
       navGroups={navGroups}
       defaultSection={defaultSection}
       activeSection={activeSection}
+      footerGroupIds={PROFILE_FOOTER_GROUP_IDS}
     >
       {/* ── Account group ─────────────────────────────────────── */}
 
@@ -92,6 +94,8 @@ export function ProfilePage() {
       {activeSection === "notifications" && (
         <NotificationsPanel isGridmaster={Boolean(isGridmaster)} />
       )}
+
+      {activeSection === "data-privacy" && <DataPrivacyPanel />}
 
       {/* ── My work group (employees only) ────────────────────── */}
 
