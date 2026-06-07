@@ -6,7 +6,7 @@ import BillingSettings from "@/components/settings/BillingSettings";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import type { Organization, OrganizationBillingSummary } from "@/types";
 
-const mockSignOutLocal = vi.fn();
+const mockSignOut = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => ({
@@ -15,7 +15,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/hooks", () => ({
-  useLogout: () => ({ signOutLocal: mockSignOutLocal }),
+  useLogout: () => ({ signOut: mockSignOut }),
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
   useIsInSandbox: () => false,
@@ -113,7 +113,7 @@ function renderBillingSettings() {
 describe("BillingSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSignOutLocal.mockResolvedValue(undefined);
+    mockSignOut.mockReset();
     vi.mocked(fetchOrganizationBilling).mockResolvedValue(billingSummary);
   });
 
@@ -229,6 +229,6 @@ describe("BillingSettings", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
 
-    expect(mockSignOutLocal).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
   });
 });

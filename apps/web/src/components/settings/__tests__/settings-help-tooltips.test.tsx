@@ -218,7 +218,7 @@ describe("settings help cleanup", () => {
     ).toBeGreaterThan(0);
     expect(
       screen.getByText(
-        "Choose whether staff must match the role gate and certification gate, or just one gate.",
+        "Decide whether staff must match both lists, or just one.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
