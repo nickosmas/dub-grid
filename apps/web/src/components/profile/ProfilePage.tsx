@@ -44,10 +44,13 @@ export function ProfilePage() {
     setEmployee,
   } = useSelfProfileData({ orgId });
 
-  const hasEmployee = Boolean(employee);
+  // Management-only employees have a row in `employees` but no focus
+  // areas — they're not on the schedule grid, so don't surface the
+  // My work group (which is just "your schedule" + "your overview").
+  const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const navGroups = useMemo(
-    () => buildProfileNavGroups({ hasEmployee }),
-    [hasEmployee],
+    () => buildProfileNavGroups({ isOnSchedule }),
+    [isOnSchedule],
   );
   const allItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
   const defaultSection = getDefaultProfileSection();
@@ -92,7 +95,7 @@ export function ProfilePage() {
 
       {/* ── My work group (employees only) ────────────────────── */}
 
-      {activeSection === "overview" && employee && (
+      {activeSection === "overview" && isOnSchedule && employee && (
         <SelfWorkOverview
           employee={employee}
           focusAreas={focusAreas}
@@ -110,7 +113,7 @@ export function ProfilePage() {
         />
       )}
 
-      {activeSection === "schedule" && employee && (
+      {activeSection === "schedule" && isOnSchedule && employee && (
         <SelfWorkSchedule
           employee={employee}
           focusAreas={focusAreas}

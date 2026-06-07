@@ -9,8 +9,8 @@ import {
 
 describe("profile nav config", () => {
   it("always renders the Account group with Profile/Security/Notifications", () => {
-    for (const hasEmployee of [true, false]) {
-      const groups = buildProfileNavGroups({ hasEmployee });
+    for (const isOnSchedule of [true, false]) {
+      const groups = buildProfileNavGroups({ isOnSchedule });
       const account = groups.find((g) => g.id === "account");
       expect(account?.label).toBe("Account");
       expect(account?.items.map((i) => i.id)).toEqual([
@@ -22,18 +22,18 @@ describe("profile nav config", () => {
   });
 
   it("does not expose a Privacy section (account deletion → Profile, cookies → Notifications, policies → Header menu)", () => {
-    const groups = buildProfileNavGroups({ hasEmployee: true });
+    const groups = buildProfileNavGroups({ isOnSchedule: true });
     const allIds = groups.flatMap((g) => g.items.map((i) => i.id));
     expect(allIds).not.toContain("privacy");
   });
 
-  it("hides the My work group when the user has no linked employee", () => {
-    const groups = buildProfileNavGroups({ hasEmployee: false });
+  it("hides the My work group for users who are not on the schedule (management-only or non-employees)", () => {
+    const groups = buildProfileNavGroups({ isOnSchedule: false });
     expect(groups.map((g) => g.id)).toEqual(["account"]);
   });
 
-  it("renders the My work group with Overview and Schedule for employees", () => {
-    const groups = buildProfileNavGroups({ hasEmployee: true });
+  it("renders the My work group with Overview and Schedule for on-schedule employees", () => {
+    const groups = buildProfileNavGroups({ isOnSchedule: true });
     const work = groups.find((g) => g.id === "work");
     expect(work?.label).toBe("My work");
     expect(work?.items.map((i) => i.id)).toEqual(["overview", "schedule"]);

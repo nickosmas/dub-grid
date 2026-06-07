@@ -32,8 +32,12 @@ export function resolveProfileSection(raw: string | null): ProfileSectionId | nu
 }
 
 export interface ProfileNavContext {
-  /** Whether the user has a linked employee record (drives the My work group). */
-  hasEmployee: boolean;
+  /**
+   * Whether the user is an on-schedule employee (has at least one focus
+   * area). Management-only employees have an `employees` row but no
+   * focus areas and so have no schedule of their own to view here.
+   */
+  isOnSchedule: boolean;
 }
 
 export function buildProfileNavGroups(
@@ -67,7 +71,7 @@ export function buildProfileNavGroups(
     { id: "account", label: "Account", items: accountItems },
   ];
 
-  if (ctx.hasEmployee) {
+  if (ctx.isOnSchedule) {
     groups.push({
       id: "work",
       label: "My work",
