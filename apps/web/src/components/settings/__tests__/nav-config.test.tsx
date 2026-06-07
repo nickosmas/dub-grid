@@ -1,34 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildNavGroups,
-  getDefaultSection,
-  type NavPermissions,
-} from "@/components/settings/nav-config";
-
-const noOrgAccess: NavPermissions = {
-  canManageOrg: false,
-  canAccessSettings: false,
-  isSuperAdmin: false,
-  isGridmaster: false,
-  canManageOrgLabels: false,
-  canViewOrgLabels: false,
-  canManageFocusAreas: false,
-  canViewFocusAreas: false,
-  canManageScheduleDefinitions: false,
-  canViewScheduleDefinitions: false,
-  canManageIndicatorTypes: false,
-  canViewIndicatorTypes: false,
-  canManageOrgSettings: false,
-  canManageCoverageRequirements: false,
-  canViewCoverageRequirements: false,
-};
+import { buildNavGroups, type NavPermissions } from "@/components/settings/nav-config";
 
 const fullSettingsPermissions: NavPermissions = {
-  ...noOrgAccess,
   canManageOrg: true,
   canAccessSettings: true,
   isSuperAdmin: true,
+  isGridmaster: false,
   canManageOrgLabels: true,
   canViewOrgLabels: true,
   canManageFocusAreas: true,
@@ -43,32 +21,6 @@ const fullSettingsPermissions: NavPermissions = {
 };
 
 describe("settings nav config", () => {
-  it("always exposes the Account group with Profile/Security/Notifications/Privacy", () => {
-    for (const perms of [noOrgAccess, fullSettingsPermissions]) {
-      const groups = buildNavGroups(perms);
-      const account = groups.find((g) => g.id === "account");
-      expect(account?.label).toBe("Account");
-      expect(account?.items.map((i) => i.id)).toEqual([
-        "profile",
-        "security",
-        "notifications",
-        "privacy",
-      ]);
-    }
-  });
-
-  it("renders only the Account group for account-only users", () => {
-    const groups = buildNavGroups(noOrgAccess);
-    expect(groups.map((g) => g.id)).toEqual(["account"]);
-  });
-
-  it("does not expose an Organizations switcher (web org-switching is disabled)", () => {
-    const groups = buildNavGroups(fullSettingsPermissions);
-    const allIds = groups.flatMap((g) => g.items.map((i) => i.id));
-    expect(allIds).not.toContain("organizations");
-    expect(groups.find((g) => g.id === "memberships")).toBeUndefined();
-  });
-
   it("groups General with org identity + labels only", () => {
     const groups = buildNavGroups(fullSettingsPermissions);
     const general = groups.find((g) => g.id === "general");
@@ -112,10 +64,9 @@ describe("settings nav config", () => {
     expect(audit?.items.map((item) => item.id)).toEqual(["org-activity"]);
   });
 
-  it("renders the group order: Account, General, Scheduling, Staff designations, Billing, Audit, Danger Zone", () => {
+  it("renders the group order: General, Scheduling, Staff designations, Billing, Audit, Danger Zone", () => {
     const groups = buildNavGroups(fullSettingsPermissions);
     expect(groups.map((g) => g.id)).toEqual([
-      "account",
       "general",
       "scheduling",
       "staff",
@@ -123,6 +74,15 @@ describe("settings nav config", () => {
       "audit",
       "danger",
     ]);
+  });
+
+  it("does not expose any account-scope sections (those live on /profile)", () => {
+    const groups = buildNavGroups(fullSettingsPermissions);
+    const allIds = groups.flatMap((g) => g.items.map((i) => i.id));
+    for (const accountId of ["profile", "security", "notifications", "privacy"]) {
+      expect(allIds).not.toContain(accountId);
+    }
+    expect(groups.find((g) => g.id === "account")).toBeUndefined();
   });
 
   it("exposes the activity log and danger zone to super admins only", () => {
@@ -147,7 +107,6 @@ describe("settings nav config", () => {
 
     expect(allIds).not.toContain("org-activity");
     expect(allIds).not.toContain("org-danger");
-    expect(groups.find((group) => group.id === "audit")).toBeUndefined();
     expect(groups.find((group) => group.id === "danger")).toBeUndefined();
   });
 
@@ -155,13 +114,5 @@ describe("settings nav config", () => {
     const groups = buildNavGroups({ ...fullSettingsPermissions, isGridmaster: true });
     const platform = groups.find((g) => g.id === "platform");
     expect(platform?.items.map((item) => item.id)).toEqual(["platform-impersonation"]);
-  });
-
-  it("defaults admins to the first org-side section so account groups don't hijack their landing", () => {
-    expect(getDefaultSection(fullSettingsPermissions)).toBe("org-general");
-  });
-
-  it("defaults account-only users to Profile", () => {
-    expect(getDefaultSection(noOrgAccess)).toBe("profile");
   });
 });

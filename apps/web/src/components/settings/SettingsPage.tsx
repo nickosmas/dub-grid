@@ -12,7 +12,6 @@ import {
 } from "@/features/settings/client";
 import { toast } from "sonner";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
-import { useSelfProfileData } from "@/hooks/useSelfProfileData";
 import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
 import { SettingsShell } from "./SettingsShell";
 import OrganizationGeneral from "./OrganizationGeneral";
@@ -29,15 +28,10 @@ import DepartmentsSettings from "./DepartmentsSettings";
 import Indicators from "./Indicators";
 import OrgActivityLog from "./ActivityLog";
 import DangerZone from "./DangerZone";
-import { ProfilePanel } from "@/components/account/ProfilePanel";
-import { SecurityPanel } from "@/components/account/SecurityPanel";
-import { NotificationsPanel } from "@/components/account/NotificationsPanel";
-import { PrivacyPanel } from "@/components/account/PrivacyPanel";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface SettingsPageProps {
-  /** Null when the user has no org-settings access (account-only user). */
-  organization: Organization | null;
+  organization: Organization;
   focusAreas: FocusArea[];
   shiftCategories: ShiftCategory[];
   jobs: JobDefinition[];
@@ -53,13 +47,10 @@ export interface SettingsPageProps {
   onCertificationsChange: (items: NamedItem[]) => void;
   onOrgRolesChange: (items: NamedItem[]) => void;
   onDepartmentsChange: (items: Department[]) => void;
-  /** orgId from the user's active session — needed for account panels even when org is null. */
-  orgId: string | null;
   canManageOrg: boolean;
   canAccessSettings: boolean;
   isSuperAdmin: boolean;
   isGridmaster: boolean;
-  canManageEmployees: boolean;
   canManageOrgLabels: boolean;
   canViewOrgLabels: boolean;
   canManageFocusAreas: boolean;
@@ -99,12 +90,10 @@ export default function SettingsPage({
   onCertificationsChange,
   onOrgRolesChange,
   onDepartmentsChange,
-  orgId,
   canManageOrg,
   canAccessSettings,
   isSuperAdmin,
   isGridmaster,
-  canManageEmployees,
   canManageOrgLabels,
   canViewOrgLabels,
   canManageFocusAreas,
@@ -122,7 +111,6 @@ export default function SettingsPage({
   onAbsenceTypesChange,
 }: SettingsPageProps) {
   const searchParams = useSearchParams();
-  const { user, profile, employee, setProfile, setEmployee } = useSelfProfileData({ orgId });
 
   const perms: NavPermissions = useMemo(() => ({
     canManageOrg,
@@ -142,9 +130,9 @@ export default function SettingsPage({
     canViewCoverageRequirements,
   }), [canManageOrg, canAccessSettings, isSuperAdmin, isGridmaster, canManageOrgLabels, canViewOrgLabels, canManageFocusAreas, canViewFocusAreas, canManageScheduleDefinitions, canViewScheduleDefinitions, canManageIndicatorTypes, canViewIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements, canViewCoverageRequirements]);
 
-  const focusAreaLabel = organization?.focusAreaLabel || "Focus Areas";
-  const certificationLabel = organization?.certificationLabel || "Certifications";
-  const roleLabel = organization?.roleLabel || "Roles";
+  const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
+  const certificationLabel = organization.certificationLabel || "Certifications";
+  const roleLabel = organization.roleLabel || "Roles";
   const scheduledDepartmentLabel = "Scheduled Departments";
   const navGroups = useMemo(() => buildNavGroups(perms, {
     focusAreaLabel,
@@ -161,10 +149,7 @@ export default function SettingsPage({
   const activeSection: SectionId = requestedSection && allItems.some(i => i.id === requestedSection) ? requestedSection : defaultSection;
   const maxWidth = getMaxWidth(activeSection);
 
-  const canEditProfileDirectly =
-    Boolean(canManageEmployees) || Boolean(isSuperAdmin) || Boolean(isGridmaster);
-
-  // Permission notice for view-only users — only meaningful when they have org access.
+  // Permission notice for view-only users.
   const banner = canAccessSettings && !isSuperAdmin && !isGridmaster ? (
     <div
       style={{
@@ -196,50 +181,20 @@ export default function SettingsPage({
       maxWidth={maxWidth}
       banner={banner}
     >
-      {/* ── Account group ─────────────────────────────────────── */}
-
-      {activeSection === "profile" && (
-        <ProfilePanel
-          user={user}
-          profile={profile}
-          employee={employee}
-          orgId={orgId}
-          canEditProfileDirectly={canEditProfileDirectly}
-          setProfile={setProfile}
-          setEmployee={setEmployee}
-        />
-      )}
-
-      {activeSection === "security" && (
-        <SecurityPanel user={user} profile={profile} setProfile={setProfile} />
-      )}
-
-      {activeSection === "notifications" && (
-        <NotificationsPanel isGridmaster={Boolean(isGridmaster)} />
-      )}
-
-      {activeSection === "privacy" && (
-        <PrivacyPanel
-          orgId={orgId}
-          canEditProfileDirectly={canEditProfileDirectly}
-          isGridmaster={Boolean(isGridmaster)}
-        />
-      )}
-
       {/* ── General group ─────────────────────────────────────── */}
 
-      {activeSection === "org-general" && organization && isSuperAdmin && (
+      {activeSection === "org-general" && isSuperAdmin && (
         <OrganizationGeneral
           organization={organization}
           onSave={onOrganizationSave}
         />
       )}
 
-      {activeSection === "org-billing" && organization && (isSuperAdmin || isGridmaster) && (
+      {activeSection === "org-billing" && (isSuperAdmin || isGridmaster) && (
         <BillingSettings organization={organization} />
       )}
 
-      {activeSection === "org-labels" && organization && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
+      {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
         <OrganizationLabels
           organization={organization}
           onSave={onOrganizationSave}
@@ -247,11 +202,11 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "org-activity" && organization && isSuperAdmin && (
+      {activeSection === "org-activity" && isSuperAdmin && (
         <OrgActivityLog orgId={organization.id} />
       )}
 
-      {activeSection === "org-display" && organization && canManageOrgSettings && (
+      {activeSection === "org-display" && canManageOrgSettings && (
         <DisplayMode
           organization={organization}
           shiftCategories={shiftCategories}
@@ -262,14 +217,14 @@ export default function SettingsPage({
 
       {/* ── Scheduling group ─────────────────────────────────── */}
 
-      {activeSection === "schedule-rules" && organization && isSuperAdmin && (
+      {activeSection === "schedule-rules" && isSuperAdmin && (
         <ScheduleRules
           organization={organization}
           onOrganizationSave={onOrganizationSave}
         />
       )}
 
-      {activeSection === "schedule-shifts" && organization && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+      {activeSection === "schedule-shifts" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
         <ShiftCategories
           shiftCategories={shiftCategories}
           focusAreas={focusAreas}
@@ -279,7 +234,7 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "schedule-jobs" && organization && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+      {activeSection === "schedule-jobs" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
         <Jobs
           jobs={jobs}
           orgId={organization.id}
@@ -296,7 +251,7 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "schedule-absence-types" && organization && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+      {activeSection === "schedule-absence-types" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
         <AbsenceTypes
           absenceTypes={absenceTypes}
           orgId={organization.id}
@@ -306,7 +261,7 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "schedule-coverage" && organization && (canManageCoverageRequirements || canViewCoverageRequirements) && (
+      {activeSection === "schedule-coverage" && (canManageCoverageRequirements || canViewCoverageRequirements) && (
         <Coverage
           orgId={organization.id}
           focusAreas={focusAreas}
@@ -323,7 +278,7 @@ export default function SettingsPage({
 
       {/* ── Staff designations group ─────────────────────────── */}
 
-      {activeSection === "staff-certifications" && organization && (canManageOrgLabels || canViewOrgLabels) && (
+      {activeSection === "staff-certifications" && (canManageOrgLabels || canViewOrgLabels) && (
         <StringListSettings
           label={certificationLabel}
           sectionTitle={certificationLabel}
@@ -352,7 +307,7 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "staff-roles" && organization && (canManageOrgLabels || canViewOrgLabels) && (
+      {activeSection === "staff-roles" && (canManageOrgLabels || canViewOrgLabels) && (
         <StringListSettings
           label={roleLabel}
           sectionTitle={roleLabel}
@@ -383,7 +338,7 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "staff-departments" && organization && (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
+      {activeSection === "staff-departments" && (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
         <DepartmentsSettings
           departments={departments}
           focusAreas={focusAreas}
@@ -397,7 +352,7 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "staff-indicators" && organization && (canManageIndicatorTypes || canViewIndicatorTypes) && (
+      {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
         <Indicators
           indicatorTypes={indicatorTypes}
           orgId={organization.id}
@@ -414,7 +369,7 @@ export default function SettingsPage({
 
       {/* ── Danger Zone group ───────────────────────────────── */}
 
-      {activeSection === "org-danger" && organization && isSuperAdmin && (
+      {activeSection === "org-danger" && isSuperAdmin && (
         <DangerZone organization={organization} />
       )}
     </SettingsShell>

@@ -125,35 +125,6 @@ vi.mock("@/components/ImpersonationPanel", () => ({
   default: () => <div>Impersonation</div>,
 }));
 
-vi.mock("@/hooks/useSelfProfileData", () => ({
-  useSelfProfileData: () => ({
-    user: null,
-    profile: null,
-    employee: null,
-    shifts: {},
-    recurringShifts: [],
-    shiftRequests: [],
-    auditNames: new Map(),
-    isLoading: false,
-    error: null,
-    setProfile: vi.fn(),
-    setEmployee: vi.fn(),
-  }),
-}));
-
-vi.mock("@/components/account/ProfilePanel", () => ({
-  ProfilePanel: () => <div>Profile</div>,
-}));
-vi.mock("@/components/account/SecurityPanel", () => ({
-  SecurityPanel: () => <div>Security</div>,
-}));
-vi.mock("@/components/account/NotificationsPanel", () => ({
-  NotificationsPanel: () => <div>Notifications</div>,
-}));
-vi.mock("@/components/account/PrivacyPanel", () => ({
-  PrivacyPanel: () => <div>Privacy</div>,
-}));
-
 import SettingsPage from "@/components/settings/SettingsPage";
 
 const organization = {
@@ -187,12 +158,10 @@ const baseProps = {
   onDepartmentsChange: vi.fn(),
   onCoverageRequirementsChange: vi.fn(),
   onAbsenceTypesChange: vi.fn(),
-  orgId: "org-1",
   canManageOrg: true,
   canAccessSettings: true,
   isSuperAdmin: true,
   isGridmaster: false,
-  canManageEmployees: true,
   canManageOrgLabels: true,
   canViewOrgLabels: true,
   canManageFocusAreas: true,

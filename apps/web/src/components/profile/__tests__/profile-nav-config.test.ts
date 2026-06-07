@@ -8,17 +8,34 @@ import {
 } from "@/components/profile/profile-nav-config";
 
 describe("profile nav config", () => {
-  it("renders a single My work group with Overview and Schedule", () => {
-    const groups = buildProfileNavGroups();
-    expect(groups).toHaveLength(1);
-    expect(groups[0].id).toBe("work");
-    expect(groups[0].label).toBe("My work");
-    expect(groups[0].items.map((i) => i.id)).toEqual(["overview", "schedule"]);
-    expect(groups[0].items.map((i) => i.label)).toEqual(["Overview", "Schedule"]);
+  it("always renders the Account group with Profile/Security/Notifications/Privacy", () => {
+    for (const hasEmployee of [true, false]) {
+      const groups = buildProfileNavGroups({ hasEmployee });
+      const account = groups.find((g) => g.id === "account");
+      expect(account?.label).toBe("Account");
+      expect(account?.items.map((i) => i.id)).toEqual([
+        "profile",
+        "security",
+        "notifications",
+        "privacy",
+      ]);
+    }
   });
 
-  it("defaults to Overview", () => {
-    expect(getDefaultProfileSection()).toBe("overview");
+  it("hides the My work group when the user has no linked employee", () => {
+    const groups = buildProfileNavGroups({ hasEmployee: false });
+    expect(groups.map((g) => g.id)).toEqual(["account"]);
+  });
+
+  it("renders the My work group with Overview and Schedule for employees", () => {
+    const groups = buildProfileNavGroups({ hasEmployee: true });
+    const work = groups.find((g) => g.id === "work");
+    expect(work?.label).toBe("My work");
+    expect(work?.items.map((i) => i.id)).toEqual(["overview", "schedule"]);
+  });
+
+  it("defaults to Profile so anyone landing on /profile sees their account first", () => {
+    expect(getDefaultProfileSection()).toBe("profile");
   });
 
   it("resolves valid section IDs and rejects unknown ones", () => {
@@ -27,7 +44,7 @@ describe("profile nav config", () => {
     }
     expect(resolveProfileSection(null)).toBeNull();
     expect(resolveProfileSection("")).toBeNull();
-    expect(resolveProfileSection("account")).toBeNull();
+    expect(resolveProfileSection("org-general")).toBeNull();
     expect(resolveProfileSection("settings")).toBeNull();
   });
 });

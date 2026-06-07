@@ -37,13 +37,13 @@ function BillingRecoverySettings({ orgId }: { orgId: string }) {
 }
 
 function SettingsPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const {
     role,
     orgId,
     canManageOrg,
     canAccessSettings,
-    canManageEmployees,
     isSuperAdmin,
     isGridmaster,
     isLoading: permissionsLoading,
@@ -59,10 +59,10 @@ function SettingsPageContent() {
     canManageCoverageRequirements,
     canViewCoverageRequirements,
   } = usePermissions();
-  // Anyone authenticated can hit /settings — the sidebar surfaces Account
-  // groups for everyone and Org groups for users with org-settings access.
-  const hasOrgSettingsAccess =
-    isGridmaster || isSuperAdmin || (role === "admin" && canAccessSettings);
+  const canViewSettingsPage =
+    isGridmaster ||
+    isSuperAdmin ||
+    (role === "admin" && canAccessSettings);
   const isBillingRecoverySection =
     searchParams.get("section") === "org-billing";
   const shouldCheckBillingRecovery =
@@ -91,20 +91,30 @@ function SettingsPageContent() {
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
     enabled:
-      hasOrgSettingsAccess &&
+      canViewSettingsPage &&
       !isCheckingBillingRecovery &&
       !billingRecoveryOrgId,
   });
-  // For account-only users we don't wait on org-data fetching.
-  const isLoading = permissionsLoading
-    || isCheckingBillingRecovery
-    || (hasOrgSettingsAccess && (loading || !org));
+  const isLoading =
+    permissionsLoading || isCheckingBillingRecovery || loading || !org;
+
+  useEffect(() => {
+    if (!permissionsLoading && !canViewSettingsPage) {
+      // Users without org-settings access get sent to their profile, where
+      // account settings live.
+      router.replace("/profile");
+    }
+  }, [canViewSettingsPage, permissionsLoading, router]);
+
+  if (!permissionsLoading && !canViewSettingsPage) {
+    return <ProgressBar loading />;
+  }
 
   if (billingRecoveryOrgId) {
     return <BillingRecoverySettings orgId={billingRecoveryOrgId} />;
   }
 
-  if (loadError && !org && hasOrgSettingsAccess) {
+  if (loadError && !org) {
     return (
       <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
         <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
@@ -141,12 +151,10 @@ function SettingsPageContent() {
           onCertificationsChange={handleCertificationsChange}
           onOrgRolesChange={setOrgRoles}
           onDepartmentsChange={setDepartments}
-          orgId={orgId}
           canManageOrg={canManageOrg}
           canAccessSettings={canAccessSettings}
           isSuperAdmin={isSuperAdmin}
           isGridmaster={isGridmaster}
-          canManageEmployees={canManageEmployees}
           canManageOrgLabels={canManageOrgLabels}
           canViewOrgLabels={canViewOrgLabels}
           canManageFocusAreas={canManageFocusAreas}

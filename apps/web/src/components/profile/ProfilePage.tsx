@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { usePermissions, useOrganizationData } from "@/hooks";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
@@ -14,32 +13,41 @@ import {
   resolveProfileSection,
 } from "./profile-nav-config";
 import { SelfWorkOverview, SelfWorkSchedule } from "./SelfWorkProfile";
+import { ProfilePanel } from "@/components/account/ProfilePanel";
+import { SecurityPanel } from "@/components/account/SecurityPanel";
+import { NotificationsPanel } from "@/components/account/NotificationsPanel";
+import { PrivacyPanel } from "@/components/account/PrivacyPanel";
 
 /**
- * Self-work surface for an employee: their schedule and their work overview,
- * presented under the shared SettingsShell so the chrome matches /settings
- * and /account. Account-scope concerns (profile, security, notifications,
- * privacy) live at /account; users without a linked employee record have
- * nothing to view here and are redirected there.
+ * /profile — the user's home for everything about them:
+ *   - Account: profile, security, notifications, privacy & data
+ *   - My work (employees only): overview, schedule
+ *
+ * Shares the SettingsShell chrome with /settings so the navigation feels
+ * the same across the app. Org admin configuration still lives at /settings.
  */
 export function ProfilePage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { orgId } = usePermissions();
+  const { orgId, canManageEmployees, isSuperAdmin, isGridmaster } = usePermissions();
   const { org, focusAreas, assignments, shiftCategories, absenceTypes, certifications, orgRoles } =
     useOrganizationData();
-  const { employee, shifts, recurringShifts, shiftRequests, auditNames, isLoading } =
-    useSelfProfileData({ orgId });
+  const {
+    user,
+    profile,
+    employee,
+    shifts,
+    recurringShifts,
+    shiftRequests,
+    auditNames,
+    setProfile,
+    setEmployee,
+  } = useSelfProfileData({ orgId });
 
-  // No linked employee → no self-work to show; send the user to their
-  // account settings instead.
-  useEffect(() => {
-    if (!isLoading && !employee) {
-      router.replace("/settings?section=profile");
-    }
-  }, [isLoading, employee, router]);
-
-  const navGroups = useMemo(() => buildProfileNavGroups(), []);
+  const hasEmployee = Boolean(employee);
+  const navGroups = useMemo(
+    () => buildProfileNavGroups({ hasEmployee }),
+    [hasEmployee],
+  );
   const allItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
   const defaultSection = getDefaultProfileSection();
   const sectionFromPath = resolveProfileSection(searchParams.get("section"));
@@ -48,34 +56,8 @@ export function ProfilePage() {
       ? sectionFromPath
       : defaultSection;
 
-  // Render an account-shortcut banner so users can jump to settings from here.
-  const banner = (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 12,
-        padding: "8px 14px",
-        background: "var(--color-surface)",
-        borderRadius: "var(--dg-radius-sm)",
-        border: "1px solid var(--color-border)",
-        fontSize: "var(--dg-fs-caption)",
-        color: "var(--color-text-muted)",
-      }}
-    >
-      <span>Looking for name, email, password, or notification settings?</span>
-      <Link href="/settings?section=profile" className="dg-btn dg-btn-secondary dg-btn-sm">
-        Open account settings
-      </Link>
-    </div>
-  );
-
-  if (!employee) {
-    // While the redirect effect runs, render nothing rather than the shell
-    // (avoids a flash of the work surface for non-employees).
-    return null;
-  }
+  const canEditProfileDirectly =
+    Boolean(canManageEmployees) || Boolean(isSuperAdmin) || Boolean(isGridmaster);
 
   return (
     <SettingsShell<ProfileSectionId>
@@ -83,9 +65,40 @@ export function ProfilePage() {
       navGroups={navGroups}
       defaultSection={defaultSection}
       activeSection={activeSection}
-      banner={banner}
     >
-      {activeSection === "overview" && (
+      {/* ── Account group ─────────────────────────────────────── */}
+
+      {activeSection === "profile" && (
+        <ProfilePanel
+          user={user}
+          profile={profile}
+          employee={employee}
+          orgId={orgId}
+          canEditProfileDirectly={canEditProfileDirectly}
+          setProfile={setProfile}
+          setEmployee={setEmployee}
+        />
+      )}
+
+      {activeSection === "security" && (
+        <SecurityPanel user={user} profile={profile} setProfile={setProfile} />
+      )}
+
+      {activeSection === "notifications" && (
+        <NotificationsPanel isGridmaster={Boolean(isGridmaster)} />
+      )}
+
+      {activeSection === "privacy" && (
+        <PrivacyPanel
+          orgId={orgId}
+          canEditProfileDirectly={canEditProfileDirectly}
+          isGridmaster={Boolean(isGridmaster)}
+        />
+      )}
+
+      {/* ── My work group (employees only) ────────────────────── */}
+
+      {activeSection === "overview" && employee && (
         <SelfWorkOverview
           employee={employee}
           focusAreas={focusAreas}
@@ -103,7 +116,7 @@ export function ProfilePage() {
         />
       )}
 
-      {activeSection === "schedule" && (
+      {activeSection === "schedule" && employee && (
         <SelfWorkSchedule
           employee={employee}
           focusAreas={focusAreas}
