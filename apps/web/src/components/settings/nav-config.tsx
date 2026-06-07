@@ -15,22 +15,42 @@ import {
   ImpersonateIcon,
   ActivityIcon,
   DangerIcon,
+  ProfileIcon,
+  NotificationsIcon,
+  PrivacyIcon,
   type NavIconProps,
 } from "@/components/icons/NavIcons";
 
 // ── Section IDs ──────────────────────────────────────────────────────────────
-export type SectionId =
+export type AccountSectionId =
+  | "profile" | "security" | "notifications" | "privacy";
+
+export type OrgSectionId =
   | "org-general" | "org-billing" | "org-labels" | "org-activity" | "org-display"
   | "schedule-rules" | "schedule-shifts" | "schedule-jobs" | "schedule-absence-types" | "schedule-coverage"
   | "staff-certifications" | "staff-roles" | "staff-departments" | "staff-indicators"
   | "platform-impersonation" | "org-danger";
 
+export type SectionId = AccountSectionId | OrgSectionId;
+
 export const VALID_SECTIONS: SectionId[] = [
+  "profile", "security", "notifications", "privacy",
   "org-general", "org-billing", "org-labels", "org-activity", "org-display",
   "schedule-rules", "schedule-shifts", "schedule-jobs", "schedule-absence-types", "schedule-coverage",
   "staff-certifications", "staff-roles", "staff-departments", "staff-indicators",
   "platform-impersonation", "org-danger",
 ];
+
+const ACCOUNT_SECTIONS: ReadonlySet<SectionId> = new Set<SectionId>([
+  "profile",
+  "security",
+  "notifications",
+  "privacy",
+]);
+
+export function isAccountSection(id: SectionId): id is AccountSectionId {
+  return ACCOUNT_SECTIONS.has(id);
+}
 
 // ── Backwards-compatible URL mapping ─────────────────────────────────────────
 const OLD_TO_NEW: Record<string, SectionId> = {
@@ -92,6 +112,18 @@ export function buildNavGroups(
   overrides?: { focusAreaLabel?: string; certificationLabel?: string; roleLabel?: string },
 ): NavGroup[] {
   const groups: NavGroup[] = [];
+
+  // Account — always available to any authenticated user
+  groups.push({
+    id: "account",
+    label: "Account",
+    items: [
+      { id: "profile", label: "Profile", Icon: ProfileIcon, description: "Your name, email, and phone — the basics about how you appear in DubGrid." },
+      { id: "security", label: "Security", Icon: ShieldIcon, description: "Change your password, manage two-factor authentication, and review active sessions." },
+      { id: "notifications", label: "Notifications", Icon: NotificationsIcon, description: "Choose how and when DubGrid contacts you across email, push, and in-app." },
+      { id: "privacy", label: "Privacy & data", Icon: PrivacyIcon, description: "Review policies, manage cookie preferences, and request account deletion." },
+    ],
+  });
 
   // General — basic org identity + terminology
   if (perms.canAccessSettings) {
@@ -170,10 +202,21 @@ export function buildNavGroups(
   return groups;
 }
 
-/** Get the first visible section ID based on permissions. */
+/**
+ * Default section when /settings is hit with no `?section=`.
+ *
+ * Admins land on the first org-side item (Organization Details for super admins,
+ * the first item they can see otherwise). Account-only users land on Profile.
+ * This preserves the pre-merge admin landing UX while still giving regular
+ * users a sensible home.
+ */
 export function getDefaultSection(perms: NavPermissions): SectionId {
   const groups = buildNavGroups(perms);
-  return groups[0]?.items[0]?.id ?? "platform-impersonation";
+  const firstOrgItem = groups
+    .find((g) => g.id !== "account")
+    ?.items[0]?.id;
+  if (firstOrgItem) return firstOrgItem;
+  return groups[0]?.items[0]?.id ?? "profile";
 }
 
 /** Get max content width for a section. */

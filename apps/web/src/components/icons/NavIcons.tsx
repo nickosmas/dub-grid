@@ -92,7 +92,6 @@ export const DangerIcon = makeIcon(WarningOutline, WarningSolid, 16);
 export const ProfileIcon = makeIcon(UserCircleOutline, UserCircleSolid, 16);
 export const NotificationsIcon = makeIcon(BellOutline, BellSolid, 16);
 export const PrivacyIcon = makeIcon(LockOutline, LockSolid, 16);
-export const OrganizationsIcon = makeIcon(UserGroupOutline, UserGroupSolid, 16);
 
 /* ── Gridmaster sidebar (default size 16) ─────────────────── */
 export const AuditLogIcon = makeIcon(ClipboardListOutline, ClipboardListSolid, 16);

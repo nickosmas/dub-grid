@@ -15,7 +15,7 @@ import {
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 
-const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/reports", "/settings"];
+const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/reports", "/settings", "/notifications", "/profile"];
 
 function isAppRoute(pathname: string): boolean {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));

@@ -31,10 +31,11 @@ export function ProfilePage() {
   const { employee, shifts, recurringShifts, shiftRequests, auditNames, isLoading } =
     useSelfProfileData({ orgId });
 
-  // No linked employee → no self-work to show; send the user to /account.
+  // No linked employee → no self-work to show; send the user to their
+  // account settings instead.
   useEffect(() => {
     if (!isLoading && !employee) {
-      router.replace("/account");
+      router.replace("/settings?section=profile");
     }
   }, [isLoading, employee, router]);
 
@@ -64,7 +65,7 @@ export function ProfilePage() {
       }}
     >
       <span>Looking for name, email, password, or notification settings?</span>
-      <Link href="/account" className="dg-btn dg-btn-secondary dg-btn-sm">
+      <Link href="/settings?section=profile" className="dg-btn dg-btn-secondary dg-btn-sm">
         Open account settings
       </Link>
     </div>
