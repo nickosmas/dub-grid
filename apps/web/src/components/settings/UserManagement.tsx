@@ -420,8 +420,16 @@ export default function UserManagementSettings({ orgId, isSuperAdmin }: { orgId:
 
   const confirmRoleChange = () => {
     if (!roleChangeConfirm) return;
-    void handleRoleChange(roleChangeConfirm.userId, roleChangeConfirm.to);
-    setRoleChangeConfirm(null);
+    void (async () => {
+      const target = roleChangeConfirm;
+      try {
+        await handleRoleChange(target.userId, target.to);
+      } finally {
+        setRoleChangeConfirm((current) =>
+          current && current.userId === target.userId ? null : current,
+        );
+      }
+    })();
   };
 
   const handleRevokeAccess = async () => {

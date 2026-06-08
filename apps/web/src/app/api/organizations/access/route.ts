@@ -253,7 +253,8 @@ export async function PATCH(req: NextRequest) {
 
     const serviceClient = getServiceClient();
 
-    if (currentUser.orgRole !== nextRole) {
+    const roleChanged = currentUser.orgRole !== nextRole;
+    if (roleChanged) {
       const { error } = await serviceClient.rpc("change_user_role", {
         p_target_user_id: userId,
         p_new_role: nextRole,
@@ -316,6 +317,16 @@ export async function PATCH(req: NextRequest) {
       changes,
       req,
     });
+
+    if (roleChanged) {
+      void dispatchNotificationEvent(user.id, {
+        action: "role_changed",
+        orgId,
+        targetUserId: userId,
+        fromRole: currentUser.orgRole ?? "user",
+        toRole: nextRole,
+      });
+    }
 
     if (permissionsChanged) {
       void dispatchNotificationEvent(user.id, {

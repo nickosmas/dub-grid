@@ -84,13 +84,18 @@ export function InlineRoleSelect({
           message={`Change this person's role to ${ORG_ROLE_LABELS[pending]}? Their access updates immediately.`}
           confirmLabel="Change role"
           variant="warning"
-          onCancel={() => setPending(null)}
+          isLoading={saving}
+          onCancel={() => {
+            if (saving) return;
+            setPending(null);
+          }}
           onConfirm={() => {
             const next = pending;
             setSaving(true);
             void (async () => {
               try {
                 await onChange(next);
+                toast.success(`Role updated to ${ORG_ROLE_LABELS[next]}.`);
                 setPending(null);
               } catch (error) {
                 toast.error(

@@ -7,6 +7,7 @@ import type { Organization } from "@/types";
 const mockSignOut = vi.fn();
 const mockIsInSandbox = vi.fn();
 const toastError = vi.fn();
+const toastSuccess = vi.fn();
 const captureException = vi.fn();
 
 vi.mock("@/hooks", () => ({
@@ -17,7 +18,10 @@ vi.mock("@/hooks", () => ({
 }));
 
 vi.mock("sonner", () => ({
-  toast: { error: (...args: unknown[]) => toastError(...args) },
+  toast: {
+    error: (...args: unknown[]) => toastError(...args),
+    success: (...args: unknown[]) => toastSuccess(...args),
+  },
 }));
 
 vi.mock("@/lib/sentry", () => ({
@@ -98,6 +102,7 @@ describe("DangerZone", () => {
       }),
     );
     expect(mockSignOut).toHaveBeenCalledWith({ scope: "global" });
+    expect(toastSuccess).toHaveBeenCalledWith("Organization deleted.");
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -140,8 +145,9 @@ describe("DangerZone", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(captureException).toHaveBeenCalled();
+    expect(toastSuccess).toHaveBeenCalledWith("Organization deleted.");
     expect(toastError).toHaveBeenCalledWith(
-      expect.stringMatching(/Could not sign out/i),
+      expect.stringMatching(/sign out/i),
     );
   });
 });

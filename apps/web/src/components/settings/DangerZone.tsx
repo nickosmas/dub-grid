@@ -40,13 +40,14 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "Failed to delete organization");
       }
+      toast.success("Organization deleted.");
       // The org is gone for this user. Sign out globally so every device's
       // session is invalidated; /goodbye handles the teardown.
       try {
         signOut({ scope: "global" });
       } catch (signOutErr) {
         Sentry.captureException(signOutErr);
-        toast.error("Could not sign out. Please refresh the page.");
+        toast.error("Couldn't sign out automatically. Please refresh the page.");
         setIsDeleting(false);
       }
     } catch (err) {

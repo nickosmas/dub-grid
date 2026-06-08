@@ -96,6 +96,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
   const [quickRevokeInviteConfirm, setQuickRevokeInviteConfirm] =
     useState<Invitation | null>(null);
+  const [quickRevokingInvite, setQuickRevokingInvite] = useState(false);
 
   const orgId = perms.orgId ?? org?.id ?? null;
   const { directory } = useDirectory(orgId);
@@ -468,7 +469,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
 
       {!isLoading && employee && org && (
         <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-          <div className="mx-auto max-w-[1100px] space-y-8 pb-10 dg-page-enter">
+          <div className="space-y-8 pb-10 dg-page-enter">
             <Link
               href="/people"
               className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text-primary)]"
@@ -698,12 +699,22 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           message={`Revoke the pending invitation for ${quickRevokeInviteConfirm.email}? The current invite link will stop working.`}
           confirmLabel="Revoke Invitation"
           variant="danger"
+          isLoading={quickRevokingInvite}
           onConfirm={() => {
             const invitationId = quickRevokeInviteConfirm.id;
-            setQuickRevokeInviteConfirm(null);
-            void handleRevokeInvitation(invitationId);
+            setQuickRevokingInvite(true);
+            void (async () => {
+              try {
+                await handleRevokeInvitation(invitationId);
+              } finally {
+                setQuickRevokingInvite(false);
+                setQuickRevokeInviteConfirm(null);
+              }
+            })();
           }}
-          onCancel={() => setQuickRevokeInviteConfirm(null)}
+          onCancel={() => {
+            if (!quickRevokingInvite) setQuickRevokeInviteConfirm(null);
+          }}
         />
       ) : null}
     </>
