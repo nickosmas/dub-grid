@@ -183,6 +183,7 @@ import {
   PUBLISH_WINDOW_DATE_FORMATTER,
   SCHEDULE_DELETE_BATCH_SIZE,
   summarizeImportPreviousOutcomes,
+  widenFetchWindow,
   type ImportPreviousBreakdown,
   type ScheduleOperation,
 } from "./_lib/operations";
@@ -875,43 +876,56 @@ function SchedulerContent() {
   absenceTypeMapRef.current = absenceTypeMap;
 
   // ── Shared refetch helper (eliminates 4x duplication) ──────────────────────
-  const refetchScheduleData = useCallback(async () => {
-    if (!org) return;
-    const [shiftData, noteRows] = await Promise.all([
-      fetchShifts(
-        org.id,
-        canEditShiftsRef.current,
-        assignmentLabelMapRef.current,
-        absenceTypeMapRef.current,
+  //
+  // `opts.ensureStart` / `opts.ensureEnd` widen the fetch window beyond the
+  // default ±90 days when a caller knows it just touched a date outside that
+  // band (e.g. import-previous into a period > 90 days from today). The
+  // default behavior is unchanged for callers that don't pass anything.
+  const refetchScheduleData = useCallback(
+    async (opts?: { ensureStart?: string; ensureEnd?: string }) => {
+      if (!org) return;
+      const { start, end } = widenFetchWindow(
         shiftFetchStart,
         shiftFetchEnd,
-        segmentCompatibility,
-      ),
-      fetchScheduleNotes(org.id, shiftFetchStart, shiftFetchEnd),
-    ]);
-    const noteMap: Record<
-      string,
-      {
-        indicatorTypeId: number;
-        status: "published" | "draft" | "draft_deleted";
-      }[]
-    > = {};
-    for (const note of noteRows) {
-      const key =
-        note.focusAreaId != null
-          ? `${note.empId}_${note.date}_${note.focusAreaId}`
-          : `${note.empId}_${note.date}`;
-      if (!noteMap[key]) noteMap[key] = [];
-      noteMap[key].push({
-        indicatorTypeId: note.indicatorTypeId,
-        status: note.status,
-      });
-    }
-    setShifts(shiftData);
-    setNotes(noteMap);
-    lastRefetchAtRef.current = Date.now();
-    return { shiftData, noteMap };
-  }, [org, shiftFetchStart, shiftFetchEnd]);
+        opts,
+      );
+      const [shiftData, noteRows] = await Promise.all([
+        fetchShifts(
+          org.id,
+          canEditShiftsRef.current,
+          assignmentLabelMapRef.current,
+          absenceTypeMapRef.current,
+          start,
+          end,
+          segmentCompatibility,
+        ),
+        fetchScheduleNotes(org.id, start, end),
+      ]);
+      const noteMap: Record<
+        string,
+        {
+          indicatorTypeId: number;
+          status: "published" | "draft" | "draft_deleted";
+        }[]
+      > = {};
+      for (const note of noteRows) {
+        const key =
+          note.focusAreaId != null
+            ? `${note.empId}_${note.date}_${note.focusAreaId}`
+            : `${note.empId}_${note.date}`;
+        if (!noteMap[key]) noteMap[key] = [];
+        noteMap[key].push({
+          indicatorTypeId: note.indicatorTypeId,
+          status: note.status,
+        });
+      }
+      setShifts(shiftData);
+      setNotes(noteMap);
+      lastRefetchAtRef.current = Date.now();
+      return { shiftData, noteMap };
+    },
+    [org, shiftFetchStart, shiftFetchEnd],
+  );
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
@@ -4551,7 +4565,13 @@ function SchedulerContent() {
         progress: 80,
         detail: "Refreshing the schedule with the imported shifts...",
       });
-      await refetchScheduleData();
+      // Widen the refetch window so newly imported drafts in a target period
+      // beyond the default ±90 days from today still come back from the API
+      // and show up in the grid.
+      await refetchScheduleData({
+        ensureStart: importPreview.targetStartDate,
+        ensureEnd: importPreview.targetEndDate,
+      });
       finishScheduleOperation("import_previous");
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);

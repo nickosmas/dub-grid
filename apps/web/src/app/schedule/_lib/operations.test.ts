@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatImportPreviousSkipDescription,
   summarizeImportPreviousOutcomes,
+  widenFetchWindow,
 } from "./operations";
 import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
 
@@ -140,5 +141,57 @@ describe("formatImportPreviousSkipDescription", () => {
       new Map(),
     );
     expect(description).toContain("an employee on 7/4");
+  });
+});
+
+describe("widenFetchWindow", () => {
+  it("returns the default window when no ensure bounds are provided", () => {
+    expect(widenFetchWindow("2026-04-01", "2026-08-01")).toEqual({
+      start: "2026-04-01",
+      end: "2026-08-01",
+    });
+  });
+
+  it("returns the default window when ensure bounds are already inside it", () => {
+    expect(
+      widenFetchWindow("2026-04-01", "2026-08-01", {
+        ensureStart: "2026-05-01",
+        ensureEnd: "2026-07-01",
+      }),
+    ).toEqual({ start: "2026-04-01", end: "2026-08-01" });
+  });
+
+  it("widens the start when ensureStart precedes the default start", () => {
+    expect(
+      widenFetchWindow("2026-04-01", "2026-08-01", {
+        ensureStart: "2025-12-15",
+      }),
+    ).toEqual({ start: "2025-12-15", end: "2026-08-01" });
+  });
+
+  it("widens the end when ensureEnd follows the default end", () => {
+    expect(
+      widenFetchWindow("2026-04-01", "2026-08-01", {
+        ensureEnd: "2027-01-14",
+      }),
+    ).toEqual({ start: "2026-04-01", end: "2027-01-14" });
+  });
+
+  it("widens both sides when ensure bounds straddle the default window", () => {
+    expect(
+      widenFetchWindow("2026-04-01", "2026-08-01", {
+        ensureStart: "2025-12-15",
+        ensureEnd: "2027-01-14",
+      }),
+    ).toEqual({ start: "2025-12-15", end: "2027-01-14" });
+  });
+
+  it("ignores ensure bounds equal to the default (no off-by-one widening)", () => {
+    expect(
+      widenFetchWindow("2026-04-01", "2026-08-01", {
+        ensureStart: "2026-04-01",
+        ensureEnd: "2026-08-01",
+      }),
+    ).toEqual({ start: "2026-04-01", end: "2026-08-01" });
   });
 });

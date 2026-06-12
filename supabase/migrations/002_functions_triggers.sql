@@ -2349,15 +2349,17 @@ BEGIN
     RETURN 'role';
   END IF;
 
-  -- Mirror the client's getScheduleEligibleRoleIds: only roles flagged
-  -- is_schedule_role count toward the role gate.
+  -- Mirror the client's getScheduleEligibleRoleIds (assignable-shifts.ts):
+  -- only roles flagged is_schedule_role count toward the role gate. NOTE:
+  -- archived roles are NOT filtered out — the client's editor still treats
+  -- them as eligible if a job references them, so the import must agree to
+  -- avoid disqualifying shifts the user could create elsewhere on the page.
   IF COALESCE(array_length(v_job_eligible_role_ids, 1), 0) > 0 THEN
     SELECT COALESCE(array_agg(orole.id), '{}'::BIGINT[])
       INTO v_schedule_role_ids
     FROM public.organization_roles orole
     WHERE orole.org_id = v_emp_org_id
       AND orole.is_schedule_role = TRUE
-      AND orole.archived_at IS NULL
       AND orole.id = ANY(v_job_eligible_role_ids);
     v_filtered_role_ids := v_schedule_role_ids;
   ELSE
@@ -2604,6 +2606,16 @@ BEGIN
       RETURN NEXT;
       CONTINUE;
     END IF;
+
+    -- Serialize check + write against any concurrent writer of this target
+    -- cell using the same advisory key write_schedule_cell_snapshot_internal
+    -- uses. Without this lock, a manual draft landing between the empty
+    -- check and our write would be silently overwritten. Advisory locks are
+    -- reentrant within one xact, so the inner write's lock acquisition is a
+    -- no-op.
+    PERFORM pg_advisory_xact_lock(
+      hashtext('schedule_cell_' || r.emp_id::TEXT || '_' || r.target_date::TEXT)
+    );
 
     -- Target already has effective content (any draft non-deleted, or any
     -- published). Uses the exact same rule grid display uses.

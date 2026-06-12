@@ -28,6 +28,31 @@ export function clampProgress(progress: number): number {
   return Math.max(0, Math.min(100, Math.round(progress)));
 }
 
+/**
+ * Unions a default fetch window `[defaultStart, defaultEnd]` (both YYYY-MM-DD)
+ * with optional `ensureStart` / `ensureEnd` bounds the caller knows must be
+ * covered. Used to widen `refetchScheduleData` past its default ±90-day band
+ * when an action just wrote into a far-out period (e.g. import-previous).
+ *
+ * Returns the wider of each side. Strings are compared lexicographically,
+ * which is correct for ISO YYYY-MM-DD.
+ */
+export function widenFetchWindow(
+  defaultStart: string,
+  defaultEnd: string,
+  opts?: { ensureStart?: string; ensureEnd?: string },
+): { start: string; end: string } {
+  const start =
+    opts?.ensureStart && opts.ensureStart < defaultStart
+      ? opts.ensureStart
+      : defaultStart;
+  const end =
+    opts?.ensureEnd && opts.ensureEnd > defaultEnd
+      ? opts.ensureEnd
+      : defaultEnd;
+  return { start, end };
+}
+
 // ── Import Previous Schedule outcome aggregation ────────────────────────────
 //
 // The server's `import_previous_schedule` RPC returns one outcome row per
