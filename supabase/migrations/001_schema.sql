@@ -605,6 +605,7 @@ COMMENT ON TABLE public.invitations IS 'Organization invitations for invite-only
 
 CREATE TABLE public.role_change_log (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id             UUID,
   target_user_id     UUID NOT NULL,
   changed_by_id      UUID,
   from_role          TEXT NOT NULL,
@@ -619,6 +620,7 @@ CREATE TABLE public.role_change_log (
 );
 
 COMMENT ON TABLE public.role_change_log IS 'Immutable audit log for all role changes in the system';
+COMMENT ON COLUMN public.role_change_log.org_id IS 'Org where the change took effect. NULL = platform-level gridmaster action (e.g. force_logout). RLS scopes non-NULL rows to the caller''s current session org.';
 COMMENT ON COLUMN public.role_change_log.change_type IS 'Type of change: role_change (org_role modified) or permission_change (admin_permissions modified)';
 COMMENT ON COLUMN public.role_change_log.permissions_before IS 'Previous admin_permissions JSONB (only for permission_change entries)';
 COMMENT ON COLUMN public.role_change_log.permissions_after IS 'New admin_permissions JSONB (only for permission_change entries)';
@@ -681,19 +683,21 @@ CREATE TABLE public.notifications (
     -- existing
     'impersonation_start', 'impersonation_end', 'system',
     'shift_change', 'schedule_published', 'shift_request_new',
-    'shift_request_approved', 'shift_request_rejected',
+    'shift_request_approved', 'shift_request_rejected', 'shift_request_expired',
     -- schedule (non-publish flows)
     'recurring_shift_updated', 'shift_series_updated',
     'schedule_note_published', 'recurring_schedules_applied',
     -- membership lifecycle
     'invitation_received', 'invitation_accepted', 'invitation_revoked',
-    'invitation_resent', 'membership_removed', 'admin_permissions_changed',
+    'invitation_resent', 'invitation_expired',
+    'membership_removed', 'admin_permissions_changed', 'member_dept_changed',
     -- employee + org account
     'employee_created', 'employee_status_changed', 'employee_profile_changed',
     'org_settings_changed', 'org_suspended', 'org_unsuspended',
     -- billing
     'billing_subscription_changed', 'billing_payment_failed',
     'billing_payment_succeeded',
+    'billing_trial_ending_soon', 'billing_trial_expired',
     -- security
     'security_email_changed', 'security_password_changed',
     'security_mfa_changed', 'security_new_device', 'security_session_revoked',
@@ -1088,6 +1092,7 @@ ALTER TABLE public.invitations
 
 -- role_change_log
 ALTER TABLE public.role_change_log
+  ADD CONSTRAINT role_change_log_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT role_change_log_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT role_change_log_changed_by_id_fkey FOREIGN KEY (changed_by_id) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -1282,6 +1287,7 @@ CREATE INDEX idx_invitations_employee_id ON public.invitations(employee_id) WHER
 -- role_change_log
 CREATE INDEX idx_role_change_log_idempotency_key ON public.role_change_log(idempotency_key);
 CREATE INDEX idx_role_change_log_target_user_created ON public.role_change_log(target_user_id, created_at DESC);
+CREATE INDEX idx_role_change_log_org_created ON public.role_change_log(org_id, created_at DESC);
 
 -- impersonation_sessions
 CREATE UNIQUE INDEX one_active_session_per_target

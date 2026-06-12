@@ -6,6 +6,9 @@ import {
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { API_ERRORS } from "@dubgrid/client-errors";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { getServiceClient } from "@/lib/supabase-service";
 
 const revokeSessionSchema = z.object({
   refreshTokenHash: z.string().min(1),
@@ -44,15 +47,36 @@ export async function DELETE(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = revokeSessionSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
+    // Capture device label + org from the session row before revoke so the
+    // alert can name what was signed out. Best-effort — if the row is gone
+    // (already revoked) we still proceed and skip the notification.
+    const { data: priorRow } = await getServiceClient()
+      .from("user_sessions")
+      .select("org_id, device_label")
+      .eq("user_id", auth.user.id)
+      .eq("refresh_token_hash", parsed.data.refreshTokenHash)
+      .maybeSingle();
+
     await revokeUserSessionForUser(auth.user.id, parsed.data.refreshTokenHash);
+
+    if (priorRow) {
+      void dispatchNotificationEvent(auth.user.id, {
+        action: "security_session_revoked",
+        orgId: (priorRow.org_id as string | null) ?? null,
+        targetUserId: auth.user.id,
+        initiatedBy: "self",
+        deviceLabel: (priorRow.device_label as string | null) ?? null,
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("account sessions DELETE failed", error);

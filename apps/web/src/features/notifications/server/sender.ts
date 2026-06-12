@@ -23,13 +23,16 @@ export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   shift_request_new: "shift_requests",
   shift_request_approved: "shift_requests",
   shift_request_rejected: "shift_requests",
+  shift_request_expired: "shift_requests",
   // membership
   invitation_received: "membership",
   invitation_accepted: "membership",
   invitation_revoked: "membership",
   invitation_resent: "membership",
+  invitation_expired: "membership",
   membership_removed: "membership",
   admin_permissions_changed: "membership",
+  member_dept_changed: "membership",
   // account
   employee_created: "account",
   employee_status_changed: "account",
@@ -41,6 +44,8 @@ export const NOTIFICATION_CATEGORIES: Record<string, string> = {
   billing_subscription_changed: "billing",
   billing_payment_failed: "billing",
   billing_payment_succeeded: "billing",
+  billing_trial_ending_soon: "billing",
+  billing_trial_expired: "billing",
   // security
   security_email_changed: "security",
   security_password_changed: "security",
@@ -90,6 +95,18 @@ function getServiceClient() {
   });
 }
 
+export interface SendNotificationOptions {
+  /**
+   * Whether to write an in-app row. Default true.
+   *
+   * Set false for actor-initiated alerts that exist for out-of-band security
+   * value only — a "you just signed in" row in the inbox of the user who just
+   * signed in is pure noise. Email + push (which still reach out-of-band
+   * channels) continue to fire.
+   */
+  writeInApp?: boolean;
+}
+
 /**
  * Create a notification and optionally send an email.
  * Should be called from server-side code (API routes, server actions).
@@ -101,33 +118,42 @@ export async function sendNotification(
   title: string,
   message: string,
   metadata: Record<string, unknown> = {},
+  options: SendNotificationOptions = {},
 ): Promise<void> {
   const supabase = getServiceClient();
   const category = NOTIFICATION_CATEGORIES[type] ?? "system";
+  const writeInApp = options.writeInApp !== false;
 
-  // 1. Always create in-app notification
-  const { data: insertedNotification, error: insertError } = await supabase
-    .from("notifications")
-    .insert({
-      user_id: userId,
-      org_id: orgId,
-      type,
-      channel: "in_app",
-      category,
-      title,
-      message,
-      metadata,
-    })
-    .select("id")
-    .maybeSingle();
-  if (insertError) {
-    logger.error({ error: insertError, type, userId }, "Failed to create notification");
-  } else if (isPushEligibleNotificationType(type)) {
+  // 1. Create the in-app notification unless the caller opted out.
+  let insertedNotificationId: string | null = null;
+  if (writeInApp) {
+    const { data: insertedNotification, error: insertError } = await supabase
+      .from("notifications")
+      .insert({
+        user_id: userId,
+        org_id: orgId,
+        type,
+        channel: "in_app",
+        category,
+        title,
+        message,
+        metadata,
+      })
+      .select("id")
+      .maybeSingle();
+    if (insertError) {
+      logger.error({ error: insertError, type, userId }, "Failed to create notification");
+    } else {
+      insertedNotificationId = insertedNotification?.id ?? null;
+    }
+  }
+
+  if (isPushEligibleNotificationType(type)) {
     await sendMobilePushNotifications(userId, orgId, {
       title,
       body: message,
       data: {
-        notificationId: insertedNotification?.id ?? null,
+        notificationId: insertedNotificationId,
         type,
         ...metadata,
       },
@@ -147,13 +173,19 @@ export async function sendNotification(
 
   if (!emailEnabled) return;
 
-  // 3. Throttle check — max emails per hour
+  // 3. Throttle check — max emails per hour.
+  // Filter on metadata.email_sent so the counter ignores rows that don't
+  // represent a successful Resend delivery. Today every channel='email' row
+  // is written only after a successful send (so the filter is redundant),
+  // but pinning the contract here means a future change to also record
+  // failed attempts won't silently poison the throttle.
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { count } = await supabase
     .from("notifications")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("channel", "email")
+    .eq("metadata->>email_sent", "true")
     .gte("created_at", oneHourAgo);
 
   if ((count ?? 0) >= MAX_EMAILS_PER_HOUR) {

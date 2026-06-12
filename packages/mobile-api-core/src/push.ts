@@ -34,6 +34,7 @@ const PUSH_ELIGIBLE_TYPES = new Set([
   "shift_request_new",
   "shift_request_approved",
   "shift_request_rejected",
+  "shift_request_expired",
   // schedule (recurring/series — touch a user's assignments directly)
   "recurring_shift_updated",
   "shift_series_updated",
@@ -43,8 +44,10 @@ const PUSH_ELIGIBLE_TYPES = new Set([
   "employee_status_changed",
   // org-level — critical org state
   "org_suspended",
-  // billing — payment failures are time-sensitive
+  // billing — payment failures + trial deadlines are time-sensitive
   "billing_payment_failed",
+  "billing_trial_ending_soon",
+  "billing_trial_expired",
   // security — always push so users notice quickly
   "security_email_changed",
   "security_password_changed",

@@ -582,10 +582,10 @@ export async function writeStripePaymentFailedAuditLog(
   serviceClient: BillingSyncClient,
   invoice: Stripe.Invoice,
   options: { stripeEventId?: string; stripeEventType?: string } = {},
-): Promise<void> {
+): Promise<{ orgId: string } | null> {
   const customerId =
     stripeCustomerId(invoice.customer ?? null);
-  if (!customerId) return;
+  if (!customerId) return null;
 
   try {
     const { data, error: orgError } = await serviceClient
@@ -598,7 +598,7 @@ export async function writeStripePaymentFailedAuditLog(
         { error: orgError, customerId, invoiceId: invoice.id },
         "Could not resolve Stripe invoice payment failure to an organization",
       );
-      return;
+      return null;
     }
 
     const { error } = await serviceClient.from("audit_log").insert({
@@ -621,8 +621,10 @@ export async function writeStripePaymentFailedAuditLog(
     if (error) {
       logger.warn({ error, orgId: data.id, invoiceId: invoice.id }, "Billing audit log write failed");
     }
+    return { orgId: data.id as string };
   } catch (error) {
     logger.warn({ error, customerId, invoiceId: invoice.id }, "Billing audit log write failed");
+    return null;
   }
 }
 

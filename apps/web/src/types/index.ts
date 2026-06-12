@@ -745,6 +745,7 @@ export type NotificationType =
   | 'shift_request_new'
   | 'shift_request_approved'
   | 'shift_request_rejected'
+  | 'shift_request_expired'
   // schedule (non-publish flows)
   | 'recurring_shift_updated'
   | 'shift_series_updated'
@@ -755,8 +756,10 @@ export type NotificationType =
   | 'invitation_accepted'
   | 'invitation_revoked'
   | 'invitation_resent'
+  | 'invitation_expired'
   | 'membership_removed'
   | 'admin_permissions_changed'
+  | 'member_dept_changed'
   // employee + org account
   | 'employee_created'
   | 'employee_status_changed'
@@ -768,6 +771,8 @@ export type NotificationType =
   | 'billing_subscription_changed'
   | 'billing_payment_failed'
   | 'billing_payment_succeeded'
+  | 'billing_trial_ending_soon'
+  | 'billing_trial_expired'
   // security
   | 'security_email_changed'
   | 'security_password_changed'

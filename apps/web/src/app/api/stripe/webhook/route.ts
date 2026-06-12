@@ -9,6 +9,7 @@ import {
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -90,14 +91,33 @@ export async function POST(req: NextRequest) {
       }
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        await writeStripePaymentFailedAuditLog(getServiceClient(), invoice, {
-          stripeEventId: event.id,
-          stripeEventType: event.type,
-        });
+        // The audit-log helper resolves the customer to an org and returns it.
+        // We piggyback off that lookup to fan out a billing_payment_failed
+        // alert to the org's super_admins. The dispatcher dedupes on
+        // stripeInvoiceId so Stripe retries don't multiply rows. A separate
+        // `customer.subscription.updated` event will follow when Stripe flips
+        // the subscription to past_due; that path also writes a notification
+        // via the notify_gridmasters_of_org_event DB trigger, but only on the
+        // *first* transition (past_due/unpaid guard), so the two paths don't
+        // double up.
+        const result = await writeStripePaymentFailedAuditLog(
+          getServiceClient(),
+          invoice,
+          { stripeEventId: event.id, stripeEventType: event.type },
+        );
         logger.warn(
           { customerId: invoice.customer, invoiceId: invoice.id },
           "Invoice payment failed",
         );
+        if (result?.orgId && invoice.id) {
+          void dispatchNotificationEvent("stripe-webhook", {
+            action: "billing_payment_failed",
+            orgId: result.orgId,
+            stripeInvoiceId: invoice.id,
+            amountDue: invoice.amount_due ?? null,
+            currency: invoice.currency ?? null,
+          });
+        }
         break;
       }
       case "invoice.payment_succeeded": {

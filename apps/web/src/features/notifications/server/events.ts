@@ -125,6 +125,71 @@ export type NotificationEvent =
       orgId: string;
       empId: string;
       fields: string[];
+    }
+  // ── Security (account-level) ────────────────────────────────────────────
+  | {
+      action: "security_new_device";
+      orgId: string | null;
+      targetUserId: string;
+      platform: "web" | "ios" | "android";
+      deviceLabel: string | null;
+      ipAddress: string | null;
+    }
+  | {
+      action: "security_mfa_changed";
+      orgId: string | null;
+      targetUserId: string;
+      enabled: boolean;
+    }
+  | {
+      action: "security_session_revoked";
+      orgId: string | null;
+      targetUserId: string;
+      /** Who initiated the revocation. 'self' = user revoked from own settings; 'gridmaster' = platform admin force-logout. */
+      initiatedBy: "self" | "gridmaster";
+      deviceLabel?: string | null;
+    }
+  // ── Billing (super_admin-targeted) ──────────────────────────────────────
+  | {
+      action: "billing_payment_failed";
+      orgId: string;
+      /** Stripe invoice id — used as the idempotency key in metadata.stripeEventId. */
+      stripeInvoiceId: string;
+      amountDue?: number | null;
+      currency?: string | null;
+    }
+  | {
+      action: "billing_trial_ending_soon";
+      orgId: string;
+      trialEndsAt: string;
+      /** Period bucket (e.g. '3d') used to dedupe repeated cron runs. */
+      periodKey: string;
+    }
+  | {
+      action: "billing_trial_expired";
+      orgId: string;
+      trialEndsAt: string;
+    }
+  // ── Expiry sweepers (cron-driven) ───────────────────────────────────────
+  | {
+      action: "shift_request_expired";
+      orgId: string;
+      requestId: string;
+      requestType: "pickup" | "swap" | "calloff";
+    }
+  | {
+      action: "invitation_expired";
+      orgId: string;
+      invitationId: string;
+      inviteeEmail: string;
+    }
+  // ── Membership change ───────────────────────────────────────────────────
+  | {
+      action: "member_dept_changed";
+      orgId: string;
+      targetUserId: string;
+      addedDepartmentNames: string[];
+      removedDepartmentNames: string[];
     };
 
 async function getAdminsWithPermission(
@@ -361,6 +426,83 @@ async function getOrgName(orgId: string): Promise<string> {
   return (data?.name as string | null) ?? "your organization";
 }
 
+type OrgCopyLabels = {
+  focusAreaLabel: string;
+  certificationLabel: string;
+  roleLabel: string;
+};
+
+async function getOrgCopyLabels(orgId: string): Promise<OrgCopyLabels> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("organizations")
+    .select("focus_area_label, certification_label, role_label")
+    .eq("id", orgId)
+    .maybeSingle();
+  return {
+    focusAreaLabel: (data?.focus_area_label as string | null) ?? "Focus Areas",
+    certificationLabel:
+      (data?.certification_label as string | null) ?? "Certifications",
+    roleLabel: (data?.role_label as string | null) ?? "Roles",
+  };
+}
+
+function titleCaseWords(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[._-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function friendlyProfileFieldLabel(
+  key: string,
+  labels: OrgCopyLabels,
+): string {
+  switch (key) {
+    case "firstName":
+      return "first name";
+    case "lastName":
+      return "last name";
+    case "email":
+      return "email";
+    case "phone":
+      return "phone number";
+    case "contactNotes":
+      return "contact notes";
+    case "employmentType":
+      return "employment type";
+    case "certification":
+      return labels.certificationLabel.toLowerCase();
+    case "seniority":
+      return "seniority";
+    case "roles":
+      return labels.roleLabel.toLowerCase();
+    case "focusAreas":
+      return labels.focusAreaLabel.toLowerCase();
+    case "departments":
+      return "departments";
+    case "departmentAdmin":
+      return "department admin assignments";
+    default:
+      return titleCaseWords(key).toLowerCase();
+  }
+}
+
+function joinWithAnd(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function capitalizeFirst(value: string): string {
+  return value.length > 0
+    ? `${value.charAt(0).toUpperCase()}${value.slice(1)}`
+    : value;
+}
+
 async function notifyShiftRequestApprovers(input: {
   actorUserId: string;
   orgId: string;
@@ -395,17 +537,32 @@ async function notifyShiftRequestApprovers(input: {
   );
 }
 
+export type NotificationDispatchResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Dispatches a notification event and returns a structured result. Errors
+ * are caught and surfaced as `{ success: false }` so callers can decide
+ * whether to fail their HTTP response. Previously this swallowed errors
+ * unconditionally and the caller had no signal of failure.
+ */
 export async function dispatchNotificationEvent(
   actorUserId: string,
   event: NotificationEvent,
-): Promise<void> {
+): Promise<NotificationDispatchResult> {
   try {
     await dispatchNotificationEventInternal(actorUserId, event);
+    return { success: true };
   } catch (error) {
     logger.error(
       { error, action: event.action, orgId: event.orgId },
       "Failed to dispatch notification event",
     );
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -566,7 +723,7 @@ async function dispatchNotificationEventInternal(
           event.orgId,
           "system" as NotificationType,
           "Your role has been updated",
-          `Your role has been changed from ${event.fromRole} to ${event.toRole}.`,
+          `Your role has been changed from ${titleCaseWords(event.fromRole)} to ${titleCaseWords(event.toRole)}.`,
           {
             fromRole: event.fromRole,
             toRole: event.toRole,
@@ -813,7 +970,7 @@ async function dispatchNotificationEventInternal(
       const recipients = new Set<string>(superAdmins);
       if (empUserId) recipients.add(empUserId);
       recipients.delete(actorUserId);
-      const transition = `${event.fromStatus} → ${event.toStatus}`;
+      const transition = `${titleCaseWords(event.fromStatus)} to ${titleCaseWords(event.toStatus)}`;
       await Promise.all(
         [...recipients].map((userId) =>
           sendNotification(
@@ -840,17 +997,289 @@ async function dispatchNotificationEventInternal(
     case "employee_profile_changed": {
       const empUserId = await getEmployeeUserId(event.empId);
       if (!empUserId || empUserId === actorUserId) return;
+
+      let body: string;
+      if (event.fields.length === 0) {
+        body = "Your profile was updated.";
+      } else if (event.fields.length > 5) {
+        body = "Several details on your profile were updated.";
+      } else {
+        const labels = await getOrgCopyLabels(event.orgId);
+        const friendly = event.fields.map((f) =>
+          friendlyProfileFieldLabel(f, labels),
+        );
+        const verb = friendly.length === 1 ? "was" : "were";
+        body = `${capitalizeFirst(joinWithAnd(friendly))} ${verb} updated.`;
+      }
+
       await sendNotification(
         empUserId,
         event.orgId,
         "employee_profile_changed" as NotificationType,
-        "Your employee profile was updated",
-        event.fields.length > 0
-          ? `Updated fields: ${event.fields.join(", ")}.`
-          : "Your employee profile was updated.",
+        "Your profile was updated",
+        body,
         { empId: event.empId, fields: event.fields },
       );
       return;
     }
+
+    // ── Security (account-level) ────────────────────────────────────────
+    // Actor-initiated events (new sign-in, MFA toggle) skip the in-app row —
+    // a "you just signed in" alert on the app you just signed into is noise.
+    // Email + push (which reach out-of-band channels) still fire.
+
+    case "security_new_device": {
+      const platformLabel = formatPlatformLabel(event.platform);
+      const where = event.deviceLabel ? `${event.deviceLabel} (${platformLabel})` : platformLabel;
+      await sendNotification(
+        event.targetUserId,
+        event.orgId,
+        "security_new_device" as NotificationType,
+        "New sign-in on your account",
+        `Your account was just signed in from a new ${where}. If this wasn't you, change your password and review your active sessions.`,
+        {
+          platform: event.platform,
+          deviceLabel: event.deviceLabel,
+          ipAddress: event.ipAddress,
+        },
+        { writeInApp: false },
+      );
+      return;
+    }
+
+    case "security_mfa_changed": {
+      await sendNotification(
+        event.targetUserId,
+        event.orgId,
+        "security_mfa_changed" as NotificationType,
+        event.enabled
+          ? "Two-factor authentication enabled"
+          : "Two-factor authentication disabled",
+        event.enabled
+          ? "Two-factor authentication was turned on for your account."
+          : "Two-factor authentication was turned off for your account. If this wasn't you, re-enable it and change your password.",
+        { enabled: event.enabled },
+        { writeInApp: false },
+      );
+      return;
+    }
+
+    // ── Billing (super_admin-targeted) ─────────────────────────────────
+
+    case "billing_payment_failed": {
+      const orgName = await getOrgName(event.orgId);
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      // Dedupe on stripeInvoiceId — Stripe retries webhooks, and we don't
+      // want one failed invoice to produce N alerts per super_admin.
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "billing_payment_failed",
+        metadataKey: "stripeInvoiceId",
+        metadataValue: event.stripeInvoiceId,
+      });
+      if (alreadySent) return;
+      await Promise.all(
+        superAdmins.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "billing_payment_failed" as NotificationType,
+            "Payment failed",
+            `A payment for ${orgName} failed. Update your payment method to avoid losing access.`,
+            {
+              stripeInvoiceId: event.stripeInvoiceId,
+              amountDue: event.amountDue ?? null,
+              currency: event.currency ?? null,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "billing_trial_ending_soon": {
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "billing_trial_ending_soon",
+        metadataKey: "periodKey",
+        metadataValue: event.periodKey,
+      });
+      if (alreadySent) return;
+      await Promise.all(
+        superAdmins.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "billing_trial_ending_soon" as NotificationType,
+            "Your trial ends soon",
+            `Your trial ends on ${formatTrialDate(event.trialEndsAt)}. Add a payment method to keep your team on the schedule.`,
+            {
+              trialEndsAt: event.trialEndsAt,
+              periodKey: event.periodKey,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    case "billing_trial_expired": {
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "billing_trial_expired",
+        metadataKey: "trialEndsAt",
+        metadataValue: event.trialEndsAt,
+      });
+      if (alreadySent) return;
+      await Promise.all(
+        superAdmins.map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "billing_trial_expired" as NotificationType,
+            "Your trial has ended",
+            "Your free trial has ended. Add a payment method now to restore full access.",
+            { trialEndsAt: event.trialEndsAt },
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ── Expiry sweepers (cron-driven) ──────────────────────────────────
+
+    case "shift_request_expired": {
+      const { requesterUserId, requesterName } = await getRequestInfo(
+        event.requestId,
+      );
+      // Dedupe — the cron may re-run; once a row exists for this request the
+      // sweeper won't re-fire because it filters on status='expired' already,
+      // but keep this guard so a transient SQL error mid-run can't double-fire.
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "shift_request_expired",
+        metadataKey: "requestId",
+        metadataValue: event.requestId,
+      });
+      if (alreadySent || !requesterUserId) return;
+      const typeLabel = getShiftRequestTypeLabel(event.requestType);
+      await sendNotification(
+        requesterUserId,
+        event.orgId,
+        "shift_request_expired" as NotificationType,
+        `${capitalize(typeLabel)} request expired`,
+        `Your ${typeLabel} request expired before it was acted on. ${requesterName === "An employee" ? "Submit a new one if you still need it." : "Submit a new one if you still need it."}`,
+        {
+          requestId: event.requestId,
+          requestType: event.requestType,
+          action: "view_request",
+          tab: "mine",
+        },
+      );
+      return;
+    }
+
+    case "invitation_expired": {
+      const inv = await getInvitation(event.invitationId);
+      const inviter = inv?.invitedBy ?? null;
+      const superAdmins = await getOrgSuperAdmins(event.orgId);
+      const orgName = await getOrgName(event.orgId);
+      const alreadySent = await hasExistingNotification(event.orgId, {
+        type: "invitation_expired",
+        metadataKey: "invitationId",
+        metadataValue: event.invitationId,
+      });
+      if (alreadySent) return;
+      const recipients = new Set<string>(superAdmins);
+      if (inviter) recipients.add(inviter);
+      await Promise.all(
+        [...recipients].map((userId) =>
+          sendNotification(
+            userId,
+            event.orgId,
+            "invitation_expired" as NotificationType,
+            "Invitation expired",
+            `An invitation to ${event.inviteeEmail} for ${orgName} expired before it was accepted.`,
+            {
+              invitationId: event.invitationId,
+              inviteeEmail: event.inviteeEmail,
+            },
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ── Membership change ──────────────────────────────────────────────
+
+    case "member_dept_changed": {
+      if (event.targetUserId === actorUserId) return;
+      const added = event.addedDepartmentNames;
+      const removed = event.removedDepartmentNames;
+      if (added.length === 0 && removed.length === 0) return;
+      const parts: string[] = [];
+      if (added.length > 0) parts.push(`added to ${joinWithAnd(added)}`);
+      if (removed.length > 0) parts.push(`removed from ${joinWithAnd(removed)}`);
+      const message = `You were ${parts.join(" and ")}.`;
+      await sendNotification(
+        event.targetUserId,
+        event.orgId,
+        "member_dept_changed" as NotificationType,
+        "Your departments changed",
+        message,
+        {
+          added,
+          removed,
+        },
+      );
+      return;
+    }
+
+    case "security_session_revoked": {
+      // Self-revoke: user clicked the button. No alert at all — they know.
+      if (event.initiatedBy === "self") return;
+      const where = event.deviceLabel ? ` on ${event.deviceLabel}` : "";
+      await sendNotification(
+        event.targetUserId,
+        event.orgId,
+        "security_session_revoked" as NotificationType,
+        "You were signed out by an administrator",
+        `A platform administrator ended your session${where}. Sign in again to continue.`,
+        {
+          initiatedBy: event.initiatedBy,
+          deviceLabel: event.deviceLabel ?? null,
+        },
+      );
+      return;
+    }
   }
+}
+
+function formatPlatformLabel(platform: "web" | "ios" | "android"): string {
+  if (platform === "ios") return "iOS device";
+  if (platform === "android") return "Android device";
+  return "browser";
+}
+
+function formatTrialDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+async function hasExistingNotification(
+  orgId: string,
+  input: { type: string; metadataKey: string; metadataValue: string },
+): Promise<boolean> {
+  const db = getServiceClient();
+  const { data } = await db
+    .from("notifications")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("type", input.type)
+    .eq(`metadata->>${input.metadataKey}`, input.metadataValue)
+    .limit(1);
+  return (data ?? []).length > 0;
 }
