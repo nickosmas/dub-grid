@@ -30,6 +30,7 @@ import {
 } from "./_lib/open-shifts";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { X } from "lucide-react";
 
 const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
   ssr: false,
@@ -107,15 +108,16 @@ import {
   fetchScheduleNotes,
   fetchShifts,
   getScheduleLastViewed,
+  importPreviousSchedule,
   moveShift,
   publishSchedule,
   updateScheduleLastViewed,
   updateSeriesAllShifts,
   upsertScheduleNote,
   upsertShift,
-  upsertShiftBatch,
   upsertShiftTimes,
   type DeleteShiftBatchItem,
+  type ImportPreviousScheduleOutcome,
 } from "@/features/schedule/client";
 import {
   computeDraftBreakdown,
@@ -136,6 +138,7 @@ import {
   useCellLocks,
   useReliableRealtimeBroadcasts,
   useShiftRequests,
+  useDismissibleBanner,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -175,11 +178,12 @@ import {
 import {
   clampProgress,
   DRAFT_CHANGED_BROADCAST_KEY,
-  IMPORT_PREVIOUS_BATCH_SIZE,
+  formatImportPreviousSkipDescription,
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
-  planImportPrevious,
-  type ImportPreviousPlan,
+  SCHEDULE_DELETE_BATCH_SIZE,
+  summarizeImportPreviousOutcomes,
+  type ImportPreviousBreakdown,
   type ScheduleOperation,
 } from "./_lib/operations";
 import {
@@ -242,6 +246,17 @@ function normalizeCustomTimeForSegmentCount(
   }
   return time ?? null;
 }
+
+type ImportPreviewState = {
+  sourceRange: string;
+  targetRange: string;
+  sourceStartDate: string;
+  sourceEndDate: string;
+  targetStartDate: string;
+  targetEndDate: string;
+  outcomes: ImportPreviousScheduleOutcome[];
+  breakdown: ImportPreviousBreakdown;
+};
 
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
@@ -400,18 +415,30 @@ function SchedulerContent() {
   );
   const [showPublishDiff, setShowPublishDiff] = useState(false);
   const [showPublishHistory, setShowPublishHistory] = useState(false);
+  // Per-banner dismissals, persisted to sessionStorage so the X actually
+  // sticks for the rest of the tab session — surviving the data-change
+  // re-renders that previously kept re-showing the banner. Hiding is UI-only:
+  // drafts and publish history are not touched, and the dismissal clears on
+  // sign-out via the dg_* sweep in clearDubgridSessionState.
+  const {
+    isDismissed: outOfWindowDraftsDismissed,
+    dismiss: dismissOutOfWindowDrafts,
+  } = useDismissibleBanner("schedule-out-of-window-drafts");
+  const {
+    isDismissed: publishBannerDismissed,
+    dismiss: dismissPublishBanner,
+  } = useDismissibleBanner("schedule-publish");
+  const {
+    isDismissed: outOfWindowPublishesDismissed,
+    dismiss: dismissOutOfWindowPublishes,
+  } = useDismissibleBanner("schedule-out-of-window-publishes");
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
   const [isImportingPrevious, setIsImportingPrevious] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [importPreview, setImportPreview] = useState<{
-    count: number;
-    disqualifiedCount: number;
-    disqualifiedSample: string[];
-    sourceRange: string;
-    targetRange: string;
-    plan: ImportPreviousPlan;
-  } | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreviewState | null>(
+    null,
+  );
   const [activeOperation, setActiveOperation] =
     useState<ScheduleOperation | null>(null);
   const [isCreatingRepeatSeries, setIsCreatingRepeatSeries] = useState(false);
@@ -564,6 +591,13 @@ function SchedulerContent() {
   );
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
+
+  // Adapts the diff-toggle label between "Show Changes" (when modified/
+  // deleted drafts have a hidden baseline worth revealing) and
+  // "Highlight New" (when every draft is brand-new — the overlay only
+  // outlines what's already drawn).
+  const hasRevealableDraftChanges =
+    draftBreakdown.modifiedShifts > 0 || draftBreakdown.deletedShifts > 0;
 
   const publishSummary = useMemo(
     () => formatDraftBreakdownSummary(draftBreakdown),
@@ -1204,17 +1238,50 @@ function SchedulerContent() {
     };
   }, [needsAuditNames, org?.id, publishHistory, shifts]);
 
-  // Build a lookup map from all recent publish history changes for O(1) access.
+  // Split publish history by overlap with the currently visible window so
+  // the banner, toggle, and overlay only describe publishes that touch
+  // what the user is looking at. YYYY-MM-DD strings sort lexically, so
+  // plain string comparison is a correct interval overlap test.
+  const inWindowPublishHistory = useMemo(
+    () =>
+      publishHistory.filter(
+        (entry) =>
+          entry.startDate <= publishWindowDateRange.endDateKey &&
+          entry.endDate >= publishWindowDateRange.startDateKey,
+      ),
+    [
+      publishHistory,
+      publishWindowDateRange.endDateKey,
+      publishWindowDateRange.startDateKey,
+    ],
+  );
+  const outOfWindowPublishHistory = useMemo(
+    () =>
+      publishHistory.filter(
+        (entry) =>
+          !(
+            entry.startDate <= publishWindowDateRange.endDateKey &&
+            entry.endDate >= publishWindowDateRange.startDateKey
+          ),
+      ),
+    [
+      publishHistory,
+      publishWindowDateRange.endDateKey,
+      publishWindowDateRange.startDateKey,
+    ],
+  );
+
+  // Build a lookup map from in-window publish history changes for O(1) access.
   // Iterate oldest→newest so the most recent publish wins per cell key.
   const publishChangesMap = useMemo(() => {
-    if (publishHistory.length === 0) return null;
+    if (inWindowPublishHistory.length === 0) return null;
     const map = new Map<
       string,
       PublishChange & { publishedAt: string; publishedBy: string }
     >();
-    // publishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
-    for (let i = publishHistory.length - 1; i >= 0; i--) {
-      const entry = publishHistory[i];
+    // inWindowPublishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
+    for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
+      const entry = inWindowPublishHistory[i];
       for (const change of entry.changes) {
         map.set(`${change.empId}_${change.date}`, {
           ...change,
@@ -1224,7 +1291,37 @@ function SchedulerContent() {
       }
     }
     return map;
-  }, [publishHistory]);
+  }, [inWindowPublishHistory]);
+
+  // Same logic as drafts: only "modified" / "deleted" entries reveal hidden
+  // state when the publish-diff overlay is on. An all-"new" publish history
+  // would just ring every cell green.
+  const publishHasRevealableChanges = useMemo(() => {
+    if (!publishChangesMap) return false;
+    for (const change of publishChangesMap.values()) {
+      if (change.kind !== "new") return true;
+    }
+    return false;
+  }, [publishChangesMap]);
+
+  // Defensive bookkeeping: when the banner that hosts the toggle unmounts,
+  // clear the overlay state so it doesn't come back on stuck-true the next
+  // time drafts/publishes appear.
+  useEffect(() => {
+    if (!hasUnpublishedChanges && showDiffOverlay) {
+      setShowDiffOverlay(false);
+    }
+  }, [hasUnpublishedChanges, showDiffOverlay]);
+
+  useEffect(() => {
+    if (inWindowPublishHistory.length === 0 && showPublishDiff) {
+      setShowPublishDiff(false);
+    }
+  }, [inWindowPublishHistory.length, showPublishDiff]);
+
+  // Dismissals persist for the tab session via useDismissibleBanner — no
+  // auto-reset on data change. The X means "hide this for the rest of the
+  // session"; sign-out wipes it.
 
   // Lookup function for grid cells: returns "F. LastName" for compact display.
   // Shows who last touched each cell (updatedBy, falling back to createdBy).
@@ -1493,7 +1590,7 @@ function SchedulerContent() {
           refetchPublishedRangesRef.current(),
         ]).catch((err) => {
           Sentry.captureException(err);
-          toast.error("Failed to refresh schedule — try reloading the page");
+          toast.error("Couldn't refresh the schedule. Try reloading the page.");
         });
       }
     };
@@ -2805,7 +2902,7 @@ function SchedulerContent() {
   const handleShiftWriteConflict = useCallback(async () => {
     const orgId = org?.id;
     if (!orgId) return;
-    toast.error("Shift was modified by another editor or another tab — refreshing");
+    toast.error("This shift was modified elsewhere. Refreshing now.");
     const freshShifts = await fetchShifts(
       orgId,
       canEditShifts,
@@ -2993,10 +3090,10 @@ function SchedulerContent() {
             date: update.dateKey,
             expectedVersion: update.expectedVersion,
           }));
-          for (let i = 0; i < deleteItems.length; i += IMPORT_PREVIOUS_BATCH_SIZE) {
+          for (let i = 0; i < deleteItems.length; i += SCHEDULE_DELETE_BATCH_SIZE) {
             await deleteShiftBatch(
               orgId,
-              deleteItems.slice(i, i + IMPORT_PREVIOUS_BATCH_SIZE),
+              deleteItems.slice(i, i + SCHEDULE_DELETE_BATCH_SIZE),
             );
           }
         } catch (err) {
@@ -4361,155 +4458,136 @@ function SchedulerContent() {
   ]);
 
   // ── Import Previous Schedule ────────────────────────────────────────────────
+  //
+  // Planning and execution both happen on the server in a single atomic RPC.
+  // The client renders counts and refetches the period — no batching, no
+  // local-state planning, no post-fetch reconciliation. See
+  // `public.import_previous_schedule` in 002_functions_triggers.sql.
 
-  // Preview: count how many shifts would be imported, then show confirmation.
-  // Runs the same qualification filter the executor uses so the count matches
-  // what will actually land in the DB.
-  const handleImportPreviousPreview = useCallback(() => {
+  const handleImportPreviousPreview = useCallback(async () => {
     if (!org || spanWeeks === "month") return;
 
     const days = spanWeeks * 7;
     const sourceStart = addDays(weekStart, -days);
+    const sourceEnd = addDays(sourceStart, days - 1);
+    const targetEnd = addDays(weekStart, days - 1);
+    const sourceStartKey = formatDateKey(sourceStart);
+    const sourceEndKey = formatDateKey(sourceEnd);
+    const targetStartKey = formatDateKey(weekStart);
+    const targetEndKey = formatDateKey(targetEnd);
 
-    const plan = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees,
-      shifts,
-      checkQualification,
-      buildEntryPayload,
-      currentUserId: currentUserRef.current?.id ?? null,
-    });
+    setIsImportingPrevious(true);
+    try {
+      const outcomes = await importPreviousSchedule({
+        orgId: org.id,
+        sourceStartDate: sourceStartKey,
+        sourceEndDate: sourceEndKey,
+        targetStartDate: targetStartKey,
+        targetEndDate: targetEndKey,
+        dryRun: true,
+      });
 
-    if (plan.upsertItems.length === 0 && plan.disqualified.length === 0) {
-      toast.info(
-        "No shifts to import — either the previous period is empty or all slots are already filled",
-      );
-      return;
+      if (outcomes.length === 0) {
+        toast.info(
+          "Nothing to import — the previous period has no shifts.",
+        );
+        return;
+      }
+
+      const breakdown = summarizeImportPreviousOutcomes(outcomes);
+      if (breakdown.imported === 0 && breakdown.totalSkipped > 0) {
+        const nameByEmpId = new Map(
+          employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
+        );
+        toast.info(
+          `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId)}.`,
+        );
+        return;
+      }
+
+      setImportPreview({
+        sourceRange: `${formatDate(sourceStart)} – ${formatDate(sourceEnd)}`,
+        targetRange: `${formatDate(weekStart)} – ${formatDate(targetEnd)}`,
+        sourceStartDate: sourceStartKey,
+        sourceEndDate: sourceEndKey,
+        targetStartDate: targetStartKey,
+        targetEndDate: targetEndKey,
+        outcomes,
+        breakdown,
+      });
+      setShowImportConfirm(true);
+    } catch (err) {
+      Sentry.captureException(err);
+      toast.error("Couldn't load the import preview. Try again.");
+    } finally {
+      setIsImportingPrevious(false);
     }
+  }, [org, spanWeeks, weekStart, employees]);
 
-    const sourceRange = `${formatDate(sourceStart)} – ${formatDate(addDays(sourceStart, days - 1))}`;
-    const targetRange = `${formatDate(weekStart)} – ${formatDate(addDays(weekStart, days - 1))}`;
-    const disqualifiedSample = plan.disqualified
-      .slice(0, 3)
-      .map((s) => `${s.empName} on ${s.date}`);
-    setImportPreview({
-      count: plan.upsertItems.length,
-      disqualifiedCount: plan.disqualified.length,
-      disqualifiedSample,
-      sourceRange,
-      targetRange,
-      plan,
-    });
-    setShowImportConfirm(true);
-  }, [
-    org,
-    spanWeeks,
-    weekStart,
-    employees,
-    shifts,
-    checkQualification,
-    buildEntryPayload,
-  ]);
-
-  // Actually apply the import (called after confirmation). Re-plans against
-  // the current shifts state in case another editor modified the target while
-  // the confirm dialog was open — the stored preview plan is a safety net,
-  // not the authoritative input.
   const handleImportPrevious = useCallback(async () => {
     if (!org || spanWeeks === "month" || !importPreview) return;
-    const days = spanWeeks * 7;
-    const sourceStart = addDays(weekStart, -days);
 
-    const plan = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees,
-      shifts,
-      checkQualification,
-      buildEntryPayload,
-      currentUserId: currentUserRef.current?.id ?? null,
-    });
-    const { upsertItems, shiftUpdates, disqualified } = plan;
-    const count = upsertItems.length;
-
+    const expected = importPreview.breakdown.imported;
     startScheduleOperation({
       kind: "import_previous",
       title: "Importing previous schedule...",
-      detail: `Copying ${count} shift${count === 1 ? "" : "s"} from ${importPreview.sourceRange} into ${importPreview.targetRange}.`,
-      progress: 6,
+      detail: `Copying ${expected} shift${expected === 1 ? "" : "s"} from ${importPreview.sourceRange} into ${importPreview.targetRange}.`,
+      progress: 25,
     });
     setShowImportConfirm(false);
     setIsImportingPrevious(true);
 
     try {
-      // Surface disqualified skips that the preview didn't already disclose
-      // (covers the case where source state shifted between preview & execute).
-      if (disqualified.length > importPreview.disqualifiedCount) {
-        const msg = disqualified
-          .slice(0, 3)
-          .map((s) => `${s.empName} on ${s.date}`)
-          .join(", ");
-        const suffix =
-          disqualified.length > 3 ? ` and ${disqualified.length - 3} more` : "";
-        toast.warning(
-          `Skipped ${disqualified.length} shift(s) due to qualifications: ${msg}${suffix}`,
-        );
-      }
-
-      // Apply optimistic state update immediately for responsive UI
-      setShifts((prev) => ({ ...prev, ...shiftUpdates }));
-      broadcastDraftChanged({ shifts: shiftUpdates });
-
-      if (count === 0) {
-        finishScheduleOperation(
-          "import_previous",
-          "Nothing needed to be imported for this date range.",
-        );
-        toast.info(
-          "No shifts to import — either the previous period is empty or all slots are already filled",
-        );
-        return;
-      }
-
-      updateScheduleOperation("import_previous", {
-        progress: 16,
-        detail: `Importing ${count} shift${count === 1 ? "" : "s"}...`,
+      const outcomes = await importPreviousSchedule({
+        orgId: org.id,
+        sourceStartDate: importPreview.sourceStartDate,
+        sourceEndDate: importPreview.sourceEndDate,
+        targetStartDate: importPreview.targetStartDate,
+        targetEndDate: importPreview.targetEndDate,
+        dryRun: false,
       });
 
-      // Persist to DB in batches so the modal can reflect real progress.
-      for (let i = 0; i < upsertItems.length; i += IMPORT_PREVIOUS_BATCH_SIZE) {
-        const batch = upsertItems.slice(i, i + IMPORT_PREVIOUS_BATCH_SIZE);
-        await upsertShiftBatch(org.id, batch);
-        const completed = Math.min(upsertItems.length, i + batch.length);
-        updateScheduleOperation("import_previous", {
-          progress: 16 + Math.round((completed / upsertItems.length) * 74),
-          detail: `Imported ${completed} of ${upsertItems.length} shift${upsertItems.length === 1 ? "" : "s"}...`,
-        });
-      }
-      // Always refetch to reconcile — catches race conditions where another user
-      // filled slots between preview and import
       updateScheduleOperation("import_previous", {
-        progress: 95,
+        progress: 80,
         detail: "Refreshing the schedule with the imported shifts...",
       });
       await refetchScheduleData();
       finishScheduleOperation("import_previous");
-      toast.success(
-        `Imported ${count} shift${count !== 1 ? "s" : ""} from previous ${spanWeeks === 1 ? "week" : "2 weeks"}`,
+
+      const breakdown = summarizeImportPreviousOutcomes(outcomes);
+      const nameByEmpId = new Map(
+        employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
       );
-    } catch (err) {
-      clearScheduleOperation("import_previous");
-      if (err instanceof OptimisticLockError) {
+      const skipDescription = formatImportPreviousSkipDescription(
+        outcomes,
+        breakdown,
+        nameByEmpId,
+      );
+
+      if (breakdown.imported === 0) {
+        toast.info(
+          skipDescription
+            ? `Nothing imported — ${skipDescription}.`
+            : "Nothing imported.",
+        );
+      } else if (breakdown.totalSkipped > 0) {
         toast.warning(
-          "Some target cells already had data — refreshing the schedule to reconcile.",
+          `Imported ${breakdown.imported} shift${
+            breakdown.imported === 1 ? "" : "s"
+          }, skipped ${breakdown.totalSkipped} (${skipDescription}).`,
+          { duration: 12000 },
         );
       } else {
-        toast.error("Failed to save some imported shifts — refreshing");
-        Sentry.captureException(err);
+        toast.success(
+          `Imported ${breakdown.imported} shift${
+            breakdown.imported === 1 ? "" : "s"
+          } from previous ${spanWeeks === 1 ? "week" : "2 weeks"}.`,
+        );
       }
+    } catch (err) {
+      clearScheduleOperation("import_previous");
+      Sentry.captureException(err);
+      toast.error("Couldn't import the previous schedule. Refreshing now.");
       await refetchScheduleData();
     } finally {
       setIsImportingPrevious(false);
@@ -4518,13 +4596,8 @@ function SchedulerContent() {
   }, [
     org,
     spanWeeks,
-    weekStart,
     importPreview,
     employees,
-    shifts,
-    broadcastDraftChanged,
-    buildEntryPayload,
-    checkQualification,
     refetchScheduleData,
     startScheduleOperation,
     updateScheduleOperation,
@@ -5511,21 +5584,24 @@ function SchedulerContent() {
                 </div>
               </div>
             )}
-            {!isBulkDeleteMode && canEditShifts && hasUnpublishedChanges && (
-              <DraftBanner
-                onPublish={() => setShowPublishConfirm(true)}
-                onCancel={openDiscardConfirm}
-                isPublishing={isPublishing}
-                isCanceling={cancelingMode !== null}
-                breakdown={draftBreakdown}
-                showDiff={showDiffOverlay}
-                onToggleDiff={() => setShowDiffOverlay((v) => !v)}
-                canPublish={canPublishSchedule}
-              />
-            )}
             {!isBulkDeleteMode &&
               canEditShifts &&
-              outOfWindowDraftGroups.length > 0 && (
+              hasUnpublishedChanges && (
+                <DraftBanner
+                  onPublish={() => setShowPublishConfirm(true)}
+                  onCancel={openDiscardConfirm}
+                  isPublishing={isPublishing}
+                  isCanceling={cancelingMode !== null}
+                  breakdown={draftBreakdown}
+                  showDiff={showDiffOverlay}
+                  onToggleDiff={() => setShowDiffOverlay((v) => !v)}
+                  canPublish={canPublishSchedule}
+                />
+              )}
+            {!isBulkDeleteMode &&
+              canEditShifts &&
+              outOfWindowDraftGroups.length > 0 &&
+              !outOfWindowDraftsDismissed && (
                 <div
                   className="dg-draft-banner no-print"
                   data-tour="draft-banner-other-weeks"
@@ -5586,13 +5662,143 @@ function SchedulerContent() {
                         </Hint>
                       );
                     })}
+                    <Hint
+                      content={hint("Hide this banner for the rest of this session")}
+                      side="bottom"
+                    >
+                      <button
+                        type="button"
+                        onClick={dismissOutOfWindowDrafts}
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
+                      >
+                        Close
+                      </button>
+                    </Hint>
                   </div>
                 </div>
               )}
-            {!isBulkDeleteMode && publishHistory.length > 0 &&
+            {!isBulkDeleteMode &&
+              outOfWindowPublishHistory.length > 0 &&
+              !outOfWindowPublishesDismissed &&
               (() => {
-                const latest = publishHistory[0];
-                const totalChanges = publishHistory.reduce(
+                type PublishGroup = {
+                  key: string;
+                  startDate: string;
+                  endDate: string;
+                  changeCount: number;
+                };
+                const groups = new Map<string, PublishGroup>();
+                for (const entry of outOfWindowPublishHistory) {
+                  const key = `${entry.startDate}_${entry.endDate}`;
+                  const existing = groups.get(key);
+                  if (existing) {
+                    existing.changeCount += entry.changeCount;
+                  } else {
+                    groups.set(key, {
+                      key,
+                      startDate: entry.startDate,
+                      endDate: entry.endDate,
+                      changeCount: entry.changeCount,
+                    });
+                  }
+                }
+                const sortedGroups = [...groups.values()].sort((a, b) =>
+                  a.startDate < b.startDate
+                    ? -1
+                    : a.startDate > b.startDate
+                      ? 1
+                      : 0,
+                );
+                const totalChanges = sortedGroups.reduce(
+                  (s, g) => s + g.changeCount,
+                  0,
+                );
+                const noun =
+                  spanWeeks === "month"
+                    ? "month"
+                    : spanWeeks === 2
+                      ? "pay period"
+                      : "week";
+                return (
+                  <div
+                    className="dg-draft-banner no-print"
+                    style={{
+                      background: "var(--color-info-bg)",
+                      borderColor: "var(--color-info-border)",
+                      color: "var(--color-info-text)",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div
+                      className="dg-draft-banner-dot"
+                      style={{ background: "var(--color-info-text)" }}
+                    />
+                    <span style={{ fontWeight: 600 }}>
+                      Recently published:
+                    </span>
+                    <span style={{ opacity: 0.85 }}>
+                      {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
+                    </span>
+                    <div
+                      className="dg-draft-banner-actions"
+                      style={{ flexWrap: "wrap" }}
+                    >
+                      {sortedGroups.map((group) => {
+                        const [sy, sm, sd] = group.startDate
+                          .split("-")
+                          .map(Number);
+                        const startDate = new Date(sy, sm - 1, sd);
+                        const [ey, em, ed] = group.endDate
+                          .split("-")
+                          .map(Number);
+                        const endDate = new Date(ey, em - 1, ed);
+                        return (
+                          <Hint
+                            key={group.key}
+                            content={hint(
+                              "Jump to this period to view what changed",
+                            )}
+                            side="bottom"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setWeekStart(startDate)}
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                            >
+                              {`${formatDate(startDate)}–${formatDate(endDate)}`}{" "}
+                              <span
+                                style={{ opacity: 0.7, marginLeft: 4 }}
+                              >
+                                ({group.changeCount})
+                              </span>
+                            </button>
+                          </Hint>
+                        );
+                      })}
+                      <Hint
+                        content={hint(
+                          "Hide this banner for the rest of this session",
+                        )}
+                        side="bottom"
+                      >
+                        <button
+                          type="button"
+                          onClick={dismissOutOfWindowPublishes}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          Close
+                        </button>
+                      </Hint>
+                    </div>
+                  </div>
+                );
+              })()}
+            {!isBulkDeleteMode &&
+              inWindowPublishHistory.length > 0 &&
+              !publishBannerDismissed &&
+              (() => {
+                const latest = inWindowPublishHistory[0];
+                const totalChanges = inWindowPublishHistory.reduce(
                   (sum, e) => sum + e.changeCount,
                   0,
                 );
@@ -5625,8 +5831,8 @@ function SchedulerContent() {
                     </span>
                     <span style={{ opacity: 0.7, marginLeft: 4 }}>
                       {totalChanges} change{totalChanges !== 1 ? "s" : ""}
-                      {publishHistory.length > 1
-                        ? ` across ${publishHistory.length} publishes`
+                      {inWindowPublishHistory.length > 1
+                        ? ` across ${inWindowPublishHistory.length} publishes`
                         : ""}
                     </span>
                     {!isMobile && showPublishDiff && <ChangeLegend />}
@@ -5645,7 +5851,9 @@ function SchedulerContent() {
                         <>
                           <Hint
                             content={hint(
-                              "Highlight differences from the published schedule",
+                              publishHasRevealableChanges
+                                ? "Highlight differences from the published schedule"
+                                : "Outline the newly published shifts",
                             )}
                             side="bottom"
                           >
@@ -5663,9 +5871,13 @@ function SchedulerContent() {
                                   : undefined,
                               }}
                             >
-                              {showPublishDiff
-                                ? "Hide Changes"
-                                : "Show What Changed"}
+                              {publishHasRevealableChanges
+                                ? showPublishDiff
+                                  ? "Hide Changes"
+                                  : "Show What Changed"
+                                : showPublishDiff
+                                  ? "Hide Highlights"
+                                  : "Highlight New"}
                             </button>
                           </Hint>
                           <button
@@ -5698,6 +5910,20 @@ function SchedulerContent() {
                           </button>
                         </>
                       )}
+                      <Hint
+                        content={hint(
+                          "Hide this banner for the rest of this session",
+                        )}
+                        side="bottom"
+                      >
+                        <button
+                          type="button"
+                          onClick={dismissPublishBanner}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
+                        >
+                          Close
+                        </button>
+                      </Hint>
                     </div>
                   </div>
                 );
@@ -6631,15 +6857,21 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Import Previous Schedule?"
               message={(() => {
-                const copyLine = `This will copy ${importPreview.count} shift${importPreview.count !== 1 ? "s" : ""} from ${importPreview.sourceRange} into ${importPreview.targetRange}. Only empty slots will be filled — existing shifts will not be overwritten.`;
-                if (importPreview.disqualifiedCount === 0) return copyLine;
-                const sample = importPreview.disqualifiedSample.join(", ");
-                const suffix =
-                  importPreview.disqualifiedCount >
-                  importPreview.disqualifiedSample.length
-                    ? ` and ${importPreview.disqualifiedCount - importPreview.disqualifiedSample.length} more`
-                    : "";
-                return `${copyLine} ${importPreview.disqualifiedCount} shift${importPreview.disqualifiedCount === 1 ? "" : "s"} cannot be copied because the assigned employees no longer have the required qualifications (${sample}${suffix}).`;
+                const { breakdown, sourceRange, targetRange, outcomes } =
+                  importPreview;
+                const copyLine = `This will copy ${breakdown.imported} shift${
+                  breakdown.imported === 1 ? "" : "s"
+                } from ${sourceRange} into ${targetRange}.`;
+                if (breakdown.totalSkipped === 0) return copyLine;
+                const nameByEmpId = new Map(
+                  employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
+                );
+                const description = formatImportPreviousSkipDescription(
+                  outcomes,
+                  breakdown,
+                  nameByEmpId,
+                );
+                return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
               })()}
               confirmLabel="Import Shifts"
               variant="info"

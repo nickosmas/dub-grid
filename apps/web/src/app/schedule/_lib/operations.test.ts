@@ -1,246 +1,144 @@
-import { describe, expect, it, vi } from "vitest";
-import { planImportPrevious } from "./operations";
-import type { Employee, ScheduleCellInput, ShiftMap } from "@/types";
+import { describe, expect, it } from "vitest";
+import {
+  formatImportPreviousSkipDescription,
+  summarizeImportPreviousOutcomes,
+} from "./operations";
+import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
 
-function buildEmployee(overrides: Partial<Employee> = {}): Employee {
+function row(
+  overrides: Partial<ImportPreviousScheduleOutcome> = {},
+): ImportPreviousScheduleOutcome {
   return {
-    id: "emp-1",
-    firstName: "Alex",
-    lastName: "Taylor",
-    employmentType: "full_time",
-    status: "active",
-    statusChangedAt: null,
-    statusNote: "",
-    certificationId: null,
-    roleIds: [],
-    seniority: 1,
-    focusAreaIds: [11],
-    phone: "",
-    email: "",
-    contactNotes: "",
-    deptAdminIds: [],
-    userId: null,
-    departmentIds: [],
-    version: 0,
-    employeeNumber: 1001,
-    createdAt: null,
+    employeeId: "emp-1",
+    sourceDate: "2026-06-14",
+    targetDate: "2026-06-28",
+    outcome: "imported",
+    reason: null,
     ...overrides,
   };
 }
 
-function buildShift(
-  overrides: Partial<ShiftMap[string]> = {},
-): ShiftMap[string] {
-  return {
-    label: "Day",
-    assignmentIds: [1],
-    isDraft: false,
-    draftKind: null,
-    publishedAssignmentDefinitionIds: [1],
-    publishedLabel: "Day",
-    ...overrides,
-  };
-}
+describe("summarizeImportPreviousOutcomes", () => {
+  it("counts every documented reason and keeps totals consistent", () => {
+    const outcomes: ImportPreviousScheduleOutcome[] = [
+      row({ outcome: "imported", reason: null }),
+      row({ outcome: "imported", reason: null }),
+      row({ outcome: "skipped", reason: "target_has_data" }),
+      row({ outcome: "skipped", reason: "target_has_data" }),
+      row({ outcome: "skipped", reason: "employee_inactive" }),
+      row({ outcome: "skipped", reason: "disqualified:focus_area" }),
+      row({ outcome: "skipped", reason: "disqualified:role" }),
+      row({ outcome: "skipped", reason: "disqualified:cert" }),
+      row({ outcome: "skipped", reason: "source_has_no_content" }),
+    ];
+    const breakdown = summarizeImportPreviousOutcomes(outcomes);
 
-const buildEntryPayload = (entry: ShiftMap[string]): ScheduleCellInput => ({
-  kind: entry.absenceTypeId != null ? "absence" : "worked",
-  segments: (entry.segments ?? []).map((s, i) => ({
-    shiftId: s.shiftId,
-    jobId: s.jobId,
-    position: s.position ?? i,
-    isMentored: s.isMentored ?? false,
-  })),
-  absenceTypeId: entry.absenceTypeId ?? null,
-  customStartTime: null,
-  customEndTime: null,
-  seriesId: null,
-  fromRecurring: false,
+    expect(breakdown.totalSource).toBe(9);
+    expect(breakdown.imported).toBe(2);
+    expect(breakdown.totalSkipped).toBe(7);
+    expect(breakdown.skippedTargetHasData).toBe(2);
+    expect(breakdown.skippedEmployeeInactive).toBe(1);
+    expect(breakdown.disqualifiedFocusArea).toBe(1);
+    expect(breakdown.disqualifiedRole).toBe(1);
+    expect(breakdown.disqualifiedCert).toBe(1);
+    expect(breakdown.skippedSourceEmpty).toBe(1);
+    expect(breakdown.skippedOther).toBe(0);
+    expect(
+      breakdown.imported + breakdown.totalSkipped,
+    ).toBe(breakdown.totalSource);
+  });
+
+  it("buckets unknown skip reasons into skippedOther so totals stay tight", () => {
+    const outcomes: ImportPreviousScheduleOutcome[] = [
+      row({ outcome: "skipped", reason: "future_reason_we_havent_modeled" }),
+      row({ outcome: "skipped", reason: null }),
+    ];
+    const breakdown = summarizeImportPreviousOutcomes(outcomes);
+    expect(breakdown.skippedOther).toBe(2);
+    expect(breakdown.imported + breakdown.totalSkipped).toBe(2);
+  });
+
+  it("returns a zeroed breakdown for an empty result set", () => {
+    const breakdown = summarizeImportPreviousOutcomes([]);
+    expect(breakdown).toEqual({
+      imported: 0,
+      skippedTargetHasData: 0,
+      skippedEmployeeInactive: 0,
+      skippedSourceEmpty: 0,
+      disqualifiedFocusArea: 0,
+      disqualifiedRole: 0,
+      disqualifiedCert: 0,
+      skippedOther: 0,
+      totalSource: 0,
+      totalSkipped: 0,
+    });
+  });
 });
 
-/**
- * `weekStart` is 2026-05-17 (Sunday). `sourceStart` is 14 days earlier
- * (2026-05-03). Days[0] is the first day of each period.
- */
-const sourceStart = new Date(2026, 4, 3); // May 3 2026 local
-const weekStart = new Date(2026, 4, 17); // May 17 2026 local
-const days = 14;
-
-describe("planImportPrevious", () => {
-  it("plans inserts for every qualified source shift when target cells are empty", () => {
-    const emp = buildEmployee();
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift({ label: "Day" }),
-      "emp-1_2026-05-04": buildShift({ label: "Night", assignmentIds: [2] }),
-    };
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification: () => null, // always qualified
-      buildEntryPayload,
-      currentUserId: "user-1",
-    });
-
-    expect(result.upsertItems).toHaveLength(2);
-    expect(result.upsertItems.map((it) => it.date)).toEqual([
-      "2026-05-17",
-      "2026-05-18",
-    ]);
-    expect(Object.keys(result.shiftUpdates)).toEqual([
-      "emp-1_2026-05-17",
-      "emp-1_2026-05-18",
-    ]);
-    expect(result.shiftUpdates["emp-1_2026-05-17"]).toMatchObject({
-      label: "Day",
-      assignmentIds: [1],
-      isDraft: true,
-      draftKind: "new",
-      updatedBy: "user-1",
-    });
-    expect(result.disqualified).toEqual([]);
+describe("formatImportPreviousSkipDescription", () => {
+  it("returns an empty string when nothing was skipped", () => {
+    const outcomes = [row({ outcome: "imported" })];
+    const breakdown = summarizeImportPreviousOutcomes(outcomes);
+    expect(
+      formatImportPreviousSkipDescription(outcomes, breakdown, new Map()),
+    ).toBe("");
   });
 
-  it("collects disqualified shifts and excludes them from upserts", () => {
-    const emp = buildEmployee({ firstName: "Sam", lastName: "Doe" });
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift({ assignmentIds: [99] }), // disqualified
-      "emp-1_2026-05-04": buildShift({ assignmentIds: [1] }), // qualified
-    };
-    const checkQualification = vi.fn((_empId: string, ids: number[]) =>
-      ids.includes(99) ? "Missing cert" : null,
+  it("groups qualification reasons under one count and names example employees", () => {
+    const outcomes: ImportPreviousScheduleOutcome[] = [
+      row({
+        employeeId: "sarah",
+        targetDate: "2026-07-03",
+        outcome: "skipped",
+        reason: "disqualified:focus_area",
+      }),
+      row({
+        employeeId: "thomas",
+        targetDate: "2026-07-05",
+        outcome: "skipped",
+        reason: "disqualified:role",
+      }),
+      row({
+        employeeId: "doug",
+        targetDate: "2026-07-06",
+        outcome: "skipped",
+        reason: "employee_inactive",
+      }),
+    ];
+    const breakdown = summarizeImportPreviousOutcomes(outcomes);
+    const names = new Map([
+      ["sarah", "Sarah Kim"],
+      ["thomas", "Thomas Crawford"],
+      ["doug", "Doug Beale"],
+    ]);
+
+    const description = formatImportPreviousSkipDescription(
+      outcomes,
+      breakdown,
+      names,
     );
-
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification,
-      buildEntryPayload,
-      currentUserId: null,
-    });
-
-    expect(result.upsertItems).toHaveLength(1);
-    expect(result.upsertItems[0]?.date).toBe("2026-05-18");
-    expect(result.disqualified).toEqual([
-      { empName: "Sam Doe", date: "5/17", reason: "Missing cert" },
-    ]);
+    expect(description).toContain("1 employee no longer active");
+    expect(description).toContain("2 qualification changes");
+    expect(description).toContain("Sarah Kim on 7/3");
+    expect(description).toContain("Thomas Crawford on 7/5");
+    expect(description).toContain("Doug Beale on 7/6");
   });
 
-  it("skips source cells where the target already has data", () => {
-    const emp = buildEmployee();
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift(), // source
-      "emp-1_2026-05-17": buildShift({ label: "Existing" }), // target occupied
-    };
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification: () => null,
-      buildEntryPayload,
-      currentUserId: null,
-    });
-
-    expect(result.upsertItems).toHaveLength(0);
-    expect(result.disqualified).toEqual([]);
-  });
-
-  it("skips source cells with no work and no absence", () => {
-    const emp = buildEmployee();
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift({
-        assignmentIds: [],
-        absenceTypeId: null,
+  it("uses a generic label for unknown employees", () => {
+    const outcomes: ImportPreviousScheduleOutcome[] = [
+      row({
+        employeeId: "ghost",
+        targetDate: "2026-07-04",
+        outcome: "skipped",
+        reason: "employee_inactive",
       }),
-    };
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification: () => null,
-      buildEntryPayload,
-      currentUserId: null,
-    });
-
-    expect(result.upsertItems).toHaveLength(0);
-  });
-
-  it("skips source cells flagged for deletion", () => {
-    const emp = buildEmployee();
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift({ isDelete: true }),
-    };
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification: () => null,
-      buildEntryPayload,
-      currentUserId: null,
-    });
-
-    expect(result.upsertItems).toHaveLength(0);
-  });
-
-  it("imports absence-only source cells without running qualification check", () => {
-    const emp = buildEmployee();
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift({
-        assignmentIds: [],
-        absenceTypeId: 5,
-        publishedAssignmentDefinitionIds: [],
-      }),
-    };
-    const checkQualification = vi.fn(() => "should not be called");
-
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification,
-      buildEntryPayload,
-      currentUserId: null,
-    });
-
-    expect(checkQualification).not.toHaveBeenCalled();
-    expect(result.upsertItems).toHaveLength(1);
-    expect(result.upsertItems[0]?.input.kind).toBe("absence");
-  });
-
-  it("reproduces the bug: preview overcount when qualification filter runs only at execute time", () => {
-    // 3 source shifts; 1 employee no longer qualified for assignment 99.
-    // Buggy preview count would be 3; correct count is 2.
-    const emp = buildEmployee();
-    const shifts: ShiftMap = {
-      "emp-1_2026-05-03": buildShift({ assignmentIds: [1] }),
-      "emp-1_2026-05-04": buildShift({ assignmentIds: [99] }),
-      "emp-1_2026-05-05": buildShift({ assignmentIds: [1] }),
-    };
-    const result = planImportPrevious({
-      days,
-      sourceStart,
-      weekStart,
-      employees: [emp],
-      shifts,
-      checkQualification: (_e, ids) => (ids.includes(99) ? "no cert" : null),
-      buildEntryPayload,
-      currentUserId: null,
-    });
-
-    expect(result.upsertItems).toHaveLength(2);
-    expect(result.disqualified).toHaveLength(1);
-    expect(result.upsertItems.length + result.disqualified.length).toBe(3);
+    ];
+    const breakdown = summarizeImportPreviousOutcomes(outcomes);
+    const description = formatImportPreviousSkipDescription(
+      outcomes,
+      breakdown,
+      new Map(),
+    );
+    expect(description).toContain("an employee on 7/4");
   });
 });

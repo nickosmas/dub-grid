@@ -415,21 +415,21 @@ export function updateScheduleLastViewed(orgId: string): Promise<void> {
   }).then(() => undefined);
 }
 
-async function requestManageWithLock(
+async function requestManageWithLockTyped<T extends Record<string, unknown>>(
   body: Record<string, unknown>,
-): Promise<void> {
+): Promise<T> {
   const response = await fetch("/api/schedule/manage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const payload = (await response.json().catch(() => null)) as
-    | {
+    | (T & {
         error?: string;
         shiftId?: string;
         expectedVersion?: number;
         actualVersion?: number;
-      }
+      })
     | null;
 
   if (response.status === 409) {
@@ -443,6 +443,14 @@ async function requestManageWithLock(
   if (!response.ok) {
     throw new Error(formatClientErrorMessage(payload?.error, "Schedule request failed."));
   }
+
+  return (payload ?? ({} as T)) as T;
+}
+
+async function requestManageWithLock(
+  body: Record<string, unknown>,
+): Promise<void> {
+  await requestManageWithLockTyped(body);
 }
 
 export function upsertShift(
@@ -462,22 +470,33 @@ export function upsertShift(
   });
 }
 
-export type UpsertShiftBatchItem = {
+export type ImportPreviousScheduleOutcomeKind = "imported" | "skipped";
+
+export type ImportPreviousScheduleOutcome = {
   employeeId: string;
-  date: string;
-  input: ScheduleCellInput;
-  expectedVersion?: number;
+  sourceDate: string;
+  targetDate: string;
+  outcome: ImportPreviousScheduleOutcomeKind;
+  /** Non-null only when outcome === "skipped". One of the documented reason
+   * codes returned by `public.import_previous_schedule`. */
+  reason: string | null;
 };
 
-export function upsertShiftBatch(
-  orgId: string,
-  shifts: UpsertShiftBatchItem[],
-): Promise<void> {
-  return requestManageWithLock({
-    action: "upsertShifts",
-    orgId,
-    shifts,
+export async function importPreviousSchedule(input: {
+  orgId: string;
+  sourceStartDate: string;
+  sourceEndDate: string;
+  targetStartDate: string;
+  targetEndDate: string;
+  dryRun: boolean;
+}): Promise<ImportPreviousScheduleOutcome[]> {
+  const payload = await requestManageWithLockTyped<{
+    outcomes?: ImportPreviousScheduleOutcome[];
+  }>({
+    action: "importPreviousSchedule",
+    ...input,
   });
+  return payload.outcomes ?? [];
 }
 
 export function deleteShift(

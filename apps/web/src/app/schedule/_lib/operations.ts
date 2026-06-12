@@ -1,6 +1,4 @@
-import type { Employee, ScheduleCellInput, ShiftMap } from "@/types";
-import { addDays, formatDate, formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
-import type { UpsertShiftBatchItem } from "@/features/schedule/client";
+import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
 
 export type { ScheduleCellInput } from "@/types";
 
@@ -11,7 +9,13 @@ export type ScheduleOperation = {
   progress: number;
 };
 
-export const IMPORT_PREVIOUS_BATCH_SIZE = 20;
+/**
+ * Batch size used for the schedule bulk-delete API. The import-previous flow
+ * no longer needs client batching — the server's `import_previous_schedule`
+ * RPC does the entire copy in one transaction.
+ */
+export const SCHEDULE_DELETE_BATCH_SIZE = 20;
+
 export const DRAFT_CHANGED_BROADCAST_KEY = "draft_changed";
 export const OPERATION_MODAL_DISMISS_MS = 450;
 export const PUBLISH_WINDOW_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
@@ -24,109 +28,132 @@ export function clampProgress(progress: number): number {
   return Math.max(0, Math.min(100, Math.round(progress)));
 }
 
-export type DisqualifiedImportShift = {
-  empName: string;
-  date: string;
-  reason: string;
+// ── Import Previous Schedule outcome aggregation ────────────────────────────
+//
+// The server's `import_previous_schedule` RPC returns one outcome row per
+// effective source cell. The client aggregates those rows into the counts the
+// modal + toast need. Keeping the aggregator pure and exported lets us test it
+// in isolation and reuse it for both dry-run preview and real execute.
+
+export type ImportPreviousBreakdown = {
+  imported: number;
+  skippedTargetHasData: number;
+  skippedEmployeeInactive: number;
+  skippedSourceEmpty: number;
+  disqualifiedFocusArea: number;
+  disqualifiedRole: number;
+  disqualifiedCert: number;
+  /** Catch-all for any reason code we don't already model. Keeps the total
+   * equal to outcomes.length even if the server grows a new reason. */
+  skippedOther: number;
+  totalSource: number;
+  totalSkipped: number;
 };
 
-export type ImportPreviousPlan = {
-  upsertItems: UpsertShiftBatchItem[];
-  shiftUpdates: Record<string, ShiftMap[string]>;
-  disqualified: DisqualifiedImportShift[];
-};
+export function summarizeImportPreviousOutcomes(
+  outcomes: ImportPreviousScheduleOutcome[],
+): ImportPreviousBreakdown {
+  const breakdown: ImportPreviousBreakdown = {
+    imported: 0,
+    skippedTargetHasData: 0,
+    skippedEmployeeInactive: 0,
+    skippedSourceEmpty: 0,
+    disqualifiedFocusArea: 0,
+    disqualifiedRole: 0,
+    disqualifiedCert: 0,
+    skippedOther: 0,
+    totalSource: outcomes.length,
+    totalSkipped: 0,
+  };
 
-export type PlanImportPreviousArgs = {
-  days: number;
-  sourceStart: Date;
-  weekStart: Date;
-  employees: Employee[];
-  shifts: ShiftMap;
-  /** Returns null if qualified, or a human-readable reason if not. */
-  checkQualification: (empId: string, assignmentIds: number[]) => string | null;
-  buildEntryPayload: (entry: ShiftMap[string]) => ScheduleCellInput;
-  currentUserId: string | null;
-};
-
-/**
- * Walks the source/target grid once and computes the full import plan.
- *
- * Shared by both the preview (counts what will land) and the executor (does
- * the inserts), so the two cannot drift apart. The qualification filter is
- * applied here — disqualified shifts are returned separately so the UI can
- * surface them before the user confirms.
- */
-export function planImportPrevious(
-  args: PlanImportPreviousArgs,
-): ImportPreviousPlan {
-  const {
-    days,
-    sourceStart,
-    weekStart,
-    employees,
-    shifts,
-    checkQualification,
-    buildEntryPayload,
-    currentUserId,
-  } = args;
-
-  const upsertItems: UpsertShiftBatchItem[] = [];
-  const shiftUpdates: Record<string, ShiftMap[string]> = {};
-  const disqualified: DisqualifiedImportShift[] = [];
-
-  for (let i = 0; i < days; i++) {
-    const sourceDate = addDays(sourceStart, i);
-    const targetDate = addDays(weekStart, i);
-    const sourceDateKey = formatDateKey(sourceDate);
-    const targetDateKey = formatDateKey(targetDate);
-
-    for (const emp of employees) {
-      const sourceKey = `${emp.id}_${sourceDateKey}`;
-      const targetKey = `${emp.id}_${targetDateKey}`;
-      const sourceShift = shifts[sourceKey];
-
-      if (
-        !sourceShift ||
-        (sourceShift.assignmentIds.length === 0 && sourceShift.absenceTypeId == null) ||
-        sourceShift.isDelete ||
-        shifts[targetKey]
-      ) {
-        continue;
-      }
-
-      if (sourceShift.assignmentIds.length > 0) {
-        const disqualifyReason = checkQualification(
-          emp.id,
-          sourceShift.assignmentIds,
-        );
-        if (disqualifyReason) {
-          disqualified.push({
-            empName: getEmployeeDisplayName(emp),
-            date: formatDate(targetDate),
-            reason: disqualifyReason,
-          });
-          continue;
-        }
-      }
-
-      shiftUpdates[targetKey] = {
-        label: sourceShift.label,
-        assignmentIds: sourceShift.assignmentIds,
-        absenceTypeId: sourceShift.absenceTypeId,
-        isDraft: true,
-        draftKind: "new",
-        publishedAssignmentDefinitionIds: [],
-        publishedLabel: "",
-        updatedBy: currentUserId,
-      };
-
-      upsertItems.push({
-        employeeId: emp.id,
-        date: targetDateKey,
-        input: buildEntryPayload(sourceShift),
-      });
+  for (const row of outcomes) {
+    if (row.outcome === "imported") {
+      breakdown.imported += 1;
+      continue;
+    }
+    breakdown.totalSkipped += 1;
+    switch (row.reason) {
+      case "target_has_data":
+        breakdown.skippedTargetHasData += 1;
+        break;
+      case "employee_inactive":
+        breakdown.skippedEmployeeInactive += 1;
+        break;
+      case "source_has_no_content":
+        breakdown.skippedSourceEmpty += 1;
+        break;
+      case "disqualified:focus_area":
+        breakdown.disqualifiedFocusArea += 1;
+        break;
+      case "disqualified:role":
+        breakdown.disqualifiedRole += 1;
+        break;
+      case "disqualified:cert":
+        breakdown.disqualifiedCert += 1;
+        break;
+      default:
+        breakdown.skippedOther += 1;
     }
   }
 
-  return { upsertItems, shiftUpdates, disqualified };
+  return breakdown;
+}
+
+/**
+ * Builds the human-facing fragment used in the modal + toast describing why
+ * shifts were skipped. Returns the empty string when nothing was skipped.
+ *
+ * `nameByEmpId` is used to put a real name next to dates in the example list;
+ * unknown employee ids fall back to "an employee".
+ */
+export function formatImportPreviousSkipDescription(
+  outcomes: ImportPreviousScheduleOutcome[],
+  breakdown: ImportPreviousBreakdown,
+  nameByEmpId: Map<string, string>,
+): string {
+  if (breakdown.totalSkipped === 0) return "";
+
+  const reasons: string[] = [];
+  if (breakdown.skippedTargetHasData > 0) {
+    reasons.push(
+      `${breakdown.skippedTargetHasData} target already had data`,
+    );
+  }
+  if (breakdown.skippedEmployeeInactive > 0) {
+    reasons.push(
+      `${breakdown.skippedEmployeeInactive} employee${
+        breakdown.skippedEmployeeInactive === 1 ? "" : "s"
+      } no longer active`,
+    );
+  }
+  const disqTotal =
+    breakdown.disqualifiedFocusArea +
+    breakdown.disqualifiedRole +
+    breakdown.disqualifiedCert;
+  if (disqTotal > 0) {
+    reasons.push(`${disqTotal} qualification change${disqTotal === 1 ? "" : "s"}`);
+  }
+  if (breakdown.skippedSourceEmpty > 0) {
+    reasons.push(`${breakdown.skippedSourceEmpty} source cell${breakdown.skippedSourceEmpty === 1 ? "" : "s"} had no usable content`);
+  }
+  if (breakdown.skippedOther > 0) {
+    reasons.push(`${breakdown.skippedOther} skipped for other reasons`);
+  }
+
+  const skippedRows = outcomes.filter((r) => r.outcome === "skipped");
+  const sample = skippedRows.slice(0, 3).map((r) => {
+    const name = nameByEmpId.get(r.employeeId) ?? "an employee";
+    return `${name} on ${formatShortDate(r.targetDate)}`;
+  });
+  const sampleSuffix =
+    skippedRows.length > sample.length
+      ? ` and ${skippedRows.length - sample.length} more`
+      : "";
+
+  return `${reasons.join(", ")}${sample.length > 0 ? ` (e.g. ${sample.join(", ")}${sampleSuffix})` : ""}`;
+}
+
+function formatShortDate(dateKey: string): string {
+  const [, m, d] = dateKey.split("-");
+  return `${Number(m)}/${Number(d)}`;
 }

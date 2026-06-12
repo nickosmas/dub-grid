@@ -48,71 +48,95 @@ describe("POST /api/schedule/manage", () => {
     });
   });
 
-  it("bulk upserts imported shifts after one permission check", async () => {
+  it("delegates importPreviousSchedule to the SQL RPC and returns per-row outcomes", async () => {
     const orgId = "11111111-1111-4111-8111-111111111111";
     const firstEmployeeId = "22222222-2222-4222-8222-222222222222";
     const secondEmployeeId = "33333333-3333-4333-8333-333333333333";
 
+    userRpc.mockResolvedValueOnce({
+      data: [
+        {
+          emp_id: firstEmployeeId,
+          source_date: "2026-06-14",
+          target_date: "2026-06-28",
+          outcome: "imported",
+          reason: null,
+        },
+        {
+          emp_id: secondEmployeeId,
+          source_date: "2026-06-15",
+          target_date: "2026-06-29",
+          outcome: "skipped",
+          reason: "employee_inactive",
+        },
+      ],
+      error: null,
+    });
+
     const response = await POST(
       makeRequest({
-        action: "upsertShifts",
+        action: "importPreviousSchedule",
         orgId,
-        shifts: [
-          {
-            employeeId: firstEmployeeId,
-            date: "2026-05-10",
-            input: {
-              kind: "worked",
-              segments: [{ shiftId: 10, jobId: 20, position: 0 }],
-              absenceTypeId: null,
-              customStartTime: null,
-              customEndTime: null,
-            },
-          },
-          {
-            employeeId: secondEmployeeId,
-            date: "2026-05-11",
-            input: {
-              kind: "absence",
-              segments: [],
-              absenceTypeId: 30,
-              customStartTime: null,
-              customEndTime: null,
-            },
-          },
-        ],
+        sourceStartDate: "2026-06-14",
+        sourceEndDate: "2026-06-27",
+        targetStartDate: "2026-06-28",
+        targetEndDate: "2026-07-11",
+        dryRun: false,
       }),
     );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       success: true,
-      count: 2,
+      outcomes: [
+        {
+          employeeId: firstEmployeeId,
+          sourceDate: "2026-06-14",
+          targetDate: "2026-06-28",
+          outcome: "imported",
+          reason: null,
+        },
+        {
+          employeeId: secondEmployeeId,
+          sourceDate: "2026-06-15",
+          targetDate: "2026-06-29",
+          outcome: "skipped",
+          reason: "employee_inactive",
+        },
+      ],
     });
     expect(requireOrgPermissions).toHaveBeenCalledTimes(1);
-    expect(userRpc).toHaveBeenCalledTimes(2);
-    expect(userRpc).toHaveBeenNthCalledWith(
-      1,
-      "write_schedule_cell_snapshot",
-      expect.objectContaining({
-        p_org_id: orgId,
-        p_emp_id: firstEmployeeId,
-        p_date: "2026-05-10",
-        p_state_kind: "worked",
-        p_shift_ids: [10],
-        p_job_ids: [20],
+    expect(userRpc).toHaveBeenCalledTimes(1);
+    expect(userRpc).toHaveBeenCalledWith("import_previous_schedule", {
+      p_org_id: orgId,
+      p_source_start: "2026-06-14",
+      p_source_end: "2026-06-27",
+      p_target_start: "2026-06-28",
+      p_target_end: "2026-07-11",
+      p_dry_run: false,
+    });
+  });
+
+  it("passes the dryRun flag through to the RPC for the preview path", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+
+    userRpc.mockResolvedValueOnce({ data: [], error: null });
+
+    await POST(
+      makeRequest({
+        action: "importPreviousSchedule",
+        orgId,
+        sourceStartDate: "2026-06-14",
+        sourceEndDate: "2026-06-27",
+        targetStartDate: "2026-06-28",
+        targetEndDate: "2026-07-11",
+        dryRun: true,
       }),
     );
-    expect(userRpc).toHaveBeenNthCalledWith(
-      2,
-      "write_schedule_cell_snapshot",
-      expect.objectContaining({
-        p_org_id: orgId,
-        p_emp_id: secondEmployeeId,
-        p_date: "2026-05-11",
-        p_state_kind: "absence",
-        p_absence_type_id: 30,
-      }),
+
+    expect(userRpc).toHaveBeenCalledWith(
+      "import_previous_schedule",
+      expect.objectContaining({ p_dry_run: true }),
     );
   });
 

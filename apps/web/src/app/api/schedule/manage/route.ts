@@ -6,6 +6,7 @@ import type {
   DbScheduleNote,
   DbShiftRequest,
 } from "@dubgrid/db-types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import {
   requireOrgPermissions,
@@ -46,12 +47,6 @@ const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 const noteStatusSchema = z.enum(["published", "draft", "draft_deleted"]);
 const seriesFrequencySchema = z.enum(["daily", "weekly", "biweekly"]);
 const dragModeSchema = z.enum(["move", "copy"]);
-const upsertShiftBatchItemSchema = z.object({
-  employeeId: z.string().uuid(),
-  date: z.string().date(),
-  input: scheduleCellStateSchema,
-  expectedVersion: z.number().int().nonnegative().optional(),
-});
 const deleteShiftBatchItemSchema = z.object({
   employeeId: z.string().uuid(),
   date: z.string().date(),
@@ -98,9 +93,13 @@ const requestSchema = z.discriminatedUnion("action", [
     expectedVersion: z.number().int().nonnegative().optional(),
   }),
   z.object({
-    action: z.literal("upsertShifts"),
+    action: z.literal("importPreviousSchedule"),
     orgId: z.string().uuid(),
-    shifts: z.array(upsertShiftBatchItemSchema).min(1).max(50),
+    sourceStartDate: z.string().date(),
+    sourceEndDate: z.string().date(),
+    targetStartDate: z.string().date(),
+    targetEndDate: z.string().date(),
+    dryRun: z.boolean(),
   }),
   z.object({
     action: z.literal("deleteShift"),
@@ -467,12 +466,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const data = parsed.data;
@@ -771,7 +770,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
-      case "upsertShifts": {
+      case "importPreviousSchedule": {
         const auth = await requireOrgPermissions(
           req,
           data.orgId,
@@ -784,16 +783,39 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        for (const shift of data.shifts) {
-          await writeShiftSnapshot(auth.userClient, {
-            orgId: data.orgId,
-            employeeId: shift.employeeId,
-            date: shift.date,
-            state: shift.input,
-            expectedVersion: shift.expectedVersion,
-          });
+        assertDateRange(data.sourceStartDate, data.sourceEndDate);
+        assertDateRange(data.targetStartDate, data.targetEndDate);
+
+        const { data: rows, error } = await auth.userClient.rpc(
+          "import_previous_schedule",
+          {
+            p_org_id: data.orgId,
+            p_source_start: data.sourceStartDate,
+            p_source_end: data.sourceEndDate,
+            p_target_start: data.targetStartDate,
+            p_target_end: data.targetEndDate,
+            p_dry_run: data.dryRun,
+          },
+        );
+        if (error) {
+          throw error;
         }
-        return NextResponse.json({ success: true, count: data.shifts.length });
+
+        const outcomes = ((rows ?? []) as Array<{
+          emp_id: string;
+          source_date: string;
+          target_date: string;
+          outcome: string;
+          reason: string | null;
+        }>).map((row) => ({
+          employeeId: row.emp_id,
+          sourceDate: row.source_date,
+          targetDate: row.target_date,
+          outcome: row.outcome,
+          reason: row.reason,
+        }));
+
+        return NextResponse.json({ success: true, outcomes });
       }
 
       case "deleteShift": {
