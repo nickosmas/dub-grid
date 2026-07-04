@@ -197,9 +197,11 @@ export default function CookieConsent() {
     }
   }
 
-  // Save only does something when the draft differs from the saved choice, or
-  // when there's no saved choice yet (the first decision must be recordable).
-  const hasChanges = baseline === null || analyticsDraft !== baseline;
+  // Save only when the draft actually differs from what would be persisted
+  // without any interaction. With no saved choice yet, the implicit default is
+  // "essential only" (false) — the same thing handleClose / "Essential only"
+  // records — so an unchanged draft has nothing to save.
+  const hasChanges = analyticsDraft !== (baseline ?? false);
 
   if (!mounted || !dialogOpen) return null;
 
