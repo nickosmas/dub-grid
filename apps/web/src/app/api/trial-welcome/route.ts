@@ -12,6 +12,7 @@ import { TrialWelcomeEmail } from "@/emails/TrialWelcomeEmail";
 import { sendResendEmail } from "@/lib/resend";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
   const { claims } = auth;
 
   if (claims.org_role !== "super_admin" || !claims.org_id) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 });
+    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   const service = getServiceClient();

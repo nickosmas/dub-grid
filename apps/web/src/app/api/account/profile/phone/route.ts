@@ -11,6 +11,7 @@ import { optionalUsPhoneSchema } from "@dubgrid/contracts";
 import { z } from "zod";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { extractRawErrorMessage } from "@/lib/client-facing";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const phoneUpdateSchema = z.object({
   orgId: z.string().uuid(),
@@ -31,7 +32,7 @@ export async function PATCH(req: NextRequest) {
       body = await req.json();
     } catch {
       return NextResponse.json(
-        { error: "Invalid request body" },
+        { error: API_ERRORS.INVALID_BODY },
         { status: 400 },
       );
     }

@@ -7,6 +7,7 @@ import {
 } from "@/lib/analytics";
 import * as Sentry from "@/lib/sentry";
 import logger from "@/lib/logger";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId, weeks } = parsed.data;

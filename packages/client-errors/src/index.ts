@@ -28,6 +28,19 @@ export const NETWORK_ERROR_MESSAGE =
 /** Default fallback when an error can't be translated and isn't safe to show. */
 export const DEFAULT_ERROR_FALLBACK = "Something went wrong. Please try again.";
 
+/**
+ * Canonical error messages returned by web API route handlers. Use these
+ * instead of inlined HTTP-status-style strings like "Unauthorized" or
+ * "Invalid input" — the wording here matches the warm/non-blaming tone used
+ * across the rest of the app and is consistent across every route.
+ */
+export const API_ERRORS = {
+  INVALID_INPUT: "Some of the details look off. Please review and try again.",
+  INVALID_BODY: "We couldn't read that request. Please try again.",
+  UNAUTHORIZED: "Please sign in to continue.",
+  FORBIDDEN: "You don't have permission to do that.",
+} as const;
+
 // ── Pattern tables ───────────────────────────────────────────────────────────
 
 /**

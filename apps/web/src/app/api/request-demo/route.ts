@@ -21,6 +21,7 @@ import {
   normalizeLineText,
   normalizeMultilineText,
 } from "@/lib/form-validation";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   contactName: z.string().trim().min(1, "Name is required").max(100),
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { success: false, error: "Invalid request body" },
+      { success: false, error: API_ERRORS.INVALID_BODY },
       { status: 400 },
     );
   }
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { success: false, error: "Invalid input" },
+      { success: false, error: API_ERRORS.INVALID_INPUT },
       { status: 400 },
     );
   }

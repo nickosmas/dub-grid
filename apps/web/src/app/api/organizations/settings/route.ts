@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -112,12 +113,12 @@ export async function PUT(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   // bodyOrgId is what the client sent. The effective orgId we ultimately

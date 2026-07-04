@@ -8,6 +8,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { extractRawErrorMessage } from "@/lib/client-facing";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export async function PATCH(
   req: NextRequest,
@@ -35,12 +36,12 @@ export async function PATCH(
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = resolveProfileChangeRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { id } = await context.params;

@@ -4,6 +4,7 @@ import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -59,11 +60,11 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
   const { email, orgId } = parsed.data;
   const normalized = email.toLowerCase();
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
   const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
   if (!hasPermission) {
     return NextResponse.json(
-      { error: "Insufficient permissions" },
+      { error: API_ERRORS.FORBIDDEN },
       { status: 403 },
     );
   }

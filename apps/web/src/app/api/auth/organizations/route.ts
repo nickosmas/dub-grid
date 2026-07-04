@@ -5,6 +5,7 @@ import {
   requireAuthenticatedSession,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const switchOrganizationSchema = z.object({
   targetOrgId: z.string().uuid(),
@@ -54,12 +55,12 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = switchOrganizationSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const supabase = createRequestSupabaseClient(req);

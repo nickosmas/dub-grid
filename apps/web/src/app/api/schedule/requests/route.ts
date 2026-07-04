@@ -18,6 +18,7 @@ import type {
   ShiftRequestStatus,
   ShiftRequestType,
 } from "@/types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -193,7 +194,7 @@ async function requireEmployeeAction(
   if (!canActForOthers && actorEmployeeId !== employeeId) {
     return {
       response: NextResponse.json(
-        { error: "Insufficient permissions" },
+        { error: API_ERRORS.FORBIDDEN },
         { status: 403 },
       ),
     } as const;
@@ -210,12 +211,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const data = parsed.data;

@@ -12,6 +12,7 @@ import {
   getSandboxFromCookie,
   SANDBOX_COOKIE_NAME,
 } from "@/lib/sandbox-cookie";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 type PermissionContext = ReturnType<typeof buildPermissionContext>;
 
@@ -49,7 +50,7 @@ export interface AuthorizedOrgRequest {
 
 function forbiddenResponse() {
   return NextResponse.json(
-    { error: "Insufficient permissions" },
+    { error: API_ERRORS.FORBIDDEN },
     { status: 403 },
   );
 }

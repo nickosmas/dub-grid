@@ -4,6 +4,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { loadOrganizationBillingSummary } from "@/features/billing/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const auth = await requireOrgPermissions(

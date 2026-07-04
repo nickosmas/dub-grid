@@ -10,6 +10,7 @@ import { InviteEmail } from "@/emails/InviteEmail";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
   const isSuperAdmin = claims.org_role === "super_admin";
   if (!isGridmaster && !isSuperAdmin) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: API_ERRORS.FORBIDDEN },
       { status: 403 },
     );
   }
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { success: false, error: "Invalid request body" },
+      { success: false, error: API_ERRORS.INVALID_BODY },
       { status: 400 },
     );
   }
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { success: false, error: "Invalid input" },
+      { success: false, error: API_ERRORS.INVALID_INPUT },
       { status: 400 },
     );
   }

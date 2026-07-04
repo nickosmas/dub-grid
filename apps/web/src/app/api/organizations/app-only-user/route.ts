@@ -10,6 +10,7 @@ import {
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const patchSchema = z.object({
   orgId: z.string().uuid(),
@@ -34,7 +35,7 @@ export async function PATCH(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
+      { error: API_ERRORS.INVALID_BODY },
       { status: 400 },
     );
   }
@@ -65,7 +66,7 @@ export async function PATCH(req: NextRequest) {
     );
     if (!hasPermission) {
       return NextResponse.json(
-        { error: "Insufficient permissions" },
+        { error: API_ERRORS.FORBIDDEN },
         { status: 403 },
       );
     }

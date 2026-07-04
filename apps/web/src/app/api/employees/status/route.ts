@@ -14,6 +14,7 @@ import {
   SELF_ACTION_FORBIDDEN_CODE,
   SELF_ACTION_FORBIDDEN_MESSAGE,
 } from "@dubgrid/domain";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -74,12 +75,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { empId, action, expectedVersion, note } = parsed.data;
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
       (isAdmin && adminPerms?.canManageEmployees === true);
 
     if (!hasPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
     }
 
     const { data: currentRow, error: currentError } = await serviceClient

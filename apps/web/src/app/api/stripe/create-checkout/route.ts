@@ -11,6 +11,7 @@ import {
 } from "@/features/billing/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
     const { orgId } = parsed.data;
     const returnUrl = resolveBillingReturnUrl(parsed.data.returnUrl, [

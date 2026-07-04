@@ -11,6 +11,7 @@ import { ImpersonationNoticeEmail } from "@/emails/ImpersonationNoticeEmail";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   targetEmail: z.string().email(),
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
   // ── Authorization — only gridmaster can trigger impersonation notifications ──
   if (claims.platform_role !== "gridmaster") {
     return NextResponse.json(
-      { success: false, error: "Unauthorized" },
+      { success: false, error: API_ERRORS.FORBIDDEN },
       { status: 403 },
     );
   }
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { success: false, error: "Invalid request body" },
+      { success: false, error: API_ERRORS.INVALID_BODY },
       { status: 400 },
     );
   }
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { success: false, error: "Invalid input" },
+      { success: false, error: API_ERRORS.INVALID_INPUT },
       { status: 400 },
     );
   }
