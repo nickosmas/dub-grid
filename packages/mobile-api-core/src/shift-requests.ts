@@ -106,10 +106,14 @@ type ShiftRequestNotificationEvent =
       adminNote?: string;
     };
 
+// The dispatcher may return a structured result (e.g. { success, error }) or
+// void — this package awaits but doesn't inspect the result, so the contract
+// is widened to `unknown` to accept either shape. Callers that DO want to
+// inspect the result can do so at their own type boundary.
 type DispatchShiftRequestNotificationEvent = (
   actorUserId: string,
   event: ShiftRequestNotificationEvent,
-) => Promise<void>;
+) => Promise<unknown>;
 
 type MobileShiftRequestsResponse = {
   requests: MobileShiftRequest[];
