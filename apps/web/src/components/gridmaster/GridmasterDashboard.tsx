@@ -150,7 +150,7 @@ export default function GridmasterDashboard({
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           Dashboard
         </h2>
         <button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>

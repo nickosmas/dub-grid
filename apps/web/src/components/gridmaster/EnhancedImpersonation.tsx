@@ -158,7 +158,7 @@ export default function EnhancedImpersonation({
           justification: trimmedJustification,
         }),
       }).catch(() => {});
-      toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name} — redirecting…`);
+      toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name}. Redirecting.`);
       window.location.replace("/schedule");
     } catch (err: unknown) {
       Sentry.captureException(err, { extra: { context: "impersonation-start" } });
@@ -203,7 +203,7 @@ export default function EnhancedImpersonation({
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         User Impersonation
       </h2>
       <p style={{ margin: "0 0 20px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
@@ -318,8 +318,10 @@ export default function EnhancedImpersonation({
           <div style={sectionHeaderStyle}>Confirm Impersonation</div>
           <div style={sectionBodyStyle}>
             {usersQuery.isLoading ? (
-              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
-                Loading user…
+              <div aria-hidden style={{ padding: "10px 14px", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)", display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="dg-skeleton" style={{ width: 180, height: 14, borderRadius: 4 }} />
+                <div className="dg-skeleton" style={{ width: 220, height: 10, borderRadius: 4 }} />
+                <div className="dg-skeleton" style={{ width: 120, height: 10, borderRadius: 4 }} />
               </div>
             ) : usersQuery.error instanceof Error ? (
               <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>

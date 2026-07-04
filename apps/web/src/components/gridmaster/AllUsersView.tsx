@@ -253,7 +253,7 @@ export default function AllUsersView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         All Users
       </h2>
 
@@ -562,7 +562,30 @@ export default function AllUsersView({
                       Organization Memberships
                     </h4>
                     {membershipsLoading ? (
-                      <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>Loading…</div>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }} aria-hidden>
+                        <thead>
+                          <tr>
+                            <th style={thStyle}>Organization</th>
+                            <th style={thStyle}>Role</th>
+                            <th style={thStyle}>Date Joined</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <tr key={i}>
+                              <td style={tdStyle}>
+                                <div className="dg-skeleton" style={{ width: "70%", height: 12, borderRadius: 4 }} />
+                              </td>
+                              <td style={tdStyle}>
+                                <div className="dg-skeleton" style={{ width: 64, height: 18, borderRadius: 999 }} />
+                              </td>
+                              <td style={tdStyle}>
+                                <div className="dg-skeleton" style={{ width: 96, height: 12, borderRadius: 4 }} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     ) : membershipsQuery.error instanceof Error ? (
                       <div style={{ padding: 16, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
                         {formatClientErrorMessage(membershipsQuery.error, "Failed to load memberships")}

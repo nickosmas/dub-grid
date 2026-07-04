@@ -14,6 +14,8 @@ import {
   type BillingConfirmAction,
 } from "@/components/gridmaster/BillingActionDialogs";
 import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
 import {
   formatBillingStatusLabel,
@@ -79,6 +81,34 @@ function statusLabelFor(org: GridmasterBillingOrgSummary) {
 
 function statusToneFor(org: GridmasterBillingOrgSummary) {
   return isTrialPending(org) ? "var(--color-text-muted)" : statusTone(org.status);
+}
+
+function BillingOversightSkeleton() {
+  return (
+    <div aria-hidden>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 160px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="dg-skeleton" style={{ width: 48, height: 22, borderRadius: 4 }} />
+            <div className="dg-skeleton" style={{ width: 96, height: 10, borderRadius: 4 }} />
+          </div>
+        ))}
+      </div>
+      <div style={sectionStyle}>
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              <div className="dg-skeleton" style={{ flex: "1 1 160px", height: 12, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 80, height: 18, borderRadius: 999 }} />
+              <div className="dg-skeleton" style={{ width: 90, height: 12, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 60, height: 12, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 120, height: 28, borderRadius: 6 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BillingRowActions({
@@ -325,7 +355,7 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
     <>
       <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <h2 style={{ margin: 0, fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
             Billing Oversight
           </h2>
           <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", fontWeight: 600 }}>
@@ -348,10 +378,10 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
         </div>
       )}
 
+      <ProgressBar loading={billingQuery.isLoading || !billing} />
+
       {billingQuery.isLoading || !billing ? (
-        <div style={sectionStyle}>
-          <div style={{ padding: 24, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>Loading billing oversight...</div>
-        </div>
+        <BillingOversightSkeleton />
       ) : (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
@@ -363,6 +393,18 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
           </div>
 
           <div style={sectionStyle}>
+            {billing.organizations.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  size="compact"
+                  icon={
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                  }
+                  title="No organizations to bill"
+                  description="Billing rows show up once organizations sign up or start a trial."
+                />
+              </div>
+            ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
                 <thead>
@@ -418,6 +460,7 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         </>
       )}

@@ -12,6 +12,7 @@ import {
   formatClientErrorMessage,
   formatOrganizationRoleLabel,
 } from "@/lib/client-facing";
+import { EmptyState } from "@/components/EmptyState";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { GridmasterUserSession, Organization } from "@/types";
@@ -269,6 +270,19 @@ function SessionsTable({
   emptyMessage: string;
   onOpen: (session: GridmasterUserSession) => void;
 }) {
+  if (!isLoading && sessions.length === 0) {
+    return (
+      <div style={{ padding: 16 }}>
+        <EmptyState
+          size="compact"
+          icon={
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          }
+          title={emptyMessage}
+        />
+      </div>
+    );
+  }
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -288,13 +302,6 @@ function SessionsTable({
             <tr>
               <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}>
                 Loading sessions...
-              </td>
-            </tr>
-          )}
-          {!isLoading && sessions.length === 0 && (
-            <tr>
-              <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}>
-                {emptyMessage}
               </td>
             </tr>
           )}
@@ -588,7 +595,7 @@ export default function GridmasterSecurityView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         Security Oversight
       </h2>
 
@@ -609,27 +616,40 @@ export default function GridmasterSecurityView({
 
           <div style={{ ...sectionStyle, marginBottom: 24 }}>
             <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-label)", fontWeight: 800, color: "var(--color-text-primary)" }}>Impersonation Governance</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr><th style={thStyle}>Status</th><th style={thStyle}>Target</th><th style={thStyle}>Justification</th><th style={thStyle}>Started</th><th style={thStyle}>Ended</th></tr>
-                </thead>
-                <tbody>
-                  {security.impersonation.recent.slice(0, 8).map((entry) => {
-                    const active = !entry.endedAt && new Date(entry.expiresAt).getTime() > Date.now();
-                    return (
-                      <tr key={entry.sessionId}>
-                        <td style={{ ...tdStyle, fontWeight: 700, color: active ? "var(--color-warning)" : "var(--color-text-muted)" }}>{active ? "Active" : entry.endedAt ? "Ended" : "Expired"}</td>
-                        <td style={tdStyle}>{entry.targetUserId.slice(0, 8)}...</td>
-                        <td style={{ ...tdStyle, maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.justification || "—"}</td>
-                        <td style={tdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
-                        <td style={tdStyle}>{entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {security.impersonation.recent.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  size="compact"
+                  icon={
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  }
+                  title="No impersonation sessions"
+                  description="Recent gridmaster impersonations appear here."
+                />
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr><th style={thStyle}>Status</th><th style={thStyle}>Target</th><th style={thStyle}>Justification</th><th style={thStyle}>Started</th><th style={thStyle}>Ended</th></tr>
+                  </thead>
+                  <tbody>
+                    {security.impersonation.recent.slice(0, 8).map((entry) => {
+                      const active = !entry.endedAt && new Date(entry.expiresAt).getTime() > Date.now();
+                      return (
+                        <tr key={entry.sessionId}>
+                          <td style={{ ...tdStyle, fontWeight: 700, color: active ? "var(--color-warning)" : "var(--color-text-muted)" }}>{active ? "Active" : entry.endedAt ? "Ended" : "Expired"}</td>
+                          <td style={tdStyle}>{entry.targetUserId.slice(0, 8)}...</td>
+                          <td style={{ ...tdStyle, maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.justification || "—"}</td>
+                          <td style={tdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
+                          <td style={tdStyle}>{entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

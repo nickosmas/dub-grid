@@ -30,6 +30,20 @@ import {
 import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
+import {
+  DashboardIcon,
+  PeopleIcon,
+  BillingIcon,
+  ComplianceIcon,
+  AuditLogIcon,
+  NewOrgIcon,
+  ShieldIcon,
+  UserGroupIcon,
+  BellIcon,
+  ImpersonateIcon,
+  HistoryIcon,
+  type NavIconProps,
+} from "@/components/icons/NavIcons";
 
 import AllUsersView from "@/components/gridmaster/AllUsersView";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
@@ -40,7 +54,8 @@ import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
 import NotificationBell from "@/components/NotificationBell";
-import { InboxView as NotificationsInboxView } from "@/app/notifications/NotificationsInboxPage";
+import ProgressBar from "@/components/ProgressBar";
+import { InboxView as AlertsInboxView } from "@/app/alerts/AlertsInboxPage";
 import {
   fetchGridmasterDashboardData,
   type GridmasterDashboardData,
@@ -68,58 +83,6 @@ type GridmasterView =
 
 const SIDEBAR_MENU_BTN_CLASS = "h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150";
 const SIDEBAR_GROUP_LABEL_CLASS = "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0";
-
-// ── Icons (inline SVGs) ──────────────────────────────────────────────────────
-
-const DashboardIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-    <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-  </svg>
-);
-
-
-const AuditIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-
-const ImpersonateIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
-const PlusIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
-
-const UsersIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const HistoryIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-
-const BellIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-  </svg>
-);
 
 // ── Organization search combobox (header) ────────────────────────────────────
 
@@ -279,7 +242,7 @@ function OrgSearchCombobox({
 
 export default function GridmasterPortal() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
   const { user: authUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
   const [signingOut, setSigningOut] = useState(false);
@@ -311,10 +274,12 @@ export default function GridmasterPortal() {
   const displayName = userName || "Gridmaster";
   const initials = getAvatarInitials(userName, "GM");
 
-  const handleSignOut = useCallback(async () => {
+  const handleSignOut = useCallback(() => {
     setSigningOut(true);
-    await signOutLocal("/login");
-  }, [signOutLocal]);
+    // /goodbye handles the actual teardown; navigation is synchronous so the
+    // button stays in its loading state until the page navigates away.
+    signOut();
+  }, [signOut]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedOrgInitialTab, setSelectedOrgInitialTab] = useState<OrganizationDetailTab | undefined>();
@@ -361,34 +326,43 @@ export default function GridmasterPortal() {
 
   // ── Nav item config (must be before early returns to satisfy Rules of Hooks) ──
 
-  const navGroups = useMemo(() => [
+  const navGroups = useMemo<Array<{
+    id: string;
+    label: string;
+    items: Array<{
+      key: GridmasterView;
+      label: string;
+      Icon: React.ComponentType<NavIconProps>;
+      onClick: () => void;
+    }>;
+  }>>(() => [
     {
       id: "navigation",
       label: "Navigation",
       items: [
-        { key: "dashboard" as GridmasterView, label: "Dashboard", icon: DashboardIcon, onClick: () => { setView("dashboard"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "all-users" as GridmasterView, label: "All Users", icon: UsersIcon, onClick: () => { setView("all-users"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "billing" as GridmasterView, label: "Billing", icon: AuditIcon, onClick: () => { setView("billing"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "compliance" as GridmasterView, label: "Compliance", icon: AuditIcon, onClick: () => { setView("compliance"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "audit-log" as GridmasterView, label: "Audit Log", icon: AuditIcon, onClick: () => { setView("audit-log"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "dashboard", label: "Dashboard", Icon: DashboardIcon, onClick: () => { setView("dashboard"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "all-users", label: "All Users", Icon: PeopleIcon, onClick: () => { setView("all-users"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "billing", label: "Billing", Icon: BillingIcon, onClick: () => { setView("billing"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "compliance", label: "Compliance", Icon: ComplianceIcon, onClick: () => { setView("compliance"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "audit-log", label: "Audit Log", Icon: AuditLogIcon, onClick: () => { setView("audit-log"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
     },
     {
       id: "actions",
       label: "Actions",
       items: [
-        { key: "create-organization" as GridmasterView, label: "New Organization", icon: PlusIcon, onClick: () => { setView("create-organization"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "security" as GridmasterView, label: "Security", icon: UsersIcon, onClick: () => { setView("security"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "gridmaster-accounts" as GridmasterView, label: "Gridmaster Accounts", icon: UsersIcon, onClick: () => { setView("gridmaster-accounts"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "create-organization", label: "New Organization", Icon: NewOrgIcon, onClick: () => { setView("create-organization"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "security", label: "Security", Icon: ShieldIcon, onClick: () => { setView("security"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "gridmaster-accounts", label: "Gridmaster Accounts", Icon: UserGroupIcon, onClick: () => { setView("gridmaster-accounts"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
     },
     {
       id: "tools",
       label: "Tools",
       items: [
-        { key: "notifications" as GridmasterView, label: "Notifications", icon: BellIcon, onClick: () => { setView("notifications"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "impersonation" as GridmasterView, label: "Impersonation", icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setSelectedOrgInitialTab(undefined); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
-        { key: "impersonation-history" as GridmasterView, label: "History", icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "notifications", label: "Alerts", Icon: BellIcon, onClick: () => { setView("notifications"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
+        { key: "impersonation", label: "Impersonation", Icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setSelectedOrgInitialTab(undefined); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
+        { key: "impersonation-history", label: "History", Icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
       ],
     },
   ], []);
@@ -405,8 +379,8 @@ export default function GridmasterPortal() {
 
   if (permLoading || signingOut || (isGridmaster && dashboardQuery.isLoading)) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center" }}>
-        <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>Loading…</span>
+      <div style={{ minHeight: "100vh", background: "var(--color-bg)" }}>
+        <ProgressBar loading />
       </div>
     );
   }
@@ -618,7 +592,7 @@ export default function GridmasterPortal() {
             { key: "gridmaster-accounts", label: "GM Accounts" },
             { key: "audit-log", label: "Audit" },
             { key: "create-organization", label: "New Org" },
-            { key: "notifications", label: "Notifications" },
+            { key: "notifications", label: "Alerts" },
             { key: "impersonation", label: "Impersonate" },
             { key: "impersonation-history", label: "History" },
           ] as { key: GridmasterView; label: string }[]).map((item) => (
@@ -655,7 +629,7 @@ export default function GridmasterPortal() {
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
                             <span className={view === item.key ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                              {item.icon}
+                              <item.Icon active={view === item.key} />
                             </span>
                             <span className="font-semibold">{item.label}</span>
                           </SidebarMenuButton>
@@ -686,7 +660,7 @@ export default function GridmasterPortal() {
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
                             <span className={view === item.key ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                              {item.icon}
+                              <item.Icon active={view === item.key} />
                             </span>
                             <span className="font-semibold">{item.label}</span>
                           </SidebarMenuButton>
@@ -823,7 +797,7 @@ export default function GridmasterPortal() {
           )}
 
           {view === "notifications" && (
-            <NotificationsInboxView />
+            <AlertsInboxView />
           )}
         </main>
       </SidebarProvider>
@@ -856,12 +830,12 @@ function GridmasterSidebarCollapseButton() {
       className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
     >
       <span className="flex shrink-0 items-center justify-center">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
           <polyline points="13 17 18 12 13 7" />
           <polyline points="6 17 11 12 6 7" />
         </svg>
       </span>
-      <span className="font-semibold ml-2">Collapse Menu</span>
+      <span className="font-semibold">Collapse Menu</span>
     </SidebarMenuButton>
   );
 }

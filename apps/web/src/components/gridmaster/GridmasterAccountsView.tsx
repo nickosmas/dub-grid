@@ -235,7 +235,7 @@ export default function GridmasterAccountsView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         Gridmaster Accounts
       </h2>
 

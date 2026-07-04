@@ -695,7 +695,7 @@ export default function OrganizationDetail({
     <div>
       {/* Organization header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
           {organization.name}
         </h2>
         {organization.slug && (
@@ -1237,7 +1237,20 @@ function OverviewTab({
               <InfoRow label="Address" value={organization.address} />
               <InfoRow label="Phone" value={organization.phone} />
               <InfoRow label="Timezone" value={organization.timezone ? `${formatTimezoneLabel(organization.timezone)} · ${organization.timezone}` : null} />
-              <InfoRow label="Employee count" value={employeeCountLoading ? "Loading…" : employeeCount.toString()} />
+              <InfoRow
+                label="Employee count"
+                value={
+                  employeeCountLoading ? (
+                    <span
+                      aria-hidden
+                      className="dg-skeleton"
+                      style={{ display: "inline-block", width: 36, height: 12, borderRadius: 4 }}
+                    />
+                  ) : (
+                    employeeCount.toString()
+                  )
+                }
+              />
             </>
           )}
         </div>

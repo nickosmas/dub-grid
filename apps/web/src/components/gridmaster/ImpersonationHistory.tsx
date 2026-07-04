@@ -96,7 +96,7 @@ export default function ImpersonationHistory() {
 
   return (
     <>
-      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
         Impersonation History
       </h2>
       <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
