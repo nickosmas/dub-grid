@@ -545,7 +545,7 @@ function EligibilityModeToggle({
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ ...labelStyle, marginBottom: 0 }}>MATCHING RULE</div>
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.35 }}>
-          Choose whether staff must match the role gate and certification gate, or just one gate.
+          Decide whether staff must match both lists, or just one.
         </div>
       </div>
       <div
@@ -1935,44 +1935,47 @@ function JobRow({
                             </label>
 
                             {timeOverride ? (
-                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                                <TimeInput12h
-                                  value={timeOverride.startTime}
-                                  onChange={(value) =>
-                                    setForm((prev) => ({
-                                      ...prev,
-                                      shiftTimeOverrides: {
-                                        ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
-                                        [String(shift.id)]: {
-                                          startTime: value,
-                                          endTime:
-                                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[String(shift.id)]?.endTime ?? null,
+                              <div style={{ display: "flex", gap: 14, alignItems: "end", flexWrap: "wrap" }}>
+                                <div>
+                                  <label style={labelStyle}>START</label>
+                                  <TimeInput12h
+                                    value={timeOverride.startTime}
+                                    onChange={(value) =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        shiftTimeOverrides: {
+                                          ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                                          [String(shift.id)]: {
+                                            startTime: value,
+                                            endTime:
+                                              normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[String(shift.id)]?.endTime ?? null,
+                                          },
                                         },
-                                      },
-                                    }))
-                                  }
-                                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
-                                />
-                                <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-                                  to
-                                </span>
-                                <TimeInput12h
-                                  value={timeOverride.endTime}
-                                  onChange={(value) =>
-                                    setForm((prev) => ({
-                                      ...prev,
-                                      shiftTimeOverrides: {
-                                        ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
-                                        [String(shift.id)]: {
-                                          startTime:
-                                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[String(shift.id)]?.startTime ?? null,
-                                          endTime: value,
+                                      }))
+                                    }
+                                    disabled={!canManageScheduleDefinitions || isRegularStaffJob}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={labelStyle}>END</label>
+                                  <TimeInput12h
+                                    value={timeOverride.endTime}
+                                    onChange={(value) =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        shiftTimeOverrides: {
+                                          ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                                          [String(shift.id)]: {
+                                            startTime:
+                                              normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[String(shift.id)]?.startTime ?? null,
+                                            endTime: value,
+                                          },
                                         },
-                                      },
-                                    }))
-                                  }
-                                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
-                                />
+                                      }))
+                                    }
+                                    disabled={!canManageScheduleDefinitions || isRegularStaffJob}
+                                  />
+                                </div>
                               </div>
                             ) : (
                               <div
@@ -2057,13 +2060,14 @@ function JobRow({
                     fontSize: "var(--dg-fs-caption)",
                     color: "var(--color-text-muted)",
                     lineHeight: 1.45,
+                    minHeight: "calc(var(--dg-fs-caption) * 1.45 * 2)",
                   }}
                 >
                   {eligibilityModeDimmed
-                    ? "The rule above becomes active when both roles and certifications are selected."
+                    ? "Activates once both lists have selections."
                     : form.eligibilityMode === "and"
-                      ? `Staff must match one selected ${roleLabel.toLowerCase()} and one selected ${certificationLabel.toLowerCase()}.`
-                      : `Staff can qualify through either a selected ${roleLabel.toLowerCase()} or a selected ${certificationLabel.toLowerCase()}.`}
+                      ? "Staff need a match in both lists."
+                      : "Staff need a match in at least one list."}
                 </div>
               </div>
 
