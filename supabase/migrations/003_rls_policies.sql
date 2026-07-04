@@ -667,20 +667,32 @@ CREATE POLICY "invitations_revoke"
 -- 10. ROLE CHANGE LOG (immutable — no UPDATE/DELETE policies)
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- Gridmaster may insert rows with NULL org_id (platform-level events like
+-- force_logout). super_admin may only insert rows scoped to their current
+-- session's org. Defense in depth: SECURITY DEFINER RPCs already enforce
+-- caller-target org match, but the policy guards any direct INSERT path too.
 CREATE POLICY "audit_insert"
   ON public.role_change_log FOR INSERT TO authenticated
   WITH CHECK (
-    public.caller_org_role() = 'super_admin'
-    OR public.is_gridmaster()
+    public.is_gridmaster()
+    OR (
+      public.caller_org_role() = 'super_admin'
+      AND org_id IS NOT NULL
+      AND org_id = public.caller_org_id()
+    )
   );
 
+-- Gridmasters see all rows (including NULL-org platform events).
+-- super_admins and admins of an org see only that org's entries, scoped to
+-- their CURRENT session's org (not the target's stale profiles.org_id).
 CREATE POLICY "audit_select"
   ON public.role_change_log FOR SELECT TO authenticated
   USING (
     public.is_gridmaster()
-    OR EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = target_user_id AND org_id = public.caller_org_id()
+    OR (
+      org_id IS NOT NULL
+      AND org_id = public.caller_org_id()
+      AND public.caller_org_role() IN ('super_admin', 'admin')
     )
   );
 
