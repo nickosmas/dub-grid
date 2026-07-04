@@ -6,6 +6,7 @@ import type {
   DbInvitation,
   DbScheduleCell,
 } from "@dubgrid/db-types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { Employee } from "@/types";
 import {
@@ -147,13 +148,21 @@ function isEmployeeDetailViewer(permissions: {
   );
 }
 
-function maskEmployeeForViewer(employee: Employee): Employee {
+function maskEmployeeForViewer(
+  employee: Employee,
+  callerUserId: string,
+): Employee {
+  // Preserve userId on the caller's own row so the dashboard / schedule can
+  // still locate it (the caller already knows their own auth id; suppressing
+  // it here just breaks self-lookup). Other rows get the link nulled so
+  // view-only callers can't map an employee → an auth account.
+  const isSelf = employee.userId === callerUserId;
   return {
     ...employee,
     contactNotes: "",
     statusNote: "",
     deptAdminIds: [],
-    userId: null,
+    userId: isSelf ? employee.userId : null,
   };
 }
 
@@ -272,7 +281,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body" },
+      { error: API_ERRORS.INVALID_BODY },
       { status: 400 },
     );
   }
@@ -347,7 +356,9 @@ export async function POST(req: NextRequest) {
 
         const mapped = ((rows ?? []) as DbEmployee[]).map(rowToEmployee);
         return NextResponse.json({
-          employees: isManager ? mapped : mapped.map(maskEmployeeForViewer),
+          employees: isManager
+            ? mapped
+            : mapped.map((e) => maskEmployeeForViewer(e, auth.actor.id)),
         });
       }
 
@@ -553,7 +564,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ employee: null });
           }
           return NextResponse.json({
-            employee: maskEmployeeForViewer(employee),
+            employee: maskEmployeeForViewer(employee, auth.actor.id),
           });
         }
 
@@ -573,7 +584,7 @@ export async function POST(req: NextRequest) {
           auth.permissions.canManageEmployees;
         if (!canReadOtherEmployees && auth.actor.id !== data.userId) {
           return NextResponse.json(
-            { error: "Insufficient permissions" },
+            { error: API_ERRORS.FORBIDDEN },
             { status: 403 },
           );
         }

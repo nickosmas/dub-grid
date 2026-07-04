@@ -83,6 +83,7 @@ export type MobileOrgScheduleContext = MobileServiceContext & {
 
 export type MobilePeopleContext = MobileServiceContext & {
   permissions: Pick<MobilePermissionsLike, "canManageEmployees" | "canViewStaff">;
+  user: Pick<MobileUserLike, "id">;
 };
 
 export type MobileNotificationsContext = MobileNotificationContext;
@@ -393,6 +394,12 @@ export async function loadMobilePeoplePayload(
         return mobilePerson;
       }
 
+      // Preserve userId on the caller's own row so the mobile app can find
+      // its own employee record (for /me/schedule lookup, "You" badge, etc.).
+      // The caller already knows their own auth id; nulling it here just
+      // breaks self-lookup. Other rows still get the link stripped so
+      // view-only callers can't map employee → auth account.
+      const isSelf = mobilePerson.userId === auth.user.id;
       return {
         ...mobilePerson,
         contactNotes: "",
@@ -403,7 +410,7 @@ export async function loadMobilePeoplePayload(
         pendingInvitation: null,
         roleIds: [],
         statusNote: "",
-        userId: null,
+        userId: isSelf ? mobilePerson.userId : null,
       };
     }),
   };
