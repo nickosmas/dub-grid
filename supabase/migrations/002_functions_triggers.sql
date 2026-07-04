@@ -889,6 +889,11 @@ DECLARE
   v_billing_priority TEXT := 'normal';
   v_billing_title    TEXT;
   v_billing_message  TEXT;
+  -- Per-transition metadata for the super_admin row. Defaults to empty so the
+  -- inbox modal renders just the title + message (no noisy DETAILS block with
+  -- the org's own id/name). Set an actionUrl + actionLabel where there is a
+  -- concrete next step the super_admin should take.
+  v_billing_metadata JSONB := '{}'::jsonb;
 BEGIN
   -- Surface important org lifecycle events to every gridmaster as an in-app
   -- notification, written with org_id = NULL so it shows regardless of the
@@ -907,9 +912,13 @@ BEGIN
     v_title   := 'Trial started';
     v_message := v_name || ' started its trial.';
     -- Super_admins see a billing-flavored welcome alert in their org inbox.
-    v_billing_type    := 'billing_subscription_changed';
-    v_billing_title   := 'Trial started';
-    v_billing_message := 'Your 14-day trial is now active. Add a payment method before it ends to keep your team running.';
+    v_billing_type     := 'billing_subscription_changed';
+    v_billing_title    := 'Trial started';
+    v_billing_message  := 'Your 14-day free trial is now active. Start a subscription before it ends to keep your team running.';
+    v_billing_metadata := jsonb_build_object(
+      'actionUrl',   '/settings?section=org-billing',
+      'actionLabel', 'Start subscription'
+    );
   ELSIF NEW.archived_at IS NOT NULL AND OLD.archived_at IS NULL THEN
     v_type     := 'org_archived';
     v_priority := 'high';
@@ -999,12 +1008,7 @@ BEGIN
       )
       SELECT
         cm.user_id, NEW.id, v_billing_type, 'in_app', 'billing', v_billing_priority,
-        v_billing_title, v_billing_message,
-        jsonb_build_object(
-          'orgId', NEW.id,
-          'orgName', NEW.name,
-          'transition', v_type
-        )
+        v_billing_title, v_billing_message, v_billing_metadata
       FROM public.organization_memberships cm
       WHERE cm.org_id = NEW.id
         AND cm.org_role = 'super_admin'
