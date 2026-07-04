@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!shifts || shifts.length === 0) {
-      const empty = generateICS([], `DubGrid — ${employee.first_name} ${employee.last_name}`);
+      const empty = generateICS([], `DubGrid: ${employee.first_name} ${employee.last_name}`);
       return new NextResponse(empty, {
         headers: {
           "Content-Type": "text/calendar; charset=utf-8",
@@ -117,10 +117,10 @@ export async function GET(req: NextRequest) {
 
           return [{
             uid: `absence-${entry.empId}-${entry.date}-${entry.absenceTypeId}@dubgrid.com`,
-            summary: `${entry.label} — DubGrid`,
+            summary: `${entry.label} (DubGrid)`,
             dtstart,
             dtend,
-            description: `${employee.first_name} ${employee.last_name} — ${entry.label}`,
+            description: `${employee.first_name} ${employee.last_name}: ${entry.label}`,
           }];
         }
 
@@ -137,14 +137,14 @@ export async function GET(req: NextRequest) {
 
         return [{
           uid: `shift-${entry.empId}-${entry.date}-${entry.segments?.map((segment) => `${segment.shiftId ?? "shiftless"}-${segment.jobId}`).join("-") ?? "worked"}@dubgrid.com`,
-          summary: `${entry.label} — DubGrid`,
+          summary: `${entry.label} (DubGrid)`,
           dtstart,
           dtend,
-          description: `${employee.first_name} ${employee.last_name} — ${entry.label}`,
+          description: `${employee.first_name} ${employee.last_name}: ${entry.label}`,
         }];
       });
 
-    const ics = generateICS(events, `DubGrid — ${employee.first_name} ${employee.last_name}`);
+    const ics = generateICS(events, `DubGrid: ${employee.first_name} ${employee.last_name}`);
 
     return new NextResponse(ics, { headers: cacheHeaders });
   } catch (err) {
