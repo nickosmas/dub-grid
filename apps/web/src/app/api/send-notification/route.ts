@@ -10,6 +10,7 @@ import {
 } from "@/features/notifications/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 // ── Input schemas ────────────────────────────────────────────────────────
 
@@ -85,12 +86,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const data = parsed.data;
@@ -113,9 +114,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await dispatchNotificationEvent(user.id, data as NotificationEvent);
+    const result = await dispatchNotificationEvent(
+      user.id,
+      data as NotificationEvent,
+    );
+    if (!result.success) {
+      Sentry.captureException(new Error(result.error), {
+        extra: { context: "send-notification", action: data.action },
+      });
+      return NextResponse.json(
+        { error: "Failed to send notification" },
+        { status: 500 },
+      );
+    }
     return NextResponse.json({ success: true });
   } catch (err) {
+    // dispatchNotificationEvent now catches internally; this is a true
+    // unexpected throw (e.g. cycle of imports failing), not a notification
+    // pipeline failure.
     Sentry.captureException(err, { extra: { context: "send-notification" } });
     logger.error(
       { err, action: data.action },

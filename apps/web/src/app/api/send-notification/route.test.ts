@@ -73,7 +73,9 @@ describe("POST /api/send-notification", () => {
     resolveEffectiveOrgId.mockImplementation(
       async (_req: NextRequest, _userId: string, orgId: string) => orgId,
     );
-    dispatchNotificationEvent.mockResolvedValue(undefined);
+    // Default: dispatcher succeeds. dispatchNotificationEvent now returns a
+    // discriminated result so the route can propagate pipeline failures.
+    dispatchNotificationEvent.mockResolvedValue({ success: true });
   });
 
   it("dispatches the event when the caller's org matches the body org", async () => {
@@ -110,6 +112,28 @@ describe("POST /api/send-notification", () => {
 
     expect(response.status).toBe(403);
     expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when the dispatcher reports a pipeline failure", async () => {
+    // Previously the route returned 200 even when dispatchNotificationEvent
+    // failed (errors were swallowed inside the dispatcher). Now the
+    // dispatcher returns a structured result and the route propagates it.
+    dispatchNotificationEvent.mockResolvedValueOnce({
+      success: false,
+      error: "fanout failed",
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "shift_request_resolved",
+        orgId: ORG_ID,
+        requestId: REQUEST_ID,
+        requestType: "swap",
+        approved: true,
+      }),
+    );
+
+    expect(response.status).toBe(500);
   });
 
   it("returns 429 when the caller is rate limited", async () => {
