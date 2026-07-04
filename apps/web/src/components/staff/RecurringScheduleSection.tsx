@@ -1037,16 +1037,16 @@ export function RecurringScheduleSection({
       )}
 
       <div>
-        <h2
+        <h1
           style={{
             margin: 0,
-            fontSize: "var(--dg-fs-heading)",
+            fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
             color: "var(--color-text-primary)",
           }}
         >
           Recurring Shifts
-        </h2>
+        </h1>
         <p
           style={{
             margin: "6px 0 0",

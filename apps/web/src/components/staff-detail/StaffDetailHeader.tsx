@@ -78,7 +78,7 @@ export function StaffDetailHeader({
                   </span>
                 </div>
 
-                <h1 className="mt-3 text-[28px] font-bold tracking-tight text-[var(--color-text-primary)]">
+                <h1 className="mt-3 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
                   {displayName}
                 </h1>
               </div>

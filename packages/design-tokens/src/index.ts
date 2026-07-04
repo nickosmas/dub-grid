@@ -86,7 +86,7 @@ export const webRadiusTokens = {
 
 export const typographyTokens = {
   fontSize: {
-    pageTitle: "28px",
+    pageTitle: "32px",
     sectionTitle: "24px",
     cardTitle: "20px",
     heading: "18px",
@@ -220,12 +220,12 @@ export const webResponsiveTokens = {
     gridColumnMin: "64px",
   },
   smallDesktop: {
-    pageTitle: "24px",
+    pageTitle: "28px",
     sectionTitle: "22px",
   },
   mobile: {
     toolbarHeight: "var(--dg-btn-h-lg)",
-    pageTitle: "22px",
+    pageTitle: "26px",
     sectionTitle: "20px",
     cardTitle: "18px",
     heading: "16px",
