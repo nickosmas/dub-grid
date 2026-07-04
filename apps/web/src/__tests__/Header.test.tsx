@@ -39,7 +39,7 @@ const mockPermissions = {
 
 vi.mock("@/hooks", () => ({
   usePermissions: () => mockPermissions,
-  useLogout: () => ({ signOutLocal: mockSignOut }),
+  useLogout: () => ({ signOut: mockSignOut }),
   setUserViewActive: (active: boolean) => mockSetUserViewActive(active),
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",

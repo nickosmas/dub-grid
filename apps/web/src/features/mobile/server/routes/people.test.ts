@@ -113,6 +113,9 @@ describe("mobile people route", () => {
       currentOrg: {
         id: "org-1",
       },
+      user: {
+        id: "00000000-0000-0000-0000-00000000009a",
+      },
       permissions: {
         canManageEmployees: false,
         canViewStaff: true,

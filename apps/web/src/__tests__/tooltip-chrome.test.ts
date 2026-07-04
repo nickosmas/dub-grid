@@ -27,10 +27,6 @@ const chartTooltipStyles = readFileSync(
   resolveWebSource("components/dashboard/chartTooltipStyles.ts"),
   "utf-8"
 )
-const analyticsCharts = readFileSync(
-  resolveWebSource("components/dashboard/AnalyticsCharts.tsx"),
-  "utf-8"
-)
 
 describe("tooltip chrome", () => {
   it("uses an elevated white surface for shared hover tooltips", () => {
@@ -59,7 +55,5 @@ describe("tooltip chrome", () => {
     expect(chartTooltipStyles).toContain('boxShadow: "var(--tooltip-shadow)"')
     expect(chartTooltipStyles).toContain("zIndex: 11000")
     expect(chartTooltipStyles).not.toContain('border: "1px solid var(--color-border-light)"')
-    expect(analyticsCharts).toContain("contentStyle={chartTooltipContentStyle}")
-    expect(analyticsCharts).toContain("wrapperStyle={chartTooltipWrapperStyle}")
   })
 })

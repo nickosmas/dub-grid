@@ -2574,7 +2574,8 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByLabelText(/override time/i));
 
-    expect(screen.getAllByText("to").length).toBeGreaterThan(0);
+    expect(screen.getByText("START")).toBeInTheDocument();
+    expect(screen.getByText("END")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
   });
 

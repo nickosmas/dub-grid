@@ -21,6 +21,13 @@ vi.mock("@/features/organization/client", () => ({
   }),
 }));
 
+vi.mock("@/features/permissions/client", () => ({
+  usePermissions: () => ({
+    isSuperAdmin: false,
+    isGridmaster: false,
+  }),
+}));
+
 vi.mock("sonner", () => ({
   toast: {
     success: vi.fn(),

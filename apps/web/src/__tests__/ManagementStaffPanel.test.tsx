@@ -233,12 +233,11 @@ describe("ManagementStaffPanel", () => {
     await user.clear(firstNameInput);
     await user.type(firstNameInput, "Jordyn");
 
-    const footerCloseButton = screen
-      .getAllByRole("button", { name: /^close$/i })
-      .find((button) => button.textContent === "Close");
-    if (!footerCloseButton) throw new Error("Expected footer Close button");
-
-    await user.click(footerCloseButton);
+    // The footer dismiss button now reads "Discard" while dirty (it resets
+    // the draft in place and never auto-closes). The icon close button in
+    // the header is the only remaining "Close" affordance, and still goes
+    // through the confirm-before-closing flow.
+    await user.click(screen.getByRole("button", { name: /^close$/i }));
 
     expect(
       screen.getByRole("dialog", { name: /unsaved changes/i }),
