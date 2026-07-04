@@ -421,7 +421,7 @@ export default function ScheduleGridMockup() {
           borderRadius: 6,
           background: "var(--color-bg-secondary)",
           color: "var(--color-text-secondary)",
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: 800,
           letterSpacing: "-0.005em",
         }}
@@ -434,6 +434,7 @@ export default function ScheduleGridMockup() {
             height: 18,
             borderRadius: 2,
             background: "var(--color-brand)",
+            flexShrink: 0,
           }}
         />
         Skilled Nursing
@@ -619,28 +620,44 @@ export default function ScheduleGridMockup() {
             );
           })}
 
-          {/* Open shifts row */}
+          {/* Open shifts row — matches the real grid: briefcase glyph + label + count badge,
+              warning bg, 2px dashed bottom border in warning color. */}
           <div
             style={{
               position: "sticky",
               left: 0,
               zIndex: 3,
               background: WARNING_BG,
-              padding: "0 14px",
+              padding: "0 10px",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
+              gap: 6,
               minHeight: ROW_HEIGHT,
               borderRight: "1px solid var(--color-border-light)",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: `2px dashed ${WARNING_BORDER}`,
+              color: WARNING_TEXT,
+              whiteSpace: "nowrap" as const,
             }}
           >
+            {/* Briefcase glyph */}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+            </svg>
             <span
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                color: WARNING_TEXT,
                 letterSpacing: "0.01em",
               }}
             >
@@ -651,10 +668,10 @@ export default function ScheduleGridMockup() {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                minWidth: 20,
-                height: 20,
-                padding: "0 6px",
-                borderRadius: 10,
+                minWidth: 18,
+                height: 18,
+                padding: "0 5px",
+                borderRadius: 9,
                 background: WARNING_BORDER,
                 color: "#fff",
                 fontSize: 11,
@@ -680,7 +697,7 @@ export default function ScheduleGridMockup() {
                     ? `linear-gradient(${TODAY_BG}, ${TODAY_BG}), ${WARNING_BG}`
                     : WARNING_BG,
                   borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
-                  borderBottom: "1px solid var(--color-border-light)",
+                  borderBottom: `2px dashed ${WARNING_BORDER}`,
                 }}
               >
                 {openList.map((seg, i) => (

@@ -3,7 +3,8 @@
    apps/web/src/components/PermissionsEditor.tsx — eight modules grouped
    under Core Operations / Administration, each with a View + Edit toggle
    pair. The mockup shows a representative subset to keep height bounded
-   alongside the four trust-signal cards. ── */
+   alongside the four trust-signal cards; the fade-out gradient suggests
+   the list continues (Organization Settings + Dashboard live below). ── */
 
 type ModuleIcon =
   | "calendar"
@@ -115,13 +116,19 @@ const ADMIN_MODULES: ModuleConfig[] = [
   },
 ];
 
+// Real totals: 25 admin permissions (2 always-on + 23 configurable). The counter
+// in PermissionsEditor reports configurable only — so "8 of 23 enabled" mirrors
+// the count for a moderately-permissioned admin.
+const ENABLED_COUNT = 8;
+const TOTAL_COUNT = 23;
+
 function Toggle({ on, disabled }: { on: boolean; disabled?: boolean }) {
   return (
     <div
       style={{
         width: 44,
         height: 24,
-        borderRadius: 12,
+        borderRadius: 9999,
         background: on ? "var(--color-brand)" : "var(--color-border)",
         position: "relative",
         transition: "background 200ms ease",
@@ -166,11 +173,11 @@ function ModuleRow({ mod }: { mod: ModuleConfig }) {
         display: "grid",
         gridTemplateColumns: "1fr 56px 56px",
         gap: 16,
-        padding: "14px 20px",
+        padding: "16px 24px",
         alignItems: "center",
       }}
     >
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", minWidth: 0 }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", minWidth: 0 }}>
         <div
           style={{
             width: 36,
@@ -190,19 +197,19 @@ function ModuleRow({ mod }: { mod: ModuleConfig }) {
           <div
             style={{
               fontSize: 14,
-              fontWeight: 600,
+              fontWeight: 500,
               color: "var(--color-text-primary)",
-              lineHeight: 1.2,
+              lineHeight: 1.3,
             }}
           >
             {mod.title}
           </div>
           <div
             style={{
-              fontSize: 12,
+              fontSize: 13,
               color: "var(--color-text-muted)",
               marginTop: 2,
-              lineHeight: 1.4,
+              lineHeight: 1.5,
             }}
           >
             {mod.description}
@@ -223,12 +230,12 @@ function CategoryHeader({ label }: { label: string }) {
   return (
     <div
       style={{
-        padding: "10px 20px",
+        padding: "12px 24px",
         background: "var(--color-bg)",
-        fontSize: 11,
-        fontWeight: 700,
+        fontSize: 13,
+        fontWeight: 600,
         color: "var(--color-text-secondary)",
-        letterSpacing: "0.08em",
+        letterSpacing: "0.06em",
         textTransform: "uppercase" as const,
       }}
     >
@@ -246,31 +253,74 @@ export default function PermissionsMockup() {
           borderRadius: 12,
           border: "1px solid var(--color-border)",
           overflow: "hidden",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-          maxHeight: 460,
+          boxShadow: "0 12px 48px rgba(0,0,0,0.18)",
+          maxHeight: 520,
         }}
       >
-        {/* Header */}
-        <div style={{ padding: "20px 20px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
-          <div
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              color: "var(--color-text-primary)",
-              marginBottom: 4,
-            }}
-          >
-            Admin Permissions
-          </div>
+        {/* Modal title bar */}
+        <div
+          style={{
+            padding: "14px 20px",
+            borderBottom: "1px solid var(--color-border-light)",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          Edit permissions
+        </div>
+
+        {/* Subtitle + counter + select-all/clear-all controls (matches real header) */}
+        <div
+          style={{
+            padding: "14px 24px",
+            background: "var(--color-bg)",
+            borderBottom: "1px solid var(--color-border-light)",
+          }}
+        >
           <div
             style={{
               fontSize: 13,
               color: "var(--color-text-muted)",
-              lineHeight: 1.4,
+              lineHeight: 1.5,
             }}
           >
-            Configure which actions this admin can perform. View Schedule and
-            View Staff are always enabled.
+            Choose what this admin can view and manage.
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              color: "var(--color-text-faint)",
+              marginTop: 4,
+            }}
+          >
+            {ENABLED_COUNT} of {TOTAL_COUNT} permissions enabled
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--color-text-muted)",
+                padding: "5px 10px",
+                borderRadius: 6,
+                background: "transparent",
+              }}
+            >
+              Select All
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--color-text-muted)",
+                padding: "5px 10px",
+                borderRadius: 6,
+                background: "transparent",
+              }}
+            >
+              Clear All
+            </div>
           </div>
         </div>
 
@@ -280,7 +330,7 @@ export default function PermissionsMockup() {
             display: "grid",
             gridTemplateColumns: "1fr 56px 56px",
             gap: 16,
-            padding: "10px 20px",
+            padding: "12px 24px",
             borderBottom: "1px solid var(--color-border-light)",
             fontSize: 11,
             fontWeight: 600,

@@ -400,10 +400,13 @@ function ScheduleScreen() {
           gap: 22,
         }}
       >
-        {/* ── MeHeroCard. Status "active" (on duty / in progress) ── */}
+        {/* ── MeHeroCard. Status "active" (on duty / in progress).
+              Real gradient ME_HERO_CARD_GRADIENT goes bottom-left → top-right,
+              colors #142579 → #2C49CC → #6E90FF at stops 0 / 0.55 / 1. ── */}
         <div
           style={{
-            background: "#2946C7",
+            background:
+              "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)",
             borderRadius: 24,
             paddingLeft: 18,
             paddingRight: 18,

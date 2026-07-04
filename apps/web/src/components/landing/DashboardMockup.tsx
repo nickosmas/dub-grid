@@ -1,62 +1,92 @@
 /* ── Dashboard mockup ─────────────────────────────────────────────────
-   Mirrors the real DubGrid dashboard (apps/web/src/app/dashboard): sticky
-   period header, four KPI stat cards, and the Coverage-by-section + Recent
-   activity cards. Uses the real .dg-card chrome; Calm Haven seed values. ── */
+   Mirrors the AdminDashboard layout (apps/web/src/components/dashboard):
+   period header, DashboardHero card (title + action + metric cards),
+   then a two-column row with CoverageBySectionCard and ActivityFeed.
+   Calm Haven seed values throughout. ── */
 
 import { ChevronLeft, ChevronRight, Check, ArrowLeftRight } from "lucide-react";
 
-/* ── KPI stat cards — labels/dots match DashboardStats ── */
-const STATS = [
-  {
-    label: "Total shifts",
-    dot: "var(--color-success)",
-    bar: "var(--color-success)",
-    value: "142",
-    pct: 78,
-    sub: "vs 138 last week",
-    delta: "↑ 4",
-    tone: "good" as const,
-  },
+/* ── Hero metric cards — match the four labels in DashboardView.tsx ── */
+type Metric = {
+  label: string;
+  value: string;
+  detail: string;
+  /** Top-right icon variant — controls accent color & glyph. */
+  icon: "coverage" | "gap" | "approval" | "bars";
+};
+
+const HERO_METRICS: Metric[] = [
   {
     label: "Coverage",
-    dot: "var(--color-info)",
-    bar: "var(--color-info)",
     value: "96%",
-    pct: 96,
-    sub: "3 open slots",
-    delta: "↑ 2%",
-    tone: "good" as const,
+    detail: "Current staffing coverage",
+    icon: "coverage",
   },
   {
-    label: "Staff scheduled",
-    dot: "var(--color-text-subtle)",
-    bar: "var(--color-text-subtle)",
-    value: "18",
-    pct: 86,
-    sub: "of 21 active",
-    delta: "-",
-    tone: "neutral" as const,
+    label: "Open gaps",
+    value: "3",
+    detail: "Staffing gaps this period",
+    icon: "gap",
   },
   {
-    label: "OT alerts",
-    dot: "var(--color-danger)",
-    bar: "var(--color-danger)",
+    label: "Draft shifts",
+    value: "5",
+    detail: "Unpublished schedule changes",
+    icon: "bars",
+  },
+  {
+    label: "Pending approvals",
     value: "2",
-    valueColor: "var(--color-danger)",
-    pct: 20,
-    sub: "over 40h limit",
-    delta: "↓ 1",
-    tone: "good" as const,
+    detail: "Requests waiting for review",
+    icon: "approval",
   },
 ];
 
-const DELTA_TONE = {
-  good: { bg: "var(--color-success-bg)", color: "var(--color-success)" },
-  bad: { bg: "var(--color-danger-bg)", color: "var(--color-danger)" },
-  neutral: { bg: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" },
+/* ── Metric icon accents — match DashboardHero.tsx getMetricAccent ── */
+const METRIC_ACCENTS: Record<Metric["icon"], { iconBg: string; iconColor: string }> = {
+  coverage: { iconBg: "#EFF6FF", iconColor: "#2563EB" },
+  gap:      { iconBg: "#fee2e2", iconColor: "#b91c1c" },
+  approval: { iconBg: "#fef3c7", iconColor: "#b45309" },
+  bars:     { iconBg: "#dbeafe", iconColor: "#1d4ed8" },
 };
 
-/* ── Coverage by section — Calm Haven focus areas ── */
+function MetricGlyph({ icon, color }: { icon: Metric["icon"]; color: string }) {
+  if (icon === "coverage") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 2.5l5 2v4.3c0 3.3-2.1 5.6-5 6.7-2.9-1.1-5-3.4-5-6.7V4.5l5-2Z" />
+        <path d="m6.4 8.9 1.7 1.7 3.6-3.8" />
+      </svg>
+    );
+  }
+  if (icon === "gap") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="6.25" />
+        <path d="M9 5.8v3.6" />
+        <path d="M9 12.3h.01" />
+      </svg>
+    );
+  }
+  if (icon === "approval") {
+    return (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5.2 3.2h7.6a1.6 1.6 0 0 1 1.6 1.6v8.4a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6V4.8a1.6 1.6 0 0 1 1.6-1.6Z" />
+        <path d="m6.4 9 1.6 1.6 3.7-3.8" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 13.5h10" />
+      <path d="M5.5 13.5V8.2" />
+      <path d="M9 13.5V4.8" />
+      <path d="M12.5 13.5V6.4" />
+    </svg>
+  );
+}
+
+/* ── Coverage rows — Calm Haven focus areas ── */
 const COVERAGE = [
   { name: "Skilled Nursing", filled: 6, req: 6, pct: 100 },
   { name: "Sheltered Care", filled: 11, req: 12, pct: 92 },
@@ -96,9 +126,6 @@ const ACTIVITY_TONE = {
   neutral: { bg: "var(--color-bg-secondary)", stroke: "var(--color-text-secondary)" },
 };
 
-const monoFont =
-  "var(--font-dm-mono), ui-monospace, SFMono-Regular, Menlo, monospace";
-
 export default function DashboardMockup() {
   return (
     <div
@@ -106,77 +133,85 @@ export default function DashboardMockup() {
         background: "var(--color-bg)",
         borderRadius: 14,
         border: "1px solid var(--color-border)",
-        padding: "16px 18px 20px",
-        maxWidth: 900,
+        padding: "20px 24px 24px",
+        maxWidth: 960,
         margin: "0 auto",
         boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
       }}
     >
-      {/* ── Period header ── */}
+      {/* ── Period header (matches DashboardHeader desktop layout) ── */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
           gap: 12,
           flexWrap: "wrap",
-          paddingBottom: 14,
-          marginBottom: 16,
-          borderBottom: "1px solid var(--color-border)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {[ChevronLeft, ChevronRight].map((Icon, i) => (
             <div
               key={i}
               style={{
-                width: 30,
-                height: 30,
-                borderRadius: 8,
+                width: 38,
+                height: 38,
+                borderRadius: 6,
                 border: "1px solid var(--color-border)",
                 background: "var(--color-surface)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--color-text-muted)",
+                color: "var(--color-text-secondary)",
               }}
             >
-              <Icon size={14} />
+              <Icon size={14} strokeWidth={2.5} />
             </div>
           ))}
-          <span
+          <div
             style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-text-secondary)",
-              minWidth: 132,
-              textAlign: "center",
+              textAlign: "center" as const,
+              minWidth: 120,
+              padding: "0 8px",
             }}
           >
-            May 13 – 19, 2026
-          </span>
-          <span
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--color-text-secondary)",
+                whiteSpace: "nowrap" as const,
+              }}
+            >
+              May 13 &ndash; 19, 2026
+            </span>
+          </div>
+          <div
             style={{
-              height: 30,
+              height: 38,
               display: "flex",
               alignItems: "center",
-              padding: "0 12px",
-              borderRadius: 8,
+              padding: "0 14px",
+              borderRadius: 6,
               border: "1px solid var(--color-border)",
               background: "var(--color-surface)",
               fontSize: 12,
               fontWeight: 600,
-              color: "var(--color-text-muted)",
+              color: "var(--color-text-secondary)",
             }}
           >
             This week
-          </span>
+          </div>
         </div>
+        <div style={{ flex: 1 }} />
+        {/* Day / Week / 2 Weeks segmented control */}
         <div
           style={{
             display: "flex",
             border: "1px solid var(--color-border)",
-            borderRadius: 8,
+            borderRadius: 6,
             overflow: "hidden",
             background: "var(--color-surface)",
           }}
@@ -185,7 +220,7 @@ export default function DashboardMockup() {
             <span
               key={tab}
               style={{
-                padding: "6px 12px",
+                padding: "8px 14px",
                 fontSize: 12,
                 fontWeight: 600,
                 color: i === 1 ? "var(--color-text-primary)" : "var(--color-text-muted)",
@@ -199,131 +234,216 @@ export default function DashboardMockup() {
         </div>
       </div>
 
-      {/* ── KPI stat cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4" style={{ gap: 12 }}>
-        {STATS.map((stat) => (
-          <div
-            className="dg-card"
-            key={stat.label}
-            style={{
-              padding: "16px 18px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            <div
+      {/* ── DashboardHero — title + action + metric cards ── */}
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 12,
+          padding: "16px 18px",
+          display: "grid",
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 24,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <h3
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--color-text-subtle)",
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  background: stat.dot,
-                }}
-              />
-              {stat.label}
-            </div>
-            <div
-              style={{
+                margin: 0,
                 fontSize: 28,
                 fontWeight: 700,
-                lineHeight: 1,
-                letterSpacing: "-0.02em",
-                fontFamily: monoFont,
-                color: stat.valueColor ?? "var(--color-text-primary)",
+                color: "var(--color-text-primary)",
+                letterSpacing: "-0.03em",
+                lineHeight: 1.2,
               }}
             >
-              {stat.value}
-            </div>
-            <div
+              Where the week stands
+            </h3>
+            <p
               style={{
-                height: 4,
-                borderRadius: 2,
-                background: "var(--color-border)",
-                overflow: "hidden",
+                margin: "6px 0 0",
+                color: "var(--color-text-muted)",
+                fontSize: 14,
+                maxWidth: 520,
+                lineHeight: 1.45,
               }}
             >
-              <div
-                style={{
-                  width: `${stat.pct}%`,
-                  height: "100%",
-                  background: stat.bar,
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
-                {stat.sub}
-              </span>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: "2px 7px",
-                  borderRadius: 4,
-                  background: DELTA_TONE[stat.tone].bg,
-                  color: DELTA_TONE[stat.tone].color,
-                }}
-              >
-                {stat.delta}
-              </span>
-            </div>
+              Coverage, gaps, and unpublished changes across the schedule. Jump straight to whatever needs your attention.
+            </p>
           </div>
-        ))}
-      </div>
-
-      {/* ── Coverage + Activity ── */}
-      <div
-        className="grid grid-cols-1 lg:grid-cols-2"
-        style={{ gap: 12, marginTop: 12 }}
-      >
-        {/* Coverage by section */}
-        <div className="dg-card">
-          <div className="dg-card-header">
-            <div>
-              <div className="dg-card-title">Coverage by focus area</div>
-              <div className="dg-card-subtitle">
-                This week &middot; required vs scheduled
-              </div>
-            </div>
-          </div>
+          {/* Action button — matches dg-btn-brand (filled brand, white text) */}
           <div
-            className="dg-card-body"
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              height: 38,
+              padding: "0 16px",
+              borderRadius: 6,
+              background: "var(--color-brand)",
+              color: "var(--color-text-inverse)",
+              fontSize: 13,
+              fontWeight: 600,
+              whiteSpace: "nowrap" as const,
+            }}
           >
-            {COVERAGE.map((row) => (
+            View schedule
+          </div>
+        </div>
+
+        {/* Metric cards — match DashboardHero MetricCard layout */}
+        <div
+          style={{
+            display: "grid",
+            gap: 10,
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+          }}
+        >
+          {HERO_METRICS.map((metric) => {
+            const accent = METRIC_ACCENTS[metric.icon];
+            return (
               <div
-                key={row.name}
+                key={metric.label}
                 style={{
-                  padding: "12px 14px",
                   background: "var(--color-bg)",
                   border: "1px solid var(--color-border)",
-                  borderRadius: 8,
+                  borderRadius: 10,
+                  padding: "12px 14px",
                 }}
               >
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     justifyContent: "space-between",
-                    gap: 10,
+                    gap: 12,
                     marginBottom: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--color-text-muted)",
+                      minWidth: 0,
+                    }}
+                  >
+                    {metric.label}
+                  </div>
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: accent.iconBg,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <MetricGlyph icon={metric.icon} color={accent.iconColor} />
+                  </div>
+                </div>
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: "var(--color-text-primary)",
+                    letterSpacing: "-0.04em",
+                    lineHeight: 1.05,
+                  }}
+                >
+                  {metric.value}
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11,
+                    color: "var(--color-text-muted)",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {metric.detail}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Coverage + Activity ── */}
+      <div
+        className="grid grid-cols-1 lg:grid-cols-2"
+        style={{ gap: 16 }}
+      >
+        {/* Coverage by focus area card — matches CoverageBySectionCard */}
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "14px 18px",
+              borderBottom: "1px solid var(--color-border-light)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Coverage by focus area
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--color-text-subtle)",
+                marginTop: 1,
+              }}
+            >
+              This week &middot; required vs scheduled
+            </div>
+          </div>
+          <div
+            style={{
+              padding: "16px 18px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {COVERAGE.map((row) => (
+              <div
+                key={row.name}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 7,
+                  padding: "14px 16px",
+                  borderRadius: 8,
+                  background: "var(--color-bg)",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                    gap: 10,
                   }}
                 >
                   <span
@@ -356,7 +476,7 @@ export default function DashboardMockup() {
                   style={{
                     height: 6,
                     borderRadius: 3,
-                    background: "var(--color-border-light)",
+                    background: "var(--color-border)",
                     overflow: "hidden",
                   }}
                 >
@@ -373,15 +493,41 @@ export default function DashboardMockup() {
           </div>
         </div>
 
-        {/* Recent activity */}
-        <div className="dg-card">
-          <div className="dg-card-header">
-            <div>
-              <div className="dg-card-title">Recent activity</div>
-              <div className="dg-card-subtitle">Latest events</div>
+        {/* Recent activity — matches ActivityFeed */}
+        <div
+          style={{
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            borderRadius: 8,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: "14px 18px",
+              borderBottom: "1px solid var(--color-border-light)",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Recent activity
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--color-text-subtle)",
+                marginTop: 1,
+              }}
+            >
+              Latest events
             </div>
           </div>
-          <div className="dg-card-body" style={{ paddingTop: 4, paddingBottom: 4 }}>
+          <div style={{ padding: "12px 16px 16px" }}>
             {ACTIVITY.map((item, i) => {
               const tone = ACTIVITY_TONE[item.tone];
               return (
@@ -409,9 +555,9 @@ export default function DashboardMockup() {
                       flexShrink: 0,
                     }}
                   >
-                    <item.Icon size={15} color={tone.stroke} strokeWidth={2.4} />
+                    <item.Icon size={14} color={tone.stroke} strokeWidth={1.6} />
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div
                       style={{
                         fontSize: 12,
@@ -426,7 +572,7 @@ export default function DashboardMockup() {
                         fontSize: 10,
                         color: "var(--color-text-subtle)",
                         marginTop: 3,
-                        textTransform: "uppercase",
+                        textTransform: "uppercase" as const,
                         letterSpacing: "0.05em",
                       }}
                     >
