@@ -32,6 +32,11 @@ interface StaffRowSharedProps {
   isReordering: boolean;
   isDragging: boolean;
   canManageEmployees: boolean;
+  /** Whether the viewer can see HR/admin detail columns (ID, employment,
+   *  status, account state, access role, date joined). Regular users
+   *  (canViewStaff only) get a coworker-style roster: NAME / focus areas /
+   *  certifications / roles only. */
+  canViewEmployeeDetails: boolean;
   /** Whether the name links to the full /people/[id] details page. Regular
    *  users get the inline read-only panel instead, so the link is suppressed. */
   canNavigateToDetailsPage: boolean;
@@ -88,6 +93,7 @@ function StaffRowCells({
   isExpanded,
   isReordering,
   canManageEmployees,
+  canViewEmployeeDetails,
   canNavigateToDetailsPage,
   isSelected,
   focusAreas,
@@ -126,36 +132,38 @@ function StaffRowCells({
   return (
     <>
       {/* Checkbox / Drag handle / Employee ID */}
-      <StaffCell
-        variant={variant}
-        tableClassName="pl-6 py-4 w-[100px] border-r border-[var(--color-border-light)]"
-        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex py-4"
-      >
-        <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
-          {isReordering && (
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" className="shrink-0">
-              <rect x="3" y="2" width="2" height="2" rx="1" />
-              <rect x="9" y="2" width="2" height="2" rx="1" />
-              <rect x="3" y="6" width="2" height="2" rx="1" />
-              <rect x="9" y="6" width="2" height="2" rx="1" />
-              <rect x="3" y="10" width="2" height="2" rx="1" />
-              <rect x="9" y="10" width="2" height="2" rx="1" />
-            </svg>
-          )}
-          {canManageEmployees && !isReordering && (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={() => onToggleSelect(emp.id)}
-              onClick={(e) => e.stopPropagation()}
-              className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
-            />
-          )}
-          <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums">
-            {isReordering ? rankNumber : `#${rankNumber}`}
-          </span>
-        </div>
-      </StaffCell>
+      {canViewEmployeeDetails && (
+        <StaffCell
+          variant={variant}
+          tableClassName="pl-6 py-4 w-[100px] border-r border-[var(--color-border-light)]"
+          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--rank flex py-4"
+        >
+          <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
+            {isReordering && (
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" className="shrink-0">
+                <rect x="3" y="2" width="2" height="2" rx="1" />
+                <rect x="9" y="2" width="2" height="2" rx="1" />
+                <rect x="3" y="6" width="2" height="2" rx="1" />
+                <rect x="9" y="6" width="2" height="2" rx="1" />
+                <rect x="3" y="10" width="2" height="2" rx="1" />
+                <rect x="9" y="10" width="2" height="2" rx="1" />
+              </svg>
+            )}
+            {canManageEmployees && !isReordering && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onToggleSelect(emp.id)}
+                onClick={(e) => e.stopPropagation()}
+                className="accent-[var(--color-today-text)] cursor-pointer w-3.5 h-3.5"
+              />
+            )}
+            <span className="text-[var(--dg-fs-footnote)] font-medium tabular-nums">
+              {isReordering ? rankNumber : `#${rankNumber}`}
+            </span>
+          </div>
+        </StaffCell>
+      )}
 
       {/* Name */}
       <StaffCell
@@ -210,29 +218,33 @@ function StaffRowCells({
       </StaffCell>
 
       {/* Employment */}
-      <StaffCell
-        variant={variant}
-        tableClassName="py-4 w-[110px] border-r border-[var(--color-border-light)]"
-        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--employment flex py-4"
-      >
-        <span
-          aria-label={employmentLabel}
-          className="text-[12px] text-[var(--color-text-muted)] whitespace-nowrap"
+      {canViewEmployeeDetails && (
+        <StaffCell
+          variant={variant}
+          tableClassName="py-4 w-[110px] border-r border-[var(--color-border-light)]"
+          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--employment flex py-4"
         >
-          {employmentLabel}
-        </span>
-      </StaffCell>
+          <span
+            aria-label={employmentLabel}
+            className="text-[12px] text-[var(--color-text-muted)] whitespace-nowrap"
+          >
+            {employmentLabel}
+          </span>
+        </StaffCell>
+      )}
 
-      {/* Status — tonal pill with leading dot, always visible. */}
-      <StaffCell
-        variant={variant}
-        tableClassName="py-4 w-[110px] border-[var(--color-border-light)] md:border-r"
-        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--status flex py-4"
-      >
-        <StatusPill tone={statusTone(emp.status)} aria-label={`Status: ${statusLabel}`}>
-          {statusLabel}
-        </StatusPill>
-      </StaffCell>
+      {/* Status — tonal pill with leading dot. Admin/HR detail. */}
+      {canViewEmployeeDetails && (
+        <StaffCell
+          variant={variant}
+          tableClassName="py-4 w-[110px] border-[var(--color-border-light)] md:border-r"
+          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--status flex py-4"
+        >
+          <StatusPill tone={statusTone(emp.status)} aria-label={`Status: ${statusLabel}`}>
+            {statusLabel}
+          </StatusPill>
+        </StaffCell>
+      )}
 
       {/* Focus Areas — neutral StatusPills, cap at 2 visible + "+N more" overflow chip. */}
       <StaffCell
@@ -296,50 +308,56 @@ function StaffRowCells({
         </span>
       </StaffCell>
 
-      {/* Account status — tonal StatusPill matching the rest of the row. */}
-      <StaffCell
-        variant={variant}
-        tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
-      >
-        {(() => {
-          const account: { label: string; tone: StatusPillTone } = emp.userId
-            ? { label: "Linked", tone: "success" }
-            : pendingInviteByEmployeeId.has(emp.id)
-              ? { label: "Invited", tone: "warning" }
-              : emp.email
-                ? { label: "Not invited", tone: "neutral" }
-                : { label: "No email", tone: "danger" };
-          return (
-            <StatusPill tone={account.tone} aria-label={`Account: ${account.label}`}>
-              {account.label}
-            </StatusPill>
-          );
-        })()}
-      </StaffCell>
-
-      {/* Access role (org_role) */}
-      <StaffCell
-        variant={variant}
-        tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
-        gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
-      >
-        <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} isSelf={isYou} />
-      </StaffCell>
-
-      {/* Date Joined — rightmost data column at lg+; no divider before chevron. */}
-      <StaffCell
-        variant={variant}
-        tableClassName="hidden lg:table-cell py-4 w-[140px]"
-        gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined hidden py-4 lg:flex"
-      >
-        <span
-          className="text-[12px] tabular-nums text-[var(--color-text-muted)] whitespace-nowrap"
-          title={emp.createdAt ?? undefined}
+      {/* Account status — admin/HR detail (invitation linkage). */}
+      {canViewEmployeeDetails && (
+        <StaffCell
+          variant={variant}
+          tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
+          gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
         >
-          {joinedLabel}
-        </span>
-      </StaffCell>
+          {(() => {
+            const account: { label: string; tone: StatusPillTone } = emp.userId
+              ? { label: "Linked", tone: "success" }
+              : pendingInviteByEmployeeId.has(emp.id)
+                ? { label: "Invited", tone: "warning" }
+                : emp.email
+                  ? { label: "Not invited", tone: "neutral" }
+                  : { label: "No email", tone: "danger" };
+            return (
+              <StatusPill tone={account.tone} aria-label={`Account: ${account.label}`}>
+                {account.label}
+              </StatusPill>
+            );
+          })()}
+        </StaffCell>
+      )}
+
+      {/* Access role (org_role) — admin/HR detail. */}
+      {canViewEmployeeDetails && (
+        <StaffCell
+          variant={variant}
+          tableClassName="hidden lg:table-cell py-4 border-[var(--color-border-light)] lg:border-r"
+          gridClassName="dg-staff-directory-cell hidden py-4 lg:flex"
+        >
+          <InlineRoleSelect orgRole={orgRole} onChange={onRoleChange} isSelf={isYou} />
+        </StaffCell>
+      )}
+
+      {/* Date Joined — admin/HR detail; rightmost data column at lg+. */}
+      {canViewEmployeeDetails && (
+        <StaffCell
+          variant={variant}
+          tableClassName="hidden lg:table-cell py-4 w-[140px]"
+          gridClassName="dg-staff-directory-cell dg-staff-directory-cell--date-joined hidden py-4 lg:flex"
+        >
+          <span
+            className="text-[12px] tabular-nums text-[var(--color-text-muted)] whitespace-nowrap"
+            title={emp.createdAt ?? undefined}
+          >
+            {joinedLabel}
+          </span>
+        </StaffCell>
+      )}
 
       {/* Chevron */}
       <StaffCell

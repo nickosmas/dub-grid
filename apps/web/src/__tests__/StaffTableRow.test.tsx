@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { StaffReorderListRow } from "@/components/staff/StaffTableRow";
+import { StaffReorderListRow, StaffTableRow } from "@/components/staff/StaffTableRow";
 import type { Employee } from "@/types";
 
 vi.mock("@/components/AuthProvider", () => ({
@@ -68,6 +68,7 @@ describe("StaffReorderListRow", () => {
       isReordering: true,
       isDragging: false,
       canManageEmployees: true,
+      canViewEmployeeDetails: true,
       canNavigateToDetailsPage: true,
       isSelected: false,
       focusAreas: [],
@@ -116,6 +117,7 @@ describe("StaffReorderListRow", () => {
         isReordering
         isDragging={false}
         canManageEmployees
+        canViewEmployeeDetails
         canNavigateToDetailsPage
         isSelected={false}
         focusAreas={[]}
@@ -131,5 +133,57 @@ describe("StaffReorderListRow", () => {
     const row = container.querySelector(".dg-staff-directory-row") as HTMLElement;
 
     expect(row.style.transform).toBe("translate3d(0, 56px, 0)");
+  });
+});
+
+describe("StaffTableRow column gating", () => {
+  function renderRow(canViewEmployeeDetails: boolean) {
+    return render(
+      <table>
+        <tbody>
+          <StaffTableRow
+            emp={makeEmployee({
+              id: "emp-1",
+              firstName: "Alice",
+              lastName: "Smith",
+              status: "active",
+              email: "alice@example.com",
+              employmentType: "full_time",
+            })}
+            globalIndex={0}
+            isExpanded={false}
+            isReordering={false}
+            isDragging={false}
+            canManageEmployees={false}
+            canViewEmployeeDetails={canViewEmployeeDetails}
+            canNavigateToDetailsPage={false}
+            isSelected={false}
+            focusAreas={[]}
+            certifications={[]}
+            roles={[]}
+            pendingInviteByEmployeeId={new Map()}
+            onToggleSelect={vi.fn()}
+            onRowClick={vi.fn()}
+          />
+        </tbody>
+      </table>,
+    );
+  }
+
+  it("hides HR/admin columns when canViewEmployeeDetails is false", () => {
+    const { container, queryByText } = renderRow(false);
+
+    expect(container.querySelector(".dg-staff-directory-cell--rank")).toBeNull();
+    expect(queryByText("Full-time")).toBeNull();
+    expect(queryByText("Active")).toBeNull();
+    expect(queryByText("Not invited")).toBeNull();
+  });
+
+  it("shows HR/admin columns when canViewEmployeeDetails is true", () => {
+    const { queryByText } = renderRow(true);
+
+    expect(queryByText("Full-time")).not.toBeNull();
+    expect(queryByText("Active")).not.toBeNull();
+    expect(queryByText("Not invited")).not.toBeNull();
   });
 });

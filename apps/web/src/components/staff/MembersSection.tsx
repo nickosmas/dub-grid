@@ -1361,6 +1361,7 @@ export function MembersSection({
                               isDragging={isDragging}
                               dragPhase={isDragging ? dragPhase ?? undefined : undefined}
                               canManageEmployees={canManageEmployees}
+                              canViewEmployeeDetails={canViewEmployeeDetails}
                               canNavigateToDetailsPage={canManageEmployees}
                               isSelected={selectedIds.has(employee.id)}
                               focusAreas={focusAreas}
@@ -1385,34 +1386,36 @@ export function MembersSection({
                     <Table>
                       <TableHeader>
                         <UITableRow className="bg-[var(--color-bg)] hover:bg-transparent">
-                          <TableHead className="w-[100px] border-r border-[var(--color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
-                            <div className="flex items-center gap-1.5">
-                              {canManageEmployees && (
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    paginatedList.length > 0 &&
-                                    paginatedList.every((employee) =>
-                                      selectedIds.has(employee.id),
-                                    )
-                                  }
-                                  onChange={() => toggleSelectAll(paginatedList)}
-                                  onClick={(event) => event.stopPropagation()}
-                                  className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-today-text)]"
-                                />
-                              )}
-                              <span
-                                className="inline-flex cursor-pointer select-none items-center gap-1"
-                                onClick={() => handleSort("seniority")}
-                              >
-                                ID{" "}
-                                <SortIcon
-                                  active={sortConfig.key === "seniority"}
-                                  dir={sortConfig.dir}
-                                />
-                              </span>
-                            </div>
-                          </TableHead>
+                          {canViewEmployeeDetails && (
+                            <TableHead className="w-[100px] border-r border-[var(--color-border-light)] pl-6 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                              <div className="flex items-center gap-1.5">
+                                {canManageEmployees && (
+                                  <input
+                                    type="checkbox"
+                                    checked={
+                                      paginatedList.length > 0 &&
+                                      paginatedList.every((employee) =>
+                                        selectedIds.has(employee.id),
+                                      )
+                                    }
+                                    onChange={() => toggleSelectAll(paginatedList)}
+                                    onClick={(event) => event.stopPropagation()}
+                                    className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-today-text)]"
+                                  />
+                                )}
+                                <span
+                                  className="inline-flex cursor-pointer select-none items-center gap-1"
+                                  onClick={() => handleSort("seniority")}
+                                >
+                                  ID{" "}
+                                  <SortIcon
+                                    active={sortConfig.key === "seniority"}
+                                    dir={sortConfig.dir}
+                                  />
+                                </span>
+                              </div>
+                            </TableHead>
+                          )}
                           <TableHead
                             className="cursor-pointer select-none border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]"
                             onClick={() => handleSort("name")}
@@ -1425,12 +1428,16 @@ export function MembersSection({
                               />
                             </span>
                           </TableHead>
-                          <TableHead className="w-[110px] border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
-                            Employment
-                          </TableHead>
-                          <TableHead className="w-[110px] border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:border-r">
-                            Status
-                          </TableHead>
+                          {canViewEmployeeDetails && (
+                            <TableHead className="w-[110px] border-r border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)]">
+                              Employment
+                            </TableHead>
+                          )}
+                          {canViewEmployeeDetails && (
+                            <TableHead className="w-[110px] border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:border-r">
+                              Status
+                            </TableHead>
+                          )}
                           <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] md:table-cell md:border-r">
                             {focusAreaLabel}
                           </TableHead>
@@ -1440,15 +1447,21 @@ export function MembersSection({
                           <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
                             Roles
                           </TableHead>
-                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
-                            Account
-                          </TableHead>
-                          <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
-                            Access
-                          </TableHead>
-                          <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
-                            Date Joined
-                          </TableHead>
+                          {canViewEmployeeDetails && (
+                            <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
+                              Account
+                            </TableHead>
+                          )}
+                          {canViewEmployeeDetails && (
+                            <TableHead className="hidden border-[var(--color-border-light)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell lg:border-r">
+                              Access
+                            </TableHead>
+                          )}
+                          {canViewEmployeeDetails && (
+                            <TableHead className="hidden w-[140px] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-subtle)] lg:table-cell">
+                              Date Joined
+                            </TableHead>
+                          )}
                           <TableHead className="w-[40px] pr-6" />
                         </UITableRow>
                       </TableHeader>
@@ -1466,6 +1479,7 @@ export function MembersSection({
                               isReordering={false}
                               isDragging={false}
                               canManageEmployees={canManageEmployees}
+                              canViewEmployeeDetails={canViewEmployeeDetails}
                               canNavigateToDetailsPage={canManageEmployees}
                               isSelected={selectedIds.has(employee.id)}
                               focusAreas={focusAreas}
