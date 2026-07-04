@@ -6,6 +6,32 @@ import type { NameMismatchDetails } from "@/types";
 
 export type ServiceClient = ReturnType<typeof getServiceClient>;
 
+export async function isOrgSuperAdminOrGridmaster(
+  serviceClient: ServiceClient,
+  actorId: string,
+  orgId: string,
+): Promise<boolean> {
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("org_role")
+      .eq("user_id", actorId)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .maybeSingle(),
+    serviceClient
+      .from("profiles")
+      .select("platform_role")
+      .eq("id", actorId)
+      .maybeSingle(),
+  ]);
+
+  return (
+    profile?.platform_role === "gridmaster" ||
+    membership?.org_role === "super_admin"
+  );
+}
+
 export async function canManageEmployees(
   serviceClient: ServiceClient,
   actorId: string,

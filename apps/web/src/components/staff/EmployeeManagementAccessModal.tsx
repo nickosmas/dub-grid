@@ -17,6 +17,7 @@ import {
   updateAppOnlyUser,
 } from "@/features/organization/client";
 import { useIsInSandbox } from "@/hooks";
+import { usePermissions } from "@/features/permissions/client";
 import { validateEmail } from "@/components/FormField";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
@@ -58,6 +59,8 @@ export function EmployeeManagementAccessModal({
   onCompleted,
 }: EmployeeManagementAccessModalProps) {
   const isInSandbox = useIsInSandbox();
+  const { isSuperAdmin, isGridmaster } = usePermissions();
+  const canAssignSuperAdmin = isSuperAdmin || isGridmaster;
   const [orgUsers, setOrgUsers] = useState<OrganizationUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -109,8 +112,16 @@ export function EmployeeManagementAccessModal({
     if (matchedUser?.orgRole === "super_admin") {
       return [{ value: "super_admin" as const, label: "Super Admin" }];
     }
+    // Only surface Super Admin for the invitation path. The matched-user branch
+    // updates an existing membership in place and is outside the invite scope.
+    if (!matchedUser && canAssignSuperAdmin) {
+      return [
+        ...ROLE_OPTIONS,
+        { value: "super_admin" as const, label: "Super Admin" },
+      ];
+    }
     return ROLE_OPTIONS;
-  }, [matchedUser?.orgRole]);
+  }, [matchedUser, canAssignSuperAdmin]);
 
   const effectiveEmail = linkedUser?.email ?? email;
   const baseRole: AssignableOrganizationRole =

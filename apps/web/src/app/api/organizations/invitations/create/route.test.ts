@@ -6,6 +6,7 @@ const forbidIfSandboxCookie = vi.fn();
 const requireAuthenticatedUser = vi.fn();
 const getServiceClient = vi.fn();
 const canManageEmployees = vi.fn();
+const isOrgSuperAdminOrGridmaster = vi.fn();
 const dispatchNotificationEvent = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
@@ -20,6 +21,8 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
+  isOrgSuperAdminOrGridmaster: (...args: unknown[]) =>
+    isOrgSuperAdminOrGridmaster(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
@@ -54,6 +57,7 @@ beforeEach(() => {
   forbidIfSandboxCookie.mockReturnValue(null);
   requireAuthenticatedUser.mockResolvedValue({ user: { id: "actor-1" } });
   canManageEmployees.mockResolvedValue(true);
+  isOrgSuperAdminOrGridmaster.mockResolvedValue(false);
 });
 
 describe("POST /api/organizations/invitations/create", () => {
@@ -98,6 +102,44 @@ describe("POST /api/organizations/invitations/create", () => {
     expect(rpc).toHaveBeenCalledWith(
       "send_invitation",
       expect.objectContaining({ p_org_id: ORG_ID }),
+    );
+  });
+
+  it("rejects super_admin role when caller is not super_admin/gridmaster", async () => {
+    const rpc = vi.fn();
+    getServiceClient.mockReturnValue({ rpc });
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(false);
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "super_admin" }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("allows super_admin role when caller is super_admin or gridmaster", async () => {
+    const rpc = vi.fn(async () => ({
+      data: {
+        invitation_id: "inv-2",
+        token: "tok-2",
+        expires_at: "2026-01-01T00:00:00Z",
+      },
+      error: null,
+    }));
+    getServiceClient.mockReturnValue({ rpc });
+    isOrgSuperAdminOrGridmaster.mockResolvedValue(true);
+
+    const { POST } = await importRoute();
+    const res = await POST(
+      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "super_admin" }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith(
+      "send_invitation",
+      expect.objectContaining({ p_role: "super_admin", p_org_id: ORG_ID }),
     );
   });
 });
