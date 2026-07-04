@@ -30,7 +30,9 @@ function makeServiceBuilder(
   if (table === "user_sessions") {
     return {
       select: vi.fn(() => ({
-        order: vi.fn().mockResolvedValue({ data: rows, error: null }),
+        not: vi.fn(() => ({
+          order: vi.fn().mockResolvedValue({ data: rows, error: null }),
+        })),
       })),
     };
   }
