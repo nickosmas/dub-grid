@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   createRequestSupabaseClient,
-  requireAuthenticatedUser,
+  requireAuthenticatedUserWithClaims,
 } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import type { NotificationFacets } from "@/types";
 import { mapNotificationRow } from "../route";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const cursorSchema = z.object({
   createdAt: z.string(),
@@ -32,19 +33,20 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) return auth.response;
+    const { user, claims } = auth;
 
     let body: unknown;
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = searchBodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
     const params = parsed.data;
     const limit = params.limit ?? 25;
@@ -52,11 +54,25 @@ export async function POST(req: NextRequest) {
 
     const supabase = createRequestSupabaseClient(req);
 
+    // Scope to the caller's current session org. Platform notifications
+    // (org_id IS NULL — gridmaster-targeted) remain visible regardless of
+    // session org. Without this clause a multi-org user could see another
+    // org's notifications when their session is on the wrong org. The RLS
+    // policy enforces the same; this is defense-in-depth at the route layer.
+    const claimOrgId =
+      typeof claims.org_id === "string" ? claims.org_id : null;
+
     let query = supabase
       .from("notifications")
       .select("*")
-      .eq("user_id", auth.user.id)
+      .eq("user_id", user.id)
       .eq("channel", "in_app");
+
+    if (claimOrgId) {
+      query = query.or(`org_id.eq.${claimOrgId},org_id.is.null`);
+    } else {
+      query = query.is("org_id", null);
+    }
 
     if (params.read === "unread") query = query.is("read_at", null);
     else if (params.read === "read") query = query.not("read_at", "is", null);

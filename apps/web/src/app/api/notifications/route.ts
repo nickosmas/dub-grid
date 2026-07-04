@@ -10,6 +10,7 @@ import type {
   NotificationPriority,
   NotificationType,
 } from "@/types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
       Object.fromEntries(req.nextUrl.searchParams.entries()),
     );
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const supabase = createRequestSupabaseClient(req);
@@ -106,12 +107,12 @@ export async function PATCH(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = patchSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const supabase = createRequestSupabaseClient(req);
