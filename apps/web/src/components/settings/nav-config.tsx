@@ -101,6 +101,17 @@ export function buildNavGroups(
     if (generalItems.length > 0) groups.push({ id: "general", label: "General", items: generalItems });
   }
 
+  // Staff designations — taxonomy that classifies who works here. Comes
+  // before Scheduling because departments, roles, and certifications are
+  // prerequisites for the scheduling config that references them.
+  if (perms.canAccessSettings) {
+    const staffItems: NavItem[] = [];
+    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: "Departments", Icon: BuildingIcon, helpHint: "Scheduled departments drive the grid; management departments are app-only.", description: "Includes scheduled departments for the grid and management departments for app-only staff." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", Icon: RolesIcon, helpHint: "Roles are visible tags; only schedule-eligible roles can gate jobs.", description: "Manage visible role tags and choose which ones actually count for job eligibility on the schedule." });
+    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", Icon: AwardIcon, helpHint: "Certifications can display on staff and can restrict assignments.", description: "The certification badge shown next to the employee's name on the schedule grid." });
+    if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff designations", items: staffItems });
+  }
+
   // Scheduling — operational config used by anyone running the schedule
   if (perms.canAccessSettings) {
     const schedItems: NavItem[] = [];
@@ -112,15 +123,6 @@ export function buildNavGroups(
     if (perms.canManageCoverageRequirements || perms.canViewCoverageRequirements) schedItems.push({ id: "schedule-coverage", label: "Coverage", Icon: CoverageIcon, helpHint: "Coverage sets minimum headcount by focus area, shift, and job.", description: "Set minimum staffing requirements by focus area and assignable shift/job combination." });
     if (perms.canManageIndicatorTypes || perms.canViewIndicatorTypes) schedItems.push({ id: "staff-indicators", label: "Indicators", Icon: IndicatorIcon, description: "Define custom indicators that can be attached to shift cells on the schedule." });
     if (schedItems.length > 0) groups.push({ id: "scheduling", label: "Scheduling", items: schedItems });
-  }
-
-  // Staff designations — taxonomy that classifies who works here
-  if (perms.canAccessSettings) {
-    const staffItems: NavItem[] = [];
-    if (perms.canManageFocusAreas || perms.canViewFocusAreas || perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-departments", label: "Departments", Icon: BuildingIcon, helpHint: "Scheduled departments drive the grid; management departments are app-only.", description: "Includes scheduled departments for the grid and management departments for app-only staff." });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-roles", label: overrides?.roleLabel ?? "Roles", Icon: RolesIcon, helpHint: "Roles are visible tags; only schedule-eligible roles can gate jobs.", description: "Manage visible role tags and choose which ones actually count for job eligibility on the schedule." });
-    if (perms.canManageOrgLabels || perms.canViewOrgLabels) staffItems.push({ id: "staff-certifications", label: overrides?.certificationLabel ?? "Certifications", Icon: AwardIcon, helpHint: "Certifications can display on staff and can restrict assignments.", description: "The certification badge shown next to the employee's name on the schedule grid." });
-    if (staffItems.length > 0) groups.push({ id: "staff", label: "Staff designations", items: staffItems });
   }
 
   // Billing — own group, not buried under Organization

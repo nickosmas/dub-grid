@@ -64,12 +64,12 @@ describe("settings nav config", () => {
     expect(audit?.items.map((item) => item.id)).toEqual(["org-activity"]);
   });
 
-  it("renders the group order: General, Scheduling, Staff designations, Billing, Audit, Danger Zone", () => {
+  it("renders the group order: General, Staff designations, Scheduling, Billing, Audit, Danger Zone", () => {
     const groups = buildNavGroups(fullSettingsPermissions);
     expect(groups.map((g) => g.id)).toEqual([
       "general",
-      "scheduling",
       "staff",
+      "scheduling",
       "billing",
       "audit",
       "danger",
