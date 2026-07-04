@@ -45,7 +45,6 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/hint";
 import { TOOLTIP_DELAY_MS } from "@/lib/constants";
 import CookieConsent from "@/components/CookieConsent";
-import TermsAcceptanceGate from "@/components/TermsAcceptanceGate";
 import OnboardingGate from "@/components/onboarding/OnboardingGate";
 
 import PostHogProvider from "@/components/PostHogProvider";
@@ -70,17 +69,15 @@ export default function RootLayout({
         <AuthProvider>
           <PostHogProvider>
             <QueryProvider>
-              <TermsAcceptanceGate>
-                <Suspense fallback={null}>
-                  <OnboardingGate>
-                    <MobileSubNavProvider>
-                      <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                        <AppShell>{children}</AppShell>
-                      </TooltipProvider>
-                    </MobileSubNavProvider>
-                  </OnboardingGate>
-                </Suspense>
-              </TermsAcceptanceGate>
+              <Suspense fallback={null}>
+                <OnboardingGate>
+                  <MobileSubNavProvider>
+                    <TooltipProvider delay={TOOLTIP_DELAY_MS}>
+                      <AppShell>{children}</AppShell>
+                    </TooltipProvider>
+                  </MobileSubNavProvider>
+                </OnboardingGate>
+              </Suspense>
             </QueryProvider>
           </PostHogProvider>
         </AuthProvider>

@@ -12,9 +12,9 @@ import {
  *
  * Keyed by the stable user **id string** (not the user object), so the
  * `SIGNED_IN` / `TOKEN_REFRESHED` re-renders that mint a new `user` reference
- * no longer re-fire the fetch — which is what made the terms gate flash and
- * mount twice. Both TermsAcceptanceGate and TrialWelcomeModal read this single
- * query so the first-login modal order is deterministic.
+ * no longer re-fire the fetch. Consumers include the `/accept-terms` page (for
+ * the already-accepted redirect) and `TrialWelcomeModal` (gated behind
+ * acceptance).
  */
 export function useTermsAcceptanceStatus(): UseQueryResult<TermsAcceptanceStatus> {
   const { user, isLoading: authLoading } = useAuth();

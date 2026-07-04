@@ -6,6 +6,7 @@ import { decodeJwt } from "jose";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { parseHost, getValidPort, buildSubdomainHost } from "@/lib/subdomain";
@@ -22,6 +23,7 @@ import { MFAVerify } from "@/components/profile/MFAVerify";
 import {
   exitSandbox,
   fetchAccessibleOrganizations,
+  fetchTermsAcceptanceStatus,
   getBrowserAuthSession,
   refreshBrowserSession,
   setBrowserSession,
@@ -30,12 +32,44 @@ import {
   switchBrowserOrganization,
 } from "@/features/account/client";
 
+// ── Post-login routing ─────────────────────────────────────────────────────────
+
+const POST_LOGIN_DESTINATION = "/dashboard";
+
+/**
+ * Resolves where to send the user after a successful sign-in: either the
+ * standalone `/accept-terms` page (preserving the original destination as
+ * `?next=...`), or the real destination itself. The terms check is a single
+ * fetch and is fast enough to keep behind the button spinner; if it fails
+ * (network blip, etc.) we proceed to the destination and let the normal app
+ * flow recover.
+ */
+async function resolvePostLoginDestination(): Promise<string> {
+  try {
+    const terms = await fetchTermsAcceptanceStatus();
+    if (!terms.acceptedCurrentTerms) {
+      return `/accept-terms?next=${encodeURIComponent(POST_LOGIN_DESTINATION)}`;
+    }
+  } catch {
+    // Best-effort: a failure here means the user lands on the destination
+    // without a ToS check this turn. They'll be re-checked next sign-in.
+  }
+  return POST_LOGIN_DESTINATION;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function getOrgSlug(): string | null {
   if (typeof window === "undefined") return null;
   const parsed = parseHost(window.location.host);
   return parsed.subdomain;
+}
+
+// Persists the last-resolved display name for a subdomain so post-logout
+// redirects to /login can paint the org name immediately instead of flashing
+// the raw slug while validate-domain re-resolves.
+function orgNameCacheKey(slug: string): string {
+  return `dg:org-name:${slug}`;
 }
 
 /**
@@ -344,7 +378,7 @@ function GridmasterLogin() {
       // markAuthTransition() keeps ProtectedRoute from bouncing to /login
       // while the auth context finishes settling after sign-in.
       markAuthTransition();
-      router.replace("/dashboard");
+      router.replace(await resolvePostLoginDestination());
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network")) {
@@ -363,7 +397,7 @@ function GridmasterLogin() {
     try {
       await refreshBrowserSession();
       markAuthTransition();
-      router.replace("/dashboard");
+      router.replace(await resolvePostLoginDestination());
     } catch {
       toast.error("Your session could not be verified. Please sign in again.");
       void signOutFromBrowser("local");
@@ -458,17 +492,19 @@ function GridmasterLogin() {
 
 function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // Same-org login → soft nav (smooth, no reload). After an ORG SWITCH → hard
   // nav: a soft nav leaves useOrganizationData's one-time org context pinned to
   // the previous org, which destabilizes the onboarding gate (the orientation
   // wizard flickers/shows twice or is skipped). A full reload resets every
   // org-context source to the switched org.
-  function navigateToDashboard(didSwitchOrg: boolean) {
+  async function navigateToDashboard(didSwitchOrg: boolean) {
+    const dest = await resolvePostLoginDestination();
     if (didSwitchOrg) {
-      window.location.replace("/dashboard");
+      window.location.replace(dest);
     } else {
-      router.replace("/dashboard");
+      router.replace(dest);
     }
   }
   const [email, setEmail] = useState("");
@@ -476,25 +512,37 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
-  // Seed from the ?name= param forwarded by the domain selector so the heading
-  // renders the real org name on first paint (no "organization" flash). Falls back
-  // to the slug for direct visits, then the fetch below corrects it.
+  // Seed from the ?name= param forwarded by the domain selector, then a cached
+  // value from a prior visit on this subdomain. Without the cache, sign-out
+  // (which redirects to /login with no params) would flash the raw slug until
+  // the fetch below resolves. Falls through to null only on a first-ever direct
+  // visit; the fetch corrects it within a tick.
   const [orgName, setOrgName] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const n = new URLSearchParams(window.location.search).get("name");
-    return n && n.trim() ? n : null;
+    if (n && n.trim()) {
+      try { window.localStorage.setItem(orgNameCacheKey(orgSlug), n); } catch { /* storage disabled */ }
+      return n;
+    }
+    try {
+      const cached = window.localStorage.getItem(orgNameCacheKey(orgSlug));
+      if (cached && cached.trim()) return cached;
+    } catch { /* storage disabled */ }
+    return null;
   });
 
   useSessionInvalidToast();
 
   // Resolve the authoritative display name for direct visits (no ?name= param)
-  // and to correct any stale value. Best-effort; validate-domain is cached.
+  // and to correct any stale cached value. Best-effort; validate-domain is cached.
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`)
       .then((r) => r.json())
       .then((d: { name?: string | null }) => {
-        if (!cancelled && d?.name) setOrgName(d.name);
+        if (cancelled || !d?.name) return;
+        setOrgName(d.name);
+        try { window.localStorage.setItem(orgNameCacheKey(orgSlug), d.name); } catch { /* storage disabled */ }
       })
       .catch(() => { /* best-effort */ });
     return () => { cancelled = true; };
@@ -592,6 +640,11 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
               // Don't carry a prior session's "view as user" toggle into the
               // org we just switched into (it would silently force read-only).
               setUserViewActive(false);
+              // Drop the prior org's React Query cache so the new org's
+              // dashboard never paints with stale cross-org data. The hard
+              // nav below would eventually reset this, but clearing here
+              // guarantees nothing in between hits the old cache.
+              queryClient.clear();
             } catch {
               await signOutFromBrowser("local");
               toast.error("Failed to switch organization. Please try again.");
@@ -624,7 +677,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
       }
 
       markAuthTransition();
-      navigateToDashboard(didSwitchOrg);
+      await navigateToDashboard(didSwitchOrg);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
@@ -673,6 +726,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 // Don't carry a prior session's "view as user" toggle into the
                 // org we just switched into (it would silently force read-only).
                 setUserViewActive(false);
+                queryClient.clear();
               } catch {
                 await signOutFromBrowser("local");
                 toast.error("Failed to switch organization.");
@@ -702,7 +756,7 @@ function OrgLogin({ orgSlug }: { orgSlug: string }) {
         }
 
         markAuthTransition();
-        navigateToDashboard(didSwitchOrg);
+        await navigateToDashboard(didSwitchOrg);
       } catch {
         toast.error("Unable to complete sign in. Please try again.");
         setMfaRequired(false);

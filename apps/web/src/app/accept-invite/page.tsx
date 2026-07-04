@@ -145,7 +145,8 @@ function AcceptInviteContent() {
       try {
         await recordCurrentTermsAcceptance();
       } catch {
-        // Non-blocking — TermsAcceptanceGate will catch this on next login
+        // Non-blocking — login will route the user through /accept-terms if
+        // this didn't persist for any reason.
       }
 
       // 3. Sign out so user re-authenticates with fresh JWT claims.
