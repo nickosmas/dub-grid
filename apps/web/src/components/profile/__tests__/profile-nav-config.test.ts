@@ -9,7 +9,7 @@ import {
 } from "@/components/profile/profile-nav-config";
 
 describe("profile nav config", () => {
-  it("always renders the Account group with Profile/Security/Notifications", () => {
+  it("always renders the Account group with Profile/Security/Alerts", () => {
     for (const isOnSchedule of [true, false]) {
       const groups = buildProfileNavGroups({ isOnSchedule });
       const account = groups.find((g) => g.id === "account");

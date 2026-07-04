@@ -63,7 +63,7 @@ export function buildProfileNavGroups(
     },
     {
       id: "notifications",
-      label: "Notifications",
+      label: "Alerts",
       Icon: NotificationsIcon,
       description:
         "Choose how and when DubGrid contacts you.",
