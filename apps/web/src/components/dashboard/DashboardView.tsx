@@ -837,7 +837,7 @@ export default function DashboardView({
           ? "Configure coverage"
           : "Open schedule",
         actionHref: permissions.canManageCoverageRequirements
-          ? "/settings"
+          ? "/settings?section=schedule-coverage"
           : "/schedule",
       };
     }
@@ -943,7 +943,7 @@ export default function DashboardView({
     // borders/shadows aren't clipped by the scroll container's edge). A small
     // outer gutter keeps the panes off the very screen edge.
     padding: userLockLayout
-      ? "0 24px"
+      ? "16px 24px 0"
       : isMobile
         ? "16px"
         : isTablet
@@ -1084,6 +1084,18 @@ export default function DashboardView({
             null
           }
           now={currentTime}
+          userId={authUser?.id ?? null}
+          orgTimezone={org.timezone ?? null}
+          hasIncompleteWork={
+            draftTotal > 0 ||
+            (hasAdminCapability &&
+              (focusAreas.length === 0 ||
+                departments.length === 0 ||
+                orgRoles.length === 0 ||
+                certifications.length === 0 ||
+                assignments.length === 0 ||
+                employees.length === 0))
+          }
         />
 
         {!isUserDashboardMode && (

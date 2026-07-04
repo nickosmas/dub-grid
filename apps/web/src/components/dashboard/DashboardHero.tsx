@@ -122,7 +122,7 @@ export default function DashboardHero({
           <h2
             style={{
               margin: 0,
-              fontSize: "clamp(1.25rem, 1.5vw, 1.7rem)",
+              fontSize: "var(--dg-fs-page-title)",
               fontWeight: 700,
               color: "var(--color-text-primary)",
               letterSpacing: "-0.03em",
