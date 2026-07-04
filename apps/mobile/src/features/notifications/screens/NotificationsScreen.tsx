@@ -198,6 +198,10 @@ export default function NotificationsScreen() {
             notification.id,
           );
           syncBootstrapUnread(response.unreadCount);
+          void Promise.all([
+            notificationsQuery.refetch(),
+            facetsQuery.refetch(),
+          ]);
         } catch (error) {
           pushClientFriendlyErrorToast(pushToast, {
             error,
@@ -212,7 +216,7 @@ export default function NotificationsScreen() {
         params: { id: notification.id },
       });
     },
-    [accessToken, pushToast],
+    [accessToken, facetsQuery, notificationsQuery, pushToast],
   );
 
   const handleArchive = useCallback(

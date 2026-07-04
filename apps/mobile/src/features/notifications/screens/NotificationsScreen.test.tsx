@@ -153,12 +153,18 @@ describe("NotificationsScreen", () => {
   });
 
   it("opens the detail screen when an alert is tapped and marks it read first", async () => {
-    useInfiniteQuery.mockReturnValue(
-      buildInfiniteQueryResult({
-        notifications: [SAMPLE_NOTIFICATION],
-        unreadCount: 1,
-      }),
-    );
+    const queryResult = buildInfiniteQueryResult({
+      notifications: [SAMPLE_NOTIFICATION],
+      unreadCount: 1,
+    });
+    useInfiniteQuery.mockReturnValue(queryResult);
+    const facetsRefetch = vi.fn().mockResolvedValue(undefined);
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isLoading: false,
+      refetch: facetsRefetch,
+    });
     markNotificationRead.mockResolvedValue({
       success: true,
       unreadCount: 0,
@@ -179,6 +185,13 @@ describe("NotificationsScreen", () => {
       params: { id: SAMPLE_NOTIFICATION.id },
     });
     expect(setQueryData).toHaveBeenCalled();
+    // Sidebar/chip badge bug: row-press must refetch both list + facets so
+    // filter chip counts stay accurate. handleArchive/handleMarkAllRead already
+    // do this — handleRowPress used to skip the facets refetch.
+    await waitFor(() => {
+      expect(queryResult.refetch).toHaveBeenCalled();
+      expect(facetsRefetch).toHaveBeenCalled();
+    });
   });
 
   it("marks all unread alerts as read", async () => {
