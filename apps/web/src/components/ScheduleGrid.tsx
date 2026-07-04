@@ -2718,11 +2718,12 @@ const SectionBlock = memo(function SectionBlock({
                                     );
                                   }
 
-                                  // Multi-pill: render each shift as a separate vertical pill
-                                  const multiTopInset =
-                                    showsDraftBadge || showsPublishDiff
-                                      ? RAISED_DIFF_BADGE_TOP_INSET
-                                      : 3;
+                                  // Multi-pill: render each shift as a separate vertical pill.
+                                  // Keep the inset stable regardless of diff state so split
+                                  // shifts stay the same height as non-split cells; the diff
+                                  // badge floats above with topOffset: -8 and the cell allows
+                                  // overflow.
+                                  const multiTopInset = 3;
                                   const multiSideInset = 3;
                                   const multiBottomInset = 3;
                                   const multiAuthorLeftInset =

@@ -299,23 +299,24 @@ export function AddManagementUserToScheduleModal({
               onChange={(value) => setCertificationId(value ? Number(value) : null)}
             />
           </div>
-          <div>
-            <label style={fieldLabelStyle}>{roleLabel}</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {roles.map((role) => (
-                <SelectableTag
-                  key={role.id}
-                  selected={roleIds.includes(role.id)}
-                  onClick={() => toggleRole(role.id)}
-                  padding="5px 12px"
-                  unselectedBackground="var(--color-bg-secondary)"
-                  unselectedBorderColor="transparent"
-                  unselectedTextColor="var(--color-text-faint)"
-                >
-                  {role.abbr}
-                </SelectableTag>
-              ))}
-            </div>
+        </div>
+
+        <div>
+          <label style={fieldLabelStyle}>{roleLabel}</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {roles.map((role) => (
+              <SelectableTag
+                key={role.id}
+                selected={roleIds.includes(role.id)}
+                onClick={() => toggleRole(role.id)}
+                padding="5px 12px"
+                unselectedBackground="var(--color-bg-secondary)"
+                unselectedBorderColor="transparent"
+                unselectedTextColor="var(--color-text-faint)"
+              >
+                {role.abbr}
+              </SelectableTag>
+            ))}
           </div>
         </div>
 

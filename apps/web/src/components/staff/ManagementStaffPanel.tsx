@@ -12,7 +12,7 @@ import {
   normalizeOptionalUsPhone,
   normalizeStaffName,
 } from "@dubgrid/contracts";
-import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
@@ -188,6 +188,25 @@ export function ManagementStaffPanel({
       closePanel();
     }
   }, [closePanel, requestClose]);
+
+  const discardChanges = useCallback(() => {
+    setFirstName(savedDraft.firstName);
+    setLastName(savedDraft.lastName);
+    setEmail(savedDraft.email);
+    setPhone(savedDraft.phone);
+    setDeptIds([...savedDraft.managementDepartmentIds]);
+    setTouched({});
+  }, [savedDraft]);
+
+  const handleDismissClick = useCallback(() => {
+    if (hasChanges) {
+      discardChanges();
+    } else {
+      closePanel();
+    }
+  }, [closePanel, discardChanges, hasChanges]);
+
+  const dismissLabel = getEditorDismissLabel({ hasUnsavedChanges: hasChanges });
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -640,31 +659,43 @@ export function ManagementStaffPanel({
                 </div>
               )}
               {accessControls}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                {!isSelf && person.managementDepartmentIds.length > 0 && deptIds.length > 0 && (
+              <EditorActionRow
+                destructiveAction={
+                  !isSelf && person.managementDepartmentIds.length > 0 && deptIds.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markTouched("managementDepartmentIds");
+                        setDeptIds([]);
+                      }}
+                      className="dg-btn dg-btn-ghost"
+                      style={{ color: "var(--color-danger)" }}
+                    >
+                      Remove from Management
+                    </button>
+                  ) : undefined
+                }
+                secondaryAction={(
                   <button
-                    type="button"
-                    onClick={() => {
-                      markTouched("managementDepartmentIds");
-                      setDeptIds([]);
-                    }}
-                    className="dg-btn dg-btn-ghost"
-                    style={{ color: "var(--color-danger)" }}
+                    onClick={handleDismissClick}
+                    disabled={saving}
+                    className="dg-btn dg-btn-secondary"
                   >
-                    Remove from Management
+                    {dismissLabel}
                   </button>
                 )}
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !hasChanges}
-                  className="dg-btn dg-btn-primary"
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  <ButtonLoading loading={saving} spinnerSize={16}>
-                    {EDITOR_ACTION_LABELS.save}
-                  </ButtonLoading>
-                </button>
-              </div>
+                primaryAction={(
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !hasChanges}
+                    className="dg-btn dg-btn-primary"
+                  >
+                    <ButtonLoading loading={saving} spinnerSize={16}>
+                      {EDITOR_ACTION_LABELS.save}
+                    </ButtonLoading>
+                  </button>
+                )}
+              />
               <div
                 style={{
                   fontSize: "var(--dg-fs-caption)",
@@ -848,11 +879,11 @@ export function ManagementStaffPanel({
               <EditorActionRow
                 secondaryAction={(
                   <button
-                    onClick={handleRequestClose}
+                    onClick={handleDismissClick}
                     disabled={saving}
                     className="dg-btn dg-btn-secondary"
                   >
-                    {EDITOR_ACTION_LABELS.close}
+                    {dismissLabel}
                   </button>
                 )}
                 primaryAction={(

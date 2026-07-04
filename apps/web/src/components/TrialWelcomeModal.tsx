@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/Modal";
 import { usePermissions, useTermsAcceptanceStatus } from "@/hooks";
@@ -73,6 +72,7 @@ export default function TrialWelcomeModal() {
     <Modal
       title="Your trial has started"
       onClose={handleClose}
+      disableOverlayClose
       style={{ maxWidth: 460 }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -102,29 +102,6 @@ export default function TrialWelcomeModal() {
           To keep using DubGrid after the trial, add a subscription before it
           ends. You can do that any time from Billing in Settings.
         </p>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: 8,
-            marginTop: 8,
-          }}
-        >
-          <button
-            type="button"
-            className="dg-btn dg-btn-secondary"
-            onClick={handleClose}
-          >
-            Got it
-          </button>
-          <Link
-            href="/settings?section=org-billing"
-            className="dg-btn dg-btn-primary"
-            onClick={handleClose}
-          >
-            View billing
-          </Link>
-        </div>
       </div>
     </Modal>
   );

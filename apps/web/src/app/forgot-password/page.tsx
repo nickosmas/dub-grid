@@ -30,7 +30,7 @@ function ForgotPasswordContent() {
       if (msg.includes("rate") || msg.includes("limit")) {
         toast.error("Too many requests. Please wait a few minutes and try again.");
       } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network error — please check your connection.");
+        toast.error("Network error. Check your connection and try again.");
       } else {
         // Always show success to prevent email enumeration
         setSent(true);

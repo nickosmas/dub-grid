@@ -20,11 +20,17 @@ import {
   type UserExistsByEmailResult,
 } from "@/features/organization/client";
 import { useIsInSandbox } from "@/hooks";
+import { usePermissions } from "@/features/permissions/client";
 
 const ROLE_OPTIONS = [
   { value: "user" as const, label: "User" },
   { value: "admin" as const, label: "Admin" },
 ];
+
+const SUPER_ADMIN_OPTION = {
+  value: "super_admin" as const,
+  label: "Super Admin",
+};
 
 interface InviteEmployeeModalProps {
   /** Employee to invite. When null, operates in management staff mode (no employee link). */
@@ -47,6 +53,14 @@ export default function InviteEmployeeModal({
 }: InviteEmployeeModalProps) {
   const isManagementInvite = !employee;
   const isInSandbox = useIsInSandbox();
+  const { isSuperAdmin, isGridmaster } = usePermissions();
+  const roleOptions = useMemo(
+    () =>
+      isSuperAdmin || isGridmaster
+        ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION]
+        : ROLE_OPTIONS,
+    [isSuperAdmin, isGridmaster],
+  );
   const [email, setEmail] = useState(employee?.email || "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -501,7 +515,7 @@ export default function InviteEmployeeModal({
             <label style={labelStyle}>Role</label>
             <CustomSelect
               value={role}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
               onChange={(v) => setRole(v as AssignableOrganizationRole)}
             />
           </div>

@@ -361,7 +361,7 @@ export function useShiftRequests(
       if (!orgId) return false;
       try {
         await claimShiftRequest(requestId, claimerEmpId, orgId);
-        toast.success("Shift claimed — awaiting admin approval");
+        toast.success("Shift claimed. Awaiting admin approval.");
         queueNotification({
           action: "shift_request_claimed",
           orgId,
@@ -394,7 +394,7 @@ export function useShiftRequests(
           input,
           focusAreaId,
         );
-        toast.success("Volunteered for shift — awaiting admin approval");
+        toast.success("Volunteered for shift. Awaiting admin approval.");
         if (id) {
           queueNotification({
             action: "shift_request_created",

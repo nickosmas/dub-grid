@@ -84,10 +84,10 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
   const features = featureCards[role] ?? featureCards.user;
 
   const heading = isSaOrientation
-    ? `Welcome to ${orgName ?? "DubGrid"}`
+    ? `Welcome to ${orgName ?? "DubGrid"}!`
     : isSuperAdmin
-      ? "Welcome to DubGrid"
-      : `Welcome to ${orgName ?? "DubGrid"}`;
+      ? "Welcome to DubGrid!"
+      : `Welcome to ${orgName ?? "DubGrid"}!`;
 
   const subtext = isSaOrientation
     ? "You\u2019ve been added as a super admin. Let\u2019s take a quick look at what you can do."

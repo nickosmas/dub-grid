@@ -16,6 +16,7 @@ import type {
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { History } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import {
   createAssignmentDefinitionIdByPairMap,
   deriveAssignmentDefinitionIdsFromAssignments,
@@ -223,7 +224,7 @@ function ChangeRow({
     mainDescription = <span style={{ color: "var(--color-danger-text)", textDecoration: "line-through" }}>{fromLabel}</span>;
   } else if (timeOnlyChange) {
     // Only times changed — don't show "M → M"
-    mainDescription = <span>{toLabel} — {timeAnnotation ?? "time updated"}</span>;
+    mainDescription = <span>{toLabel} ({timeAnnotation ?? "time updated"})</span>;
     timeAnnotation = null; // already shown inline
   } else {
     mainDescription = <span>{fromLabel} → {toLabel}</span>;
@@ -414,8 +415,12 @@ export default function PublishHistoryPanel({
           <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" }}>
             Publish History
           </div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-            {loading ? "Loading..." : `${entries.length} publish${entries.length !== 1 ? "es" : ""}`}
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2, minHeight: 14 }}>
+            {loading ? (
+              <span className="dg-skeleton" style={{ display: "inline-block", width: 88, height: 10, borderRadius: 4 }} />
+            ) : (
+              `${entries.length} publish${entries.length !== 1 ? "es" : ""}`
+            )}
           </div>
         </div>
         <button
@@ -434,11 +439,29 @@ export default function PublishHistoryPanel({
         </button>
       </div>
 
+      <ProgressBar loading={loading} />
+
       {/* Body */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
         {loading && entries.length === 0 && (
-          <div style={{ textAlign: "center", padding: 40, color: "var(--color-text-muted)" }}>
-            Loading publish history...
+          <div aria-hidden style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: 12,
+                  border: "1px solid var(--color-border-light)",
+                  borderRadius: "var(--dg-radius-md)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div className="dg-skeleton" style={{ width: 140, height: 12, borderRadius: 4 }} />
+                <div className="dg-skeleton" style={{ width: "60%", height: 10, borderRadius: 4 }} />
+                <div className="dg-skeleton" style={{ width: 84, height: 18, borderRadius: 999 }} />
+              </div>
+            ))}
           </div>
         )}
 

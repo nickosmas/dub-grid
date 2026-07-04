@@ -11,6 +11,7 @@ import {
 } from "@/features/account/client";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
 import { Inbox } from "lucide-react";
@@ -199,6 +200,39 @@ function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) 
   );
 }
 
+function RequestQueueSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 2 }).map((_, i) => (
+        <div key={i} className="dg-card" aria-hidden>
+          <div className="dg-card-header">
+            <div className="flex flex-col gap-2">
+              <div className="dg-skeleton" style={{ width: 140, height: 14, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 200, height: 12, borderRadius: 4 }} />
+            </div>
+            <div className="dg-skeleton" style={{ width: 64, height: 18, borderRadius: 999 }} />
+          </div>
+          <div className="dg-card-body flex flex-col gap-3">
+            <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((__, j) => (
+                <div key={j} className="flex flex-col gap-2">
+                  <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
+                  <div className="dg-skeleton" style={{ width: "80%", height: 12, borderRadius: 4 }} />
+                </div>
+              ))}
+            </div>
+            <div className="dg-skeleton" style={{ width: "100%", height: 96, borderRadius: 8 }} />
+            <div className="flex gap-2">
+              <div className="dg-skeleton" style={{ width: 96, height: 32, borderRadius: 6 }} />
+              <div className="dg-skeleton" style={{ width: 96, height: 32, borderRadius: 6 }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function ProfileChangeRequestQueue({
   orgId,
   focusAreas,
@@ -260,9 +294,9 @@ export function ProfileChangeRequestQueue({
     : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       <div>
-        <h1 className="m-0 text-[24px] font-bold tracking-tight text-[var(--color-text-primary)]">
+        <h1 className="m-0 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
           People requests
         </h1>
         <p className="mb-0 mt-1 text-[14px] text-[var(--color-text-muted)]">
@@ -270,12 +304,10 @@ export function ProfileChangeRequestQueue({
         </p>
       </div>
 
+      <ProgressBar loading={loading} />
+
       {loading ? (
-        <div className="dg-card">
-          <div className="dg-card-body text-[14px] text-[var(--color-text-muted)]">
-            Loading requests...
-          </div>
-        </div>
+        <RequestQueueSkeleton />
       ) : requests.length === 0 ? (
         <EmptyState
           icon={<Inbox size={28} />}

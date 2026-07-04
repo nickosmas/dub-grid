@@ -2,8 +2,8 @@ import type { CSSProperties, ReactNode } from "react";
 
 interface PageContainerProps {
   children: ReactNode;
-  /** Maximum content width in px. Default 1200. */
-  maxWidth?: number;
+  /** Maximum content width in px, or "none" for full-bleed. Default 1200. */
+  maxWidth?: number | "none";
   /** Skip the entry animation (e.g. when nested inside another animated container). */
   noAnimation?: boolean;
   /** Extra style overrides for the outer scroller. */
@@ -44,7 +44,7 @@ export function PageContainer({
         className={noAnimation ? undefined : "dg-page-enter"}
         style={{
           width: "100%",
-          maxWidth,
+          ...(maxWidth === "none" ? null : { maxWidth }),
           ...contentStyle,
         }}
       >

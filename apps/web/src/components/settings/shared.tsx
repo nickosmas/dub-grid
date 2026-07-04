@@ -40,7 +40,7 @@ export function normalizeTimeCompare(t: string | null | undefined): string | nul
 // ── Section card (headerless container) ─────────────────────────────────────────
 export function SectionCard({
   children,
-  maxWidth = 860,
+  maxWidth = 1120,
   noPadding = false,
 }: {
   children: React.ReactNode;
@@ -278,7 +278,7 @@ export function TimeInput12h({ value, onChange, disabled }: { value: string | nu
         onChange={(val) => onChange(to24h(val, minute, period))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 68 }}
+        style={{ width: 72 }}
       />
       <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
       <CustomSelect
@@ -287,7 +287,7 @@ export function TimeInput12h({ value, onChange, disabled }: { value: string | nu
         onChange={(val) => onChange(to24h(hour, val, period))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 68 }}
+        style={{ width: 72 }}
       />
       <CustomSelect
         value={period}
@@ -295,7 +295,7 @@ export function TimeInput12h({ value, onChange, disabled }: { value: string | nu
         onChange={(val) => onChange(to24h(hour, minute, val as "AM" | "PM"))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 72 }}
+        style={{ width: 78 }}
       />
     </div>
   );

@@ -68,3 +68,5 @@ export type { SelfProfileRecord } from "./useSelfProfileData";
 
 export { useOrgClaims } from "./useOrgClaims";
 export type { OrgClaims } from "./useOrgClaims";
+
+export { useDismissibleBanner } from "./useDismissibleBanner";

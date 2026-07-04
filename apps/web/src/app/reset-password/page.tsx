@@ -128,7 +128,7 @@ function ResetPasswordContent() {
       } else if (msg.includes("weak") || msg.includes("short")) {
         setFormError("Password is too weak. Please choose a stronger password.");
       } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network error — please check your connection.");
+        toast.error("Network error. Check your connection and try again.");
       } else {
         toast.error("Failed to update password. Please try again.");
       }

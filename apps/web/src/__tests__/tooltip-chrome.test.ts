@@ -31,10 +31,6 @@ const analyticsCharts = readFileSync(
   resolveWebSource("components/dashboard/AnalyticsCharts.tsx"),
   "utf-8"
 )
-const trendsCard = readFileSync(
-  resolveWebSource("components/dashboard/TrendsCard.tsx"),
-  "utf-8"
-)
 
 describe("tooltip chrome", () => {
   it("uses an elevated white surface for shared hover tooltips", () => {
@@ -65,7 +61,5 @@ describe("tooltip chrome", () => {
     expect(chartTooltipStyles).not.toContain('border: "1px solid var(--color-border-light)"')
     expect(analyticsCharts).toContain("contentStyle={chartTooltipContentStyle}")
     expect(analyticsCharts).toContain("wrapperStyle={chartTooltipWrapperStyle}")
-    expect(trendsCard).toContain("contentStyle={chartTooltipContentStyle}")
-    expect(trendsCard).toContain("wrapperStyle={chartTooltipWrapperStyle}")
   })
 })

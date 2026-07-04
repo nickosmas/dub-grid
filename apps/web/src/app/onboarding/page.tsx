@@ -107,7 +107,7 @@ export default function OnboardingPage() {
 
         <h1
           style={{
-            fontSize: "28px",
+            fontSize: "var(--dg-fs-page-title)",
             fontWeight: 800,
             marginBottom: "16px",
             color: "var(--color-text-primary)",

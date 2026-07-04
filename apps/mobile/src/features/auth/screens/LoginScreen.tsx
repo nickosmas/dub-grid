@@ -445,7 +445,7 @@ export default function LoginScreen() {
             ) : stage === "credentials" ? (
               <View style={styles.stage}>
                 <View style={styles.header}>
-                  <Text style={styles.title}>Welcome back</Text>
+                  <Text style={styles.title}>Welcome back!</Text>
                   <Text style={styles.subtitle}>
                     Continue to{" "}
                     <Text style={styles.subtitleStrong}>{orgLabel}</Text>

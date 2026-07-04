@@ -16,7 +16,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
   const perms = usePermissions();
   const { setupStatus, loading: orgLoading, org } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
 
   const isLoading = orgLoading || empLoading || perms.isLoading;
   const hasEmployees = employees.length > 0;
@@ -104,7 +104,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             Refresh
           </button>
           <button
-            onClick={() => signOutLocal()}
+            onClick={() => signOut()}
             style={{
               padding: "10px 24px",
               borderRadius: 10,
