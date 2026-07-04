@@ -154,6 +154,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/goodbye" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/cookie-policy" ||

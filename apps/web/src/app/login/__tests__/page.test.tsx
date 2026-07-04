@@ -4,7 +4,13 @@
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LoginPage from "@/app/login/page";
+
+function renderWithQueryClient(ui: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 // Mock account client — setBrowserSession is called after server-side auth succeeds
 const mockSetSession = vi.fn();
@@ -60,7 +66,7 @@ describe("Login page submit states", () => {
     // Arrange: fetch never resolves so loading stays true
     vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
 
-    const { container } = render(<LoginPage />);
+    const { container } = renderWithQueryClient(<LoginPage />);
     submitForm(container);
 
     await waitFor(() => {
@@ -84,7 +90,7 @@ describe("Login page submit states", () => {
       ),
     );
 
-    const { container } = render(<LoginPage />);
+    const { container } = renderWithQueryClient(<LoginPage />);
     submitForm(container);
 
     await waitFor(() => {
