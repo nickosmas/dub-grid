@@ -790,18 +790,32 @@ CREATE POLICY "shift_requests_delete"
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own notifications
+-- Users can read their own notifications, scoped to their current session org.
+-- Platform notifications (org_id IS NULL) are also visible — they target the
+-- user regardless of which org they're in. The org clause prevents a user
+-- who belongs to multiple orgs from seeing org-B notifications while their
+-- session is on org-A. Gridmasters bypass via the FOR ALL policy below.
 CREATE POLICY "own_notifications_select"
   ON public.notifications FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  );
 
--- Users can update (mark read) their own notifications
+-- Users can update (mark read) their own notifications, same scope as select.
 CREATE POLICY "own_notifications_update"
   ON public.notifications FOR UPDATE TO authenticated
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  );
 
--- Gridmaster can read all notifications (for support/debugging)
+-- Gridmaster can read/write all notifications (support/debugging + platform
+-- notifications they receive for ALL their accessible orgs).
 CREATE POLICY "gridmaster_all_notifications"
   ON public.notifications FOR ALL TO authenticated
   USING (public.is_gridmaster())
@@ -812,10 +826,13 @@ CREATE POLICY "notifications_insert_blocked"
   ON public.notifications FOR INSERT TO authenticated
   WITH CHECK (FALSE);
 
--- Users can delete their own notifications from the inbox view
+-- Users can delete their own notifications, same scope as select.
 CREATE POLICY "own_notifications_delete"
   ON public.notifications FOR DELETE TO authenticated
-  USING (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  );
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

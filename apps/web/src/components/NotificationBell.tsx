@@ -157,7 +157,7 @@ function NotificationIcon({ type }: { type: string }) {
 
 /**
  * @param onViewAll Optional override for the "View all" footer. When provided,
- *   it replaces the default `/notifications` link, e.g. so the gridmaster portal
+ *   it replaces the default `/alerts` link, e.g. so the gridmaster portal
  *   can route to its own in-portal feed view instead of ejecting to the app.
  */
 export default function NotificationBell({
@@ -240,7 +240,7 @@ export default function NotificationBell({
     try {
       await markAllNotificationsRead();
       invalidateAll();
-      toast.success("All notifications marked as read");
+      toast.success("All alerts marked as read");
     } catch (err) {
       toast.error(formatClientErrorMessage(err, "Couldn't mark all read"));
     } finally {
@@ -256,7 +256,7 @@ export default function NotificationBell({
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>
       <button
         onClick={handleToggle}
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-label={`Alerts${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         aria-expanded={open}
         aria-haspopup="true"
         style={{
@@ -319,7 +319,7 @@ export default function NotificationBell({
       {open && (
         <div
           role="region"
-          aria-label="Notifications"
+          aria-label="Alerts"
           style={{
             position: "absolute",
             top: "calc(100% + 6px)",
@@ -347,12 +347,12 @@ export default function NotificationBell({
             }}
           >
             <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-              Notifications
+              Alerts
             </span>
             {unreadCount > 0 && (
               <button
                 onClick={() => setConfirmingMarkAllRead(true)}
-                aria-label="Mark all notifications as read"
+                aria-label="Mark all alerts as read"
                 style={{
                   background: "none",
                   border: "none",
@@ -377,7 +377,7 @@ export default function NotificationBell({
               </div>
             ) : notifications.length === 0 ? (
               <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
-                No notifications
+                No alerts
               </div>
             ) : (
               notifications.map((n) => {
@@ -386,7 +386,7 @@ export default function NotificationBell({
                   <button
                     key={n.id}
                     onClick={() => { if (isUnread) handleMarkRead(n.id); }}
-                    aria-label={`${n.title}: ${n.message}${isUnread ? " (unread — click to mark as read)" : ""}`}
+                    aria-label={`${n.title}: ${n.message}${isUnread ? " (unread, click to mark as read)" : ""}`}
                     style={{
                       display: "flex",
                       gap: 12,
@@ -459,11 +459,11 @@ export default function NotificationBell({
                 fontFamily: "inherit",
               }}
             >
-              View all notifications
+              View all alerts
             </button>
           ) : (
             <Link
-              href="/notifications"
+              href="/alerts"
               onClick={() => setOpen(false)}
               style={{
                 display: "flex",
@@ -479,7 +479,7 @@ export default function NotificationBell({
                 fontFamily: "inherit",
               }}
             >
-              View all notifications
+              View all alerts
             </Link>
           )}
         </div>
@@ -489,8 +489,8 @@ export default function NotificationBell({
           title="Mark all read?"
           message={
             unreadCount === 1
-              ? "This marks your one unread notification as read."
-              : `This marks all ${unreadCount} unread notifications as read.`
+              ? "This marks your one unread alert as read."
+              : `This marks all ${unreadCount} unread alerts as read.`
           }
           confirmLabel="Mark all read"
           variant="info"
