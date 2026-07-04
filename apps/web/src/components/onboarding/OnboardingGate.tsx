@@ -21,7 +21,9 @@ import { queryKeys } from "@/lib/query-keys";
 const PUBLIC_ROUTES = [
   "/",
   "/login",
+  "/goodbye",
   "/accept-invite",
+  "/accept-terms",
   "/auth",
   "/api",
   "/terms",

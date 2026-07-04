@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { Monitor, Smartphone, Trash2 } from "lucide-react";
+import { Monitor, Smartphone } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   fetchAccountSessions,
   getBrowserAuthSession,
   revokeAccountSession,
 } from "@/features/account/client";
+import { useLogout } from "@/hooks/useLogout";
 import { queryKeys } from "@/lib/query-keys";
 
 interface UserSession {
@@ -73,6 +74,7 @@ function extractSupabaseSessionId(accessToken: string): string | null {
 export function SessionList() {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
+  const { signOut } = useLogout();
 
   const sessionsQuery = useQuery({
     queryKey: user ? queryKeys.account.sessions(user.id) : ["account", "anon", "sessions"],
@@ -129,6 +131,10 @@ export function SessionList() {
     : null;
 
   function handleRevoke(session: UserSession) {
+    if (session.isCurrent) {
+      signOut({ scope: "local" });
+      return;
+    }
     revokeMutation.mutate(session);
   }
 
@@ -188,19 +194,16 @@ export function SessionList() {
                 {s.ipAddress === "::1" ? "localhost" : s.ipAddress ?? "Unknown IP"} &middot; {formatRelative(s.lastActiveAt)}
               </div>
             </div>
-            {!s.isCurrent && (
-              <button
-                onClick={() => handleRevoke(s)}
-                disabled={revokingId === s.id}
-                className="dg-btn dg-btn-ghost dg-btn-xs"
-                style={{ color: "var(--color-danger)" }}
-                aria-label="Revoke session"
-              >
-                <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
-                  <Trash2 size={14} />
-                </ButtonLoading>
-              </button>
-            )}
+            <button
+              onClick={() => handleRevoke(s)}
+              disabled={revokingId === s.id}
+              className="dg-btn dg-btn-ghost dg-btn-xs"
+              style={{ color: "var(--color-danger)" }}
+            >
+              <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
+                Sign out
+              </ButtonLoading>
+            </button>
           </div>
         );
       })}

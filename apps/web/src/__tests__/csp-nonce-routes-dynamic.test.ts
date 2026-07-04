@@ -22,6 +22,7 @@ const APP_DIR = join(__dirname, "..", "app");
 // CSP (its public-route list) — these are allowed to be statically prerendered.
 const PUBLIC_SEGMENTS = new Set([
   "login",
+  "goodbye",
   "privacy",
   "terms",
   "cookie-policy",

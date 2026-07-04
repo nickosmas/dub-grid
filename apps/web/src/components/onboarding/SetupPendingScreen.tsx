@@ -12,7 +12,7 @@ import { useLogout } from "@/hooks";
  * configuration permissions completes setup.
  */
 export default function SetupPendingScreen() {
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
 
   // Auto-refresh every 30s to check if admin has completed setup
   useEffect(() => {
@@ -96,7 +96,7 @@ export default function SetupPendingScreen() {
             Refresh
           </button>
           <button
-            onClick={() => signOutLocal()}
+            onClick={() => signOut()}
             type="button"
             style={{
               padding: "10px 24px",

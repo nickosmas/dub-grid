@@ -19,6 +19,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import {
   completeBillingCheckout,
   fetchOrganizationBilling,
@@ -550,7 +551,7 @@ export default function BillingSettings({
   organization: { id: string };
 }) {
   const queryClient = useQueryClient();
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
   const isInSandbox = useIsInSandbox();
   const sandboxSourceOrgId = useSandboxSourceOrgId();
   const searchParams = useSearchParams();
@@ -772,16 +773,33 @@ export default function BillingSettings({
             </div>
           )}
 
+          <ProgressBar loading={billingQuery.isLoading || !billing} />
+
           {billingQuery.isLoading || !billing ? (
             <div
+              aria-hidden
               style={{
-                padding: "8px 0",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 12,
               }}
             >
-              Loading billing...
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    padding: 14,
+                    borderRadius: "var(--dg-radius-md)",
+                    border: "1px solid var(--color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
+                  <div className="dg-skeleton" style={{ width: 64, height: 20, borderRadius: 4 }} />
+                </div>
+              ))}
             </div>
           ) : (
             <>
@@ -907,7 +925,7 @@ export default function BillingSettings({
                     <button
                       type="button"
                       className="dg-btn dg-btn-secondary"
-                      onClick={() => void signOutLocal()}
+                      onClick={() => signOut()}
                     >
                       <LogOut size={15} aria-hidden="true" />
                       Sign out
