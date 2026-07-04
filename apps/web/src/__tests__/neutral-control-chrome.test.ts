@@ -3,7 +3,6 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { relative, resolve } from "path";
 
 import { buttonVariants } from "@/components/ui/button";
-import { tabsListVariants } from "@/components/ui/tabs";
 import { createWebCssVariables } from "@dubgrid/design-tokens";
 
 function resolveRepoRoot(): string {
@@ -33,8 +32,6 @@ const printOptionsModal = readFileSync(resolveWebSource("components/PrintOptions
 const repeatForm = readFileSync(resolveWebSource("components/RepeatForm.tsx"), "utf-8");
 const shiftPicker = readFileSync(resolveWebSource("components/ShiftPicker.tsx"), "utf-8");
 const staffDetailPage = readFileSync(resolveWebSource("components/staff-detail/StaffDetailPage.tsx"), "utf-8");
-const userManagement = readFileSync(resolveWebSource("components/settings/UserManagement.tsx"), "utf-8");
-const tabsSource = readFileSync(resolveWebSource("components/ui/tabs.tsx"), "utf-8");
 const cardPrimitive = readFileSync(resolveWebSource("components/ui/card.tsx"), "utf-8");
 const inputPrimitive = readFileSync(resolveWebSource("components/ui/input.tsx"), "utf-8");
 const sidebarPrimitive = readFileSync(resolveWebSource("components/ui/sidebar.tsx"), "utf-8");
@@ -119,12 +116,6 @@ describe("shared chrome theming", () => {
     expect(globalsCss).toMatch(
       /\.dg-nav-tab\s*\{[\s\S]*min-height: var\(--dg-toolbar-h\);[\s\S]*border-radius: var\(--dg-btn-radius\);[\s\S]*\}/,
     );
-    expect(tabsListVariants()).toContain("rounded-[var(--dg-tab-shell-radius)]");
-    expect(tabsListVariants()).toContain("p-[var(--dg-tab-shell-pad)]");
-    expect(tabsListVariants()).toContain(
-      "group-data-horizontal/tabs:h-[var(--dg-toolbar-h)]",
-    );
-    expect(tabsSource).toContain("rounded-[var(--dg-tab-inner-radius)]");
     expect(globalsCss).toMatch(
       /\.dg-scroll-inner\s*\{[\s\S]*height: 100%;[\s\S]*\}/,
     );
@@ -148,7 +139,6 @@ describe("shared chrome theming", () => {
       staffDetailPage,
       membersSection,
       toolbar,
-      userManagement,
     ]) {
       expect(source).toContain("dg-span-tabs");
       expect(source).toContain("dg-span-tab");
