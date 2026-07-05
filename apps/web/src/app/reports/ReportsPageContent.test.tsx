@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ReportsPageContent from "./ReportsPageContent";
 
 const usePermissions = vi.fn();
@@ -260,6 +260,10 @@ describe("ReportsPageContent", () => {
     exportOperationsReportPdf.mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("keeps preview gated behind Generate report", async () => {
     renderReports();
     const currentWeekOptionLabel = getCurrentWeekOptionLabel();
@@ -382,6 +386,8 @@ describe("ReportsPageContent", () => {
   });
 
   it("shows the custom calendar only after choosing a custom date range", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-05T00:00:00.000Z"));
     renderReports();
 
     expect(await screen.findByRole("heading", { name: "Reports" })).toBeInTheDocument();

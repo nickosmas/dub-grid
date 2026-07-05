@@ -175,7 +175,7 @@ describe("SettingsRoute", () => {
       enabled: false,
     });
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/schedule");
+      expect(mockReplace).toHaveBeenCalledWith("/profile");
     });
   });
 
