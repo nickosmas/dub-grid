@@ -1,5 +1,5 @@
 import {
-  supabase, OptimisticLockError, logAudit,
+  supabase, OptimisticLockError, logAudit, fetchAllRows,
 } from "./shared";
 import { fetchAssignmentDefinitions } from "./config";
 import type { DbScheduleCell } from "./types";
@@ -52,19 +52,28 @@ async function fetchNormalizedShifts(
   endDate?: string,
   segmentCompatibility?: SegmentCompatibilityMaps | null,
 ): Promise<ShiftMap> {
-  let query = supabase
-    .from("schedule_cells")
-    .select(
-      "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
-    )
-    .eq("org_id", orgId);
-  if (startDate) query = query.gte("date", startDate);
-  if (endDate) query = query.lte("date", endDate);
-  const { data, error } = await query;
-  if (error) throw error;
+  const buildPage = (from: number, to: number) => {
+    let query = supabase
+      .from("schedule_cells")
+      .select(
+        "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
+      )
+      .eq("org_id", orgId);
+    if (startDate) query = query.gte("date", startDate);
+    if (endDate) query = query.lte("date", endDate);
+    return query
+      .order("date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+  };
+  // A single unpaged query here would silently truncate at PostgREST's
+  // max_rows cap (200 OK, rows just missing) once an org/date window has
+  // more schedule_cells than the configured limit — fetchAllRows paginates
+  // past that regardless of what the cap is set to.
+  const data = await fetchAllRows<DbScheduleCell>(buildPage);
 
   let assignmentIdByPair: Map<string, number> | undefined;
-  if (!segmentCompatibility && (data?.length ?? 0) > 0) {
+  if (!segmentCompatibility && data.length > 0) {
     assignmentIdByPair = createAssignmentDefinitionIdByPairMap(
       await fetchAssignmentDefinitions(orgId, true),
     );
@@ -72,7 +81,7 @@ async function fetchNormalizedShifts(
 
   const atMap = absenceTypeMap ?? new Map<number, string>();
   const map: ShiftMap = {};
-  for (const row of (data ?? []) as DbScheduleCell[]) {
+  for (const row of data) {
     const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
       isScheduler,
       assignmentLabelMap,

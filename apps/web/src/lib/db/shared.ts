@@ -144,6 +144,45 @@ export async function saveNamedEntities<T extends { id: number; name: string }>(
   return { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length };
 }
 
+// ── Auto-paginating row fetch ────────────────────────────────────────────────
+
+export const DEFAULT_PAGE_SIZE = 500;
+
+export interface PagedQueryResult<T> {
+  data: T[] | null;
+  error: { message: string } | null;
+}
+
+/**
+ * Loops `fetchPage(from, to)` — each call must build and return a FRESH
+ * query (Supabase builders are single-use once awaited) filtered to that row
+ * window via `.range(from, to)` on a query with a stable `.order(...)` —
+ * accumulating pages until one comes back with fewer rows than `pageSize`.
+ * PostgREST's own row cap (`max_rows`) differs across environments and
+ * truncates silently (200 OK, no error, no thrown exception), so we detect
+ * "last page" ourselves using a page size safely below any plausible server
+ * cap rather than trusting the server not to have truncated already.
+ */
+export async function fetchAllRows<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PagedQueryResult<T>>,
+  pageSize: number = DEFAULT_PAGE_SIZE,
+): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await fetchPage(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    // A page shorter than requested means we've reached the end. A page
+    // that's an exact multiple of pageSize triggers one harmless trailing
+    // request that comes back empty — expected, not an off-by-one to "fix".
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+  return rows;
+}
+
 /** Strip seconds from PostgreSQL TIME values ("HH:MM:SS" → "HH:MM"). */
 export function trimTime(t: string | null): string | null {
   if (!t) return t;

@@ -178,7 +178,10 @@ import {
 } from "./_lib/editor-session";
 import {
   clampProgress,
+  daysBetweenDateKeys,
   DRAFT_CHANGED_BROADCAST_KEY,
+  FETCH_WINDOW_RECENTER_BUFFER_DAYS,
+  FETCH_WINDOW_RECENTER_THRESHOLD_DAYS,
   formatImportPreviousSkipDescription,
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
@@ -338,16 +341,30 @@ function SchedulerContent() {
     return () => window.clearInterval(interval);
   }, []);
 
-  // Date range for shift fetching: ±90 days from today.
-  // Shifts outside this window are not loaded — keeps payload small for mature orgs.
-  const shiftFetchStart = useMemo(
+  // Default date range for shift fetching: ±90 days from today. Used only to
+  // seed/reset the actually-loaded window below — never as a fetch bound
+  // directly, since the loaded window must follow navigation (see the
+  // "sync loaded window to current view" effect further down).
+  const defaultShiftFetchStart = useMemo(
     () => formatDateKey(addDays(today, -90)),
     [today],
   );
-  const shiftFetchEnd = useMemo(
+  const defaultShiftFetchEnd = useMemo(
     () => formatDateKey(addDays(today, 90)),
     [today],
   );
+
+  // The currently-loaded shift/notes window. Starts at the ±90-day default,
+  // then widens (or recenters, for a far jump) to follow wherever the user
+  // navigates — see the sync effect below. Every existing reader of
+  // shiftFetchStart/shiftFetchEnd keeps the same name so it transparently
+  // tracks the live window instead of the fixed default.
+  const [loadedShiftWindow, setLoadedShiftWindow] = useState(() => ({
+    start: defaultShiftFetchStart,
+    end: defaultShiftFetchEnd,
+  }));
+  const shiftFetchStart = loadedShiftWindow.start;
+  const shiftFetchEnd = loadedShiftWindow.end;
 
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(new Date()),
@@ -601,6 +618,25 @@ function SchedulerContent() {
         },
       ),
     [shifts, notes, publishWindowDateRange, spanWeeks, payPeriodStartDate],
+  );
+
+  // Formatted "start–end" label per out-of-window group, shared by the
+  // summary sentence (so it names every period, not just a count) and the
+  // jump-to-period buttons below it.
+  const outOfWindowDraftGroupRanges = useMemo(
+    () =>
+      outOfWindowDraftGroups.map((group) => {
+        const end =
+          spanWeeks === "month"
+            ? new Date(
+                group.periodStart.getFullYear(),
+                group.periodStart.getMonth() + 1,
+                0,
+              )
+            : addDays(group.periodStart, spanWeeks * 7 - 1);
+        return `${formatDate(group.periodStart)}–${formatDate(end)}`;
+      }),
+    [outOfWindowDraftGroups, spanWeeks],
   );
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
@@ -890,17 +926,26 @@ function SchedulerContent() {
   // ── Shared refetch helper (eliminates 4x duplication) ──────────────────────
   //
   // `opts.ensureStart` / `opts.ensureEnd` widen the fetch window beyond the
-  // default ±90 days when a caller knows it just touched a date outside that
-  // band (e.g. import-previous into a period > 90 days from today). The
-  // default behavior is unchanged for callers that don't pass anything.
+  // currently-loaded one when a caller knows it just touched a date outside
+  // that band (e.g. import-previous into a far-out period). `opts.recenter`
+  // replaces the loaded window with `[ensureStart, ensureEnd]` outright
+  // instead of widening — used when a navigation jump is far enough that
+  // widening would approach the server's 366-day range cap (see the
+  // "sync loaded window to current view" effect below). The default
+  // behavior is unchanged for callers that don't pass anything, and every
+  // fetch (widened, recentered, or default) persists its actual bounds into
+  // `loadedShiftWindow` so subsequent bare calls keep tracking the live window.
   const refetchScheduleData = useCallback(
-    async (opts?: { ensureStart?: string; ensureEnd?: string }) => {
+    async (opts?: {
+      ensureStart?: string;
+      ensureEnd?: string;
+      recenter?: boolean;
+    }) => {
       if (!org) return;
-      const { start, end } = widenFetchWindow(
-        shiftFetchStart,
-        shiftFetchEnd,
-        opts,
-      );
+      const { start, end } =
+        opts?.recenter && opts.ensureStart && opts.ensureEnd
+          ? { start: opts.ensureStart, end: opts.ensureEnd }
+          : widenFetchWindow(shiftFetchStart, shiftFetchEnd, opts);
       const [shiftData, noteRows] = await Promise.all([
         fetchShifts(
           org.id,
@@ -933,6 +978,7 @@ function SchedulerContent() {
       }
       setShifts(shiftData);
       setNotes(noteMap);
+      setLoadedShiftWindow({ start, end });
       lastRefetchAtRef.current = Date.now();
       return { shiftData, noteMap };
     },
@@ -950,6 +996,7 @@ function SchedulerContent() {
       prevOrgIdRef.current = org.id;
       scheduleLoadStarted.current = false;
       draftCheckStarted.current = false;
+      setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
     }
     if (orgLoading || !org || scheduleLoadStarted.current) return;
     scheduleLoadStarted.current = true;
@@ -988,11 +1035,11 @@ function SchedulerContent() {
               canEditShifts,
               assignmentLabelMap,
               absenceTypeMap,
-              shiftFetchStart,
-              shiftFetchEnd,
+              defaultShiftFetchStart,
+              defaultShiftFetchEnd,
               segmentCompatibility,
             ),
-            fetchScheduleNotes(orgId, shiftFetchStart, shiftFetchEnd),
+            fetchScheduleNotes(orgId, defaultShiftFetchStart, defaultShiftFetchEnd),
             canViewRecurringShifts
               ? fetchRecurringShifts(
                   orgId,
@@ -1005,8 +1052,8 @@ function SchedulerContent() {
             getScheduleLastViewed(orgId).catch(() => null),
             fetchCalloffOpenShifts(
               orgId,
-              shiftFetchStart,
-              shiftFetchEnd,
+              defaultShiftFetchStart,
+              defaultShiftFetchEnd,
               assignmentLabelMap,
             ).catch((err) => {
               Sentry.captureException(err, {
@@ -1014,8 +1061,8 @@ function SchedulerContent() {
                 extra: {
                   context: "schedule.initial_calloff_open_shifts",
                   orgId,
-                  startDate: shiftFetchStart,
-                  endDate: shiftFetchEnd,
+                  startDate: defaultShiftFetchStart,
+                  endDate: defaultShiftFetchEnd,
                 },
               });
               toast.error("Failed to load available shift opportunities");
@@ -1023,15 +1070,15 @@ function SchedulerContent() {
             }),
             fetchPublishedDateRanges(
               orgId,
-              shiftFetchStart,
-              shiftFetchEnd,
+              defaultShiftFetchStart,
+              defaultShiftFetchEnd,
             ).catch((err) => {
               Sentry.captureException(err, {
                 extra: {
                   context: "schedule.initial_published_ranges",
                   orgId,
-                  startDate: shiftFetchStart,
-                  endDate: shiftFetchEnd,
+                  startDate: defaultShiftFetchStart,
+                  endDate: defaultShiftFetchEnd,
                 },
               });
               return [] as { startDate: string; endDate: string }[];
@@ -1039,6 +1086,7 @@ function SchedulerContent() {
           ]);
 
         lastViewedRef.current = lastViewed;
+        setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
 
         // Fetch publish history since user's last view (falls back to 24h if null)
         const recentPublishes = await fetchRecentPublishHistory(
@@ -1670,6 +1718,67 @@ function SchedulerContent() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permsLoading, org, scheduleLoading, canEditShifts]);
+
+  // Sync the loaded shift/notes window to wherever the user has navigated.
+  // Without this, `loadedShiftWindow` stays at its ±90-day default forever —
+  // paging far enough forward/backward renders a misleadingly blank grid for
+  // periods that actually have data, since nothing ever re-fetches outside
+  // that band. Waits on `draftCheckComplete` so this doesn't race the
+  // scheduler-visibility re-fetch above (both call fetchShifts + setShifts).
+  const isSyncingFetchWindowRef = useRef(false);
+  useEffect(() => {
+    if (!org || scheduleLoading || !draftCheckComplete) return;
+    if (isSyncingFetchWindowRef.current) return;
+
+    const needed = publishWindowDateRange;
+    const isContained =
+      needed.startDateKey >= loadedShiftWindow.start &&
+      needed.endDateKey <= loadedShiftWindow.end;
+    if (isContained) return;
+
+    const widened = widenFetchWindow(loadedShiftWindow.start, loadedShiftWindow.end, {
+      ensureStart: needed.startDateKey,
+      ensureEnd: needed.endDateKey,
+    });
+    const shouldRecenter =
+      daysBetweenDateKeys(widened.start, widened.end) >
+      FETCH_WINDOW_RECENTER_THRESHOLD_DAYS;
+
+    const fetchOpts = shouldRecenter
+      ? {
+          ensureStart: formatDateKey(
+            addDays(
+              new Date(`${needed.startDateKey}T00:00:00`),
+              -FETCH_WINDOW_RECENTER_BUFFER_DAYS,
+            ),
+          ),
+          ensureEnd: formatDateKey(
+            addDays(
+              new Date(`${needed.endDateKey}T00:00:00`),
+              FETCH_WINDOW_RECENTER_BUFFER_DAYS,
+            ),
+          ),
+          recenter: true as const,
+        }
+      : { ensureStart: needed.startDateKey, ensureEnd: needed.endDateKey };
+
+    isSyncingFetchWindowRef.current = true;
+    void refetchScheduleData(fetchOpts)
+      .catch((err) => {
+        Sentry.captureException(err);
+        toast.error("Couldn't load the schedule for this period.");
+      })
+      .finally(() => {
+        isSyncingFetchWindowRef.current = false;
+      });
+  }, [
+    org,
+    scheduleLoading,
+    draftCheckComplete,
+    publishWindowDateRange,
+    loadedShiftWindow,
+    refetchScheduleData,
+  ]);
 
   const dates = useMemo(
     () =>
@@ -5672,43 +5781,34 @@ function SchedulerContent() {
                         (s, g) => s + g.count,
                         0,
                       );
-                      return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week"}${outOfWindowDraftGroups.length === 1 ? "" : "s"}`;
+                      const unit = spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
+                      return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} (${outOfWindowDraftGroupRanges.join(", ")})`;
                     })()}
                   </span>
                   <div
                     className="dg-draft-banner-actions"
                     style={{ flexWrap: "wrap" }}
                   >
-                    {outOfWindowDraftGroups.map((group) => {
-                      const end =
-                        spanWeeks === "month"
-                          ? new Date(
-                              group.periodStart.getFullYear(),
-                              group.periodStart.getMonth() + 1,
-                              0,
-                            )
-                          : addDays(group.periodStart, spanWeeks * 7 - 1);
-                      return (
-                        <Hint
-                          key={group.periodKey}
-                          content={hint(
-                            `Jump to this period to publish or discard its drafts`,
-                          )}
-                          side="bottom"
+                    {outOfWindowDraftGroups.map((group, index) => (
+                      <Hint
+                        key={group.periodKey}
+                        content={hint(
+                          `Jump to this period to publish or discard its drafts`,
+                        )}
+                        side="bottom"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setWeekStart(group.periodStart)}
+                          className="dg-btn dg-btn-secondary dg-btn-sm"
                         >
-                          <button
-                            type="button"
-                            onClick={() => setWeekStart(group.periodStart)}
-                            className="dg-btn dg-btn-secondary dg-btn-sm"
-                          >
-                            {`${formatDate(group.periodStart)}–${formatDate(end)}`}{" "}
-                            <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                              ({group.count})
-                            </span>
-                          </button>
-                        </Hint>
-                      );
-                    })}
+                          {outOfWindowDraftGroupRanges[index]}{" "}
+                          <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                            ({group.count})
+                          </span>
+                        </button>
+                      </Hint>
+                    ))}
                     <Hint
                       content={hint("Hide this banner for the rest of this session")}
                       side="bottom"

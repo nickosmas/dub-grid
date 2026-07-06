@@ -192,4 +192,131 @@ describe("POST /api/schedule/manage", () => {
       }),
     );
   });
+
+  // Spy-enabled chainable query mock: every filter/order/range call is a
+  // vi.fn() returning the same object (so calls can be asserted), and the
+  // object itself is thenable, matching the real Supabase query builder.
+  function chainableQuery(result: { data: unknown; error: unknown }) {
+    const query: Record<string, ReturnType<typeof vi.fn>> = {};
+    for (const method of ["select", "eq", "gte", "lte", "order", "range"]) {
+      query[method] = vi.fn(() => query);
+    }
+    (query as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) =>
+      resolve(result);
+    return query;
+  }
+
+  it("paginates fetchShifts through the service client and maps a short page into shifts", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const empId = "22222222-2222-4222-8222-222222222222";
+
+    const query = chainableQuery({
+      data: [
+        {
+          id: "cell-1",
+          emp_id: empId,
+          date: "2026-08-02",
+          org_id: orgId,
+          version: 0,
+          series_id: null,
+          from_recurring: false,
+          created_by: null,
+          updated_by: null,
+          created_at: "2026-08-01T00:00:00.000Z",
+          updated_at: "2026-08-01T00:00:00.000Z",
+          snapshots: [
+            {
+              id: "snap-1",
+              cell_id: "cell-1",
+              org_id: orgId,
+              snapshot_kind: "published",
+              state_kind: "absence",
+              absence_type_id: 5,
+              custom_start_time: null,
+              custom_end_time: null,
+              segments: [],
+            },
+          ],
+        },
+      ],
+      error: null,
+    });
+    serviceFrom.mockReturnValue(query);
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchShifts",
+        orgId,
+        isScheduler: true,
+        assignmentLabels: [],
+        absenceTypeLabels: [[5, "Vacation"]],
+        startDate: "2026-08-02",
+        endDate: "2026-08-15",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(query.eq).toHaveBeenCalledWith("org_id", orgId);
+    expect(query.gte).toHaveBeenCalledWith("date", "2026-08-02");
+    expect(query.lte).toHaveBeenCalledWith("date", "2026-08-15");
+    expect(query.order).toHaveBeenCalledWith("date", { ascending: true });
+    expect(query.range).toHaveBeenCalledWith(0, 499);
+    expect(body.shifts[`${empId}_2026-08-02`]).toBeDefined();
+  });
+
+  it("paginates fetchScheduleNotes through the service client", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const empId = "22222222-2222-4222-8222-222222222222";
+
+    const query = chainableQuery({
+      data: [
+        {
+          id: 1,
+          org_id: orgId,
+          emp_id: empId,
+          date: "2026-08-02",
+          indicator_type_id: 7,
+          focus_area_id: 2,
+          status: "published",
+          created_by: "user-1",
+          created_at: "2026-08-01T00:00:00.000Z",
+          updated_at: "2026-08-01T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    serviceFrom.mockReturnValue(query);
+
+    const response = await POST(
+      makeRequest({
+        action: "fetchScheduleNotes",
+        orgId,
+        startDate: "2026-08-02",
+        endDate: "2026-08-15",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(query.eq).toHaveBeenCalledWith("org_id", orgId);
+    expect(query.gte).toHaveBeenCalledWith("date", "2026-08-02");
+    expect(query.lte).toHaveBeenCalledWith("date", "2026-08-15");
+    expect(query.order).toHaveBeenCalledWith("date", { ascending: true });
+    expect(query.range).toHaveBeenCalledWith(0, 499);
+    expect(body.notes).toEqual([
+      {
+        id: 1,
+        orgId,
+        empId,
+        date: "2026-08-02",
+        indicatorTypeId: 7,
+        focusAreaId: 2,
+        status: "published",
+        createdBy: "user-1",
+        createdAt: "2026-08-01T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+      },
+    ]);
+  });
 });

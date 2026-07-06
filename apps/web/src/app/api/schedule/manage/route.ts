@@ -29,7 +29,7 @@ import {
   formatDateKey,
   iterateDateRange,
 } from "@/lib/utils";
-import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
+import { RECURRING_SHIFT_COLS, fetchAllRows } from "@/lib/db/shared";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import type {
   GridOpenShift,
@@ -450,9 +450,11 @@ async function fetchScheduleCellSnapshotPayload(
 
 function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
   const snapshots = cell.snapshots ?? [];
-  const draft = snapshots.find((snapshot) => snapshot.snapshot_kind === "draft");
-  if (draft) {
-    return draft.state_kind !== "deleted";
+  // Any draft blocks the fill, including an explicit delete — a manager who
+  // cleared a day shouldn't have it silently resurrected by a later apply.
+  const hasDraft = snapshots.some((snapshot) => snapshot.snapshot_kind === "draft");
+  if (hasDraft) {
+    return true;
   }
 
   return snapshots.some((snapshot) => snapshot.snapshot_kind === "published");
@@ -518,26 +520,31 @@ export async function POST(req: NextRequest) {
           data.orgId,
         );
 
-        let query = auth.serviceClient
-          .from("schedule_cells")
-          .select(
-            "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
-          )
-          .eq("org_id", data.orgId);
-        if (data.startDate) {
-          query = query.gte("date", data.startDate);
-        }
-        if (data.endDate) {
-          query = query.lte("date", data.endDate);
-        }
-
-        const { data: rows, error } = await query;
-        if (error) {
-          throw error;
-        }
+        const buildPage = (from: number, to: number) => {
+          let query = auth.serviceClient
+            .from("schedule_cells")
+            .select(
+              "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
+            )
+            .eq("org_id", data.orgId);
+          if (data.startDate) {
+            query = query.gte("date", data.startDate);
+          }
+          if (data.endDate) {
+            query = query.lte("date", data.endDate);
+          }
+          return query
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+        };
+        // A single unpaged query here would silently truncate at PostgREST's
+        // max_rows cap (200 OK, rows just missing) once an org/date window
+        // has more schedule_cells than the configured limit.
+        const rows = await fetchAllRows<DbScheduleCell>(buildPage);
 
         const shifts: Record<string, unknown> = {};
-        for (const row of (rows ?? []) as DbScheduleCell[]) {
+        for (const row of rows) {
           const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
             isScheduler: data.isScheduler,
             assignmentLabelMap,
@@ -565,26 +572,28 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        let query = auth.serviceClient
-          .from("schedule_notes")
-          .select(
-            "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
-          )
-          .eq("org_id", data.orgId);
-        if (data.startDate) {
-          query = query.gte("date", data.startDate);
-        }
-        if (data.endDate) {
-          query = query.lte("date", data.endDate);
-        }
-
-        const { data: rows, error } = await query;
-        if (error) {
-          throw error;
-        }
+        const buildNotesPage = (from: number, to: number) => {
+          let query = auth.serviceClient
+            .from("schedule_notes")
+            .select(
+              "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+            )
+            .eq("org_id", data.orgId);
+          if (data.startDate) {
+            query = query.gte("date", data.startDate);
+          }
+          if (data.endDate) {
+            query = query.lte("date", data.endDate);
+          }
+          return query
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+        };
+        const noteRows = await fetchAllRows<DbScheduleNote>(buildNotesPage);
 
         return NextResponse.json({
-          notes: ((rows ?? []) as DbScheduleNote[]).map((row) => ({
+          notes: noteRows.map((row) => ({
             id: row.id,
             orgId: row.org_id,
             empId: row.emp_id,
@@ -1186,7 +1195,20 @@ export async function POST(req: NextRequest) {
         }
 
         assertDateRange(data.startDate, data.endDate);
-        const [{ data: recurringRows, error: recurringError }, { data: cells, error: cellError }] =
+        const buildExistingCellsPage = (from: number, to: number) =>
+          auth.serviceClient
+            .from("schedule_cells")
+            .select(
+              "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
+            )
+            .eq("org_id", data.orgId)
+            .gte("date", data.startDate)
+            .lte("date", data.endDate)
+            .order("date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(from, to);
+
+        const [{ data: recurringRows, error: recurringError }, cells] =
           await Promise.all([
             auth.serviceClient
               .from("recurring_shifts")
@@ -1195,20 +1217,13 @@ export async function POST(req: NextRequest) {
               .is("archived_at", null)
               .lte("effective_from", data.endDate)
               .or(`effective_until.is.null,effective_until.gte.${data.startDate}`),
-            auth.serviceClient
-              .from("schedule_cells")
-              .select(
-                "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
-              )
-              .eq("org_id", data.orgId)
-              .gte("date", data.startDate)
-              .lte("date", data.endDate),
+            // A single unpaged query here would silently truncate at PostgREST's
+            // max_rows cap, causing already-scheduled cells to be treated as
+            // empty and overwritten by the recurring fill below.
+            fetchAllRows<DbScheduleCell>(buildExistingCellsPage),
           ]);
         if (recurringError) {
           throw recurringError;
-        }
-        if (cellError) {
-          throw cellError;
         }
 
         const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
@@ -1221,7 +1236,7 @@ export async function POST(req: NextRequest) {
         }
 
         const cellsByKey = new Map<string, DbScheduleCell>();
-        for (const cell of (cells ?? []) as DbScheduleCell[]) {
+        for (const cell of cells) {
           cellsByKey.set(`${cell.emp_id}_${cell.date}`, cell);
         }
 

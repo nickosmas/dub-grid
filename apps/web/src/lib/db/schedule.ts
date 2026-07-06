@@ -1,6 +1,6 @@
 import {
   supabase, logAudit, formatDateKey,
-  RECURRING_SHIFT_COLS,
+  RECURRING_SHIFT_COLS, fetchAllRows,
 } from "./shared";
 import { fetchJobDefinitions, fetchShiftCategories } from "./config";
 import type { DbRecurringShift, DbScheduleNote, RecurringDraft, DbScheduleCell } from "./types";
@@ -292,16 +292,23 @@ export async function fetchPublishHistory(
 // ── Schedule Notes ───────────────────────────────────────────────────────────
 
 export async function fetchScheduleNotes(orgId: string, startDate?: string, endDate?: string): Promise<ScheduleNote[]> {
-  let query = supabase
-    .from("schedule_notes")
-    .select("id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at")
-    .eq("org_id", orgId);
-  if (startDate) query = query.gte("date", startDate);
-  if (endDate) query = query.lte("date", endDate);
-  const { data, error } = await query;
-  if (error) throw error;
+  const buildPage = (from: number, to: number) => {
+    let query = supabase
+      .from("schedule_notes")
+      .select("id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at")
+      .eq("org_id", orgId);
+    if (startDate) query = query.gte("date", startDate);
+    if (endDate) query = query.lte("date", endDate);
+    return query
+      .order("date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+  };
+  // See fetchNormalizedShifts in shifts.ts — an unpaged query here silently
+  // truncates at PostgREST's max_rows cap instead of erroring.
+  const data = await fetchAllRows<DbScheduleNote>(buildPage);
 
-  return (data as DbScheduleNote[]).map((row) => ({
+  return data.map((row) => ({
     id: row.id,
     orgId: row.org_id,
     empId: row.emp_id,

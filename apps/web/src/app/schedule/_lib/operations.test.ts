@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  daysBetweenDateKeys,
   formatImportPreviousSkipDescription,
   getSkipReasonLabel,
   summarizeImportPreviousOutcomes,
@@ -212,5 +213,27 @@ describe("widenFetchWindow", () => {
         ensureEnd: "2026-08-01",
       }),
     ).toEqual({ start: "2026-04-01", end: "2026-08-01" });
+  });
+});
+
+describe("daysBetweenDateKeys", () => {
+  it("returns 0 for the same date", () => {
+    expect(daysBetweenDateKeys("2026-04-01", "2026-04-01")).toBe(0);
+  });
+
+  it("returns the typical whole-day span", () => {
+    expect(daysBetweenDateKeys("2026-04-01", "2026-04-15")).toBe(14);
+  });
+
+  it("returns a negative value when end precedes start", () => {
+    expect(daysBetweenDateKeys("2026-04-15", "2026-04-01")).toBe(-14);
+  });
+
+  it("handles a span crossing a leap-year Feb 29", () => {
+    expect(daysBetweenDateKeys("2028-02-01", "2028-03-01")).toBe(29);
+  });
+
+  it("handles a span crossing a non-leap-year February", () => {
+    expect(daysBetweenDateKeys("2026-02-01", "2026-03-01")).toBe(28);
   });
 });

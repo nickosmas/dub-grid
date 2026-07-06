@@ -53,6 +53,24 @@ export function widenFetchWindow(
   return { start, end };
 }
 
+/** Buffer used when recentering the loaded shift-fetch window on a far navigation jump. */
+export const FETCH_WINDOW_RECENTER_BUFFER_DAYS = 90;
+/**
+ * If widening the loaded window to cover a newly-viewed range would span more
+ * than this many days, recenter instead of widening — keeps the fetch well
+ * under the server's 366-day range cap (`MAX_RANGE_DAYS` in
+ * `apps/web/src/lib/db/shifts.ts` and the `/api/schedule/manage` route) no
+ * matter how far the user has paged.
+ */
+export const FETCH_WINDOW_RECENTER_THRESHOLD_DAYS = 300;
+
+/** Whole-day difference between two YYYY-MM-DD keys (local midnight, matching this file's date-math convention). */
+export function daysBetweenDateKeys(startKey: string, endKey: string): number {
+  const start = new Date(`${startKey}T00:00:00`);
+  const end = new Date(`${endKey}T00:00:00`);
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+}
+
 // ── Import Previous Schedule outcome aggregation ────────────────────────────
 //
 // The server's `import_previous_schedule` RPC returns one outcome row per
