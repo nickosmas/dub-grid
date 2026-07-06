@@ -57,6 +57,7 @@ export interface ScheduleGridAccessors {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  fromRecurringForKey?: (empId: string, date: Date) => boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;

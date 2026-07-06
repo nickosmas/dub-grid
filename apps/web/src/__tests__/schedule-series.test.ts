@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createShiftSeries, upsertRecurringShift } from "@/lib/db/schedule";
+import { createShiftSeries } from "@/lib/db/schedule";
 import { supabase } from "@/lib/supabase";
 
 vi.mock("@/lib/audit", () => ({
@@ -217,40 +217,6 @@ describe("createShiftSeries", () => {
       p_series_id: expect.any(String),
       p_from_recurring: false,
       p_expected_version: 0,
-    });
-  });
-
-  it("stores full canonical state when saving a recurring template", async () => {
-    vi.mocked(supabase.rpc).mockResolvedValue({ error: null });
-
-    const input = {
-      kind: "worked" as const,
-      segments: [
-        { shiftId: 12, jobId: 88, position: 0 },
-        { shiftId: null, jobId: 99, position: 1 },
-      ],
-      absenceTypeId: null,
-      customStartTime: "07:30",
-      customEndTime: "18:00",
-      seriesId: null,
-      fromRecurring: false,
-    };
-
-    await upsertRecurringShift("emp-1", "org-1", 2, input, "2026-04-14");
-
-    expect(supabase.rpc).toHaveBeenCalledWith("upsert_recurring_shift", {
-      p_emp_id: "emp-1",
-      p_org_id: "org-1",
-      p_day_of_week: 2,
-      p_state: {
-        ...input,
-        segments: input.segments.map((segment) => ({
-          ...segment,
-          isMentored: false,
-        })),
-        fromRecurring: true,
-      },
-      p_effective_from: "2026-04-14",
     });
   });
 

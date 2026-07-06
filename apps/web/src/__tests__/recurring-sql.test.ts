@@ -70,29 +70,14 @@ describe("recurring schedule database contract", () => {
     );
   });
 
-  it("writes recurring autofill through canonical schedule cell snapshots", () => {
+  it("does not define the dead SQL apply_recurring_schedules RPC", () => {
+    // Recurring autofill is applied via the app's /api/schedule/manage route
+    // (applyRecurringSchedules action), not this RPC — it was never called
+    // from application code and has been removed to avoid drift between two
+    // parallel implementations of the same fill algorithm.
     const sql = readFileSync(resolveMigrationPath(), "utf8");
 
-    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.apply_recurring_schedules\s*\(/);
-    expect(sql).toContain("public.resolve_schedule_state_storage");
-    expect(sql).toContain("public.schedule_cell_has_effective_content");
-    expect(sql).toContain("public.write_schedule_cell_snapshot_internal");
-    expect(sql).toContain("state.shift_ids");
-    expect(sql).toContain("state.job_ids");
-    expect(sql).toContain("state.absence_type_id");
-    expect(sql).toContain("'absenceTypeId', r.absence_type_id");
-  });
-
-  it("derives recurring autofill labels directly from shifts and jobs", () => {
-    const sql = readFileSync(resolveMigrationPath(), "utf8");
-
-    expect(sql).toContain("LEFT JOIN public.shift_categories shift");
-    expect(sql).toContain("LEFT JOIN public.jobs job");
-    expect(sql).toContain("'label', r.shift_label");
-    expect(sql).not.toContain("derive_assignment_ids_for_segments");
-    expect(sql).not.toContain("rs.shift_id");
-    expect(sql).not.toContain("rs.job_id");
-    expect(sql).not.toContain("rs.absence_type_id");
+    expect(sql).not.toMatch(/CREATE OR REPLACE FUNCTION public\.apply_recurring_schedules\s*\(/);
   });
 
   it("updates series templates from canonical state only", () => {

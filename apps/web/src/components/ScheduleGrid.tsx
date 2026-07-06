@@ -525,6 +525,7 @@ interface LegacyScheduleGridProps {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  fromRecurringForKey?: (empId: string, date: Date) => boolean;
   showDiffOverlay?: boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
@@ -633,6 +634,7 @@ interface SectionBlockProps {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  fromRecurringForKey?: (empId: string, date: Date) => boolean;
   showDiffOverlay?: boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
@@ -707,6 +709,7 @@ const SectionBlock = memo(function SectionBlock({
   getCustomShiftTimes,
   getPublishedCustomShiftTimes,
   draftKindForKey,
+  fromRecurringForKey,
   showDiffOverlay,
   showPublishDiffOverlay,
   publishedLabelForKey,
@@ -1771,6 +1774,8 @@ const SectionBlock = memo(function SectionBlock({
                       const cellSegments =
                         segmentsForKey?.(emp.id, date) ?? [];
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
+                      const fromRecurring =
+                        fromRecurringForKey?.(emp.id, date) ?? false;
                       const publishDiff =
                         publishDiffForKey?.(emp.id, date) ?? null;
                       const showsPublishDiff = !!(
@@ -3388,6 +3393,25 @@ const SectionBlock = memo(function SectionBlock({
                                 </span>
                               </MaybeHint>
                             )}
+                            {fromRecurring && shiftLabel && shiftLabel !== "OFF" && (
+                              <MaybeHint content="From recurring schedule" side="top">
+                                <span
+                                  aria-label="From recurring schedule"
+                                  style={{
+                                    position: "absolute",
+                                    bottom: 1,
+                                    right: 2,
+                                    fontSize: 10,
+                                    lineHeight: 1,
+                                    color: "var(--color-text-muted)",
+                                    zIndex: 2,
+                                    pointerEvents: "auto",
+                                  }}
+                                >
+                                  ↻
+                                </span>
+                              </MaybeHint>
+                            )}
                           </div>
                           <div
                             className="dg-grid-cell__chrome"
@@ -3583,6 +3607,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   getCustomShiftTimes,
   getPublishedCustomShiftTimes,
   draftKindForKey,
+  fromRecurringForKey,
   showDiffOverlay,
   showPublishDiffOverlay,
   publishedLabelForKey,
@@ -3923,6 +3948,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                         getPublishedCustomShiftTimes
                       }
                       draftKindForKey={draftKindForKey}
+                      fromRecurringForKey={fromRecurringForKey}
                       showDiffOverlay={showDiffOverlay}
                       showPublishDiffOverlay={showPublishDiffOverlay}
                       publishedLabelForKey={publishedLabelForKey}
@@ -4165,6 +4191,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
           model.accessors.getPublishedCustomShiftTimes
         }
         draftKindForKey={model.accessors.draftKindForKey}
+        fromRecurringForKey={model.accessors.fromRecurringForKey}
         showDiffOverlay={model.options.showDiffOverlay}
         showPublishDiffOverlay={model.options.showPublishDiffOverlay}
         publishedLabelForKey={model.accessors.publishedLabelForKey}

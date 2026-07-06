@@ -26,6 +26,10 @@ vi.mock("@/app/api/shared/schedule", () => ({
   fetchAssignmentLabelMap: vi.fn(),
 }));
 
+vi.mock("@/features/notifications/server/events", () => ({
+  dispatchNotificationEvent: vi.fn(),
+}));
+
 import { POST } from "./route";
 
 function makeRequest(body: Record<string, unknown>) {
@@ -45,6 +49,7 @@ describe("POST /api/schedule/manage", () => {
     requireOrgPermissions.mockResolvedValue({
       userClient: { rpc: userRpc },
       serviceClient: { from: serviceFrom },
+      actor: { id: "actor-user" },
     });
   });
 
@@ -198,7 +203,7 @@ describe("POST /api/schedule/manage", () => {
   // object itself is thenable, matching the real Supabase query builder.
   function chainableQuery(result: { data: unknown; error: unknown }) {
     const query: Record<string, ReturnType<typeof vi.fn>> = {};
-    for (const method of ["select", "eq", "gte", "lte", "order", "range"]) {
+    for (const method of ["select", "eq", "gte", "lte", "is", "or", "in", "order", "range"]) {
       query[method] = vi.fn(() => query);
     }
     (query as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) =>
@@ -318,5 +323,127 @@ describe("POST /api/schedule/manage", () => {
         updatedAt: "2026-08-01T00:00:00.000Z",
       },
     ]);
+  });
+
+  describe("applyRecurringSchedules", () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const empId = "22222222-2222-4222-8222-222222222222";
+    // 2026-08-03 is a Monday (day_of_week 1 per iterateDateRange's UTC getUTCDay()).
+    const dateKey = "2026-08-03";
+
+    function recurringShiftRow() {
+      return {
+        id: "rec-1",
+        emp_id: empId,
+        org_id: orgId,
+        day_of_week: 1,
+        state: { kind: "absence", absenceTypeId: 9 },
+        effective_from: "2026-01-01",
+        effective_until: null,
+      };
+    }
+
+    function mockTables(existingCellSnapshots: unknown[]) {
+      const recurringQuery = chainableQuery({
+        data: [recurringShiftRow()],
+        error: null,
+      });
+      const cellsQuery = chainableQuery({
+        data: existingCellSnapshots.length
+          ? [
+              {
+                id: "cell-1",
+                emp_id: empId,
+                date: dateKey,
+                org_id: orgId,
+                version: 2,
+                series_id: null,
+                from_recurring: false,
+                created_by: null,
+                updated_by: null,
+                created_at: "2026-08-01T00:00:00.000Z",
+                updated_at: "2026-08-01T00:00:00.000Z",
+                snapshots: existingCellSnapshots,
+              },
+            ]
+          : [],
+        error: null,
+      });
+      const absenceQuery = chainableQuery({
+        data: [{ id: 9, name: "Vacation" }],
+        error: null,
+      });
+      serviceFrom.mockImplementation((table: string) => {
+        if (table === "recurring_shifts") return recurringQuery;
+        if (table === "schedule_cells") return cellsQuery;
+        if (table === "absence_types") return absenceQuery;
+        throw new Error(`unexpected table ${table}`);
+      });
+      return { recurringQuery, cellsQuery, absenceQuery };
+    }
+
+    it("does not resurrect a cell whose draft was explicitly deleted, and paginates the existing-cells lookup", async () => {
+      const { cellsQuery } = mockTables([
+        {
+          id: "snap-1",
+          cell_id: "cell-1",
+          org_id: orgId,
+          snapshot_kind: "draft",
+          state_kind: "deleted",
+          absence_type_id: null,
+          custom_start_time: null,
+          custom_end_time: null,
+          segments: [],
+        },
+      ]);
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: dateKey,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.generated).toEqual([]);
+      expect(userRpc).not.toHaveBeenCalled();
+      // Guards against the query silently truncating at PostgREST's max_rows
+      // cap on a large org/date range.
+      expect(cellsQuery.range).toHaveBeenCalledWith(0, 499);
+      expect(cellsQuery.order).toHaveBeenCalledWith("date", { ascending: true });
+    });
+
+    it("fills a genuinely empty cell from the recurring template", async () => {
+      mockTables([]);
+
+      const response = await POST(
+        makeRequest({
+          action: "applyRecurringSchedules",
+          orgId,
+          startDate: dateKey,
+          endDate: dateKey,
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.generated).toEqual([
+        { empId, date: dateKey, label: "Vacation", absenceTypeId: 9 },
+      ]);
+      expect(userRpc).toHaveBeenCalledWith(
+        "write_schedule_cell_snapshot",
+        expect.objectContaining({
+          p_org_id: orgId,
+          p_emp_id: empId,
+          p_date: dateKey,
+          p_state_kind: "absence",
+          p_absence_type_id: 9,
+          p_from_recurring: true,
+        }),
+      );
+    });
   });
 });

@@ -2689,6 +2689,12 @@ function SchedulerContent() {
     [shifts, draftCheckComplete, canEditShifts],
   );
 
+  const fromRecurringForKey = useCallback(
+    (empId: string, date: Date): boolean =>
+      shifts[`${empId}_${formatDateKey(date)}`]?.fromRecurring ?? false,
+    [shifts],
+  );
+
   const publishedLabelForKey = useCallback(
     (empId: string, date: Date): string | null => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
@@ -5193,6 +5199,7 @@ function SchedulerContent() {
           getCustomShiftTimes,
           getPublishedCustomShiftTimes,
           draftKindForKey,
+          fromRecurringForKey,
           publishedLabelForKey,
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
@@ -5244,6 +5251,7 @@ function SchedulerContent() {
       getCustomShiftTimes,
       getPublishedCustomShiftTimes,
       draftKindForKey,
+      fromRecurringForKey,
       publishedLabelForKey,
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
