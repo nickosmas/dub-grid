@@ -386,7 +386,7 @@ describe("dashboard user mode selection", () => {
     expect(getDashboardPeriodLabel("2weeks")).toBe("these 2 weeks");
     expect(getDashboardOvertimeThreshold(1)).toBe(40);
     expect(getDashboardOvertimeThreshold(7)).toBe(40);
-    expect(getDashboardOvertimeThreshold(14)).toBe(80);
+    expect(getDashboardOvertimeThreshold(14)).toBe(40);
   });
 });
 

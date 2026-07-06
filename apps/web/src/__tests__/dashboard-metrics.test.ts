@@ -580,6 +580,50 @@ describe("Dashboard Metrics", () => {
     expect(hours[0]?.overtimeHours).toBe(10);
   });
 
+  it("should flag overtime hit in one week of a 2-week period even when the fortnight total stays low", () => {
+    // Week 1: 5 × 10h shifts = 50 hours (10 hours of weekly OT).
+    // Week 2: 2 × 8h shifts = 16 hours. Combined total = 66 hours, which is
+    // well under a naive 2×40=80 scaled threshold — but the week 1 overtime
+    // must still surface instead of being averaged away.
+    const twoWeekDates = getDatesInRange(weekStart, 14);
+    const shifts: ShiftMap = {};
+    for (let i = 1; i < 6; i++) {
+      const dateKey = formatDateKey(twoWeekDates[i]);
+      shifts[`emp1_${dateKey}`] = {
+        label: "DAY",
+        assignmentIds: [101],
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "DAY",
+        customStartTime: "08:00",
+        customEndTime: "18:00", // 10 hours
+        isDraft: false,
+        draftKind: null,
+      };
+    }
+    Object.assign(
+      shifts,
+      Object.fromEntries([
+        createShift("emp1", formatDateKey(twoWeekDates[8]), [101]), // 8 hours
+        createShift("emp1", formatDateKey(twoWeekDates[9]), [101]), // 8 hours
+      ]),
+    );
+
+    const assignmentById = new Map([[101, assignment1]]);
+    const periodDateKeys = twoWeekDates.map(formatDateKey);
+
+    const hours = computeAllEmployeeHours(
+      [employee1],
+      periodDateKeys,
+      shifts,
+      assignmentById,
+      40,
+    );
+
+    expect(hours[0]?.totalHours).toBe(66);
+    expect(hours[0]?.isOvertime).toBe(true);
+    expect(hours[0]?.overtimeHours).toBe(10);
+  });
+
   it("should filter shifts by week correctly", () => {
     const weekStartKey = formatDateKey(weekStart);
     const weekEndDate = new Date(weekStart);

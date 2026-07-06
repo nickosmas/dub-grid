@@ -160,8 +160,11 @@ export function getDashboardPeriodLabel(viewMode: ViewMode): string {
   return "this week";
 }
 
-export function getDashboardOvertimeThreshold(periodDays: number): number {
-  return 40 * Math.max(1, Math.ceil(periodDays / 7));
+// Weekly overtime threshold. computeEmployeeWeeklyHours evaluates it per
+// 7-day chunk of the period, so this stays flat rather than scaling with
+// periodDays — scaling it here would let a light week mask a heavy one.
+export function getDashboardOvertimeThreshold(_periodDays: number): number {
+  return 40;
 }
 
 function useMinuteNow(): Date {

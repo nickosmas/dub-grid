@@ -338,12 +338,26 @@ export function computeEmployeeWeeklyHours(
     totalHours += hours;
   }
 
-  const overtimeHours = Math.max(0, totalHours - otThreshold);
+  // Overtime is a per-week concept: a multi-week period (e.g. the dashboard's
+  // "2 Weeks" view) must flag anyone who exceeded otThreshold in *any* single
+  // week, not just when the period's combined total crosses a scaled-up
+  // threshold. Averaging a heavy week against a light one would otherwise
+  // hide real weekly overtime. So chunk into 7-day weeks and evaluate each
+  // one against the same flat otThreshold, summing the overage.
+  let overtimeHours = 0;
+  for (let i = 0; i < weekDateKeys.length; i += 7) {
+    let weekTotal = 0;
+    for (const dateKey of weekDateKeys.slice(i, i + 7)) {
+      weekTotal += dailyHours[dateKey] ?? 0;
+    }
+    overtimeHours += Math.max(0, weekTotal - otThreshold);
+  }
+
   return {
     empId,
     totalHours: Math.round(totalHours * 10) / 10,
     dailyHours,
-    isOvertime: totalHours > otThreshold,
+    isOvertime: overtimeHours > 0,
     overtimeHours: Math.round(overtimeHours * 10) / 10,
   };
 }
