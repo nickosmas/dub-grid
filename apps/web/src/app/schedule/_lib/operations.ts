@@ -125,6 +125,25 @@ export function summarizeImportPreviousOutcomes(
 }
 
 /**
+ * Human-facing label for a single skip reason code, grouped the same way
+ * `summarizeImportPreviousOutcomes` groups its `disqualified:*` counters.
+ * Shared by the skip-description toast text and the full results panel.
+ */
+export function getSkipReasonLabel(reason: string | null): string {
+  switch (reason) {
+    case "target_has_data":
+      return "Target already had data";
+    case "employee_inactive":
+      return "Employee no longer active";
+    case "source_has_no_content":
+      return "Source cell had no usable content";
+    default:
+      if (reason?.startsWith("disqualified:")) return "Qualification change";
+      return "Skipped for other reasons";
+  }
+}
+
+/**
  * Builds the human-facing fragment used in the modal + toast describing why
  * shifts were skipped. Returns the empty string when nothing was skipped.
  *
@@ -178,7 +197,7 @@ export function formatImportPreviousSkipDescription(
   return `${reasons.join(", ")}${sample.length > 0 ? ` (e.g. ${sample.join(", ")}${sampleSuffix})` : ""}`;
 }
 
-function formatShortDate(dateKey: string): string {
+export function formatShortDate(dateKey: string): string {
   const [, m, d] = dateKey.split("-");
   return `${Number(m)}/${Number(d)}`;
 }

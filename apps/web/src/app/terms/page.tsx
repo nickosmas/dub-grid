@@ -25,7 +25,7 @@ export default function TermsOfServicePage() {
         padding: "48px 24px 80px",
       }}
     >
-      <div style={{ maxWidth: "720px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
         <Link
           href="/"
           style={{

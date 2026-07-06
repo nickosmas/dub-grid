@@ -33,24 +33,23 @@ export async function recordCurrentTermsAcceptance(
   acceptedAt = new Date().toISOString(),
 ): Promise<void> {
   const serviceClient = getServiceClient();
-  const { error: insertError } = await serviceClient
-    .from("terms_acceptances")
-    .insert({
+  const [{ error: insertError }, { error: updateError }] = await Promise.all([
+    serviceClient.from("terms_acceptances").insert({
       user_id: userId,
       terms_version: CURRENT_TERMS_VERSION,
-    });
+    }),
+    serviceClient
+      .from("profiles")
+      .update({
+        terms_accepted_at: acceptedAt,
+        terms_version: CURRENT_TERMS_VERSION,
+      })
+      .eq("id", userId),
+  ]);
 
   if (insertError && !insertError.message?.includes("duplicate")) {
     throw insertError;
   }
-
-  const { error: updateError } = await serviceClient
-    .from("profiles")
-    .update({
-      terms_accepted_at: acceptedAt,
-      terms_version: CURRENT_TERMS_VERSION,
-    })
-    .eq("id", userId);
 
   if (updateError) {
     throw updateError;

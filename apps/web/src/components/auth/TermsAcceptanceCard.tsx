@@ -47,7 +47,7 @@ export default function TermsAcceptanceCard({
         borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--dg-shadow-auth-card)",
         width: "100%",
-        maxWidth: 720,
+        maxWidth: 960,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -84,8 +84,8 @@ export default function TermsAcceptanceCard({
             maxWidth: 520,
           }}
         >
-          Please read these updated Terms of Service in full. Scroll to the
-          bottom to enable the Accept button.
+          Please read these updated Terms of Service in full before
+          continuing.
         </p>
       </div>
 
@@ -100,7 +100,7 @@ export default function TermsAcceptanceCard({
           background: "var(--color-bg-secondary)",
           border: "1px solid var(--color-border-light)",
           borderRadius: "var(--dg-radius-lg)",
-          maxHeight: "min(60vh, 480px)",
+          maxHeight: "min(65vh, 640px)",
           overflowY: "auto",
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
@@ -120,18 +120,14 @@ export default function TermsAcceptanceCard({
           style={{
             margin: 0,
             fontSize: "var(--dg-fs-label)",
-            color: reachedBottom
-              ? "var(--color-success, #16a34a)"
-              : "var(--color-text-faint)",
+            color: "var(--color-text-faint)",
             textAlign: "center",
             minHeight: "1.2em",
             transition: "color 150ms ease",
           }}
           aria-live="polite"
         >
-          {reachedBottom
-            ? "Thank you for reviewing the Terms."
-            : "Scroll to the bottom of the Terms to continue."}
+          {reachedBottom ? "" : "Scroll to the bottom of the Terms to continue."}
         </p>
 
         <button

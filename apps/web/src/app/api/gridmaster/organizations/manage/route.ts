@@ -10,6 +10,7 @@ import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -96,12 +97,20 @@ export async function POST(req: NextRequest) {
   try {
     switch (parsed.data.action) {
       case "archiveOrganization": {
-        const { error } = await serviceClient
+        const { data: archived, error } = await serviceClient
           .from("organizations")
           .update({ archived_at: new Date().toISOString() })
-          .eq("id", parsed.data.orgId);
+          .eq("id", parsed.data.orgId)
+          .select("slug")
+          .maybeSingle();
         if (error) {
           throw error;
+        }
+        // The public subdomain lookup caches {id, name} by slug with a long
+        // TTL — invalidate immediately so this org's subdomain stops
+        // resolving right away instead of appearing valid until it expires.
+        if (archived?.slug) {
+          void cacheDel(CacheKey.orgBySlug(archived.slug));
         }
         await writeGridmasterAuditLog({
           serviceClient,

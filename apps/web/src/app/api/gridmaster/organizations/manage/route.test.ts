@@ -49,6 +49,12 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
+const cacheDel = vi.fn();
+vi.mock("@/lib/cache", () => ({
+  cacheDel: (...args: unknown[]) => cacheDel(...args),
+  CacheKey: { orgBySlug: (slug: string) => `dg:org:slug:${slug}` },
+}));
+
 import { POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -68,7 +74,15 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
-    organizationEq.mockResolvedValue({ error: null });
+    // Supports both `await update().eq(...)` (restoreOrganization) and
+    // `update().eq(...).select(...).maybeSingle()` (archiveOrganization,
+    // which needs the slug back to invalidate the subdomain-lookup cache).
+    organizationEq.mockReturnValue({
+      then: (resolve: (value: { error: null }) => void) => resolve({ error: null }),
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn(() => Promise.resolve({ data: { slug: "acme" }, error: null })),
+      })),
+    });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
     organizationInsert.mockReturnValue({
       select: vi.fn(() => ({
@@ -169,6 +183,9 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         resource_id: ORG_ID,
       }),
     );
+    // The subdomain-lookup cache must be invalidated so the archived org's
+    // subdomain stops resolving immediately instead of waiting out the TTL.
+    expect(cacheDel).toHaveBeenCalledWith("dg:org:slug:acme");
   });
 
   it("assigns an org role by email and writes an audit event", async () => {

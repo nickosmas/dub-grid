@@ -35,12 +35,17 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
+const cacheDel = vi.fn();
+vi.mock("@/lib/cache", () => ({
+  cacheDel: (...args: unknown[]) => cacheDel(...args),
+  CacheKey: { orgBySlug: (slug: string) => `dg:org:slug:${slug}` },
+}));
 
 const ORG_ID = "11111111-1111-1111-1111-111111111111";
 
 /** Builds a chainable service-client stub backed by controllable handlers. */
 function buildServiceClient(opts: {
-  org: { id: string; name: string; archived_at: string | null } | null;
+  org: { id: string; name: string; slug?: string; archived_at: string | null } | null;
   orgUpdateError?: unknown;
   subscription?: { stripe_subscription_id: string | null } | null;
 }) {
@@ -132,9 +137,9 @@ describe("POST /api/organizations/delete", () => {
     expect(res.status).toBe(409);
   });
 
-  it("archives the org, cancels Stripe, and audits on success", async () => {
+  it("archives the org, cancels Stripe, invalidates the subdomain cache, and audits on success", async () => {
     const { client, orgUpdate, subUpdate, auditInsert } = buildServiceClient({
-      org: { id: ORG_ID, name: "Acme", archived_at: null },
+      org: { id: ORG_ID, name: "Acme", slug: "acme", archived_at: null },
       subscription: { stripe_subscription_id: "sub_123" },
     });
     authorize(client);
@@ -153,6 +158,9 @@ describe("POST /api/organizations/delete", () => {
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({ action: "organization.deleted", org_id: ORG_ID }),
     );
+    // The subdomain-lookup cache must be invalidated so the archived org's
+    // subdomain stops resolving immediately instead of waiting out the TTL.
+    expect(cacheDel).toHaveBeenCalledWith("dg:org:slug:acme");
   });
 
   it("still archives the org when there is no Stripe subscription", async () => {

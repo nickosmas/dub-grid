@@ -18,6 +18,7 @@ import DraftBanner from "@/components/DraftBanner";
 import DraftReviewSummary from "@/components/DraftReviewSummary";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
 import ScheduleOperationModal from "@/components/ScheduleOperationModal";
+import ImportResultsModal from "@/components/ImportResultsModal";
 import BulkDeleteReviewContent, {
   type BulkDeleteReviewTarget,
 } from "./_components/BulkDeleteReviewContent";
@@ -259,6 +260,13 @@ type ImportPreviewState = {
   breakdown: ImportPreviousBreakdown;
 };
 
+type ImportResultsState = {
+  sourceRange: string;
+  targetRange: string;
+  outcomes: ImportPreviousScheduleOutcome[];
+  breakdown: ImportPreviousBreakdown;
+};
+
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
   const shouldAutoUseOneWeek = useMediaQuery(AUTO_ONE_WEEK);
@@ -440,6 +448,10 @@ function SchedulerContent() {
   const [importPreview, setImportPreview] = useState<ImportPreviewState | null>(
     null,
   );
+  const [importResults, setImportResults] = useState<ImportResultsState | null>(
+    null,
+  );
+  const [showImportResults, setShowImportResults] = useState(false);
   const [activeOperation, setActiveOperation] =
     useState<ScheduleOperation | null>(null);
   const [isCreatingRepeatSeries, setIsCreatingRepeatSeries] = useState(false);
@@ -4584,18 +4596,33 @@ function SchedulerContent() {
         nameByEmpId,
       );
 
+      if (breakdown.totalSkipped > 0) {
+        setImportResults({
+          sourceRange: importPreview.sourceRange,
+          targetRange: importPreview.targetRange,
+          outcomes,
+          breakdown,
+        });
+      }
+
       if (breakdown.imported === 0) {
         toast.info(
           skipDescription
             ? `Nothing imported — ${skipDescription}.`
             : "Nothing imported.",
+          breakdown.totalSkipped > 0
+            ? { action: { label: "View details", onClick: () => setShowImportResults(true) } }
+            : undefined,
         );
       } else if (breakdown.totalSkipped > 0) {
         toast.warning(
           `Imported ${breakdown.imported} shift${
             breakdown.imported === 1 ? "" : "s"
           }, skipped ${breakdown.totalSkipped} (${skipDescription}).`,
-          { duration: 12000 },
+          {
+            duration: 12000,
+            action: { label: "View details", onClick: () => setShowImportResults(true) },
+          },
         );
       } else {
         toast.success(
@@ -6901,6 +6928,20 @@ function SchedulerContent() {
                 setShowImportConfirm(false);
                 setImportPreview(null);
               }}
+            />
+          )}
+          {showImportResults && importResults && (
+            <ImportResultsModal
+              sourceRange={importResults.sourceRange}
+              targetRange={importResults.targetRange}
+              outcomes={importResults.outcomes}
+              breakdown={importResults.breakdown}
+              nameByEmpId={
+                new Map(
+                  employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
+                )
+              }
+              onClose={() => setShowImportResults(false)}
             />
           )}
           {showPublishHistory && org && (

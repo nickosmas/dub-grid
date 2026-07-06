@@ -5,6 +5,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { cancelSubscription } from "@/lib/stripe";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
   // Load the org so we can match the typed confirmation and skip double-deletes.
   const { data: org, error: orgError } = await serviceClient
     .from("organizations")
-    .select("id, name, archived_at")
+    .select("id, name, slug, archived_at")
     .eq("id", effectiveOrgId)
     .maybeSingle();
 
@@ -105,6 +106,13 @@ export async function POST(req: NextRequest) {
     });
     logger.error({ error: archiveError, orgId: effectiveOrgId }, "Failed to archive organization");
     return NextResponse.json({ error: "Failed to delete organization" }, { status: 500 });
+  }
+
+  // The public subdomain lookup caches {id, name} by slug with a long TTL —
+  // invalidate immediately so an archived org's subdomain stops resolving
+  // right away instead of appearing valid until the cache expires.
+  if (org.slug) {
+    void cacheDel(CacheKey.orgBySlug(org.slug));
   }
 
   // Cancel the Stripe subscription. A Stripe failure must not block the

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatImportPreviousSkipDescription,
+  getSkipReasonLabel,
   summarizeImportPreviousOutcomes,
   widenFetchWindow,
 } from "./operations";
@@ -141,6 +142,24 @@ describe("formatImportPreviousSkipDescription", () => {
       new Map(),
     );
     expect(description).toContain("an employee on 7/4");
+  });
+});
+
+describe("getSkipReasonLabel", () => {
+  it("labels each documented reason code", () => {
+    expect(getSkipReasonLabel("target_has_data")).toBe("Target already had data");
+    expect(getSkipReasonLabel("employee_inactive")).toBe("Employee no longer active");
+    expect(getSkipReasonLabel("source_has_no_content")).toBe(
+      "Source cell had no usable content",
+    );
+    expect(getSkipReasonLabel("disqualified:focus_area")).toBe("Qualification change");
+    expect(getSkipReasonLabel("disqualified:role")).toBe("Qualification change");
+    expect(getSkipReasonLabel("disqualified:cert")).toBe("Qualification change");
+  });
+
+  it("falls back to a generic label for an undocumented reason", () => {
+    expect(getSkipReasonLabel("something_new")).toBe("Skipped for other reasons");
+    expect(getSkipReasonLabel(null)).toBe("Skipped for other reasons");
   });
 });
 

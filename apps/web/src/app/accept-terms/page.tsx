@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -82,13 +82,11 @@ export default function AcceptTermsPage() {
     },
   });
 
-  const [pendingHandoff, setPendingHandoff] = useState(false);
   function handleAccept() {
     if (!user) {
       toast.error("Session expired. Please sign in again.");
       return;
     }
-    setPendingHandoff(true);
     accept.mutate();
   }
 
@@ -100,17 +98,13 @@ export default function AcceptTermsPage() {
     !!user &&
     !termsLoading &&
     terms !== undefined &&
-    terms.acceptedCurrentTerms === false &&
-    !pendingHandoff;
+    terms.acceptedCurrentTerms === false;
+
+  if (!showCard) return null;
 
   return (
     <PageShell>
-      {showCard ? (
-        <TermsAcceptanceCard
-          onAccept={handleAccept}
-          loading={accept.isPending}
-        />
-      ) : null}
+      <TermsAcceptanceCard onAccept={handleAccept} loading={accept.isPending} />
     </PageShell>
   );
 }

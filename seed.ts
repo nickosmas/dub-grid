@@ -1870,7 +1870,7 @@ async function main() {
 
     const seededJobs = await seedJobsForOrg(db, orgId, assignmentRows);
 
-    // 10. Schedule cells (May 17 – May 30, 2026 — 2 weeks of data)
+    // 10. Schedule cells (Jul 5 – Jul 18, 2026 — 2 weeks of data)
     const offAbsenceType = absenceTypeRows[0]; // First absence type (e.g., "Off")
     let shiftCount = 0;
 
@@ -1897,7 +1897,7 @@ async function main() {
       );
       if (empWorkAssignments.length === 0) continue;
 
-      const shiftStart = new Date(2026, 4, 17); // May 17, 2026
+      const shiftStart = new Date(2026, 6, 5); // July 5, 2026
       for (let i = 0; i < 14; i++) {
         const d = new Date(shiftStart);
         d.setDate(d.getDate() + i);

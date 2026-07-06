@@ -14,6 +14,7 @@ import {
 import { rowToOrganization } from "@/lib/db/mappers";
 import type { DbOrganization } from "@/lib/db/types";
 import { ORGANIZATION_COLS } from "@/lib/db/shared";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -449,6 +450,13 @@ export async function PUT(req: NextRequest) {
     }
 
     const updatedOrg = rowToOrganization(updatedRow as DbOrganization);
+
+    // The public subdomain lookup caches {id, name} by slug with a long TTL
+    // (organizations.slug is write-once, but name isn't) — invalidate on
+    // rename so the cached display name doesn't linger stale for a day.
+    if (changeKeys.has("name") && updatedOrg.slug) {
+      void cacheDel(CacheKey.orgBySlug(updatedOrg.slug));
+    }
 
     const auditPayload = {
       org_id: orgId,

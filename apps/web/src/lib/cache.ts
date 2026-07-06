@@ -8,6 +8,14 @@ export const TTL = {
   MODERATE: 120,
   /** 30 seconds — middleware profile/membership fallback */
   MIDDLEWARE: 30,
+  /**
+   * 24 hours — public, unauthenticated subdomain→org lookup. Safe this long
+   * because organizations.slug is write-once (set at creation, never
+   * rewritten); the cached `name` is invalidated explicitly on rename
+   * (organizations/settings/route.ts) and on archive
+   * (organizations/delete/route.ts) rather than relying on TTL expiry.
+   */
+  PUBLIC_LOOKUP: 86400,
 } as const;
 
 // ── Redis Client (lazy singleton) ───────────────────────────────────────
@@ -59,6 +67,9 @@ export const CacheKey = {
     `dg:mw:membership:${userId}:${slug}`,
   mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
   mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+
+  // Public subdomain lookup (validate-domain)
+  orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
 } as const;
 
 // ── Typed Cache Operations ──────────────────────────────────────────────

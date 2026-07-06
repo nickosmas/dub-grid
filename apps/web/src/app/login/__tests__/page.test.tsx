@@ -1,11 +1,16 @@
 /**
- * Unit tests for login/page.tsx submit states.
+ * Unit tests for OrgLogin's submit states.
  * Validates: Requirements 3.1, 3.3
+ *
+ * LoginPage itself is now an async Server Component that only picks which
+ * of DomainSelector/OrgLogin/GridmasterLogin to render based on the Host
+ * header (see app/login/page.tsx) — the actual submit logic under test here
+ * lives in OrgLogin.
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import LoginPage from "@/app/login/page";
+import OrgLogin from "@/app/login/OrgLogin";
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -15,11 +20,13 @@ function renderWithQueryClient(ui: React.ReactElement) {
 // Mock account client — setBrowserSession is called after server-side auth succeeds
 const mockSetSession = vi.fn();
 vi.mock("@/features/account/client", () => ({
+  exitSandbox: vi.fn().mockResolvedValue({ success: true }),
   fetchAccessibleOrganizations: vi.fn().mockResolvedValue({ organizations: [] }),
   getBrowserAuthSession: vi.fn().mockResolvedValue(null),
   refreshBrowserSession: vi.fn().mockResolvedValue(undefined),
   setBrowserSession: (...args: unknown[]) => mockSetSession(...args),
   signOutFromBrowser: vi.fn().mockResolvedValue(undefined),
+  startBrowserTrial: vi.fn().mockResolvedValue({ success: true }),
   switchBrowserOrganization: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -49,11 +56,18 @@ function submitForm(container: HTMLElement) {
   fireEvent.submit(screen.getByRole("button", { name: /sign in/i }));
 }
 
-describe("Login page submit states", () => {
+/** A validate-domain response so OrgLogin's mount effect resolves the org as found. */
+function validateDomainResponse() {
+  return new Response(JSON.stringify({ valid: true, name: "Test Org" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+describe("OrgLogin submit states", () => {
   beforeEach(() => {
-    // parseHost reads window.location.host (not hostname); set host to a subdomain
-    Object.defineProperty(window, 'location', {
-      value: { host: 'test-org.localhost', hostname: 'test-org.localhost', replace: vi.fn(), reload: vi.fn(), href: '', search: '?verified=1' },
+    Object.defineProperty(window, "location", {
+      value: { host: "test-org.localhost", hostname: "test-org.localhost", replace: vi.fn(), reload: vi.fn(), href: "", search: "?verified=1" },
       writable: true,
       configurable: true,
     });
@@ -63,10 +77,17 @@ describe("Login page submit states", () => {
   });
 
   it("successful sign-in: button stays disabled and shows spinner", async () => {
-    // Arrange: fetch never resolves so loading stays true
-    vi.spyOn(globalThis, "fetch").mockReturnValue(new Promise(() => {}));
+    // Arrange: /api/auth/login never resolves so loading stays true; the
+    // mount-time validate-domain call resolves normally.
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/validate-domain")) {
+        return Promise.resolve(validateDomainResponse());
+      }
+      return new Promise(() => {});
+    });
 
-    const { container } = renderWithQueryClient(<LoginPage />);
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" />);
     submitForm(container);
 
     await waitFor(() => {
@@ -78,19 +99,20 @@ describe("Login page submit states", () => {
   });
 
   it("failed sign-in: loading resets to false and error message is displayed", async () => {
-    // Arrange: fetch returns 401 (invalid credentials).
-    // Return a fresh Response per call — OrgLogin also fires a /api/validate-domain
-    // fetch on mount, and a single shared Response body can only be read once.
-    vi.spyOn(globalThis, "fetch").mockImplementation(() =>
-      Promise.resolve(
+    vi.spyOn(globalThis, "fetch").mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/validate-domain")) {
+        return Promise.resolve(validateDomainResponse());
+      }
+      return Promise.resolve(
         new Response(JSON.stringify({ success: false, error: "Invalid email or password" }), {
           status: 401,
           headers: { "Content-Type": "application/json" },
         }),
-      ),
-    );
+      );
+    });
 
-    const { container } = renderWithQueryClient(<LoginPage />);
+    const { container } = renderWithQueryClient(<OrgLogin orgSlug="test-org" />);
     submitForm(container);
 
     await waitFor(() => {
@@ -100,5 +122,21 @@ describe("Login page submit states", () => {
     // Button must be re-enabled — loading=false on error
     const button = screen.getByRole("button", { name: /sign in/i });
     expect(button).not.toBeDisabled();
+  });
+
+  it("shows an organization-not-found state when validate-domain reports the slug doesn't exist", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ valid: false, name: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    renderWithQueryClient(<OrgLogin orgSlug="nonexistent" />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Organization not found")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
   });
 });

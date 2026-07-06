@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -36,6 +37,24 @@ export function createRequestSupabaseClient(req: NextRequest) {
           // Route handlers use the request-bound response separately.
         },
       },
+    },
+  );
+}
+
+/**
+ * Builds a user-scoped Supabase client from a raw access token instead of
+ * request cookies — for server contexts (e.g. right after
+ * signInWithPassword) that have fresh tokens but no cookie jar yet.
+ * `auth.uid()`-scoped RPCs (switch_org, start_trial_for_org) work with this
+ * client the same way they do with the cookie-based one.
+ */
+export function createTokenScopedClient(accessToken: string) {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
     },
   );
 }
