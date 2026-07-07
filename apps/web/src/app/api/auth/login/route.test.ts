@@ -17,18 +17,16 @@ vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 
-vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    auth: { signInWithPassword: (...args: unknown[]) => signInWithPassword(...args) },
-  }),
-}));
-
 // The token-scoped client used for org RPCs (get_my_organizations,
-// switch_org, start_trial_for_org) and post-switch refreshSession.
+// switch_org, start_trial_for_org) and post-switch refreshSession, plus the
+// anon-key client used for signInWithPassword itself.
 vi.mock("@/lib/api-auth", () => ({
   createTokenScopedClient: () => ({
     rpc: (...args: unknown[]) => rpc(...args),
     auth: { refreshSession: (...args: unknown[]) => refreshSession(...args) },
+  }),
+  createAnonClient: () => ({
+    auth: { signInWithPassword: (...args: unknown[]) => signInWithPassword(...args) },
   }),
 }));
 
@@ -84,7 +82,7 @@ describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     validateCsrfOrigin.mockReturnValue(null);
     fetchTermsAcceptanceStatus.mockResolvedValue({ acceptedCurrentTerms: true, acceptedVersion: "v1" });

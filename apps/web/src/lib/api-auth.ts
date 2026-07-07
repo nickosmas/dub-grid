@@ -59,6 +59,21 @@ export function createTokenScopedClient(accessToken: string) {
   );
 }
 
+/**
+ * Builds a fresh, non-cached anon-key client for `.auth.*` calls that must
+ * never touch the shared service-role singleton (see supabase-service.ts).
+ * signInWithPassword et al mutate the calling client's own session state,
+ * which would silently swap getServiceClient()'s Authorization header from
+ * service_role to the signed-in user's JWT for the rest of the process.
+ */
+export function createAnonClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+}
+
 export async function requireAuthenticatedSession(
   req: NextRequest,
 ): Promise<AuthResult> {

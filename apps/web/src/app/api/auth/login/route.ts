@@ -8,8 +8,7 @@ import {
 } from "@dubgrid/domain";
 import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { createTokenScopedClient } from "@/lib/api-auth";
-import { getServiceClient } from "@/lib/supabase-service";
+import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
 import { parseHost } from "@/lib/subdomain";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
 import logger from "@/lib/logger";
@@ -198,9 +197,9 @@ export async function POST(req: NextRequest) {
 
   // ── Authenticate via Supabase ─────────────────────────────────────
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !serviceKey) {
+  if (!supabaseUrl || !anonKey) {
     logger.error("Supabase env vars not configured for login route");
     Sentry.captureMessage("Supabase env vars not configured for login route", "error");
     return NextResponse.json(
@@ -209,7 +208,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const supabase = getServiceClient();
+  const supabase = createAnonClient();
 
   const { data, error } = await timer.time("signin", () =>
     supabase.auth.signInWithPassword({ email, password }),
