@@ -21,6 +21,7 @@ export function BottomSheetModal({
   dismissDisabled = false,
   scrollable = false,
   accessibilityLabel = "Dismiss",
+  footer,
   children,
 }: {
   visible: boolean;
@@ -28,6 +29,7 @@ export function BottomSheetModal({
   dismissDisabled?: boolean;
   scrollable?: boolean;
   accessibilityLabel?: string;
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   const translateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
@@ -63,15 +65,18 @@ export function BottomSheetModal({
           <View style={styles.grabber} />
           {scrollable ? (
             <ScrollView
-              contentContainerStyle={styles.body}
+              contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
               showsVerticalScrollIndicator={false}
               style={styles.scrollArea}
             >
               {children}
             </ScrollView>
           ) : (
-            <View style={styles.body}>{children}</View>
+            <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>
+              {children}
+            </View>
           )}
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
         </Animated.View>
       </View>
     </Modal>
@@ -114,5 +119,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: SHEET_BOTTOM_PADDING,
     gap: 16,
+  },
+  bodyWithFooter: {
+    paddingBottom: 16,
+  },
+  footer: {
+    flexDirection: "row",
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: mobileColors.borderSubtle,
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: SHEET_BOTTOM_PADDING,
   },
 });

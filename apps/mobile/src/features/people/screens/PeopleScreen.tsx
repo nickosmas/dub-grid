@@ -110,6 +110,13 @@ export default function PeopleScreen() {
       profileRequestsQuery.refetch(),
     ]),
   );
+  function clearFilters() {
+    setFocusFilterId("all");
+    setManagementDepartmentFilterId("all");
+    setStatusFilter("active");
+    setSortMode("seniority");
+  }
+
   function confirmProfileRequestAction() {
     if (!profileRequestConfirmation) return;
 
@@ -232,6 +239,24 @@ export default function PeopleScreen() {
       onRefresh={manualRefresh.refresh}
     >
       <BottomSheetModal
+        footer={
+          <>
+            <Button
+              compact
+              disabled={activeFilterCount === 0}
+              label="Clear all"
+              tone="neutral"
+              onPress={clearFilters}
+            />
+            <View style={styles.filterFooterSpacer} />
+            <Button
+              compact
+              label="Done"
+              tone="primary"
+              onPress={() => setIsFilterModalVisible(false)}
+            />
+          </>
+        }
         onDismiss={() => setIsFilterModalVisible(false)}
         scrollable
         visible={isFilterModalVisible}
@@ -693,6 +718,9 @@ const styles = StyleSheet.create({
   sheetTitle: {
     ...mobileText.heroMetric,
     color: mobileColors.textPrimary,
+  },
+  filterFooterSpacer: {
+    flex: 1,
   },
   searchBarRow: {
     alignItems: "center",
