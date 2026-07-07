@@ -61,7 +61,7 @@ export default function OpenShiftsCard({
       : `${openSlotCount} unfilled ${periodLabel}`;
 
   return (
-    <div className="dg-card">
+    <div className="dg-card" style={{ display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div className="dg-card-header">
         <div>
@@ -73,7 +73,10 @@ export default function OpenShiftsCard({
         )}
       </div>
 
-      <div className="dg-card-body">
+      <div
+        className="dg-card-body"
+        style={openShifts.length === 0 ? { display: "flex", flex: 1 } : undefined}
+      >
         {openShifts.length === 0 ? (
           <EmptyState
             title={
@@ -91,6 +94,7 @@ export default function OpenShiftsCard({
                   : undefined
             }
             size="inline"
+            style={{ flex: 1 }}
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
