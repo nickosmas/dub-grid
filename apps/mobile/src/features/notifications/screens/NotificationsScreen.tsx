@@ -21,7 +21,10 @@ import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useNotificationFacets } from "../hooks/useNotificationFacets";
-import { openNotificationAction } from "../lib/openNotificationAction";
+import {
+  isNotificationActionSupportedOnMobile,
+  openNotificationAction,
+} from "../lib/openNotificationAction";
 import {
   bulkUpdateNotifications,
   getNotifications,
@@ -454,6 +457,9 @@ function NotificationCard({
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
   const action = extractNotificationAction(notification.metadata);
+  const actionSupported = action
+    ? isNotificationActionSupportedOnMobile(action.href)
+    : false;
 
   return (
     <Pressable
@@ -512,7 +518,7 @@ function NotificationCard({
         {isUnread ? <View style={styles.unreadDot} /> : null}
       </View>
       <View style={styles.cardActions}>
-        {action ? (
+        {action && actionSupported ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={action.label}
@@ -532,6 +538,15 @@ function NotificationCard({
               color={mobileColors.brand}
             />
           </Pressable>
+        ) : action ? (
+          <View style={styles.webOnlyHint}>
+            <Ionicons
+              name="globe-outline"
+              size={14}
+              color={mobileColors.textMuted}
+            />
+            <Text style={styles.webOnlyHintLabel}>Complete on web</Text>
+          </View>
         ) : (
           <View />
         )}
@@ -743,6 +758,20 @@ const styles = StyleSheet.create({
   ctaPillLabel: {
     ...mobileText.label,
     color: mobileColors.brand,
+    fontWeight: "600",
+  },
+  webOnlyHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: mobileRadii.pill,
+    backgroundColor: mobileColors.surfaceMuted,
+  },
+  webOnlyHintLabel: {
+    ...mobileText.label,
+    color: mobileColors.textMuted,
     fontWeight: "600",
   },
   archiveButton: {

@@ -4,6 +4,7 @@ import {
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestBodySchema,
   mobileNotificationPreferencesResponseSchema,
+  mobileNotificationSchema,
   mobilePersonSchema,
   mobilePersonResponseSchema,
   mobilePersonUpdateBodySchema,
@@ -625,6 +626,39 @@ describe("mobile contracts", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.linkedEmployee?.focusAreaIds).toEqual([]);
+  });
+
+  it("accepts notification types that mobile already receives pushes for but previously had no schema entry", () => {
+    const base = {
+      id: "5c1e2f3a-1111-4b2c-8888-abcdef123456",
+      channel: "in_app" as const,
+      category: "billing",
+      priority: "high" as const,
+      title: "Trial ending soon",
+      message: "Your trial ends in 2 days.",
+      metadata: {},
+      readAt: null,
+      archivedAt: null,
+      createdAt: "2026-07-01T00:00:00.000Z",
+    };
+
+    for (const type of [
+      "shift_request_expired",
+      "invitation_expired",
+      "member_dept_changed",
+      "billing_trial_ending_soon",
+      "billing_trial_expired",
+      "org_created",
+      "org_trial_started",
+      "org_archived",
+      "org_restored",
+      "org_subscription_converted",
+      "org_subscription_canceled",
+      "org_payment_failed",
+    ] as const) {
+      const result = mobileNotificationSchema.safeParse({ ...base, type });
+      expect(result.success).toBe(true);
+    }
   });
 
   it("accepts a valid notification read response", () => {

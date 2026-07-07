@@ -25,7 +25,10 @@ import {
   mobileText,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
-import { openNotificationAction } from "../lib/openNotificationAction";
+import {
+  isNotificationActionSupportedOnMobile,
+  openNotificationAction,
+} from "../lib/openNotificationAction";
 
 function formatFullTimestamp(value: string): string {
   return new Date(value).toLocaleString("en-US", {
@@ -164,6 +167,9 @@ export default function NotificationDetailScreen() {
     () => extractNotificationAction(notification?.metadata ?? null),
     [notification?.metadata],
   );
+  const actionSupported = action
+    ? isNotificationActionSupportedOnMobile(action.href)
+    : false;
 
   const handleOpenAction = useCallback(() => {
     if (!action) return;
@@ -238,8 +244,20 @@ export default function NotificationDetailScreen() {
         </Text>
         <Text style={styles.message}>{notification.message}</Text>
 
-        {action ? (
+        {action && actionSupported ? (
           <Button tone="primary" label={action.label} onPress={handleOpenAction} />
+        ) : action ? (
+          <View style={styles.webOnlyHint}>
+            <Ionicons
+              name="globe-outline"
+              size={16}
+              color={mobileColors.textMuted}
+            />
+            <Text style={styles.webOnlyHintLabel}>
+              This action isn't available in the mobile app. Sign in on the web
+              to complete it.
+            </Text>
+          </View>
         ) : null}
 
         <MetadataList metadata={notification.metadata} />
@@ -322,6 +340,20 @@ const styles = StyleSheet.create({
   title: {
     ...mobileText.screenTitle,
     color: mobileColors.textPrimary,
+  },
+  webOnlyHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: mobileRadii.control,
+    backgroundColor: mobileColors.surfaceMuted,
+  },
+  webOnlyHintLabel: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
+    flexShrink: 1,
   },
   timestamp: {
     ...mobileText.caption,
