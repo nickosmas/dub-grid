@@ -3,6 +3,7 @@ import type { DashboardContentProps } from "./DashboardContentProps";
 import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
 import ActivityFeed from "./ActivityFeed";
 import CoverageBySectionCard from "./CoverageBySectionCard";
+import MyScheduleRow from "./MyScheduleRow";
 import OpenShiftsCard from "./OpenShiftsCard";
 import StaffHoursCard from "./StaffHoursCard";
 
@@ -20,6 +21,10 @@ export default function AdminDashboard(props: DashboardContentProps) {
     focusAreas,
     shiftRequests,
     currentEmpId,
+    currentPeriodShifts,
+    assignmentById,
+    absenceTypeById,
+    periodDates,
     draftNewCount,
     draftModifiedCount,
     draftDeletedCount,
@@ -81,6 +86,15 @@ export default function AdminDashboard(props: DashboardContentProps) {
   return (
     <>
       <ActionQueueCard items={actionItems} maxVisible={5} grouped />
+
+      <MyScheduleRow
+        currentEmpId={currentEmpId}
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={periodDates}
+        periodLabel={periodLabel}
+      />
 
       <div
         style={{

@@ -450,7 +450,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       }
     >
       {!hasScheduleItems ? (
-        <ScheduleEmptyState isMobile={isMobile} />
+        <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
       ) : stackLayout ? (
         <div
           data-testid="user-dashboard-content-grid"
@@ -1645,17 +1645,20 @@ function MeHeroCard({
 
 function ScheduleEmptyState({
   isMobile,
+  isTwoWeekView,
   style,
 }: {
   isMobile: boolean;
+  isTwoWeekView: boolean;
   style?: CSSProperties;
 }) {
+  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   return (
     <EmptyState
       data-testid="user-dashboard-empty-schedule"
       icon={<CalendarDays size={24} />}
-      title="Nothing scheduled this week"
-      description="When shifts get published, they'll show up right here."
+      title={`You're not scheduled ${periodLabel}`}
+      description="When your shifts get published, they'll show up right here."
       style={{
         minHeight: isMobile ? 260 : 360,
         width: "100%",

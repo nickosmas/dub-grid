@@ -240,7 +240,7 @@ export default function Header({ orgName }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useLogout();
-  const { orgId, isGridmaster, role, canViewStaff, canAccessSettings, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel, level } = usePermissions();
+  const { orgId, isGridmaster, role, canViewStaff, canAccessSettings, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -260,13 +260,7 @@ export default function Header({ orgName }: HeaderProps) {
             : "";
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
-    if (item.id === "dashboard") {
-      // Dashboard is an admin tool. Regular users (org_role = 'user') don't
-      // get one — they go straight to /schedule. Admins previewing the user
-      // experience via "view as user" also hide it to match what a real
-      // user would see (and /dashboard redirects them anyway).
-      return !isUserViewActive && (isGridmaster || level >= 2);
-    }
+    if (item.id === "dashboard") return true;
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
     if (item.id === "reports") {

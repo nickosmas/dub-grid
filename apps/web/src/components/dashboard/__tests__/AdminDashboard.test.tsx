@@ -24,8 +24,12 @@ function makeProps(
       },
     ],
     activityItems: [],
+    absenceTypeById: new Map(),
+    assignmentById: new Map(),
     coverageRequirements: [{ id: 1 }],
     currentEmpId: "emp-1",
+    currentPeriodShifts: {},
+    periodDates: [new Date("2026-05-11T00:00:00")],
     currentHours: [
       {
         dailyHours: {},

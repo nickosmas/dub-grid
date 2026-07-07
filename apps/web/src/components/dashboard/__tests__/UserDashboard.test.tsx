@@ -1385,7 +1385,7 @@ describe("UserDashboard", () => {
 
     const emptyState = screen.getByTestId("user-dashboard-empty-schedule");
 
-    expect(emptyState).toHaveTextContent("Nothing scheduled this week");
+    expect(emptyState).toHaveTextContent("You're not scheduled this week");
     expect(emptyState.style.border).toContain("dashed");
     expect(emptyState).toHaveStyle({
       alignItems: "center",

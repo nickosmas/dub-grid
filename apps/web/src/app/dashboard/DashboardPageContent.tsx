@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
@@ -85,22 +84,9 @@ function DashboardContent() {
 }
 
 export default function DashboardPageContent() {
-  const router = useRouter();
-  const { isGridmaster, isLoading, level, isUserViewActive } = usePermissions();
+  const { isGridmaster, isLoading } = usePermissions();
 
-  // Regular users (org_role = 'user') don't get a dashboard — they go straight
-  // to /schedule, which is the only screen with content for them. Admins in
-  // "view as user" mode also redirect, since they're previewing the user
-  // experience. Use replace() so the back button doesn't bounce back here.
-  const isRegularUser = !isLoading && !isGridmaster && level < 2;
-  const shouldRedirectToSchedule = isRegularUser || isUserViewActive;
-  useEffect(() => {
-    if (shouldRedirectToSchedule) {
-      router.replace("/schedule");
-    }
-  }, [shouldRedirectToSchedule, router]);
-
-  if (isLoading || shouldRedirectToSchedule) {
+  if (isLoading) {
     return <ProgressBar loading />;
   }
 

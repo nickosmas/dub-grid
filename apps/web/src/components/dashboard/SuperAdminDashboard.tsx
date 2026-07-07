@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import StaffHoursCard from "./StaffHoursCard";
 import CoverageBySectionCard from "./CoverageBySectionCard";
+import MyScheduleRow from "./MyScheduleRow";
 import OpenShiftsCard from "./OpenShiftsCard";
 import ActivityFeed from "./ActivityFeed";
 
@@ -16,6 +17,11 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     currentHours,
     activeEmployees,
     focusAreas,
+    currentEmpId,
+    currentPeriodShifts,
+    assignmentById,
+    absenceTypeById,
+    periodDates,
     periodLabel,
     overtimeThreshold,
     isMobile,
@@ -28,6 +34,15 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
 
   return (
     <>
+      <MyScheduleRow
+        currentEmpId={currentEmpId}
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={periodDates}
+        periodLabel={periodLabel}
+      />
+
       <div
         style={{
           display: "grid",
