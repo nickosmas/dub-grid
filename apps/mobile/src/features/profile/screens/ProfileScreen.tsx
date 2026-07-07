@@ -5,7 +5,6 @@ import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Alert,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -67,7 +66,6 @@ import {
   profilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 import { PendingRequestsCard } from "../components/PendingRequestsCard";
-import { LEGAL_URLS } from "../../consent/lib/consent";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -457,29 +455,13 @@ export default function ProfileScreen() {
               />
               <ProfileNavRow
                 iconName="notifications-outline"
-                isLast
                 label="Notifications"
                 onPress={() => router.push("/(tabs)/profile/notifications")}
               />
-            </ProfileList>
-          </ProfileSection>
-
-          <ProfileSection title="Privacy & data">
-            <ProfileList>
               <ProfileNavRow
                 iconName="shield-outline"
-                label="Privacy policy"
-                onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
-              />
-              <ProfileNavRow
-                iconName="document-text-outline"
-                label="Terms of service"
-                onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
-              />
-              <ProfileNavRow
-                iconName="options-outline"
                 isLast
-                label="Tracking & analytics preferences"
+                label="Privacy & data"
                 onPress={() => router.push("/(tabs)/profile/privacy")}
               />
             </ProfileList>
