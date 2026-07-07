@@ -10,6 +10,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
   const {
     org,
     coverageRequirements,
+    permissions,
     sectionCoverage,
     openShifts,
     publishedWindowState,
@@ -55,6 +56,7 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           focusAreaLabel={org.focusAreaLabel || "section"}
           isMobile={isMobile}
           hasRequirements={coverageRequirements.length > 0}
+          canManageCoverageRequirements={permissions.canManageCoverageRequirements}
           publishedWindowState={publishedWindowState}
           periodLabel={periodLabel}
           onExpand={() => onExpandPanel("coverage")}

@@ -109,6 +109,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
             focusAreaLabel={org.focusAreaLabel || "section"}
             isMobile={isMobile}
             hasRequirements={coverageRequirements.length > 0}
+            canManageCoverageRequirements={permissions.canManageCoverageRequirements}
             publishedWindowState={publishedWindowState}
             periodLabel={periodLabel}
             onExpand={() => onExpandPanel("coverage")}

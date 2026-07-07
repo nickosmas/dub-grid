@@ -149,4 +149,55 @@ describe("AdminDashboard", () => {
     expect(container.querySelector('a[href="/schedule"]')).not.toBeNull();
     expect(container.querySelector('a[href="/people/emp-1"]')).not.toBeNull();
   });
+
+  it("links to coverage settings when requirements aren't configured yet", () => {
+    render(
+      <AdminDashboard
+        {...makeProps({
+          coverageRequirements: [],
+          sectionCoverage: [],
+          permissions: {
+            ...buildPerms("admin", "org-1", false),
+            canApproveShiftRequests: true,
+            canEditShifts: true,
+            canViewDashboardAnalytics: true,
+            canViewSchedule: true,
+            canManageCoverageRequirements: true,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText("No coverage requirements configured"),
+    ).toBeInTheDocument();
+    const configureLink = screen.getByRole("link", { name: "Configure coverage" });
+    expect(configureLink).toHaveAttribute(
+      "href",
+      "/settings?section=schedule-coverage",
+    );
+  });
+
+  it("hides the configure-coverage link when the admin can't manage requirements", () => {
+    render(
+      <AdminDashboard
+        {...makeProps({
+          coverageRequirements: [],
+          sectionCoverage: [],
+          permissions: {
+            ...buildPerms("admin", "org-1", false),
+            canApproveShiftRequests: true,
+            canEditShifts: true,
+            canViewDashboardAnalytics: true,
+            canViewSchedule: true,
+            canManageCoverageRequirements: false,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("link", { name: "Configure coverage" }),
+    ).not.toBeInTheDocument();
+  });
 });

@@ -22,6 +22,7 @@ function makeProps(
     openShifts: [],
     org: { id: "org-1", focusAreaLabel: "Wing" },
     overtimeThreshold: 80,
+    permissions: { canManageCoverageRequirements: true },
     periodLabel: "this week",
     publishedWindowState: "published",
     sectionCoverage: [],
