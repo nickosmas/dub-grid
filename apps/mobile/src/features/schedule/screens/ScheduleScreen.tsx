@@ -27,7 +27,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AnchoredPopupSurface } from "../../../shared/components/AnchoredPopupSurface";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Reanimated, {
+  Easing,
+  Extrapolation,
+  cancelAnimation,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -87,7 +97,6 @@ import {
   filterTeamScheduleEntriesByFocusArea,
   formatCompactScheduleDate,
   formatScheduleDayLabel,
-  formatScheduleMonthLabel,
   formatScheduleRange,
   formatScheduleTimeRange,
   getFeaturedMeScheduleSegment,
@@ -103,6 +112,7 @@ import {
   getScheduleEntryStartTime,
   getScheduleEntryTitle,
   getScheduleMonthStartDate,
+  getScheduleMonthWeekIndexForDate,
   getScheduleRangeForDate,
   getSplitShiftSegmentLabel,
   getSplitShiftSegmentsForEntry,
@@ -133,9 +143,20 @@ const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
 const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
 const OPEN_SHIFT_STACK_PEEK_HEIGHT = 10;
 const OPEN_SHIFT_STACK_SIDE_INSET = 6;
-const SCHEDULE_CALENDAR_POPUP_RIGHT_OFFSET = 52;
 const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// Fallback single-row height, used until the real row is measured. Matches
+// monthCalendarDaySlot's minHeight in styles below.
+const WEEK_STRIP_ROW_HEIGHT = 44;
+// Fixed size for the circular date highlight, shared by every week/month row.
+const DATE_HIGHLIGHT_SIZE = 36;
+// Matches monthCalendarWeek/monthCalendarWeeks gap in styles below.
+const MONTH_GRID_ROW_GAP = 6;
+const MONTH_EXPAND_SECTION_GAP = 14;
+const MONTH_EXPAND_TIMING = {
+  duration: 240,
+  easing: Easing.out(Easing.cubic),
+};
 const ME_HERO_CARD_BACKGROUND = "#2946C7";
 const ME_HERO_COLLABORATOR_BACKGROUND = "#3A55CB";
 // Matches the web hero gradient: dark bottom-left → light top-right.
@@ -233,7 +254,7 @@ function getFirstDateForFocusArea(
 
 function formatScheduleHeaderDate(date: string): string {
   return new Intl.DateTimeFormat("en-US", {
-    month: "long",
+    month: "short",
     day: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00.000Z`));
@@ -260,7 +281,7 @@ function formatTeamScheduleHeaderDateLabel(
   }
 
   const weekdayLabel = new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
+    weekday: "short",
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00.000Z`));
 
@@ -999,9 +1020,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     string | null
   >(null);
   const [weekStripWidth, setWeekStripWidth] = useState(0);
+  const [weekStripRowHeight, setWeekStripRowHeight] = useState(
+    WEEK_STRIP_ROW_HEIGHT,
+  );
   const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<string | null>(
     null,
   );
+  const calendarExpandProgress = useSharedValue(0);
+  const calendarDragStartProgress = useSharedValue(0);
   const [pendingAction, setPendingAction] =
     useState<PendingRequestAction>(null);
   const [requestActionConfirmation, setRequestActionConfirmation] =
@@ -1013,6 +1039,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const selectedDateRef = useRef<string | null>(null);
   const weekStripTranslateX = useRef(new Animated.Value(0)).current;
   const weekTransitionRef = useRef<Animated.CompositeAnimation | null>(null);
+  const monthSwipeStartXRef = useRef<number | null>(null);
+  const monthSwipeStartTimestampRef = useRef<number | null>(null);
+  const monthSwipeTranslateX = useRef(new Animated.Value(0)).current;
+  const monthTransitionRef = useRef<Animated.CompositeAnimation | null>(null);
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
   const openShiftVisibility =
     bootstrapQuery.data?.currentOrg.openShiftVisibility;
@@ -1176,10 +1206,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const currentTimeValue = getCurrentTimeValue(now, timeZone);
   const visibleCalendarMonth =
     calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
-  const monthCalendarLabel = formatScheduleMonthLabel(
-    visibleCalendarMonth,
-    timeZone,
-  );
   const previousWeekDate = addDaysToIsoDate(selectedDate, -7);
   const nextWeekDate = addDaysToIsoDate(selectedDate, 7);
   const previousWeekDays = useMemo(
@@ -1207,6 +1233,66 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const monthWeeks = useMemo(
     () => buildScheduleMonthDays(visibleCalendarMonth, selectedDate, timeZone),
     [selectedDate, timeZone, visibleCalendarMonth],
+  );
+  const previousMonthAnchor = addMonthsToIsoDate(visibleCalendarMonth, -1);
+  const nextMonthAnchor = addMonthsToIsoDate(visibleCalendarMonth, 1);
+  // Only reachable via month-swipe, which only exists once expanded — skip
+  // the (non-trivial: ~35-42 Intl.DateTimeFormat calls each) computation
+  // otherwise.
+  const previousMonthWeeks = useMemo(
+    () =>
+      isCalendarOpen
+        ? buildScheduleMonthDays(previousMonthAnchor, selectedDate, timeZone)
+        : [],
+    [isCalendarOpen, previousMonthAnchor, selectedDate, timeZone],
+  );
+  const nextMonthWeeks = useMemo(
+    () =>
+      isCalendarOpen
+        ? buildScheduleMonthDays(nextMonthAnchor, selectedDate, timeZone)
+        : [],
+    [isCalendarOpen, nextMonthAnchor, selectedDate, timeZone],
+  );
+  const anchorWeekIndex = getScheduleMonthWeekIndexForDate(
+    visibleCalendarMonth,
+    selectedDate,
+  );
+  // One shared row height for every week row (swipeable or static) so the
+  // grid stays perfectly aligned as it slides — no per-row measurement.
+  const monthGridRowsHeight =
+    monthWeeks.length * weekStripRowHeight +
+    Math.max(0, monthWeeks.length - 1) * MONTH_GRID_ROW_GAP;
+  const anchorRowOffsetInStack =
+    anchorWeekIndex * (weekStripRowHeight + MONTH_GRID_ROW_GAP);
+  // The dates panel clips from a single row's height up to the full month
+  // grid height, so when fully expanded every week row is visible.
+  const calendarOuterClipAnimatedStyle = useAnimatedStyle(
+    () => ({
+      height: interpolate(
+        calendarExpandProgress.value,
+        [0, 1],
+        [weekStripRowHeight, monthGridRowsHeight],
+        Extrapolation.CLAMP,
+      ),
+    }),
+    [weekStripRowHeight, monthGridRowsHeight],
+  );
+  // The dates themselves just slide (no opacity/crossfade): the anchor
+  // (selected) week starts exactly where the collapsed row sits and moves
+  // south into its true row as the rest of the month is revealed.
+  const calendarDatesStackAnimatedStyle = useAnimatedStyle(
+    () => ({
+      transform: [
+        {
+          translateY: interpolate(
+            calendarExpandProgress.value,
+            [0, 1],
+            [-anchorRowOffsetInStack, 0],
+          ),
+        },
+      ],
+    }),
+    [anchorRowOffsetInStack],
   );
   const selectedDayTeamEntries = useMemo(
     () =>
@@ -1467,8 +1553,19 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     selectedDate,
   ]);
 
-  function closeAnchoredPopups() {
+  function closeCalendarExpansion() {
+    if (!isCalendarOpen) {
+      return;
+    }
+
+    calendarExpandProgress.value = withTiming(0, MONTH_EXPAND_TIMING);
     setIsCalendarOpen(false);
+    // Browsing months (chevrons or the month swipe) without picking a date
+    // leaves calendarMonthAnchor pointed at a month that may not contain
+    // selectedDate, which makes anchorWeekIndex resolve out of range and
+    // the collapsed week row fail to match any rendered week — a blank
+    // strip. Reset so the collapsed view always re-centers on selectedDate.
+    setCalendarMonthAnchor(null);
   }
 
   function getCommittedSelectedDate() {
@@ -1486,8 +1583,12 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectDate(nextDate: string) {
     commitSelectedDate(nextDate);
+    // Not redundant with closeCalendarExpansion's own reset below: that
+    // early-returns when the calendar is already collapsed (e.g. tapping a
+    // date directly in the week strip), so this is what keeps
+    // visibleCalendarMonth correct in that case.
     setCalendarMonthAnchor(getScheduleMonthStartDate(nextDate));
-    closeAnchoredPopups();
+    closeCalendarExpansion();
   }
 
   function handleOpenShiftDetail(entry: MobileScheduleEntry) {
@@ -1532,7 +1633,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     const releaseOffset = clampWeekSwipeDelta(deltaX, completeOffset);
     const rebasedOffset = direction * completeOffset + releaseOffset;
 
-    closeAnchoredPopups();
+    closeCalendarExpansion();
     weekTransitionRef.current?.stop();
     weekStripTranslateX.setValue(rebasedOffset);
     commitSelectedDate(nextDate);
@@ -1588,13 +1689,17 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   }
 
   function handleWeekSwipeStart(event: GestureResponderEvent) {
+    if (isCalendarOpen) {
+      return;
+    }
+
     weekTransitionRef.current?.stop();
     swipeStartXRef.current = getSwipeEventX(event);
     swipeStartTimestampRef.current = getSwipeEventTimestamp(event);
   }
 
   function handleWeekSwipeMove(event: GestureResponderEvent) {
-    if (swipeStartXRef.current == null) {
+    if (isCalendarOpen || swipeStartXRef.current == null) {
       return;
     }
 
@@ -1625,29 +1730,171 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     resetWeekSwipe();
   }
 
+  function getMonthSwipeWidth() {
+    return weekStripWidth || WEEK_SWIPE_FALLBACK_WIDTH;
+  }
+
+  function resetMonthSwipe() {
+    monthTransitionRef.current?.stop();
+    const resetAnimation = Animated.spring(monthSwipeTranslateX, {
+      toValue: 0,
+      damping: 18,
+      stiffness: 220,
+      mass: 0.7,
+      useNativeDriver: true,
+    });
+
+    monthTransitionRef.current = resetAnimation;
+    resetAnimation.start(() => {
+      monthTransitionRef.current = null;
+    });
+  }
+
+  function completeMonthSwipe(direction: -1 | 1, deltaX: number) {
+    const completeOffset = getMonthSwipeWidth();
+    const releaseOffset = clampWeekSwipeDelta(deltaX, completeOffset);
+    const rebasedOffset = direction * completeOffset + releaseOffset;
+
+    monthTransitionRef.current?.stop();
+    monthSwipeTranslateX.setValue(rebasedOffset);
+    // visibleCalendarMonth is always the 1st of its month, so this lands
+    // exactly on the 1st of the month being swiped to. Selecting it (not
+    // just browsing, as the chevrons do) keeps selectedDate inside the
+    // visible month, so anchorWeekIndex stays valid once collapsed.
+    const nextMonthStartDate = addMonthsToIsoDate(
+      visibleCalendarMonth,
+      direction,
+    );
+    const isTargetCurrentMonth =
+      nextMonthStartDate === getScheduleMonthStartDate(todayDate);
+    setCalendarMonthAnchor(nextMonthStartDate);
+    commitSelectedDate(isTargetCurrentMonth ? todayDate : nextMonthStartDate);
+
+    const settleAnimation = Animated.spring(monthSwipeTranslateX, {
+      toValue: 0,
+      damping: 22,
+      stiffness: 260,
+      mass: 0.8,
+      useNativeDriver: true,
+    });
+
+    monthTransitionRef.current = settleAnimation;
+    settleAnimation.start(({ finished }) => {
+      if (!finished) {
+        return;
+      }
+
+      monthTransitionRef.current = null;
+    });
+  }
+
+  function handleMonthSwipeEnd(
+    releaseX: number,
+    releaseTimestamp: number | null,
+  ) {
+    if (monthSwipeStartXRef.current == null) {
+      return;
+    }
+
+    const deltaX = releaseX - monthSwipeStartXRef.current;
+    const startTimestamp = monthSwipeStartTimestampRef.current;
+    monthSwipeStartXRef.current = null;
+    monthSwipeStartTimestampRef.current = null;
+    const swipeWidth = getMonthSwipeWidth();
+    const elapsedMs =
+      releaseTimestamp != null && startTimestamp != null
+        ? releaseTimestamp - startTimestamp
+        : null;
+
+    if (
+      !isCommittedWeekSwipe({
+        deltaX,
+        elapsedMs,
+        width: swipeWidth,
+      })
+    ) {
+      resetMonthSwipe();
+      return;
+    }
+
+    completeMonthSwipe(deltaX < 0 ? 1 : -1, deltaX);
+  }
+
+  function handleMonthSwipeStart(event: GestureResponderEvent) {
+    if (!isCalendarOpen) {
+      return;
+    }
+
+    monthTransitionRef.current?.stop();
+    monthSwipeStartXRef.current = getSwipeEventX(event);
+    monthSwipeStartTimestampRef.current = getSwipeEventTimestamp(event);
+  }
+
+  function handleMonthSwipeMove(event: GestureResponderEvent) {
+    if (!isCalendarOpen || monthSwipeStartXRef.current == null) {
+      return;
+    }
+
+    const moveX = getSwipeEventX(event);
+    if (moveX == null) {
+      return;
+    }
+
+    monthSwipeTranslateX.setValue(
+      clampWeekSwipeDelta(
+        moveX - monthSwipeStartXRef.current,
+        getMonthSwipeWidth(),
+      ),
+    );
+  }
+
+  function handleMonthSwipeRelease(event: GestureResponderEvent) {
+    const releaseX = getSwipeEventX(event);
+    if (releaseX == null) {
+      monthSwipeStartXRef.current = null;
+      monthSwipeStartTimestampRef.current = null;
+      return;
+    }
+
+    handleMonthSwipeEnd(releaseX, getSwipeEventTimestamp(event));
+  }
+
+  function handleMonthSwipeCancel() {
+    monthSwipeStartXRef.current = null;
+    monthSwipeStartTimestampRef.current = null;
+    resetMonthSwipe();
+  }
+
   function handlePreviousWeek() {
-    closeAnchoredPopups();
+    closeCalendarExpansion();
     commitSelectedDate(addDaysToIsoDate(getCommittedSelectedDate(), -7));
   }
 
   function handleNextWeek() {
-    closeAnchoredPopups();
+    closeCalendarExpansion();
     commitSelectedDate(addDaysToIsoDate(getCommittedSelectedDate(), 7));
   }
 
   function handleGoToToday() {
-    closeAnchoredPopups();
+    closeCalendarExpansion();
     commitSelectedDate(null);
   }
 
-  function handleToggleCalendar() {
-    if (isCalendarOpen) {
-      setIsCalendarOpen(false);
-      return;
+  function handleCalendarDragStart() {
+    if (!isCalendarOpen) {
+      setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDate));
     }
+  }
 
-    setCalendarMonthAnchor(getScheduleMonthStartDate(selectedDate));
-    setIsCalendarOpen(true);
+  function handleCalendarDragEnd(nextIsOpen: boolean) {
+    setIsCalendarOpen(nextIsOpen);
+    if (!nextIsOpen) {
+      // Same reset as closeCalendarExpansion — dragging the handle closed
+      // is the primary way users collapse the calendar, so it needs the
+      // same re-centering or a month browsed via swipe/chevrons leaves
+      // anchorWeekIndex pointing outside monthWeeks and the strip goes blank.
+      setCalendarMonthAnchor(null);
+    }
   }
 
   function handleSelectFocusArea(nextFocusAreaKey: string) {
@@ -1666,26 +1913,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
       if (firstMatchingDate && firstMatchingDate !== selectedDate) {
         commitSelectedDate(firstMatchingDate);
+        // See the matching comment in handleSelectDate: not redundant with
+        // closeCalendarExpansion's reset, which no-ops while collapsed.
         setCalendarMonthAnchor(getScheduleMonthStartDate(firstMatchingDate));
       }
     }
 
-    closeAnchoredPopups();
-  }
-
-  function handlePreviousMonth() {
-    setCalendarMonthAnchor((current) =>
-      addMonthsToIsoDate(
-        current ?? getScheduleMonthStartDate(selectedDate),
-        -1,
-      ),
-    );
-  }
-
-  function handleNextMonth() {
-    setCalendarMonthAnchor((current) =>
-      addMonthsToIsoDate(current ?? getScheduleMonthStartDate(selectedDate), 1),
-    );
+    closeCalendarExpansion();
   }
 
   const weekStripRenderWidth = weekStripWidth || WEEK_SWIPE_FALLBACK_WIDTH;
@@ -1703,6 +1937,37 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       days: nextWeekDays,
     },
   ];
+  const calendarDragRange = Math.max(
+    1,
+    monthGridRowsHeight - weekStripRowHeight,
+  );
+  const calendarDragGesture = Gesture.Pan()
+    .onStart(() => {
+      "worklet";
+      cancelAnimation(calendarExpandProgress);
+      calendarDragStartProgress.value = calendarExpandProgress.value;
+      runOnJS(handleCalendarDragStart)();
+    })
+    .onUpdate((event) => {
+      "worklet";
+      const nextProgress =
+        calendarDragStartProgress.value + event.translationY / calendarDragRange;
+      calendarExpandProgress.value = Math.min(1, Math.max(0, nextProgress));
+    })
+    .onEnd((event) => {
+      "worklet";
+      const shouldOpen =
+        event.velocityY > 600
+          ? true
+          : event.velocityY < -600
+            ? false
+            : calendarExpandProgress.value > 0.5;
+      calendarExpandProgress.value = withTiming(
+        shouldOpen ? 1 : 0,
+        MONTH_EXPAND_TIMING,
+      );
+      runOnJS(handleCalendarDragEnd)(shouldOpen);
+    });
 
   const meStickyHeader = !isTeamScope ? (
     <View style={styles.meWeekNavigator}>
@@ -1745,6 +2010,86 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     </View>
   ) : undefined;
 
+  function renderMonthWeeks(
+    weeks: MobileScheduleMonthDay[][],
+    isCenterMonth: boolean,
+  ) {
+    return weeks.map((week, weekIndex) => {
+      if (isCenterMonth && weekIndex === anchorWeekIndex) {
+        return (
+          <View
+            key="anchor-week"
+            accessibilityLabel="Schedule week strip"
+            onLayout={(event) => {
+              setWeekStripRowHeight(event.nativeEvent.layout.height);
+            }}
+            onTouchCancel={handleWeekSwipeCancel}
+            onTouchEnd={handleWeekSwipeRelease}
+            onTouchMove={handleWeekSwipeMove}
+            onTouchStart={handleWeekSwipeStart}
+            style={styles.weekSwipeRowClip}
+          >
+            <Animated.View
+              style={[
+                styles.weekStripTrack,
+                {
+                  width: weekStripRenderWidth * weekStripRows.length,
+                  transform: [
+                    { translateX: -weekStripRenderWidth },
+                    { translateX: weekStripTranslateX },
+                  ],
+                },
+              ]}
+            >
+              {weekStripRows.map((row) => (
+                <View
+                  key={row.key}
+                  style={[
+                    styles.monthCalendarWeek,
+                    { width: weekStripRenderWidth },
+                  ]}
+                >
+                  {row.days.map((day) => (
+                    <MonthDayCell
+                      key={day.date}
+                      day={{
+                        ...day,
+                        // buildScheduleWeekDays doesn't compute this, so it's
+                        // always undefined here — derive it so leading/
+                        // trailing days gray out in month view. In week view
+                        // every date should read at full prominence, so
+                        // month membership is ignored while collapsed.
+                        isCurrentMonth:
+                          !isCalendarOpen ||
+                          getScheduleMonthStartDate(day.date) ===
+                            visibleCalendarMonth,
+                      }}
+                      accessible={row.key === "current"}
+                      onPress={() => handleSelectDate(day.date)}
+                    />
+                  ))}
+                </View>
+              ))}
+            </Animated.View>
+          </View>
+        );
+      }
+
+      return (
+        <View key={week[0]?.date ?? "week"} style={styles.monthCalendarWeek}>
+          {week.map((day) => (
+            <MonthDayCell
+              key={day.date}
+              day={day}
+              accessible={isCenterMonth}
+              onPress={() => handleSelectDate(day.date)}
+            />
+          ))}
+        </View>
+      );
+    });
+  }
+
   const stickyHeader = isTeamScope ? (
     <View style={styles.stickyControlsSection}>
       <View style={styles.teamHeaderUtilityRow}>
@@ -1754,111 +2099,111 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           </Text>
         </View>
         <View style={styles.teamHeaderActions}>
-          <View style={styles.calendarMenuAnchor}>
-            <IconControlButton
-              accessibilityLabel="Open month calendar"
-              iconName="calendar-outline"
-              onPress={handleToggleCalendar}
-            />
-          </View>
+          {!isSelectedToday ? (
+            <Pressable
+              accessibilityRole="button"
+              android_ripple={{ color: "rgba(37, 99, 235, 0.12)" }}
+              onPress={handleGoToToday}
+              style={({ pressed }) => [
+                styles.meTodayButton,
+                pressed && styles.meTodayButtonPressed,
+              ]}
+            >
+              <Text style={styles.meTodayButtonText}>Today</Text>
+            </Pressable>
+          ) : null}
           <AlertsChromeButton unreadCount={unreadNotificationCount} />
         </View>
       </View>
 
-      <View
-        accessibilityLabel="Schedule week strip"
-        onLayout={(event) => {
-          setWeekStripWidth(event.nativeEvent.layout.width);
-        }}
-        onTouchCancel={handleWeekSwipeCancel}
-        onTouchEnd={handleWeekSwipeRelease}
-        onTouchMove={handleWeekSwipeMove}
-        onTouchStart={handleWeekSwipeStart}
-        style={styles.weekStripFrame}
-      >
-        <Animated.View
-          style={[
-            styles.weekStripTrack,
-            {
-              width: weekStripRenderWidth * weekStripRows.length,
-              transform: [
-                { translateX: -weekStripRenderWidth },
-                { translateX: weekStripTranslateX },
-              ],
-            },
-          ]}
+      <View style={styles.calendarBlock}>
+        {/* Weekday labels: always visible, fixed in place — never move. */}
+        <View style={styles.monthCalendarWeekdays}>
+          {MONTH_WEEKDAY_LABELS.map((label) => (
+            <Text key={label} style={styles.monthCalendarWeekdayLabel}>
+              {label}
+            </Text>
+          ))}
+        </View>
+
+        {/* Dates: the selected week starts at the strip's position and
+            moves south into its true row as the full month is revealed —
+            a plain slide, no fading. */}
+        <Reanimated.View
+          accessibilityLabel="Schedule month grid"
+          onLayout={(event) => {
+            setWeekStripWidth(event.nativeEvent.layout.width);
+          }}
+          onTouchCancel={handleMonthSwipeCancel}
+          onTouchEnd={handleMonthSwipeRelease}
+          onTouchMove={handleMonthSwipeMove}
+          onTouchStart={handleMonthSwipeStart}
+          style={[styles.weekStripFrame, calendarOuterClipAnimatedStyle]}
         >
-          {weekStripRows.map((row) => (
-            <View
-              key={row.key}
+          <Reanimated.View
+            style={[styles.monthCalendarWeeks, calendarDatesStackAnimatedStyle]}
+          >
+            <Animated.View
               style={[
-                styles.weekStrip,
+                styles.monthSwipeTrack,
                 {
-                  width: weekStripRenderWidth,
+                  width: weekStripRenderWidth * 3,
+                  transform: [
+                    { translateX: -weekStripRenderWidth },
+                    { translateX: monthSwipeTranslateX },
+                  ],
                 },
               ]}
             >
-              {row.days.map((day) => (
-                <DayChip
-                  key={day.date}
-                  day={day}
-                  onPress={() => handleSelectDate(day.date)}
-                />
-              ))}
-            </View>
-          ))}
-        </Animated.View>
+              <View
+                style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}
+              >
+                {renderMonthWeeks(previousMonthWeeks, false)}
+              </View>
+              <View
+                style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}
+              >
+                {renderMonthWeeks(monthWeeks, true)}
+              </View>
+              <View
+                style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}
+              >
+                {renderMonthWeeks(nextMonthWeeks, false)}
+              </View>
+            </Animated.View>
+          </Reanimated.View>
+        </Reanimated.View>
+
+        <GestureDetector gesture={calendarDragGesture}>
+          <View
+            accessibilityLabel={
+              isCalendarOpen
+                ? "Collapse month calendar"
+                : "Open month calendar"
+            }
+            accessibilityRole="adjustable"
+            hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
+            style={styles.calendarDragHandleRow}
+          >
+            <View style={styles.calendarDragHandleBar} />
+          </View>
+        </GestureDetector>
       </View>
     </View>
   ) : (
     meStickyHeader
   );
 
-  const activePopupTop = Math.max(insets.top, 8) + 52;
-  const renderAnchoredPopupOverlay =
-    isTeamScope && isCalendarOpen
-      ? () => (
-          <View style={styles.popupOverlayRoot}>
-            <Pressable
-              accessibilityLabel="Dismiss schedule popup"
-              accessibilityRole="button"
-              onPress={closeAnchoredPopups}
-              style={styles.popupDismissLayer}
-            />
-            {isCalendarOpen ? (
-              <AnchoredPopupSurface
-                accessibilityLabel="Month calendar popup"
-                style={[
-                  styles.monthCalendarPopupSurface,
-                  {
-                    right: SCHEDULE_CALENDAR_POPUP_RIGHT_OFFSET,
-                    top: activePopupTop,
-                  },
-                ]}
-              >
-                <MonthCalendar
-                  monthLabel={monthCalendarLabel}
-                  weeks={monthWeeks}
-                  onNextMonth={handleNextMonth}
-                  onPreviousMonth={handlePreviousMonth}
-                  onSelectDate={handleSelectDate}
-                />
-              </AnchoredPopupSurface>
-            ) : null}
-          </View>
-        )
-      : undefined;
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      renderOverlay={renderAnchoredPopupOverlay}
       scrollViewRef={!isTeamScope ? meScrollViewRef : undefined}
       stickyHeader={stickyHeader}
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
     >
+      <View>
       {isTeamScope && teamFocusAreaTabs.length > 0 ? (
         <ScrollView
           horizontal
@@ -2086,135 +2431,67 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
         visible={Boolean(requestActionConfirmation)}
       />
+      </View>
     </Screen>
   );
 }
 
-function DayChip({
+type MonthDayCellDay = {
+  date: string;
+  dayLabel: string;
+  isToday: boolean;
+  isSelected: boolean;
+  isCurrentMonth?: boolean;
+};
+
+// Shared by the week strip's single row and the full month grid so the
+// highlight is always the same circle, in the same place, at the same size.
+function MonthDayCell({
   day,
   onPress,
+  accessible = true,
 }: {
-  day: MobileScheduleWeekDay;
+  day: MonthDayCellDay;
   onPress: () => void;
+  // The week-swipe strip always keeps the previous/next week mounted
+  // off-screen (clipped horizontally) so a swipe can start instantly. Those
+  // copies duplicate a week that's already accessible in the full month
+  // grid, so they're excluded from the accessibility tree.
+  accessible?: boolean;
 }) {
   return (
     <Pressable
-      accessibilityLabel={`Select ${day.date}`}
-      accessibilityRole="button"
-      accessibilityState={{ selected: day.isSelected }}
+      accessibilityLabel={accessible ? `Select date ${day.date}` : undefined}
+      accessibilityRole={accessible ? "button" : undefined}
+      accessibilityState={accessible ? { selected: day.isSelected } : undefined}
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
       onPress={onPress}
-      style={styles.dayChip}
+      style={styles.monthCalendarDaySlot}
     >
       <View
         style={[
-          styles.dayChipBody,
-          day.isSelected && !day.isToday && styles.dayChipBodySelected,
-          day.isSelected && day.isToday && styles.dayChipBodyToday,
+          styles.dateHighlightCircle,
+          day.isSelected && !day.isToday && styles.dateHighlightSelected,
+          day.isSelected && day.isToday && styles.dateHighlightTodaySelected,
+          day.isToday && !day.isSelected && styles.dateHighlightToday,
+          day.isCurrentMonth === false && styles.dateHighlightOutsideMonth,
         ]}
       >
         <Text
+          maxFontSizeMultiplier={1.3}
           style={[
-            styles.dayChipWeekday,
-            day.isSelected && !day.isToday && styles.dayChipWeekdaySelected,
-            day.isToday && !day.isSelected && styles.dayChipWeekdayToday,
-            day.isSelected && day.isToday && styles.dayChipWeekdayTodaySelected,
-          ]}
-        >
-          {day.weekdayLabel}
-        </Text>
-        <Text
-          style={[
-            styles.dayChipDay,
-            day.isSelected && !day.isToday && styles.dayChipDaySelected,
-            day.isToday && !day.isSelected && styles.dayChipDayToday,
-            day.isSelected && day.isToday && styles.dayChipDayTodaySelected,
+            styles.dateHighlightText,
+            day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
+            day.isToday && !day.isSelected && styles.dateHighlightTextToday,
+            day.isSelected &&
+              day.isToday &&
+              styles.dateHighlightTextTodaySelected,
           ]}
         >
           {day.dayLabel}
         </Text>
       </View>
     </Pressable>
-  );
-}
-
-function MonthCalendar({
-  monthLabel,
-  weeks,
-  onNextMonth,
-  onPreviousMonth,
-  onSelectDate,
-}: {
-  monthLabel: string;
-  weeks: MobileScheduleMonthDay[][];
-  onNextMonth: () => void;
-  onPreviousMonth: () => void;
-  onSelectDate: (date: string) => void;
-}) {
-  return (
-    <View style={styles.monthCalendar}>
-      <View style={styles.monthCalendarHeader}>
-        <IconControlButton
-          accessibilityLabel="Previous month"
-          iconName="chevron-back"
-          iconSize={10}
-          onPress={onPreviousMonth}
-        />
-        <Text style={styles.monthCalendarTitle}>{monthLabel}</Text>
-        <IconControlButton
-          accessibilityLabel="Next month"
-          iconName="chevron-forward"
-          iconSize={10}
-          onPress={onNextMonth}
-        />
-      </View>
-
-      <View style={styles.monthCalendarWeekdays}>
-        {MONTH_WEEKDAY_LABELS.map((label) => (
-          <Text key={label} style={styles.monthCalendarWeekdayLabel}>
-            {label}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.monthCalendarWeeks}>
-        {weeks.map((week) => (
-          <View key={week[0]?.date ?? "week"} style={styles.monthCalendarWeek}>
-            {week.map((day) => (
-              <Pressable
-                key={day.date}
-                accessibilityLabel={`Select date ${day.date}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: day.isSelected }}
-                android_ripple={{
-                  color: "rgba(15, 23, 42, 0.08)",
-                  borderless: true,
-                }}
-                onPress={() => onSelectDate(day.date)}
-                style={[
-                  styles.monthCalendarDay,
-                  day.isSelected && styles.monthCalendarDaySelected,
-                  day.isToday &&
-                    !day.isSelected &&
-                    styles.monthCalendarDayToday,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.monthCalendarDayText,
-                    !day.isCurrentMonth &&
-                      styles.monthCalendarDayTextOutsideMonth,
-                    day.isSelected && styles.monthCalendarDayTextSelected,
-                  ]}
-                >
-                  {day.dayLabel}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ))}
-      </View>
-    </View>
   );
 }
 
@@ -4356,7 +4633,8 @@ const styles = StyleSheet.create({
   meTodayButtonText: {
     ...mobileText.meta,
     color: mobileColors.brand,
-    fontWeight: "600",
+    fontFamily: "DMSans_700Bold",
+    fontWeight: "700",
   },
   meHeroCard: {
     position: "relative",
@@ -5372,91 +5650,32 @@ const styles = StyleSheet.create({
   iconControlButtonPressed: {
     opacity: 0.82,
   },
+  calendarBlock: {
+    gap: MONTH_EXPAND_SECTION_GAP,
+  },
   weekStripFrame: {
-    minHeight: 72,
+    overflow: "hidden",
+  },
+  calendarDragHandleRow: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 2,
+  },
+  calendarDragHandleBar: {
+    width: 36,
+    height: 5,
+    borderRadius: mobileRadii.pill,
+    backgroundColor: mobileColors.textSubtle,
+  },
+  weekSwipeRowClip: {
     overflow: "hidden",
   },
   weekStripTrack: {
     flexDirection: "row",
-    minHeight: 72,
-  },
-  weekStrip: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  dayChip: {
-    flex: 1,
-    minHeight: 72,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayChipBody: {
-    minWidth: 36,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "transparent",
-    backgroundColor: "transparent",
-    gap: 2,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-  },
-  dayChipBodySelected: {
-    backgroundColor: mobileColors.brand,
-    borderColor: mobileColors.brand,
-  },
-  dayChipBodyToday: {
-    backgroundColor: mobileColors.danger,
-    borderColor: mobileColors.danger,
-  },
-  dayChipWeekday: {
-    ...mobileText.label,
-    color: mobileColors.textSubtle,
-  },
-  dayChipWeekdaySelected: {
-    color: mobileColors.textInverse,
-  },
-  dayChipWeekdayToday: {
-    color: mobileColors.danger,
-  },
-  dayChipWeekdayTodaySelected: {
-    color: mobileColors.textInverse,
-  },
-  dayChipDay: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  dayChipDaySelected: {
-    color: mobileColors.textInverse,
-  },
-  dayChipDayToday: {
-    color: mobileColors.danger,
-  },
-  dayChipDayTodaySelected: {
-    color: mobileColors.textInverse,
-  },
-  monthCalendar: {
-    padding: 16,
-    gap: 14,
-  },
-  monthCalendarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingBottom: 6,
-  },
-  monthCalendarTitle: {
-    ...mobileText.sectionTitle,
-    flex: 1,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
   },
   monthCalendarWeekdays: {
     flexDirection: "row",
     gap: 6,
-    paddingBottom: 6,
   },
   monthCalendarWeekdayLabel: {
     flex: 1,
@@ -5466,53 +5685,65 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   monthCalendarWeeks: {
-    gap: 6,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  monthSwipeTrack: {
+    flexDirection: "row",
+  },
+  monthGridColumn: {
+    gap: MONTH_GRID_ROW_GAP,
   },
   monthCalendarWeek: {
     flexDirection: "row",
     gap: 6,
   },
-  monthCalendarDay: {
+  monthCalendarDaySlot: {
     flex: 1,
-    aspectRatio: 1,
-    borderRadius: mobileRadii.pill,
+    minHeight: WEEK_STRIP_ROW_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateHighlightCircle: {
+    width: DATE_HIGHLIGHT_SIZE,
+    height: DATE_HIGHLIGHT_SIZE,
+    borderRadius: DATE_HIGHLIGHT_SIZE / 2,
     borderWidth: 1,
     borderColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
   },
-  monthCalendarDaySelected: {
+  dateHighlightSelected: {
     backgroundColor: mobileColors.brand,
     borderColor: mobileColors.brand,
   },
-  monthCalendarDayToday: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
+  dateHighlightTodaySelected: {
+    backgroundColor: mobileColors.danger,
+    borderColor: mobileColors.danger,
   },
-  monthCalendarDayText: {
+  dateHighlightToday: {
+    backgroundColor: mobileColors.dangerSoft,
+    borderColor: mobileColors.dangerBorder,
+  },
+  dateHighlightOutsideMonth: {
+    opacity: 0.4,
+  },
+  dateHighlightText: {
     color: mobileColors.textPrimary,
     fontSize: 15,
     fontWeight: "700",
   },
-  monthCalendarDayTextOutsideMonth: {
-    color: mobileColors.textSubtle,
-  },
-  monthCalendarDayTextSelected: {
+  dateHighlightTextSelected: {
     color: mobileColors.textInverse,
   },
-  calendarMenuAnchor: {
-    position: "relative",
-    zIndex: 10,
+  dateHighlightTextToday: {
+    color: mobileColors.danger,
   },
-  popupOverlayRoot: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  popupDismissLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  monthCalendarPopupSurface: {
-    width: 320,
+  dateHighlightTextTodaySelected: {
+    color: mobileColors.textInverse,
   },
   alertBadge: {
     position: "absolute",

@@ -21,6 +21,7 @@ import {
   createSafeAreaContextModule,
   createScreenModule,
 } from "../../../test/native";
+import { capturedPanGestures } from "../../../test/gesture-handler-stub";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -1635,7 +1636,7 @@ describe("ScheduleScreen", () => {
   it("shows job-focused team rows and opens shift detail from the Schedule tab", () => {
     render(<TeamScheduleScreen />);
 
-    expect(screen.getByText("Today, April 16")).toBeInTheDocument();
+    expect(screen.getByText("Today, Apr 16")).toBeInTheDocument();
     expect(screen.queryByTestId("today-date-dot-2026-04-16")).not.toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Select Skilled Nursing" }),
@@ -1643,7 +1644,7 @@ describe("ScheduleScreen", () => {
     const headerButtonLabels = screen
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-    expect(headerButtonLabels.indexOf("Select 2026-04-18")).toBeLessThan(
+    expect(headerButtonLabels.indexOf("Select date 2026-04-18")).toBeLessThan(
       headerButtonLabels.indexOf("Select Emergency"),
     );
     expect(screen.getByText("Me")).toBeInTheDocument();
@@ -1800,7 +1801,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("Me")).toBeInTheDocument();
     expect(screen.queryByText("Next Week Nurse")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Select 2026-04-23" }),
+      screen.getByRole("button", { name: "Select date 2026-04-23" }),
     ).toHaveAttribute("aria-selected", "true");
 
     for (let index = 1; index < 10; index += 1) {
@@ -1808,7 +1809,7 @@ describe("ScheduleScreen", () => {
     }
 
     expect(
-      screen.getByRole("button", { name: "Select 2026-06-25" }),
+      screen.getByRole("button", { name: "Select date 2026-06-25" }),
     ).toHaveAttribute("aria-selected", "true");
     expect(useQuery).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1842,16 +1843,96 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
   });
 
-  it("dismisses schedule popups when tapping outside of them", () => {
+  it("renders the month calendar drag handle collapsed by default", () => {
     render(<TeamScheduleScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open month calendar" }));
-    expect(screen.getByLabelText("Month calendar popup")).toBeInTheDocument();
+    expect(screen.getByLabelText("Open month calendar")).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Collapse month calendar"),
+    ).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss schedule popup" }));
+  function dragCalendarHandle(shouldOpen: boolean) {
+    const gesture = capturedPanGestures.at(-1);
+    act(() => {
+      gesture?.__handlers.onStart?.({});
+      gesture?.__handlers.onEnd?.({ velocityY: shouldOpen ? 700 : -700 });
+    });
+  }
+
+  it("expands the month calendar via the drag handle and collapses back to a populated week strip", () => {
+    render(<TeamScheduleScreen />);
 
     expect(
-      screen.queryByLabelText("Month calendar popup"),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: "Select date 2026-04-16" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    dragCalendarHandle(true);
+
+    expect(screen.getByLabelText("Collapse month calendar")).toBeInTheDocument();
+
+    dragCalendarHandle(false);
+
+    expect(screen.getByLabelText("Open month calendar")).toBeInTheDocument();
+    // Regression: closing used to leave calendarMonthAnchor pointed at
+    // whatever month was last browsed, which could make the collapsed
+    // week strip render nothing at all.
+    expect(
+      screen.getByRole("button", { name: "Select date 2026-04-16" }),
+    ).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("selects a date when swiping the month grid to a different month", () => {
+    render(<TeamScheduleScreen />);
+
+    dragCalendarHandle(true);
+
+    function fireQuickMonthSwipe(direction: "next" | "previous") {
+      const monthGrid = screen.getByLabelText("Schedule month grid");
+      const [startX, endX] = direction === "next" ? [280, 230] : [230, 280];
+      const quickStart = createEvent.touchStart(monthGrid, {
+        changedTouches: [{ pageX: startX }],
+        touches: [{ pageX: startX }],
+      });
+      Object.defineProperty(quickStart, "timeStamp", {
+        configurable: true,
+        value: 1000,
+      });
+      fireEvent(monthGrid, quickStart);
+
+      const quickMove = createEvent.touchMove(monthGrid, {
+        changedTouches: [{ pageX: endX }],
+        touches: [{ pageX: endX }],
+      });
+      Object.defineProperty(quickMove, "timeStamp", {
+        configurable: true,
+        value: 1040,
+      });
+      fireEvent(monthGrid, quickMove);
+
+      const quickEnd = createEvent.touchEnd(monthGrid, {
+        changedTouches: [{ pageX: endX }],
+      });
+      Object.defineProperty(quickEnd, "timeStamp", {
+        configurable: true,
+        value: 1080,
+      });
+      fireEvent(monthGrid, quickEnd);
+    }
+
+    // Swiping into May (not the current month) selects its 1st.
+    fireQuickMonthSwipe("next");
+    expect(
+      screen.getByRole("button", { name: "Select date 2026-05-01" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    // Swiping back into April (the current month) selects today instead
+    // of the 1st. getByRole also implicitly asserts there's exactly one
+    // accessible match — the off-screen adjacent-month preview cells are
+    // correctly excluded from the accessibility tree.
+    fireQuickMonthSwipe("previous");
+    expect(
+      screen.getByRole("button", { name: "Select date 2026-04-16" }),
+    ).toHaveAttribute("aria-selected", "true");
   });
 });

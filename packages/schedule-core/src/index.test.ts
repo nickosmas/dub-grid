@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { hasShiftStartedAtTimeRanges } from "./index";
+import {
+  getScheduleMonthWeekIndexForDate,
+  hasShiftStartedAtTimeRanges,
+} from "./index";
 
 describe("hasShiftStartedAtTimeRanges", () => {
   // 2026-05-14, 14:30 UTC
@@ -105,5 +108,27 @@ describe("hasShiftStartedAtTimeRanges", () => {
         timeZone,
       }),
     ).toBe(true);
+  });
+});
+
+describe("getScheduleMonthWeekIndexForDate", () => {
+  // May 2026: May 1 is a Friday, so the grid's first row starts Sun Apr 26.
+  it("returns 0 for the month's start date", () => {
+    expect(
+      getScheduleMonthWeekIndexForDate("2026-05-01", "2026-05-01"),
+    ).toBe(0);
+  });
+
+  it("returns 0 for a leading day from the previous month in the first grid row", () => {
+    expect(
+      getScheduleMonthWeekIndexForDate("2026-05-01", "2026-04-27"),
+    ).toBe(0);
+  });
+
+  it("returns the correct row for a date later in the month", () => {
+    // 2026-05-14 falls in the grid row starting 2026-05-10 (row index 2).
+    expect(
+      getScheduleMonthWeekIndexForDate("2026-05-01", "2026-05-14"),
+    ).toBe(2);
   });
 });

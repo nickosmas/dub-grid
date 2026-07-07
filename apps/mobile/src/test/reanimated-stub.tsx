@@ -64,10 +64,28 @@ export function withDelay<T>(_delay: number, value: T) {
 
 export const Easing = {
   inOut: (fn: unknown) => fn,
+  out: (fn: unknown) => fn,
   ease: () => 0,
   linear: () => 0,
   quad: () => 0,
+  cubic: () => 0,
 } as const;
+
+export const Extrapolation = {
+  EXTEND: "extend",
+  CLAMP: "clamp",
+  IDENTITY: "identity",
+} as const;
+
+export function cancelAnimation(_sharedValue: unknown) {
+  return undefined;
+}
+
+export function runOnJS<Args extends unknown[], Return>(
+  fn: (...args: Args) => Return,
+) {
+  return fn;
+}
 
 export function useAnimatedScrollHandler() {
   return () => undefined;

@@ -779,11 +779,15 @@ export function buildScheduleMonthDays(
   );
 }
 
-export function formatScheduleMonthLabel(
-  date: string,
-  timeZone?: string | null,
-): string {
-  return formatDate(date, { month: "long", year: "numeric" }, timeZone);
+export function getScheduleMonthWeekIndexForDate(
+  monthAnchorDate: string,
+  targetDate: string,
+): number {
+  const gridStartDate = getScheduleWeekStartDate(
+    getScheduleMonthStartDate(monthAnchorDate),
+  );
+
+  return Math.floor(getDaysBetweenIsoDates(gridStartDate, targetDate) / 7);
 }
 
 export function formatSchedulePillDateLabel(

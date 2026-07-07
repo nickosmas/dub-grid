@@ -45,6 +45,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
       key === "numberOfLines" ||
+      key === "maxFontSizeMultiplier" ||
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"
     ) {
@@ -62,6 +63,9 @@ function pickDomProps(input: Record<string, any>) {
     }
 
     if (key === "accessibilityState") {
+      if (value == null) {
+        continue;
+      }
       const state = value as {
         disabled?: boolean;
         expanded?: boolean;

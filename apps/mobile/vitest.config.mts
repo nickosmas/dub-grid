@@ -69,6 +69,16 @@ export default defineConfig(async () => {
             "./src/test/reanimated-stub.tsx",
           ),
         },
+        // react-native-gesture-handler ships untranspiled syntax vitest can't
+        // parse, and its native recognizers don't run under jsdom anyway.
+        // Stub Gesture/GestureDetector to inert passthroughs.
+        {
+          find: /^react-native-gesture-handler$/,
+          replacement: path.resolve(
+            __dirname,
+            "./src/test/gesture-handler-stub.tsx",
+          ),
+        },
         // Expo native modules eagerly import expo-modules-core + native bindings
         // that vitest can't resolve/run in jsdom. Shim them to test stubs (same
         // approach as the react-native shim above). expo-notifications is
