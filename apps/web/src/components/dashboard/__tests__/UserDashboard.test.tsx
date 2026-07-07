@@ -1356,11 +1356,13 @@ describe("UserDashboard", () => {
     const myWeek = screen.getByTestId("user-dashboard-my-week");
 
     expect(within(myWeek).getAllByText("General shift")).toHaveLength(1);
+    // Absence rows show "Absence" as the row title with the specific absence
+    // type (e.g. "Off") in a pill below, matching the mobile app's treatment.
+    expect(within(myWeek).getByText("Absence")).toBeInTheDocument();
     expect(within(myWeek).getAllByText("Off")).toHaveLength(1);
-    expect(within(myWeek).queryByText("Absence")).not.toBeInTheDocument();
     expect(
       within(myWeek).queryAllByTestId("user-dashboard-week-pills"),
-    ).toHaveLength(0);
+    ).toHaveLength(1);
   });
 
   it("uses one empty-week message without repeating a blank My Week card", () => {

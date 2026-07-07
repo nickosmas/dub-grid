@@ -2612,7 +2612,7 @@ function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
               whiteSpace: "nowrap",
             }}
           >
-            {item.segment.title}
+            {item.segment.isAbsence ? (item.segment.typeLabel ?? item.segment.title) : item.segment.title}
           </div>
           {timeRange ? (
             <div
@@ -2649,7 +2649,10 @@ function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
 }
 
 function WeekPillRow({ segment }: { segment: DashboardScheduleSegment }) {
-  const showShiftPill = shouldShowShiftPill(segment);
+  // Absence rows show "Absence" as the title above (see WeekShiftRow) and always
+  // pair it with the specific colored pill (e.g. "Sick") below, matching the
+  // mobile app's Absence-eyebrow-then-pill treatment.
+  const showShiftPill = segment.isAbsence || shouldShowShiftPill(segment);
 
   if (!showShiftPill && !segment.isMentored) {
     return null;
