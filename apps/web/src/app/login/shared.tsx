@@ -76,9 +76,13 @@ export function useSessionInvalidToast() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error") === "session_invalid") {
+    const code = params.get("error");
+    if (code === "session_invalid") {
       toast.error("Your session could not be verified. Please sign in again.");
       // Clean the URL so a refresh doesn't re-show the toast
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (code === "inactivity_timeout") {
+      toast.info("You were signed out after 30 minutes of inactivity.");
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);

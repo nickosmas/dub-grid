@@ -24,6 +24,12 @@ interface RunLogoutTeardownProps {
    * enabled immediately.
    */
   scope: LogoutScope | null;
+  /**
+   * Why the sign-out happened, from `?reason=` on the URL. When "inactivity",
+   * the "Sign back in" link carries `?error=inactivity_timeout` so the login
+   * page can surface a neutral explanatory toast.
+   */
+  reason?: "inactivity" | null;
 }
 
 /**
@@ -42,8 +48,10 @@ interface RunLogoutTeardownProps {
  * in" mid-teardown would still have valid cookies and bounce straight back
  * into the app.
  */
-export function RunLogoutTeardown({ scope }: RunLogoutTeardownProps) {
+export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownProps) {
   const queryClient = useQueryClient();
+  const signInHref =
+    reason === "inactivity" ? "/login?error=inactivity_timeout" : "/login";
   // StrictMode + Turbopack dev double-mount guard. Without this we call
   // signOutFromBrowser twice and recreate the lock contention the redesign
   // exists to avoid.
@@ -113,7 +121,7 @@ export function RunLogoutTeardown({ scope }: RunLogoutTeardownProps) {
       }}
     >
       {done ? (
-        <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
+        <Link href={signInHref} className="dg-auth-submit" style={primaryStyle}>
           Sign back in
         </Link>
       ) : (

@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
 import TrialWelcomeModal from "@/components/TrialWelcomeModal";
+import InactivityGuard from "@/components/InactivityGuard";
 import { fetchOrganizationBilling } from "@/features/billing/client";
 import {
   fetchOrganizationBootstrap,
@@ -135,6 +136,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </div>
       {!isGridmaster && <TrialWelcomeModal />}
+      <InactivityGuard />
     </>
   );
 }

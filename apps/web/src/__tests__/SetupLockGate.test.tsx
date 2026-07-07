@@ -62,6 +62,7 @@ vi.mock("@/hooks", () => ({
   usePermissions: () => mockPermissions,
   useOrganizationData: () => mockOrganizationData,
   useEmployees: () => mockEmployeesData,
+  useLogout: () => ({ signOut: vi.fn(), signOutOthers: vi.fn() }),
 }));
 
 vi.mock("@/features/onboarding/client", () => ({

@@ -51,6 +51,11 @@ function parseScope(value: string | string[] | undefined): LogoutScope | null {
   return null;
 }
 
+function parseReason(value: string | string[] | undefined): "inactivity" | null {
+  const v = Array.isArray(value) ? value[0] : value;
+  return v === "inactivity" ? v : null;
+}
+
 // Server component so the random pick happens once per request and is baked
 // into the SSR'd HTML — no hydration mismatch, no client-side flash from one
 // variant to another. RunLogoutTeardown is a client wrapper that performs the
@@ -61,11 +66,13 @@ export const dynamic = "force-dynamic";
 export default async function GoodbyePage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string | string[] }>;
+  searchParams: Promise<{ scope?: string | string[]; reason?: string | string[] }>;
 }) {
   const headline = pickRandom(HEADLINES);
   const subline = pickRandom(SUBLINES);
-  const scope = parseScope((await searchParams).scope);
+  const resolvedSearchParams = await searchParams;
+  const scope = parseScope(resolvedSearchParams.scope);
+  const reason = parseReason(resolvedSearchParams.reason);
 
   return (
     <PageShell>
@@ -116,7 +123,7 @@ export default async function GoodbyePage({
           {subline}
         </p>
 
-        <RunLogoutTeardown scope={scope} />
+        <RunLogoutTeardown scope={scope} reason={reason} />
       </div>
     </PageShell>
   );
