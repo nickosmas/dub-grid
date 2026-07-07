@@ -5403,8 +5403,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   dayChipBodySelected: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
+    backgroundColor: mobileColors.brand,
+    borderColor: mobileColors.brand,
   },
   dayChipBodyToday: {
     backgroundColor: mobileColors.danger,
@@ -5415,7 +5415,7 @@ const styles = StyleSheet.create({
     color: mobileColors.textSubtle,
   },
   dayChipWeekdaySelected: {
-    color: mobileColors.textPrimary,
+    color: mobileColors.textInverse,
   },
   dayChipWeekdayToday: {
     color: mobileColors.danger,
@@ -5428,7 +5428,7 @@ const styles = StyleSheet.create({
     color: mobileColors.textPrimary,
   },
   dayChipDaySelected: {
-    color: mobileColors.textPrimary,
+    color: mobileColors.textInverse,
   },
   dayChipDayToday: {
     color: mobileColors.danger,
