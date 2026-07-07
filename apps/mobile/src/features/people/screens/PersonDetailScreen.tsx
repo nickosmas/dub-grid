@@ -469,7 +469,10 @@ export default function PersonDetailScreen() {
     statusMutation.mutate({
       action: confirmAction,
       expectedVersion: person.version,
-      note: confirmAction === "deactivate" ? inactiveNote.trim() : undefined,
+      note:
+        confirmAction === "deactivate" || confirmAction === "remove"
+          ? inactiveNote.trim() || undefined
+          : undefined,
     });
   }
 
@@ -840,10 +843,14 @@ export default function PersonDetailScreen() {
         title={statusConfirmationTitle}
         visible={confirmAction != null}
       >
-        {confirmAction === "deactivate" ? (
+        {confirmAction === "deactivate" || confirmAction === "remove" ? (
           <TextInput
             onChangeText={setInactiveNote}
-            placeholder="Reason (optional)"
+            placeholder={
+              confirmAction === "remove"
+                ? "Reason (optional) - e.g. Left the company"
+                : "Reason (optional) - e.g. On leave until June"
+            }
             placeholderTextColor={mobileColors.textSubtle}
             style={styles.input}
             value={inactiveNote}

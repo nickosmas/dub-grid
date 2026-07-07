@@ -460,7 +460,6 @@ export default function PeopleScreen() {
                   key={person.id}
                   accessHint={canManageEmployees ? accessHint : null}
                   id={person.id}
-                  employeeNumber={person.employeeNumber}
                   employmentType={person.employmentType}
                   isLast={index === filteredPeople.length - 1}
                   name={getFullName(person)}
@@ -587,7 +586,6 @@ function SelectionRow({
 
 function PersonRow({
   id,
-  employeeNumber,
   employmentType,
   name,
   orgRole,
@@ -599,7 +597,6 @@ function PersonRow({
   onPress,
 }: {
   id: string;
-  employeeNumber: number;
   employmentType: MobilePerson["employmentType"];
   name: string;
   orgRole: MobileOrgRole;
@@ -657,7 +654,6 @@ function PersonRow({
           <Text numberOfLines={1} style={styles.personName}>
             {name}
           </Text>
-          <Text style={styles.personEmployeeNumber}>#{employeeNumber}</Text>
           {orgRoleBadge ? (
             <View style={orgRoleBadge.containerStyle}>
               <Text style={orgRoleBadge.textStyle}>{orgRoleBadge.label}</Text>
@@ -824,11 +820,6 @@ const styles = StyleSheet.create({
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
     flexShrink: 1,
-  },
-  personEmployeeNumber: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-    fontVariant: ["tabular-nums"],
   },
   personSubtitle: {
     ...mobileText.body,
