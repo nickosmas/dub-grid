@@ -133,7 +133,8 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
             border: "1px solid var(--color-info-border)",
             boxShadow: "var(--dg-shadow-auth-card)",
             color: "var(--color-info-text)",
-            fontSize: "var(--dg-fs-footnote)",
+            fontSize: "var(--dg-fs-body)",
+            fontWeight: 600,
             lineHeight: 1.5,
           }}
         >
@@ -156,7 +157,7 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
               opacity: 0.7,
             }}
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
       )}
