@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import * as Sentry from "@/lib/sentry";
@@ -26,8 +27,7 @@ interface RunLogoutTeardownProps {
   scope: LogoutScope | null;
   /**
    * Why the sign-out happened, from `?reason=` on the URL. When "inactivity",
-   * the "Sign back in" link carries `?error=inactivity_timeout` so the login
-   * page can surface a neutral explanatory toast.
+   * this page shows a dismissible explanatory notice.
    */
   reason?: "inactivity" | null;
 }
@@ -50,12 +50,12 @@ interface RunLogoutTeardownProps {
  */
 export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownProps) {
   const queryClient = useQueryClient();
-  const signInHref = reason === "inactivity" ? "/login?error=inactivity_timeout" : "/login";
   // StrictMode + Turbopack dev double-mount guard. Without this we call
   // signOutFromBrowser twice and recreate the lock contention the redesign
   // exists to avoid.
   const ranRef = useRef(false);
   const [done, setDone] = useState(scope === null);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -119,8 +119,51 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
         alignItems: "center",
       }}
     >
+      {reason === "inactivity" && !noticeDismissed && (
+        <div
+          role="status"
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            width: "100%",
+            marginBottom: 28,
+            padding: "12px 14px",
+            borderRadius: 8,
+            background: "var(--color-info-bg)",
+            border: "1px solid var(--color-info-border)",
+            color: "var(--color-info-text)",
+            fontSize: "var(--dg-fs-footnote)",
+            lineHeight: 1.5,
+          }}
+        >
+          <span style={{ flex: 1 }}>
+            You were signed out after 30 minutes of inactivity.
+          </span>
+          <button
+            type="button"
+            onClick={() => setNoticeDismissed(true)}
+            aria-label="Dismiss"
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "transparent",
+              border: "none",
+              padding: 2,
+              margin: 0,
+              color: "inherit",
+              cursor: "pointer",
+              opacity: 0.7,
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
       {done ? (
-        <Link href={signInHref} className="dg-auth-submit" style={primaryStyle}>
+        <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
           Sign back in
         </Link>
       ) : (

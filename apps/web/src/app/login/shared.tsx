@@ -81,9 +81,6 @@ export function useSessionInvalidToast() {
       toast.error("Your session could not be verified. Please sign in again.");
       // Clean the URL so a refresh doesn't re-show the toast
       window.history.replaceState({}, "", window.location.pathname);
-    } else if (code === "inactivity_timeout") {
-      toast.info("You were signed out after 30 minutes of inactivity.");
-      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 }
