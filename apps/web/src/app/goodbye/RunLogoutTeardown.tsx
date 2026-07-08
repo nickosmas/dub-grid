@@ -112,34 +112,32 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}
-    >
+    <>
       {reason === "inactivity" && !noticeDismissed && (
         <div
           role="status"
           style={{
+            position: "fixed",
+            top: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100,
             display: "flex",
-            alignItems: "flex-start",
-            gap: 10,
-            width: "100%",
-            marginBottom: 28,
-            padding: "12px 14px",
-            borderRadius: 8,
+            alignItems: "center",
+            gap: 12,
+            width: "max-content",
+            maxWidth: "calc(100vw - 32px)",
+            padding: "12px 16px",
+            borderRadius: 10,
             background: "var(--color-info-bg)",
             border: "1px solid var(--color-info-border)",
+            boxShadow: "var(--dg-shadow-auth-card)",
             color: "var(--color-info-text)",
             fontSize: "var(--dg-fs-footnote)",
             lineHeight: 1.5,
           }}
         >
-          <span style={{ flex: 1 }}>
-            You were signed out after 30 minutes of inactivity.
-          </span>
+          <span>You were signed out after 30 minutes of inactivity.</span>
           <button
             type="button"
             onClick={() => setNoticeDismissed(true)}
@@ -162,22 +160,30 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
           </button>
         </div>
       )}
-      {done ? (
-        <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
-          Sign back in
-        </Link>
-      ) : (
-        <button
-          type="button"
-          className="dg-auth-submit"
-          disabled
-          aria-busy="true"
-          style={primaryStyle}
-        >
-          Sign back in
-        </button>
-      )}
-    </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        {done ? (
+          <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
+            Sign back in
+          </Link>
+        ) : (
+          <button
+            type="button"
+            className="dg-auth-submit"
+            disabled
+            aria-busy="true"
+            style={primaryStyle}
+          >
+            Sign back in
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
