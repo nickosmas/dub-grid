@@ -2,16 +2,8 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import {
-  disablePostHog,
-  enablePostHog,
-  identifyUser,
-  resetPostHog,
-} from "@/lib/posthog";
-import {
-  getAnalyticsConsentSnapshot,
-  subscribeToConsentChanges,
-} from "@/components/CookieConsent";
+import { disablePostHog, enablePostHog, identifyUser, resetPostHog } from "@/lib/posthog";
+import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
 
 /**
  * Initializes PostHog and identifies the user.

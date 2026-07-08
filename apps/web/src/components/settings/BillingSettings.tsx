@@ -18,30 +18,19 @@ import type { LucideIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import {
   completeBillingCheckout,
   fetchOrganizationBilling,
   openBillingPortal,
   startBillingCheckout,
 } from "@/features/billing/client";
-import { useLogout } from "@/hooks";
-import {
-  describeAction,
-  formatDetails,
-  formatRelativeTime,
-} from "@/lib/activity-log-utils";
-import {
-  formatBillingStatusLabel,
-  formatClientErrorMessage,
-} from "@/lib/client-facing";
+import { useIsInSandbox, useLogout, useSandboxSourceOrgId } from "@/hooks";
+import { describeAction, formatDetails, formatRelativeTime } from "@/lib/activity-log-utils";
+import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  sectionBodyStyle,
-  sectionHeaderStyle,
-  sectionStyle,
-  tdStyle,
-  thStyle,
-} from "@/lib/styles";
+import { sectionBodyStyle, sectionHeaderStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type {
   BillingOperationSummary,
   FullAuditLogEntry,
@@ -181,12 +170,7 @@ function BillingMetric({
             flexShrink: 0,
           }}
         >
-          <Icon
-            size={18}
-            strokeWidth={1.7}
-            color={iconAccent.color}
-            aria-hidden="true"
-          />
+          <Icon size={18} strokeWidth={1.7} color={iconAccent.color} aria-hidden="true" />
         </div>
       </div>
       <div
@@ -204,13 +188,8 @@ function BillingMetric({
   );
 }
 
-function BillingOperations({
-  operations,
-}: {
-  operations: BillingOperationSummary[];
-}) {
-  const [selectedOperation, setSelectedOperation] =
-    useState<BillingOperationSummary | null>(null);
+function BillingOperations({ operations }: { operations: BillingOperationSummary[] }) {
+  const [selectedOperation, setSelectedOperation] = useState<BillingOperationSummary | null>(null);
 
   function openOperation(operation: BillingOperationSummary) {
     setSelectedOperation(operation);
@@ -234,22 +213,15 @@ function BillingOperations({
           }}
         >
           <ReceiptText size={15} aria-hidden="true" />
-          <span id="recent-billing-operations-heading">
-            Recent billing operations
-          </span>
+          <span id="recent-billing-operations-heading">Recent billing operations</span>
         </div>
         <div style={sectionBodyStyle}>
           {operations.length === 0 ? (
-            <div
-              style={{
-                padding: "8px 0",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
-              }}
-            >
-              No billing activity yet.
-            </div>
+            <EmptyState
+              size="compact"
+              icon={<ReceiptText size={22} />}
+              title="No billing activity yet"
+            />
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -275,9 +247,7 @@ function BillingOperations({
                       }}
                       style={{ cursor: "pointer" }}
                     >
-                      <td style={{ ...tdStyle, fontWeight: 700 }}>
-                        {operation.label}
-                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>{operation.label}</td>
                       <td style={tdStyle}>{operation.actorLabel}</td>
                       <td
                         style={{
@@ -429,9 +399,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function billingOperationToAuditEntry(
-  operation: BillingOperationSummary,
-): FullAuditLogEntry {
+function billingOperationToAuditEntry(operation: BillingOperationSummary): FullAuditLogEntry {
   const id = Number(operation.id);
   return {
     id: Number.isFinite(id) ? id : 0,
@@ -475,20 +443,18 @@ type BillingMetricConfig = {
   tone?: "danger" | "warning";
 };
 
-function billingNoticeCopy(
-  billingAccess: OrganizationBillingSummary["billingAccess"],
-) {
+function billingNoticeCopy(billingAccess: OrganizationBillingSummary["billingAccess"]) {
   switch (billingAccess.state) {
     case "trial_ending_soon":
       return billingAccess.daysUntilTrialEnd === 1
-        ? "Trial access ends tomorrow. Add billing to keep the workspace active."
-        : `Trial access ends in ${billingAccess.daysUntilTrialEnd ?? "a few"} days. Add billing to keep the workspace active.`;
+        ? "Trial access ends tomorrow. Add billing to keep the organization active."
+        : `Trial access ends in ${billingAccess.daysUntilTrialEnd ?? "a few"} days. Add billing to keep the organization active.`;
     case "trial_grace":
-      return "Trial access has ended. Add billing before the grace period ends to keep the workspace active.";
+      return "Trial access has ended. Add billing before the grace period ends to keep the organization active.";
     case "payment_attention_required":
-      return "Billing needs attention. Update payment details to keep the workspace active.";
+      return "Billing needs attention. Update payment details to keep the organization active.";
     case "locked":
-      return "Workspace access is locked until billing is restored.";
+      return "Organization access is locked until billing is restored.";
     default:
       return null;
   }
@@ -548,22 +514,25 @@ function formatTrialTimeLeft(billing: OrganizationBillingSummary): {
   };
 }
 
-export default function BillingSettings({
-  organization,
-}: {
-  organization: { id: string };
-}) {
+export default function BillingSettings({ organization }: { organization: { id: string } }) {
   const queryClient = useQueryClient();
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
+  const isInSandbox = useIsInSandbox();
+  const sandboxSourceOrgId = useSandboxSourceOrgId();
   const searchParams = useSearchParams();
   const handledBillingReturnRef = useRef<string | null>(null);
   const [openingCheckout, setOpeningCheckout] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
   const billingResult = searchParams.get("billing");
   const checkoutSessionId = searchParams.get("stripe_checkout_session_id");
+  // In sandbox mode the active org is the sandbox clone, which has no
+  // real Stripe state. Display the source organization's billing instead so
+  // the user can see what's actually billed. Action buttons are still
+  // gated by isInSandbox below, so the source-org data is read-only here.
+  const billingOrgId = isInSandbox && sandboxSourceOrgId ? sandboxSourceOrgId : organization.id;
   const billingQuery = useQuery({
-    queryKey: queryKeys.org.billing(organization.id),
-    queryFn: () => fetchOrganizationBilling(organization.id),
+    queryKey: queryKeys.org.billing(billingOrgId),
+    queryFn: () => fetchOrganizationBilling(billingOrgId),
     staleTime: 30_000,
   });
   const billing = billingQuery.data;
@@ -644,21 +613,14 @@ export default function BillingSettings({
       });
       window.location.assign(url);
     } catch (error) {
-      toast.error(
-        formatClientErrorMessage(error, "Failed to open billing portal"),
-      );
+      toast.error(formatClientErrorMessage(error, "Failed to open billing portal"));
     } finally {
       setOpeningPortal(false);
     }
   }
 
-  const seatTone =
-    billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
-  const isTrialEndMissing =
-    Boolean(billing) &&
-    (billing!.status === "trialing" || !billing!.status) &&
-    !billing!.trialEndsAt &&
-    billing!.billingAccess.daysUntilTrialEnd == null;
+  const seatTone = billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
+  const isTrialPending = Boolean(billing) && billing!.billingAccess.state === "trial_pending";
   const primaryAction =
     billing?.hasStripeCustomer && billing.hasStripeSubscription
       ? "Manage billing"
@@ -764,23 +726,37 @@ export default function BillingSettings({
                 fontWeight: 700,
               }}
             >
-              {formatClientErrorMessage(
-                billingQuery.error,
-                "Failed to load billing",
-              )}
+              {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
             </div>
           )}
 
+          <ProgressBar loading={billingQuery.isLoading || !billing} />
+
           {billingQuery.isLoading || !billing ? (
             <div
+              aria-hidden
               style={{
-                padding: "8px 0",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--dg-fs-label)",
-                fontWeight: 600,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 12,
               }}
             >
-              Loading billing...
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    padding: 14,
+                    borderRadius: "var(--dg-radius-md)",
+                    border: "1px solid var(--color-border-light)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
+                  <div className="dg-skeleton" style={{ width: 64, height: 20, borderRadius: 4 }} />
+                </div>
+              ))}
             </div>
           ) : (
             <>
@@ -866,21 +842,20 @@ export default function BillingSettings({
                 </div>
               )}
 
-              {isTrialEndMissing && (
+              {isTrialPending && (
                 <div
                   style={{
                     padding: "10px 12px",
                     borderRadius: "var(--dg-radius-md)",
-                    border: "1px solid var(--color-warning-border)",
-                    background: "var(--color-warning-bg)",
-                    color: "var(--color-warning)",
+                    border: "1px solid var(--color-info-border)",
+                    background: "var(--color-info-bg)",
+                    color: "var(--color-info-text)",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
                   }}
                 >
-                  This organization is marked trialing, but no trial end date is
-                  set. A gridmaster should extend the trial to initialize the
-                  countdown.
+                  Your trial starts the first time an administrator signs in. The countdown begins
+                  then. Refresh this page to see your trial end date.
                 </div>
               )}
 
@@ -906,7 +881,7 @@ export default function BillingSettings({
                     <button
                       type="button"
                       className="dg-btn dg-btn-secondary"
-                      onClick={() => void signOutLocal()}
+                      onClick={() => signOut()}
                     >
                       <LogOut size={15} aria-hidden="true" />
                       Sign out
@@ -932,13 +907,15 @@ export default function BillingSettings({
                       !billing.canManageBilling ||
                       !billing.stripeConfigured ||
                       openingCheckout ||
-                      openingPortal
+                      openingPortal ||
+                      isInSandbox
+                    }
+                    title={
+                      isInSandbox ? "Billing actions are disabled in sandbox mode." : undefined
                     }
                   >
                     <ExternalLink size={15} aria-hidden="true" />
-                    {openingCheckout || openingPortal
-                      ? "Opening..."
-                      : primaryAction}
+                    {openingCheckout || openingPortal ? "Opening..." : primaryAction}
                   </button>
                 </div>
               </div>
@@ -946,9 +923,7 @@ export default function BillingSettings({
           )}
         </div>
       </div>
-      {billing && (
-        <BillingOperations operations={billing.recentOperations ?? []} />
-      )}
+      {billing && <BillingOperations operations={billing.recentOperations ?? []} />}
     </div>
   );
 }

@@ -667,20 +667,32 @@ CREATE POLICY "invitations_revoke"
 -- 10. ROLE CHANGE LOG (immutable — no UPDATE/DELETE policies)
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- Gridmaster may insert rows with NULL org_id (platform-level events like
+-- force_logout). super_admin may only insert rows scoped to their current
+-- session's org. Defense in depth: SECURITY DEFINER RPCs already enforce
+-- caller-target org match, but the policy guards any direct INSERT path too.
 CREATE POLICY "audit_insert"
   ON public.role_change_log FOR INSERT TO authenticated
   WITH CHECK (
-    public.caller_org_role() = 'super_admin'
-    OR public.is_gridmaster()
+    public.is_gridmaster()
+    OR (
+      public.caller_org_role() = 'super_admin'
+      AND org_id IS NOT NULL
+      AND org_id = public.caller_org_id()
+    )
   );
 
+-- Gridmasters see all rows (including NULL-org platform events).
+-- super_admins and admins of an org see only that org's entries, scoped to
+-- their CURRENT session's org (not the target's stale profiles.org_id).
 CREATE POLICY "audit_select"
   ON public.role_change_log FOR SELECT TO authenticated
   USING (
     public.is_gridmaster()
-    OR EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = target_user_id AND org_id = public.caller_org_id()
+    OR (
+      org_id IS NOT NULL
+      AND org_id = public.caller_org_id()
+      AND public.caller_org_role() IN ('super_admin', 'admin')
     )
   );
 
@@ -790,31 +802,49 @@ CREATE POLICY "shift_requests_delete"
 
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own notifications
+-- Users can read their own notifications, scoped to their current session org.
+-- Platform notifications (org_id IS NULL) are also visible — they target the
+-- user regardless of which org they're in. The org clause prevents a user
+-- who belongs to multiple orgs from seeing org-B notifications while their
+-- session is on org-A. Gridmasters bypass via the FOR ALL policy below.
 CREATE POLICY "own_notifications_select"
   ON public.notifications FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  );
 
--- Users can update (mark read) their own notifications
+-- Users can update (mark read) their own notifications, same scope as select.
 CREATE POLICY "own_notifications_update"
   ON public.notifications FOR UPDATE TO authenticated
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+  USING (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  );
 
--- Gridmaster can read all notifications (for support/debugging)
+-- Gridmaster can read/write all notifications (support/debugging + platform
+-- notifications they receive for ALL their accessible orgs).
 CREATE POLICY "gridmaster_all_notifications"
   ON public.notifications FOR ALL TO authenticated
   USING (public.is_gridmaster())
   WITH CHECK (public.is_gridmaster());
 
--- Block direct INSERT/DELETE — notifications are system-generated via SECURITY DEFINER functions
+-- Block direct INSERT — notifications are system-generated via SECURITY DEFINER functions
 CREATE POLICY "notifications_insert_blocked"
   ON public.notifications FOR INSERT TO authenticated
   WITH CHECK (FALSE);
 
-CREATE POLICY "notifications_delete_blocked"
+-- Users can delete their own notifications, same scope as select.
+CREATE POLICY "own_notifications_delete"
   ON public.notifications FOR DELETE TO authenticated
-  USING (FALSE);
+  USING (
+    user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL)
+  );
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

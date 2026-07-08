@@ -39,7 +39,9 @@ async function exportStaff(orgId: string) {
 
   const { data: employees, error } = await supabase
     .from("employees")
-    .select("id, first_name, last_name, email, phone, status, status_note, seniority, focus_area_ids, certification_id, role_ids, contact_notes, archived_at")
+    .select(
+      "id, first_name, last_name, email, phone, status, status_note, seniority, focus_area_ids, certification_id, role_ids, contact_notes, archived_at",
+    )
     .eq("org_id", orgId)
     .is("archived_at", null)
     .order("seniority", { ascending: true })
@@ -51,14 +53,35 @@ async function exportStaff(orgId: string) {
   const [{ data: focusAreas }, { data: certs }, { data: roles }] = await Promise.all([
     supabase.from("focus_areas").select("id, name").eq("org_id", orgId).is("archived_at", null),
     supabase.from("certifications").select("id, name").eq("org_id", orgId).is("archived_at", null),
-    supabase.from("organization_roles").select("id, name").eq("org_id", orgId).is("archived_at", null),
+    supabase
+      .from("organization_roles")
+      .select("id, name")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
   ]);
 
-  const faMap = new Map((focusAreas ?? []).map((fa: Record<string, unknown>) => [fa.id as number, fa.name as string]));
-  const certMap = new Map((certs ?? []).map((c: Record<string, unknown>) => [c.id as number, c.name as string]));
-  const roleMap = new Map((roles ?? []).map((r: Record<string, unknown>) => [r.id as number, r.name as string]));
+  const faMap = new Map(
+    (focusAreas ?? []).map((fa: Record<string, unknown>) => [fa.id as number, fa.name as string]),
+  );
+  const certMap = new Map(
+    (certs ?? []).map((c: Record<string, unknown>) => [c.id as number, c.name as string]),
+  );
+  const roleMap = new Map(
+    (roles ?? []).map((r: Record<string, unknown>) => [r.id as number, r.name as string]),
+  );
 
-  const headers = ["First Name", "Last Name", "Email", "Phone", "Status", "Seniority", "Focus Areas", "Certification", "Roles", "Notes"];
+  const headers = [
+    "First Name",
+    "Last Name",
+    "Email",
+    "Phone",
+    "Status",
+    "Seniority",
+    "Focus Areas",
+    "Certification",
+    "Roles",
+    "Notes",
+  ];
   const rows = (employees ?? []).map((emp: Record<string, unknown>) => [
     emp.first_name as string,
     emp.last_name as string,
@@ -111,11 +134,7 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
 
   // Fetch absence types for published absence labels.
   const [{ data: absenceTypes }] = await Promise.all([
-    supabase
-      .from("absence_types")
-      .select("id, label")
-      .eq("org_id", orgId)
-      .is("archived_at", null),
+    supabase.from("absence_types").select("id, label").eq("org_id", orgId).is("archived_at", null),
   ]);
   const absenceTypeById = new Map(
     (absenceTypes ?? []).map((row: Record<string, unknown>) => [
@@ -136,19 +155,18 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
   // Index shifts by emp_id:date
   const shiftIndex = new Map<string, string>();
   for (const row of shifts as PublishedShiftRow[]) {
-    const entry = resolvePublishedScheduleEntry(
-      row,
-      new Map(),
-      absenceTypeById,
-    );
+    const entry = resolvePublishedScheduleEntry(row, new Map(), absenceTypeById);
     if (!entry) continue;
     shiftIndex.set(`${entry.empId}:${entry.date}`, entry.label);
   }
 
-  const headers = ["Employee", ...dates.map((d) => {
-    const dt = new Date(d + "T00:00:00");
-    return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-  })];
+  const headers = [
+    "Employee",
+    ...dates.map((d) => {
+      const dt = new Date(d + "T00:00:00");
+      return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    }),
+  ];
 
   const rows = (employees ?? []).map((emp: Record<string, unknown>) => {
     const name = `${emp.first_name} ${emp.last_name}`;

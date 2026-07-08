@@ -19,7 +19,7 @@ export default function OrganizationChangeReviewModal({
   return (
     <ChangeReviewModal
       title="Review Organization Changes"
-      description="Review these organization changes before saving. Sensitive updates should be confirmed carefully because they affect the whole workspace."
+      description="Review these organization changes before saving. Sensitive updates should be confirmed carefully because they affect the whole organization."
       changes={changes}
       saving={saving}
       confirmLabel="Confirm Save"

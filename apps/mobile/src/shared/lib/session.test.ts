@@ -13,10 +13,10 @@ vi.mock("expo-secure-store", () => ({
 }));
 
 import {
-  loadLastWorkspaceSlug,
+  loadLastOrgSlug,
   loadSession,
   loadStoredPushDevice,
-  saveLastWorkspaceSlug,
+  saveLastOrgSlug,
   saveSession,
   saveStoredPushDevice,
   secureStoreAdapter,
@@ -55,10 +55,10 @@ describe("session storage", () => {
     expect(window.localStorage.getItem("dubgrid-mobile-session")).toContain("token-123");
   });
 
-  it("persists the last workspace slug across logouts", async () => {
-    await saveLastWorkspaceSlug("DubGrid-Health");
+  it("persists the last organization slug across logouts", async () => {
+    await saveLastOrgSlug("DubGrid-Health");
 
-    await expect(loadLastWorkspaceSlug()).resolves.toBe("dubgrid-health");
+    await expect(loadLastOrgSlug()).resolves.toBe("dubgrid-health");
   });
 
   it("persists the active push device on web", async () => {

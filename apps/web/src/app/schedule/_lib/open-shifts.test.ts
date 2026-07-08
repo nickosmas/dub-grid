@@ -27,13 +27,13 @@ function buildEmployee(overrides: Partial<Employee> = {}): Employee {
     userId: null,
     departmentIds: [],
     version: 0,
+    employeeNumber: 1001,
+    createdAt: null,
     ...overrides,
   };
 }
 
-function buildShiftRequest(
-  overrides: Partial<ShiftRequest> = {},
-): ShiftRequest {
+function buildShiftRequest(overrides: Partial<ShiftRequest> = {}): ShiftRequest {
   return {
     id: "request-1",
     orgId: "org-1",
@@ -192,9 +192,9 @@ describe("buildGridCalloffOpenShiftsFromRequests", () => {
       endDate: "2026-04-27",
     });
 
-    expect(
-      result.map((item) => ({ id: item.id, focusAreaId: item.focusAreaId })),
-    ).toEqual([{ id: "request-fallback", focusAreaId: 11 }]);
+    expect(result.map((item) => ({ id: item.id, focusAreaId: item.focusAreaId }))).toEqual([
+      { id: "request-fallback", focusAreaId: 11 },
+    ]);
   });
 
   it("shows all current coverage gaps to schedule editors, even before publication", () => {

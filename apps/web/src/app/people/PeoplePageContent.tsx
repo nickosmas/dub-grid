@@ -23,14 +23,30 @@ function PeopleContent() {
     orgId,
   } = usePermissions();
   const {
-    org, focusAreas, assignments, shiftCategories, jobs, certifications, orgRoles, departments, assignmentLabelMap, absenceTypes,
-    loading: refLoading, loadError, setupStatus,
+    org,
+    focusAreas,
+    assignments,
+    shiftCategories,
+    jobs,
+    certifications,
+    orgRoles,
+    departments,
+    assignmentLabelMap,
+    absenceTypes,
+    loading: refLoading,
+    loadError,
+    setupStatus,
   } = useOrganizationData();
   const {
-    employees, benchedEmployees, terminatedEmployees,
+    employees,
+    inactiveEmployees,
+    removedEmployees,
     loading: empLoading,
-    handleAddEmployee, handleSaveEmployee, handleDeleteEmployee,
-    handleBenchEmployee, handleActivateEmployee,
+    handleAddEmployee,
+    handleSaveEmployee,
+    handleRemoveEmployee,
+    handleDeactivateEmployee,
+    handleActivateEmployee,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -45,20 +61,31 @@ function PeopleContent() {
 
   const staffEmployees = useMemo(
     () =>
-      employees
-        .filter((e) => e.focusAreaIds.length > 0)
-        .sort((a, b) => a.seniority - b.seniority),
+      employees.filter((e) => e.focusAreaIds.length > 0).sort((a, b) => a.seniority - b.seniority),
     [employees],
   );
 
-  // Don't render content until permissions are resolved and access is confirmed
-  if (permsLoading || !canViewStaff) {
+  // While permissions are resolving, show the indicator. Once resolved, if
+  // the viewer can't access People, render nothing — the useEffect above is
+  // already navigating away, so flashing a fake loading bar to an
+  // unauthorized user just wastes a paint. (audit L1)
+  if (permsLoading) {
     return <ProgressBar loading />;
+  }
+  if (!canViewStaff) {
+    return null;
   }
 
   if (loadError && !org) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        }}
+      >
         <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
       </div>
     );
@@ -72,14 +99,14 @@ function PeopleContent() {
         <>
           <StaffView
             employees={staffEmployees}
-            benchedEmployees={benchedEmployees}
-            terminatedEmployees={terminatedEmployees}
+            inactiveEmployees={inactiveEmployees}
+            removedEmployees={removedEmployees}
             focusAreas={focusAreas}
             certifications={certifications}
             roles={orgRoles}
             onSave={handleSaveEmployee}
-            onDelete={handleDeleteEmployee}
-            onBench={handleBenchEmployee}
+            onRemove={handleRemoveEmployee}
+            onDeactivate={handleDeactivateEmployee}
             onActivate={handleActivateEmployee}
             onAdd={() => setShowAddModal(true)}
             orgId={org?.id ?? ""}

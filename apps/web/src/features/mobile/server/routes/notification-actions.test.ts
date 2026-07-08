@@ -125,8 +125,7 @@ describe("mobile notification actions", () => {
 
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
-      error:
-        "We updated that notification, but we couldn't refresh your mobile alerts right now.",
+      error: "We updated that notification, but we couldn't refresh your mobile alerts right now.",
     });
   });
 });

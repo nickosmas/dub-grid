@@ -57,8 +57,7 @@ export default function ChangeLegend() {
                 height: 8,
                 borderRadius: "50%",
                 background: tone.background,
-                boxShadow:
-                  "0 0 0 1px rgba(255, 255, 255, 0.75), 0 0 0 2px rgba(15, 23, 42, 0.08)",
+                boxShadow: "0 0 0 1px rgba(255, 255, 255, 0.75), 0 0 0 2px rgba(15, 23, 42, 0.08)",
                 flexShrink: 0,
               }}
             />

@@ -57,7 +57,10 @@ export async function fetchUserSessionsForUser(
     .select(
       "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash",
     )
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    // Filter partial rows created by switch_org before track-session fills in
+    // refresh_token_hash. These are non-revokable transient rows.
+    .not("refresh_token_hash", "is", null);
 
   if (options.activeSince) {
     query = query.gte("last_active_at", options.activeSince);
@@ -99,9 +102,7 @@ export function getActiveUserSessionCutoff(now: Date = new Date()): string {
   return new Date(now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS).toISOString();
 }
 
-export async function trackUserSessionForUser(
-  input: TrackUserSessionInput,
-): Promise<void> {
+export async function trackUserSessionForUser(input: TrackUserSessionInput): Promise<void> {
   const { error } = await getServiceClient()
     .from("user_sessions")
     .upsert(
@@ -140,9 +141,7 @@ export async function revokeUserSessionForUser(
 }
 
 function hashSupabaseSessionId(sessionId: string): string {
-  return createHash("sha256")
-    .update(`supabase-session:${sessionId}`)
-    .digest("hex");
+  return createHash("sha256").update(`supabase-session:${sessionId}`).digest("hex");
 }
 
 function isUserSessionPlatform(value: unknown): value is UserSessionPlatform {

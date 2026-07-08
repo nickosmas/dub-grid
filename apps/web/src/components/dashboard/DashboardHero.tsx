@@ -55,7 +55,16 @@ function MetricIcon({ label, color }: { label: string; color: string }) {
 
   if (key.includes("coverage")) {
     return (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M9 2.5l5 2v4.3c0 3.3-2.1 5.6-5 6.7-2.9-1.1-5-3.4-5-6.7V4.5l5-2Z" />
         <path d="m6.4 8.9 1.7 1.7 3.6-3.8" />
       </svg>
@@ -64,7 +73,16 @@ function MetricIcon({ label, color }: { label: string; color: string }) {
 
   if (key.includes("gap")) {
     return (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <circle cx="9" cy="9" r="6.25" />
         <path d="M9 5.8v3.6" />
         <path d="M9 12.3h.01" />
@@ -74,7 +92,16 @@ function MetricIcon({ label, color }: { label: string; color: string }) {
 
   if (key.includes("approval")) {
     return (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M5.2 3.2h7.6a1.6 1.6 0 0 1 1.6 1.6v8.4a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6V4.8a1.6 1.6 0 0 1 1.6-1.6Z" />
         <path d="m6.4 9 1.6 1.6 3.7-3.8" />
       </svg>
@@ -82,7 +109,16 @@ function MetricIcon({ label, color }: { label: string; color: string }) {
   }
 
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 13.5h10" />
       <path d="M5.5 13.5V8.2" />
       <path d="M9 13.5V4.8" />
@@ -122,7 +158,7 @@ export default function DashboardHero({
           <h2
             style={{
               margin: 0,
-              fontSize: "clamp(1.25rem, 1.5vw, 1.7rem)",
+              fontSize: "var(--dg-fs-page-title)",
               fontWeight: 700,
               color: "var(--color-text-primary)",
               letterSpacing: "-0.03em",

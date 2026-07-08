@@ -9,9 +9,7 @@ export interface EmployeeContactConflict {
   message: string;
 }
 
-export function getEmployeeContactConflict(
-  error: unknown,
-): EmployeeContactConflict | null {
+export function getEmployeeContactConflict(error: unknown): EmployeeContactConflict | null {
   if (!error || typeof error !== "object") {
     return null;
   }
@@ -26,11 +24,7 @@ export function getEmployeeContactConflict(
     return null;
   }
 
-  const text = [
-    record.constraint,
-    record.details,
-    record.message,
-  ]
+  const text = [record.constraint, record.details, record.message]
     .filter((value): value is string => typeof value === "string")
     .join(" ");
 
@@ -49,6 +43,22 @@ export function getEmployeeContactConflict(
       error: "That phone number is already used by another person.",
       field: "phone",
       message: "That phone number is already used by another person.",
+    };
+  }
+
+  // employee_email_belongs_to_user / employee_email_belongs_to_other_user:
+  // the BEFORE trigger raised because the email matches a different auth
+  // user's account email. Surface as a contact conflict so the existing
+  // EmployeeContactConflictError path on the client picks it up.
+  if (
+    text.includes("employee_email_belongs_to_user") ||
+    text.includes("employee_email_belongs_to_other_user")
+  ) {
+    return {
+      code: EMPLOYEE_CONTACT_CONFLICT_CODE,
+      error: "That email belongs to a different user account.",
+      field: "email",
+      message: "That email belongs to a different user account.",
     };
   }
 

@@ -16,7 +16,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 const REALTIME_FLAG = {
   name: "disable_realtime",
   label: "Pause Live Updates",
-  description: "Stop live schedule and workspace updates for this organization.",
+  description: "Stop live schedule and organization updates for this organization.",
 } as const;
 
 const HIGH_IMPACT_FLAGS = new Set<string>([REALTIME_FLAG.name]);
@@ -92,8 +92,9 @@ export default function FeatureFlagsEditor({
 
   const hasHighImpactChanges = useMemo(() => {
     const nextFlags = normalizeFlagState(flags);
-    return Object.keys(nextFlags).some((flag) =>
-      HIGH_IMPACT_FLAGS.has(flag) && (nextFlags[flag] ?? false) !== (savedFlags[flag] ?? false),
+    return Object.keys(nextFlags).some(
+      (flag) =>
+        HIGH_IMPACT_FLAGS.has(flag) && (nextFlags[flag] ?? false) !== (savedFlags[flag] ?? false),
     );
   }, [flags, savedFlags]);
 
@@ -103,7 +104,9 @@ export default function FeatureFlagsEditor({
         <div style={sectionHeaderStyle}>Runtime Controls</div>
         <div style={sectionBodyStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flex: 1 }}>
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flex: 1 }}
+            >
               <input
                 type="checkbox"
                 checked={flags[REALTIME_FLAG.name] ?? false}
@@ -111,8 +114,20 @@ export default function FeatureFlagsEditor({
                 style={{ width: 16, height: 16, accentColor: "var(--color-today-text)" }}
               />
               <div>
-                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>{REALTIME_FLAG.label}</div>
-                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>{REALTIME_FLAG.description}</div>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 600,
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {REALTIME_FLAG.label}
+                </div>
+                <div
+                  style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}
+                >
+                  {REALTIME_FLAG.description}
+                </div>
               </div>
             </label>
           </div>
@@ -121,14 +136,18 @@ export default function FeatureFlagsEditor({
 
       {/* Save */}
       <EditorActionRow
-        secondaryAction={(
+        secondaryAction={
           hasChanges ? (
-            <button className="dg-btn dg-btn-secondary" onClick={() => setFlags(savedFlags)} disabled={saving}>
+            <button
+              className="dg-btn dg-btn-secondary"
+              onClick={() => setFlags(savedFlags)}
+              disabled={saving}
+            >
               {EDITOR_ACTION_LABELS.discard}
             </button>
           ) : undefined
-        )}
-        primaryAction={(
+        }
+        primaryAction={
           <button
             className="dg-btn dg-btn-primary"
             onClick={() => {
@@ -142,13 +161,13 @@ export default function FeatureFlagsEditor({
           >
             {getEditorSaveLabel(saving)}
           </button>
-        )}
+        }
       />
 
       {confirmOpen && (
         <ConfirmDialog
           title="Save Runtime Control Changes"
-          message="This change can affect live workspace behavior. Review carefully before saving."
+          message="This change can affect live organization behavior. Review carefully before saving."
           confirmLabel="Save Changes"
           variant="warning"
           isLoading={saving}

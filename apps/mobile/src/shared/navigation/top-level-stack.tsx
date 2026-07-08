@@ -24,9 +24,7 @@ export const commonStackOptions: NativeStackNavigationOptions = {
   },
 };
 
-export function createTopLevelStackOptions(
-  title: string,
-): NativeStackNavigationOptions {
+export function createTopLevelStackOptions(title: string): NativeStackNavigationOptions {
   const useLargeTitle = Platform.OS === "ios";
 
   return {
@@ -38,9 +36,7 @@ export function createTopLevelStackOptions(
   };
 }
 
-export function createDetailStackOptions(
-  title: string,
-): NativeStackNavigationOptions {
+export function createDetailStackOptions(title: string): NativeStackNavigationOptions {
   return {
     ...commonStackOptions,
     title,

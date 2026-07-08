@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  computeScheduleEntryDraftKind,
-  shiftEditableIdentityMatches,
-} from "./editor-session";
+import { computeScheduleEntryDraftKind, shiftEditableIdentityMatches } from "./editor-session";
 import type { ShiftMap } from "@/types";
 
-function makeShiftEntry(
-  overrides: Partial<ShiftMap[string]> = {},
-): ShiftMap[string] {
+function makeShiftEntry(overrides: Partial<ShiftMap[string]> = {}): ShiftMap[string] {
   return {
     draft: null,
     published: null,

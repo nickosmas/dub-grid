@@ -2,9 +2,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
+import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { Timer } from "@/lib/server-timing";
 import * as Sentry from "@/lib/sentry";
 
 /**
@@ -66,9 +69,7 @@ interface JWTClaims {
  * Gridmaster platform_role takes precedence over org_role.
  */
 export function calculateEffectiveRole(claims: JWTClaims): string {
-  return claims.platform_role === "gridmaster"
-    ? "gridmaster"
-    : claims.org_role ?? "user";
+  return claims.platform_role === "gridmaster" ? "gridmaster" : (claims.org_role ?? "user");
 }
 
 /**
@@ -79,30 +80,57 @@ export function getRoleLevel(role: string): number {
 }
 
 export async function middleware(req: NextRequest) {
+  const timer = new Timer();
   const host = req.headers.get("host") ?? "";
   const pathname = req.nextUrl.pathname;
   const parsedHost = parseHost(host);
   const subdomain = parsedHost.subdomain;
 
-  // CSP — 'self' + 'unsafe-inline' for scripts.
-  // 'strict-dynamic' is intentionally NOT used because statically pre-rendered
-  // pages (landing, privacy, terms) have no nonce on their <script> tags, so
-  // 'strict-dynamic' would override 'self' and block all scripts, preventing
-  // React hydration (stuck loading spinner in production).
-  const cspHeader = `
+  // CSP. Two script-src policies (SECURITY_AUDIT.md F-4):
+  //  - Static/public pages (marketing, login, auth flows) are pre-rendered and
+  //    can't carry a per-request nonce, so they keep 'unsafe-inline'. These pages
+  //    hold no user data and have no injection sink.
+  //  - The authenticated app is rendered dynamically (its layouts/pages set
+  //    `export const dynamic = "force-dynamic"` for exactly this reason), so in
+  //    production it drops 'unsafe-inline' for a per-request nonce + 'strict-dynamic'.
+  //    Next.js stamps the nonce onto its inline bootstrap scripts (read from this
+  //    request CSP header) and the nonced bundle loads analytics by propagation.
+  // In development both policies stay on 'unsafe-inline' so HMR / React Refresh work.
+  const isDev = process.env.NODE_ENV === "development";
+  const nonce = isDev
+    ? ""
+    : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+  const analyticsSrc = "https://va.vercel-scripts.com";
+  const devScriptExtras = isDev ? "'unsafe-eval'" : "";
+  const devConnectExtras = isDev
+    ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
+    : "";
+  const buildCsp = (scriptSrc: string) =>
+    `
     default-src 'self';
-    script-src 'self' 'unsafe-inline' ${process.env.NODE_ENV === "development" ? "'unsafe-eval'" : ""} https://va.vercel-scripts.com;
+    script-src ${scriptSrc};
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';
-    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${process.env.NODE_ENV === "development" ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321" : ""};
+    connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.stripe.com https://*.posthog.com https://us.i.posthog.com https://eu.i.posthog.com ${devConnectExtras};
     frame-ancestors 'self';
     object-src 'none';
     base-uri 'none';
     form-action 'self';
-    ${process.env.NODE_ENV === "production" ? "upgrade-insecure-requests;" : ""}
-  `;
-  const contentSecurityPolicyHeaderValue = cspHeader.replace(/\s{2,}/g, " ").trim();
+    ${isDev ? "" : "upgrade-insecure-requests;"}
+  `
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+  // Static/public pages keep 'unsafe-inline'.
+  const contentSecurityPolicyHeaderValue = buildCsp(
+    `'self' 'unsafe-inline' ${devScriptExtras} ${analyticsSrc}`,
+  );
+  // Authenticated app: nonce + 'strict-dynamic' in production (its pages are
+  // force-dynamic, so Next can stamp the nonce); 'unsafe-inline' in dev.
+  const dynamicCspHeaderValue = isDev
+    ? contentSecurityPolicyHeaderValue
+    : buildCsp(`'self' 'nonce-${nonce}' 'strict-dynamic' ${analyticsSrc}`);
 
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
@@ -110,9 +138,20 @@ export async function middleware(req: NextRequest) {
   // Marketing pages should only render on the apex domain — redirect
   // any subdomain (including nonsense slugs) back to the bare domain.
   if (subdomain && subdomain !== "gridmaster") {
-    const isMarketingPage = pathname === "/" || pathname === "/privacy" || pathname === "/terms" || pathname === "/request-demo";
+    const isMarketingPage =
+      pathname === "/" ||
+      pathname === "/privacy" ||
+      pathname === "/terms" ||
+      pathname === "/request-demo";
     if (isMarketingPage) {
+      // Explicitly set both pathname and host from already-trusted values
+      // (pathname, parsedHost) rather than relying on req.url's own host —
+      // under self-hosted `next start`, req.url reports the server's bind
+      // address (e.g. "localhost:3000") instead of the real incoming Host,
+      // so mutating only .host on it is a no-op and this would otherwise
+      // redirect to itself forever.
       const url = new URL(req.url);
+      url.pathname = pathname;
       url.host = `${parsedHost.rootDomain}${parsedHost.port}`;
       const res = NextResponse.redirect(url);
       res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
@@ -126,6 +165,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname === "/" ||
     pathname === "/login" ||
+    pathname === "/goodbye" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
     pathname === "/cookie-policy" ||
@@ -142,6 +182,12 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
+  // Past the public/static branches: this is the authenticated, force-dynamic
+  // app. Swap in the nonce-based CSP so Next.js stamps the nonce onto its inline
+  // scripts (it reads the nonce from this request CSP header) and we drop
+  // 'unsafe-inline'.
+  requestHeaders.set("Content-Security-Policy", dynamicCspHeaderValue);
+
   // Create a mutable response so @supabase/ssr can refresh session cookies
   // and pass the modified request headers forward for Next.js SSR hydration
   const res = NextResponse.next({
@@ -149,7 +195,7 @@ export async function middleware(req: NextRequest) {
   });
 
   // Apply CSP to the response sent to the browser
-  res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
+  res.headers.set("Content-Security-Policy", dynamicCspHeaderValue);
 
   // Use @supabase/ssr to read the session from cookies. This correctly handles
   // the sb-<project-ref>-auth-token cookie format and multi-chunk cookie
@@ -163,15 +209,15 @@ export async function middleware(req: NextRequest) {
           return req.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
         },
       },
-    }
+    },
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
@@ -187,7 +233,9 @@ export async function middleware(req: NextRequest) {
   try {
     const jwks = getJwks();
     if (jwks) {
-      const { payload } = await jwtVerify(session.access_token, jwks);
+      const { payload } = await timer.time("jwt_verify", () =>
+        jwtVerify(session.access_token, jwks),
+      );
       claims = payload as JWTClaims;
     } else {
       claims = decodeJwt(session.access_token) as JWTClaims;
@@ -214,7 +262,8 @@ export async function middleware(req: NextRequest) {
   // from the caller's profile so route guards still work.
   // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
   const isGridmaster = claims.platform_role === "gridmaster";
-  const subdomainMismatch = !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
+  const subdomainMismatch =
+    !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
 
   if (
     !claims.platform_role ||
@@ -226,17 +275,15 @@ export async function middleware(req: NextRequest) {
 
     try {
       // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
-      const profile = await cacheThrough(
-        CacheKey.mwProfile(userId),
-        TTL.MIDDLEWARE,
-        async () => {
+      const profile = await timer.time("mw_profile", () =>
+        cacheThrough(CacheKey.mwProfile(userId), TTL.MIDDLEWARE, async () => {
           const { data } = await supabase
             .from("profiles")
             .select("platform_role, org_id")
             .eq("id", userId)
             .maybeSingle();
           return data;
-        },
+        }),
       );
 
       // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
@@ -245,10 +292,8 @@ export async function middleware(req: NextRequest) {
       let resolvedOrgSlug: string | undefined = undefined;
 
       if (subdomain && subdomain !== "gridmaster") {
-        const membership = await cacheThrough(
-          CacheKey.mwMembership(userId, subdomain),
-          TTL.MIDDLEWARE,
-          async () => {
+        const membership = await timer.time("mw_membership", () =>
+          cacheThrough(CacheKey.mwMembership(userId, subdomain), TTL.MIDDLEWARE, async () => {
             const { data } = await supabase
               .from("organization_memberships")
               .select("org_role, org_id, organizations!inner(slug)")
@@ -256,7 +301,7 @@ export async function middleware(req: NextRequest) {
               .eq("organizations.slug", subdomain)
               .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
             return data;
-          },
+          }),
         );
 
         if (membership) {
@@ -295,18 +340,12 @@ export async function middleware(req: NextRequest) {
   if (isGridmaster) {
     const rawCookie = req.headers.get("cookie") ?? "";
     const impCookiePrefix = "dubgrid-impersonation=";
-    const impCookie = rawCookie
-      .split("; ")
-      .find((c) => c.startsWith(impCookiePrefix));
+    const impCookie = rawCookie.split("; ").find((c) => c.startsWith(impCookiePrefix));
 
     if (impCookie) {
       try {
-        const impData = JSON.parse(
-          decodeURIComponent(impCookie.slice(impCookiePrefix.length)),
-        );
-        const expired =
-          !impData.expiresAt ||
-          new Date(impData.expiresAt).getTime() <= Date.now();
+        const impData = JSON.parse(decodeURIComponent(impCookie.slice(impCookiePrefix.length)));
+        const expired = !impData.expiresAt || new Date(impData.expiresAt).getTime() <= Date.now();
 
         if (expired) {
           // Clear expired cookie
@@ -341,27 +380,92 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // ── Sandbox mode override ──────────────────────────────────────────────
+  // When a user has an active sandbox cookie, override the org context to
+  // the sandbox org id WITHOUT touching the JWT or the current subdomain.
+  // The user stays signed in, on their real-org subdomain, but every
+  // org_id-scoped read/write is routed to the sandbox copy. Exiting just
+  // clears the cookie — no JWT refresh, no navigation.
+  let isInSandbox = false;
+  if (!isImpersonating && session?.user?.id) {
+    const sandboxCookie = getSandboxFromCookie(req.headers.get("cookie") ?? "");
+    if (sandboxCookie) {
+      if (sandboxCookie.userId !== session?.user?.id) {
+        // Cookie was set for a different user — clear it.
+        res.cookies.set("dubgrid-sandbox", "", { path: "/", maxAge: 0 });
+      } else {
+        try {
+          const supabaseUrl2 = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (supabaseUrl2 && serviceKey) {
+            const svc = createClient(supabaseUrl2, serviceKey, {
+              auth: { autoRefreshToken: false, persistSession: false },
+            });
+            const { data } = await timer.time("mw_sandbox", async () =>
+              svc
+                .from("organizations")
+                .select("id, slug")
+                .eq("id", sandboxCookie.sandboxOrgId)
+                .eq("workspace_kind", "sandbox")
+                .eq("sandbox_owner_user_id", session?.user?.id)
+                .is("archived_at", null)
+                .maybeSingle(),
+            );
+            if (data) {
+              isInSandbox = true;
+              claims = {
+                ...claims,
+                org_id: data.id,
+                // Intentionally keep claims.org_slug so the user stays on
+                // their real-org subdomain and the subdomain redirect at
+                // line 410 is a no-op.
+              };
+            }
+            // No row → either the sandbox was deleted server-side or the
+            // verification query transiently failed. Either way, fail open:
+            // do not override here. The /api/organization/bootstrap and
+            // /api/test-sandbox handlers do their own ownership checks via
+            // the service client, so a stale cookie cannot leak data even
+            // if middleware doesn't override. The user clears the cookie
+            // explicitly by clicking Exit, not by us guessing.
+          }
+        } catch (e) {
+          Sentry.captureException(e, {
+            extra: { context: "middleware-sandbox-verify" },
+          });
+        }
+      }
+    }
+  }
+
   // ── Organization access check ───────────────────────────────────────────
   // The JWT hook filters out suspended orgs on token refresh, but a user
   // with a pre-suspension JWT can still access the app until it expires
   // (up to 1 hour). This check catches that window.
   // Billing follows the same pattern: active trials and grace periods keep
-  // regular users out of billing, but a hard lock blocks workspace access.
+  // regular users out of billing, but a hard lock blocks organization access.
   // Skip for gridmasters (they manage suspended orgs) and impersonation.
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
-      const orgAccess = await cacheThrough(
-        CacheKey.mwOrgAccess(claims.org_id),
-        TTL.MIDDLEWARE,
-        async () => {
+      const orgAccess = await timer.time("mw_org_access", () =>
+        cacheThrough(CacheKey.mwOrgAccess(claims.org_id!), TTL.MIDDLEWARE, async () => {
           const { data } = await supabase
             .from("organizations")
-            .select("suspended_at, subscription_status, trial_ends_at")
+            .select("suspended_at, archived_at, subscription_status, trial_ends_at")
             .eq("id", claims.org_id!)
             .maybeSingle();
           return data ?? null;
-        },
+        }),
       );
+
+      // A deleted (archived) org revokes access just like a suspended one. A
+      // user with a pre-deletion JWT can still hit the app until it clears, so
+      // catch that window here.
+      if (orgAccess?.archived_at !== null && orgAccess?.archived_at !== undefined) {
+        const loginUrl = new URL("/login", req.url);
+        loginUrl.searchParams.set("deleted", "true");
+        return NextResponse.redirect(loginUrl);
+      }
 
       if (orgAccess?.suspended_at !== null && orgAccess?.suspended_at !== undefined) {
         const loginUrl = new URL("/login", req.url);
@@ -374,12 +478,11 @@ export async function middleware(req: NextRequest) {
         trialEndsAt: orgAccess?.trial_ends_at ?? null,
       });
 
+      const canRecoverBilling = getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
+
       if (billingAccess.isLocked) {
-        const canRecoverBilling =
-          getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
         const isBillingRecoveryPath =
-          pathname === "/settings" &&
-          req.nextUrl.searchParams.get("section") === "org-billing";
+          pathname === "/settings" && req.nextUrl.searchParams.get("section") === "org-billing";
 
         if (canRecoverBilling && !isBillingRecoveryPath) {
           const billingUrl = new URL("/settings", req.url);
@@ -388,6 +491,12 @@ export async function middleware(req: NextRequest) {
         }
 
         if (!canRecoverBilling && pathname !== "/billing-required") {
+          return NextResponse.redirect(new URL("/billing-required", req.url));
+        }
+      } else if (billingAccess.state === "trial_pending" && !canRecoverBilling) {
+        // Trial clock has not started yet (no super_admin has signed in). Hold
+        // non-super-admins on the setup screen until a super_admin starts it.
+        if (pathname !== "/billing-required") {
           return NextResponse.redirect(new URL("/billing-required", req.url));
         }
       } else if (pathname === "/billing-required") {
@@ -418,7 +527,12 @@ export async function middleware(req: NextRequest) {
 
   // Redirect /gridmaster to /dashboard on the gridmaster subdomain.
   // The gridmaster portal renders at /dashboard when the user is a gridmaster.
-  if (isGridmaster && !isImpersonating && pathname.startsWith("/gridmaster") && subdomain !== "gridmaster") {
+  if (
+    isGridmaster &&
+    !isImpersonating &&
+    pathname.startsWith("/gridmaster") &&
+    subdomain !== "gridmaster"
+  ) {
     const gridmasterHost = buildSubdomainHost("gridmaster", parsedHost);
     const url = new URL(req.url);
     url.host = gridmasterHost;
@@ -456,9 +570,15 @@ export async function middleware(req: NextRequest) {
   if (isImpersonating) {
     res.headers.set("x-dubgrid-impersonating", "true");
   }
+  if (isInSandbox) {
+    res.headers.set("x-dubgrid-sandbox", "true");
+  }
+  timer.applyTo(res.headers);
   return res;
 }
 
 export const config = {
-  matcher: ["/((?!_next|favicon\\.ico|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)"],
+  matcher: [
+    "/((?!_next|favicon\\.ico|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)",
+  ],
 };

@@ -22,10 +22,7 @@ vi.mock("@/lib/db/mappers", () => ({
   rowToEmployee,
 }));
 
-function makeAuth(overrides?: {
-  canManageEmployees?: boolean;
-  canViewStaff?: boolean;
-}) {
+function makeAuth(overrides?: { canManageEmployees?: boolean; canViewStaff?: boolean }) {
   return {
     currentOrg: {
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
@@ -41,6 +38,7 @@ function makeAuth(overrides?: {
 function makeEmployee(overrides: Record<string, unknown> = {}) {
   return {
     id: "d660d308-4e0d-4daf-84fd-6753405e6740",
+    employeeNumber: 1042,
     firstName: "Mina",
     lastName: "Diaz",
     employmentType: "full_time",

@@ -82,13 +82,9 @@ describe("mobile me-schedule route", () => {
     );
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
-      "http://localhost:8081",
-    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:8081");
     expect(response.headers.get("Access-Control-Allow-Methods")).toContain("GET");
-    expect(response.headers.get("Access-Control-Allow-Headers")).toContain(
-      "authorization",
-    );
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain("authorization");
   });
 
   it("returns the linked employee with home focus areas for schedule reads", async () => {

@@ -155,7 +155,7 @@ function hueToRgb(p: number, q: number, t: number): number {
 }
 
 function hslToRgb(hsl: { h: number; s: number; l: number }): { r: number; g: number; b: number } {
-  const h = ((hsl.h % 360) + 360) % 360 / 360;
+  const h = (((hsl.h % 360) + 360) % 360) / 360;
   const s = Math.max(0, Math.min(1, hsl.s));
   const l = Math.max(0, Math.min(1, hsl.l));
 
@@ -178,16 +178,10 @@ function relativeLuminance(hex: string): number {
   const { r, g, b } = hexToRgb(hex);
   const transform = (channel: number) => {
     const normalized = channel / 255;
-    return normalized <= 0.03928
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
   };
 
-  return (
-    0.2126 * transform(r) +
-    0.7152 * transform(g) +
-    0.0722 * transform(b)
-  );
+  return 0.2126 * transform(r) + 0.7152 * transform(g) + 0.0722 * transform(b);
 }
 
 function contrastRatio(left: string, right: string): number {
@@ -301,7 +295,7 @@ export const DEFAULT_DESIG_COLOR = { bg: "#F1F5F9", text: "#475569" };
 
 /** Draft-mode cell border colors by change kind. */
 export const DRAFT_BORDER_COLORS: Record<string, string> = {
-  new: '#16A34A',
-  modified: '#D97706',
-  deleted: '#DC2626',
+  new: "#16A34A",
+  modified: "#D97706",
+  deleted: "#DC2626",
 };

@@ -23,11 +23,16 @@ export interface DbOrganization {
   archived_at: string | null;
   suspended_at: string | null;
   suspended_reason: string | null;
+  workspace_kind: "real" | "sandbox";
+  sandbox_owner_user_id: string | null;
+  sandbox_source_org_id: string | null;
   enforce_conflict_prevention: boolean;
   coverage_rule_config?: Record<string, unknown> | null;
+  open_shift_visibility?: Record<string, unknown> | null;
   stripe_customer_id: string | null;
   subscription_status: string | null;
   trial_ends_at: string | null;
+  trial_started_at: string | null;
   subscription_seats: number | null;
   data_retention_days: number;
   feature_overrides: Record<string, boolean>;

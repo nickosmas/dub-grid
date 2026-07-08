@@ -13,13 +13,14 @@
 CREATE TYPE public.platform_role AS ENUM ('gridmaster', 'none');
 CREATE TYPE public.org_role AS ENUM ('super_admin', 'admin', 'user');
 CREATE TYPE public.shift_series_frequency AS ENUM ('daily', 'weekly', 'biweekly');
-CREATE TYPE public.employee_status AS ENUM ('active', 'benched', 'terminated');
+CREATE TYPE public.employee_status AS ENUM ('active', 'inactive', 'removed');
 CREATE TYPE public.employee_employment_type AS ENUM ('full_time', 'part_time');
 CREATE TYPE public.shift_request_type AS ENUM ('pickup', 'swap', 'calloff');
 CREATE TYPE public.shift_request_status AS ENUM ('open', 'pending_approval', 'approved', 'rejected', 'cancelled', 'expired');
 CREATE TYPE public.profile_change_request_type AS ENUM ('profile_update', 'account_deletion');
 CREATE TYPE public.profile_change_request_status AS ENUM ('pending', 'approved', 'rejected', 'cancelled');
 CREATE TYPE public.department_type AS ENUM ('scheduled', 'management');
+CREATE TYPE public.workspace_kind AS ENUM ('real', 'sandbox');
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -63,34 +64,62 @@ CREATE TABLE public.organizations (
   pay_period_start_date DATE,
   stripe_customer_id   TEXT UNIQUE,
   subscription_status  TEXT NOT NULL DEFAULT 'trialing',
-  trial_ends_at        TIMESTAMPTZ DEFAULT (now() + interval '14 days'),
+  -- NULL trial_ends_at = "trial pending": the org exists but the trial clock has
+  -- not started yet. It starts when the FIRST super_admin genuinely LOGS IN to the
+  -- org, via the start_trial_for_org RPC called from the real web/mobile login
+  -- flow, which sets trial_ends_at = now() + 14 days. It is NOT started by token
+  -- refresh, automatic org reconciliation, or org switching (those leaked trials
+  -- onto orgs the user never chose). Keep 14 in sync with DEFAULT_TRIAL_DAYS in
+  -- packages/domain/src/billing.ts.
+  trial_ends_at        TIMESTAMPTZ,
+  -- Set to now() at the same moment trial_ends_at is set (trial activation), so
+  -- the start is recorded explicitly rather than inferred as ends - 14 days
+  -- (which would drift if DEFAULT_TRIAL_DAYS ever changes). NULL while pending.
+  trial_started_at     TIMESTAMPTZ,
+  trial_welcome_email_sent_at   TIMESTAMPTZ,
+  trial_welcome_seen_at         TIMESTAMPTZ,
   subscription_seats   INTEGER,
   data_retention_days  INTEGER NOT NULL DEFAULT 365,
   archived_at          TIMESTAMPTZ,
   suspended_at                  TIMESTAMPTZ,
   suspended_reason              TEXT,
+  workspace_kind            public.workspace_kind NOT NULL DEFAULT 'real',
+  sandbox_owner_user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  sandbox_source_org_id     UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
   enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
   coverage_rule_config JSONB NOT NULL DEFAULT '{"mentoredCoverageCreditPercent":100}'::jsonb,
+  open_shift_visibility JSONB NOT NULL DEFAULT '{"coverageGap":"matched","calloff":"matched"}'::jsonb,
   feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  -- Per-org monotonic counter for employees.employee_number. Stamped by the
+  -- assign_employee_number BEFORE INSERT trigger. Starts at 1001 so the first
+  -- hire reads as a 4-digit badge ID (1001, 1002, …). Numbers are never
+  -- reused, even after termination.
+  next_employee_number INTEGER NOT NULL DEFAULT 1001,
   created_by           UUID,
   updated_by           UUID,
   created_at           TIMESTAMPTZ DEFAULT now(),
-  updated_at           TIMESTAMPTZ DEFAULT now(),
-
-  CONSTRAINT organizations_trialing_requires_trial_end
-    CHECK (subscription_status <> 'trialing' OR trial_ends_at IS NOT NULL)
+  updated_at           TIMESTAMPTZ DEFAULT now()
+  -- NOTE: no organizations_trialing_requires_trial_end constraint. A trialing org
+  -- with a NULL trial_ends_at is the legitimate "trial pending" state (clock not
+  -- started until the first super_admin signs in). The billing evaluator
+  -- (packages/domain/src/billing.ts) maps that combo to state "trial_pending".
 );
 
 COMMENT ON COLUMN public.organizations.suspended_at IS 'Non-null when the organization is suspended. Members are blocked from accessing the app.';
 COMMENT ON COLUMN public.organizations.data_retention_days IS 'Number of days to retain archived/deleted data before permanent purge (default 365)';
 COMMENT ON COLUMN public.organizations.stripe_customer_id IS 'Stripe customer ID for billing';
 COMMENT ON COLUMN public.organizations.subscription_status IS 'Stripe subscription status: trialing, active, past_due, canceled, unpaid';
+COMMENT ON COLUMN public.organizations.trial_ends_at IS 'NULL = trial pending until the FIRST super_admin genuinely logs in to the org, which (via the start_trial_for_org RPC, called from the real web/mobile login flow) sets it to now() + 14 days. Not started by token refresh, automatic org reconciliation, or org switching.';
+COMMENT ON COLUMN public.organizations.trial_started_at IS 'Set to now() at the same instant trial_ends_at is set (trial activation). Records the start explicitly instead of inferring it as trial_ends_at minus DEFAULT_TRIAL_DAYS. NULL while the trial is pending.';
+COMMENT ON COLUMN public.organizations.trial_welcome_email_sent_at IS 'Set once the "trial started" email has been sent (idempotency guard).';
+COMMENT ON COLUMN public.organizations.trial_welcome_seen_at IS 'Set when a super_admin dismisses the one-time trial welcome modal.';
 COMMENT ON COLUMN public.organizations.logo_url IS 'URL to the organization custom logo image';
 COMMENT ON COLUMN public.organizations.app_name IS 'Custom display name for the application';
 COMMENT ON COLUMN public.organizations.meta_description IS 'Custom SEO meta description';
 COMMENT ON COLUMN public.organizations.theme_config IS 'JSON object containing primary_color, accent_color, etc.';
 COMMENT ON COLUMN public.organizations.landing_page_config IS 'JSON object containing hero_title, features, and pain_points';
 COMMENT ON COLUMN public.organizations.feature_overrides IS 'JSON object of per-org feature flag overrides. Keys are flag names, values are booleans. Checked before PostHog.';
+COMMENT ON COLUMN public.organizations.open_shift_visibility IS 'Controls when open shifts are surfaced to regular users (not editors/admins). Shape {"coverageGap":mode,"calloff":mode} where mode is hidden|matched|always. matched = only when the shift fits the user''s availability (default, legacy behavior); always = regardless of availability (still published + not-started); hidden = never shown even on a shortage.';
 COMMENT ON COLUMN public.organizations.pay_period_start_date IS 'Optional biweekly pay-period anchor date. When set, the 2-week schedule view aligns to 14-day periods starting on this date.';
 COMMENT ON COLUMN public.organizations.coverage_rule_config IS 'Organization-level schedule coverage rules. mentoredCoverageCreditPercent controls how mentored assignments count toward coverage.';
 
@@ -124,6 +153,8 @@ CREATE TABLE public.profiles (
 COMMENT ON COLUMN public.profiles.version IS 'Optimistic lock version counter for race-condition-safe role changes';
 COMMENT ON COLUMN public.profiles.role_locked IS 'Flag indicating if role is currently locked during a change operation';
 COMMENT ON CONSTRAINT gridmaster_no_org ON public.profiles IS 'Gridmasters cannot belong to an organization — they have global scope';
+
+ALTER TABLE ONLY public.profiles REPLICA IDENTITY FULL;
 
 
 -- ── organization_memberships ──────────────────────────────────────────────────
@@ -225,6 +256,11 @@ ALTER TABLE ONLY public.departments REPLICA IDENTITY FULL;
 CREATE TABLE public.employees (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id            UUID NOT NULL,
+  -- Per-org immutable badge number. Stamped by the assign_employee_number
+  -- BEFORE INSERT trigger from organizations.next_employee_number; any value
+  -- supplied by the caller is overwritten. Immutability enforced by
+  -- prevent_employee_number_change BEFORE UPDATE trigger.
+  employee_number   INTEGER NOT NULL,
   first_name        TEXT NOT NULL,
   last_name         TEXT NOT NULL,
   seniority         INTEGER NOT NULL,
@@ -262,6 +298,20 @@ CREATE UNIQUE INDEX unique_active_employee_email_per_org
 CREATE UNIQUE INDEX unique_active_employee_phone_per_org
   ON public.employees (org_id, regexp_replace(phone, '[^0-9]+', '', 'g'))
   WHERE archived_at IS NULL AND regexp_replace(phone, '[^0-9]+', '', 'g') <> '';
+
+-- One active employee row per (org, user). Enforces the canonical "one
+-- employees row = one person per org" rule at the DB layer, defending
+-- against accidental duplicate inserts via from-user, link-user, or
+-- direct DB writes. Partial-index so archived (terminated) employees
+-- keep their historical user link without blocking a fresh hire.
+CREATE UNIQUE INDEX unique_active_user_per_org
+  ON public.employees (org_id, user_id)
+  WHERE user_id IS NOT NULL AND archived_at IS NULL;
+
+-- Per-org badge uniqueness. Survives termination (archived_at IS NOT NULL) so
+-- numbers are never reused.
+ALTER TABLE public.employees
+  ADD CONSTRAINT unique_employee_number_per_org UNIQUE (org_id, employee_number);
 
 ALTER TABLE ONLY public.employees REPLICA IDENTITY FULL;
 
@@ -494,6 +544,8 @@ CREATE TABLE public.recurring_shifts (
   CONSTRAINT valid_effective_range CHECK (effective_until IS NULL OR effective_from <= effective_until)
 );
 
+ALTER TABLE ONLY public.recurring_shifts REPLICA IDENTITY FULL;
+
 
 -- ── shift_series ──────────────────────────────────────────────────────────────
 
@@ -553,6 +605,7 @@ COMMENT ON TABLE public.invitations IS 'Organization invitations for invite-only
 
 CREATE TABLE public.role_change_log (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id             UUID,
   target_user_id     UUID NOT NULL,
   changed_by_id      UUID,
   from_role          TEXT NOT NULL,
@@ -567,6 +620,7 @@ CREATE TABLE public.role_change_log (
 );
 
 COMMENT ON TABLE public.role_change_log IS 'Immutable audit log for all role changes in the system';
+COMMENT ON COLUMN public.role_change_log.org_id IS 'Org where the change took effect. NULL = platform-level gridmaster action (e.g. force_logout). RLS scopes non-NULL rows to the caller''s current session org.';
 COMMENT ON COLUMN public.role_change_log.change_type IS 'Type of change: role_change (org_role modified) or permission_change (admin_permissions modified)';
 COMMENT ON COLUMN public.role_change_log.permissions_before IS 'Previous admin_permissions JSONB (only for permission_change entries)';
 COMMENT ON COLUMN public.role_change_log.permissions_after IS 'New admin_permissions JSONB (only for permission_change entries)';
@@ -622,22 +676,47 @@ COMMENT ON CONSTRAINT no_self_impersonation ON public.impersonation_sessions IS 
 -- ── notifications ───────────────────────────────────────────────────────────
 
 CREATE TABLE public.notifications (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL,
-  org_id     UUID,
-  type       TEXT NOT NULL CHECK (type IN (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID NOT NULL,
+  org_id      UUID,
+  type        TEXT NOT NULL CHECK (type IN (
+    -- existing
     'impersonation_start', 'impersonation_end', 'system',
     'shift_change', 'schedule_published', 'shift_request_new',
-    'shift_request_approved', 'shift_request_rejected'
+    'shift_request_approved', 'shift_request_rejected', 'shift_request_expired',
+    -- schedule (non-publish flows)
+    'recurring_shift_updated', 'shift_series_updated',
+    'schedule_note_published', 'recurring_schedules_applied',
+    -- membership lifecycle
+    'invitation_received', 'invitation_accepted', 'invitation_revoked',
+    'invitation_resent', 'invitation_expired',
+    'membership_removed', 'admin_permissions_changed', 'member_dept_changed',
+    -- employee + org account
+    'employee_created', 'employee_status_changed', 'employee_profile_changed',
+    'org_settings_changed', 'org_suspended', 'org_unsuspended',
+    -- billing
+    'billing_subscription_changed', 'billing_payment_failed',
+    'billing_payment_succeeded',
+    'billing_trial_ending_soon', 'billing_trial_expired',
+    -- security
+    'security_email_changed', 'security_password_changed',
+    'security_mfa_changed', 'security_new_device', 'security_session_revoked',
+    -- platform / gridmaster (org lifecycle events, written with org_id = NULL)
+    'org_created', 'org_trial_started', 'org_archived', 'org_restored',
+    'org_subscription_converted', 'org_subscription_canceled', 'org_payment_failed'
   )),
-  channel    TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
-  category   TEXT,
-  title      TEXT NOT NULL,
-  message    TEXT NOT NULL,
-  metadata   JSONB DEFAULT '{}'::JSONB,
-  read_at    TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  channel     TEXT NOT NULL DEFAULT 'in_app' CHECK (channel IN ('in_app', 'email')),
+  category    TEXT,
+  priority    TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'critical')),
+  title       TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  metadata    JSONB DEFAULT '{}'::JSONB,
+  read_at     TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE ONLY public.notifications REPLICA IDENTITY FULL;
 
 COMMENT ON TABLE public.notifications IS 'In-app and email notifications for users';
 
@@ -696,6 +775,8 @@ CREATE TABLE public.notification_preferences (
 
 COMMENT ON TABLE public.notification_preferences IS 'Per-user notification channel preferences (in_app/email toggles per category)';
 
+ALTER TABLE ONLY public.notification_preferences REPLICA IDENTITY FULL;
+
 
 -- ── mobile_device_tokens ────────────────────────────────────────────────────
 
@@ -720,6 +801,7 @@ CREATE TABLE public.user_sessions (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID NOT NULL,
   org_id             UUID,
+  active_org_id      UUID,
   supabase_session_id UUID UNIQUE,
   platform           TEXT,
   app_version        TEXT,
@@ -727,17 +809,20 @@ CREATE TABLE public.user_sessions (
   ip_address         INET,
   last_active_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
-  refresh_token_hash TEXT NOT NULL UNIQUE
+  refresh_token_hash TEXT UNIQUE
 );
 
 COMMENT ON TABLE public.user_sessions IS 'Tracks individual device sessions for per-device session management';
-COMMENT ON COLUMN public.user_sessions.org_id IS 'Organization context active in the session when the device last reported presence';
+COMMENT ON COLUMN public.user_sessions.org_id IS 'Snapshot of the JWT org_id at the last presence ping (audit only — not authoritative for claims)';
+COMMENT ON COLUMN public.user_sessions.active_org_id IS 'Authoritative per-session org context read by custom_access_token_hook on JWT refresh. Set by switch_org; falls back to profiles.org_id when NULL';
 COMMENT ON COLUMN public.user_sessions.supabase_session_id IS 'Supabase auth session_id claim for correlating web and mobile sessions';
 COMMENT ON COLUMN public.user_sessions.platform IS 'Client platform for the session (web, ios, android)';
 COMMENT ON COLUMN public.user_sessions.app_version IS 'Client application version when reported';
 COMMENT ON COLUMN public.user_sessions.device_label IS 'User-friendly device identifier (e.g., "Chrome on MacOS")';
 COMMENT ON COLUMN public.user_sessions.ip_address IS 'IP address of the device at session creation';
-COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification - UNIQUE constraint prevents duplicate sessions';
+COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification. UNIQUE prevents duplicates; NULL allowed for rows created by switch_org before the client first calls track-session';
+
+ALTER TABLE ONLY public.user_sessions REPLICA IDENTITY FULL;
 
 
 -- ── schedule_draft_sessions ───────────────────────────────────────────────────
@@ -768,6 +853,8 @@ CREATE TABLE public.publish_history (
 );
 
 CREATE INDEX idx_publish_history_org_date ON public.publish_history(org_id, published_at DESC);
+
+ALTER TABLE ONLY public.publish_history REPLICA IDENTITY FULL;
 
 
 -- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
@@ -1005,6 +1092,7 @@ ALTER TABLE public.invitations
 
 -- role_change_log
 ALTER TABLE public.role_change_log
+  ADD CONSTRAINT role_change_log_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE,
   ADD CONSTRAINT role_change_log_target_user_id_fkey FOREIGN KEY (target_user_id) REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD CONSTRAINT role_change_log_changed_by_id_fkey FOREIGN KEY (changed_by_id) REFERENCES auth.users(id) ON DELETE SET NULL;
 
@@ -1039,7 +1127,8 @@ ALTER TABLE public.mobile_device_tokens
 -- user_sessions
 ALTER TABLE public.user_sessions
   ADD CONSTRAINT user_sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
-  ADD CONSTRAINT user_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
+  ADD CONSTRAINT user_sessions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE SET NULL,
+  ADD CONSTRAINT user_sessions_active_org_id_fkey FOREIGN KEY (active_org_id) REFERENCES public.organizations(id) ON DELETE SET NULL;
 
 -- shift_requests
 ALTER TABLE public.shift_requests
@@ -1198,6 +1287,7 @@ CREATE INDEX idx_invitations_employee_id ON public.invitations(employee_id) WHER
 -- role_change_log
 CREATE INDEX idx_role_change_log_idempotency_key ON public.role_change_log(idempotency_key);
 CREATE INDEX idx_role_change_log_target_user_created ON public.role_change_log(target_user_id, created_at DESC);
+CREATE INDEX idx_role_change_log_org_created ON public.role_change_log(org_id, created_at DESC);
 
 -- impersonation_sessions
 CREATE UNIQUE INDEX one_active_session_per_target
@@ -1210,6 +1300,8 @@ CREATE INDEX idx_impersonation_sessions_history ON public.impersonation_sessions
 CREATE INDEX idx_notifications_user_unread ON public.notifications(user_id, created_at DESC) WHERE read_at IS NULL;
 CREATE INDEX idx_notifications_user_all ON public.notifications(user_id, created_at DESC);
 CREATE INDEX idx_notifications_user_org ON public.notifications(user_id, org_id, created_at DESC);
+CREATE INDEX idx_notifications_user_inbox ON public.notifications(user_id, created_at DESC) WHERE archived_at IS NULL;
+CREATE INDEX idx_notifications_user_archived ON public.notifications(user_id, archived_at DESC) WHERE archived_at IS NOT NULL;
 
 -- profile_change_requests
 CREATE INDEX idx_profile_change_requests_org_status ON public.profile_change_requests(org_id, status, created_at DESC);
@@ -1303,6 +1395,19 @@ ALTER TABLE public.subscriptions
   ADD CONSTRAINT subscriptions_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
+-- ── stripe_processed_events ──────────────────────────────────────────────────
+-- Idempotency ledger for the Stripe webhook (M-4). Stripe legitimately
+-- redelivers events; the handler inserts the event id here first and skips
+-- reprocessing on a unique-violation, so audit/activity rows aren't duplicated.
+
+CREATE TABLE public.stripe_processed_events (
+  event_id     TEXT PRIMARY KEY,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.stripe_processed_events IS 'Dedup ledger for Stripe webhook event ids (replay idempotency)';
+
+
 -- ── audit_log ──────────────────────────────────────────────────────────────
 
 CREATE TABLE public.audit_log (
@@ -1353,3 +1458,9 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.indicator_types;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.subscriptions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.audit_log;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.impersonation_sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.user_sessions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.recurring_shifts;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.publish_history;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.notification_preferences;

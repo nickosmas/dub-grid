@@ -128,10 +128,7 @@ export function computeShiftDistribution(
 
 // ─── Day-of-Week Pattern ────────────────────────────────
 
-export function computeDayPattern(
-  empId: string,
-  shifts: ShiftMap,
-): DayPatternEntry[] {
+export function computeDayPattern(empId: string, shifts: ShiftMap): DayPatternEntry[] {
   const dayCounts = new Array(7).fill(0);
   let total = 0;
 
@@ -179,7 +176,7 @@ export function computeFocusAreaDistribution(
     }
   }
 
-  const faMap = new Map(focusAreas.map(fa => [fa.id, fa]));
+  const faMap = new Map(focusAreas.map((fa) => [fa.id, fa]));
 
   return Array.from(faCounts.entries())
     .map(([faId, count]) => {
@@ -202,17 +199,13 @@ export interface OvertimeSummary {
   avgOTPerWeek: number;
 }
 
-export function computeOvertimeSummary(
-  hoursHistory: WeeklyHoursSummary[],
-): OvertimeSummary {
-  const weeksWithOT = hoursHistory.filter(w => w.isOvertime).length;
+export function computeOvertimeSummary(hoursHistory: WeeklyHoursSummary[]): OvertimeSummary {
+  const weeksWithOT = hoursHistory.filter((w) => w.isOvertime).length;
   const totalOTHours = hoursHistory.reduce((sum, w) => sum + w.overtimeHours, 0);
   return {
     weeksWithOT,
     totalOTHours: Math.round(totalOTHours * 10) / 10,
-    avgOTPerWeek: weeksWithOT > 0
-      ? Math.round((totalOTHours / weeksWithOT) * 10) / 10
-      : 0,
+    avgOTPerWeek: weeksWithOT > 0 ? Math.round((totalOTHours / weeksWithOT) * 10) / 10 : 0,
   };
 }
 
@@ -239,16 +232,16 @@ export function generateEmployeeCSV(
   lines.push(`Phone,${esc(employee.phone)}`);
   lines.push(`Seniority,${employee.seniority}`);
 
-  const cert = certifications.find(c => c.id === employee.certificationId);
+  const cert = certifications.find((c) => c.id === employee.certificationId);
   lines.push(`Certification,${esc(cert?.name ?? "None")}`);
 
   const roleNames = employee.roleIds
-    .map(id => orgRoles.find(r => r.id === id)?.name ?? "")
+    .map((id) => orgRoles.find((r) => r.id === id)?.name ?? "")
     .filter(Boolean);
   lines.push(`Roles,${esc(roleNames.join(", ") || "None")}`);
 
   const faNames = employee.focusAreaIds
-    .map(id => focusAreas.find(fa => fa.id === id)?.name ?? "")
+    .map((id) => focusAreas.find((fa) => fa.id === id)?.name ?? "")
     .filter(Boolean);
   lines.push(`Focus Areas,${esc(faNames.join(", ") || "None")}`);
   lines.push("");
@@ -278,13 +271,19 @@ export function generateEmployeeCSV(
     const isAbsence = entry.absenceTypeId != null;
     const label = isAbsence
       ? entry.label
-      : entry.assignmentIds.map(id => assignmentById.get(id)?.label ?? "?").join("/");
-    const startTime = isAbsence ? "" : (entry.customStartTime ?? entry.assignmentIds.map(id => assignmentById.get(id)?.defaultStartTime).find(Boolean) ?? "");
-    const endTime = isAbsence ? "" : (entry.customEndTime ?? entry.assignmentIds.map(id => assignmentById.get(id)?.defaultEndTime).find(Boolean) ?? "");
+      : entry.assignmentIds.map((id) => assignmentById.get(id)?.label ?? "?").join("/");
+    const startTime = isAbsence
+      ? ""
+      : (entry.customStartTime ??
+        entry.assignmentIds.map((id) => assignmentById.get(id)?.defaultStartTime).find(Boolean) ??
+        "");
+    const endTime = isAbsence
+      ? ""
+      : (entry.customEndTime ??
+        entry.assignmentIds.map((id) => assignmentById.get(id)?.defaultEndTime).find(Boolean) ??
+        "");
     const status = entry.isDraft ? "Draft" : "Published";
-    lines.push(
-      `${dateKey},${esc(label)},${startTime},${endTime},${status}`,
-    );
+    lines.push(`${dateKey},${esc(label)},${startTime},${endTime},${status}`);
   }
   lines.push("");
 

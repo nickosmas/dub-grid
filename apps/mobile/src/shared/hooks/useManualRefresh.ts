@@ -1,12 +1,20 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
-export function useManualRefresh(
-  onRefresh: () => Promise<unknown> | unknown,
-) {
+const REFRESH_COOLDOWN_MS = 500;
+
+export function useManualRefresh(onRefresh: () => Promise<unknown> | unknown) {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Track the last completion time to suppress rapid back-to-back pulls.
+  const lastCompletedAtRef = useRef(0);
 
   const refresh = useCallback(() => {
     if (isRefreshing) {
+      return;
+    }
+    if (
+      lastCompletedAtRef.current > 0 &&
+      Date.now() - lastCompletedAtRef.current < REFRESH_COOLDOWN_MS
+    ) {
       return;
     }
 
@@ -22,6 +30,7 @@ export function useManualRefresh(
     void refreshPromise
       .catch(() => undefined)
       .finally(() => {
+        lastCompletedAtRef.current = Date.now();
         setIsRefreshing(false);
       });
   }, [isRefreshing, onRefresh]);

@@ -42,11 +42,15 @@ export async function GET() {
         : { status: "error", error: `HTTP ${res.status}`, latencyMs: Date.now() - redisStart };
     }
   } catch {
-    checks.redis = { status: "error", error: "connection failed", latencyMs: Date.now() - redisStart };
+    checks.redis = {
+      status: "error",
+      error: "connection failed",
+      latencyMs: Date.now() - redisStart,
+    };
   }
 
   const allHealthy = Object.values(checks).every(
-    (c) => c.status === "ok" || c.status === "unconfigured"
+    (c) => c.status === "ok" || c.status === "unconfigured",
   );
 
   return Response.json(
@@ -56,6 +60,6 @@ export async function GET() {
       version: process.env.npm_package_version || "unknown",
       checks,
     },
-    { status: allHealthy ? 200 : 503 }
+    { status: allHealthy ? 200 : 503 },
   );
 }

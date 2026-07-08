@@ -1,9 +1,4 @@
-import type {
-  CoverageGap,
-  Employee,
-  GridOpenShift,
-  ShiftRequest,
-} from "@/types";
+import type { CoverageGap, Employee, GridOpenShift, ShiftRequest } from "@/types";
 import { formatDateKey } from "@/lib/utils";
 
 interface SelectVisibleCoverageGapsInput {
@@ -103,10 +98,7 @@ export function buildGridCalloffOpenShiftsFromRequests({
   endDate,
 }: BuildGridCalloffOpenShiftsFromRequestsInput): GridOpenShift[] {
   const employeeHomeFocusAreaById = new Map(
-    employees.map((employee) => [
-      employee.id,
-      employee.focusAreaIds[0] ?? null,
-    ]),
+    employees.map((employee) => [employee.id, employee.focusAreaIds[0] ?? null]),
   );
 
   return requests.reduce<GridOpenShift[]>((openShifts, request) => {
@@ -121,9 +113,7 @@ export function buildGridCalloffOpenShiftsFromRequests({
     }
 
     const focusAreaId =
-      request.requesterFocusAreaId ??
-      employeeHomeFocusAreaById.get(request.requesterEmpId) ??
-      null;
+      request.requesterFocusAreaId ?? employeeHomeFocusAreaById.get(request.requesterEmpId) ?? null;
 
     if (focusAreaId == null) {
       return openShifts;

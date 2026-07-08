@@ -34,10 +34,7 @@ type ResolveStoredSegmentsInput = {
   assignmentIds?: number[] | null;
 };
 
-export function buildShiftJobPairKey(
-  shiftId: number | null,
-  jobId: number,
-): string {
+export function buildShiftJobPairKey(shiftId: number | null, jobId: number): string {
   return `${shiftId ?? "null"}:${jobId}`;
 }
 
@@ -57,11 +54,7 @@ export function createAssignmentDefinitionIdByPairMap<T extends AssignmentDefini
     const jobId = assignment.jobId ?? assignment.job_id ?? null;
     if (jobId == null) continue;
     const key = buildShiftJobPairKey(shiftId, jobId);
-    if (
-      !assignmentIdByPair.has(key) ||
-      assignment.shiftId != null ||
-      assignment.shift_id != null
-    ) {
+    if (!assignmentIdByPair.has(key) || assignment.shiftId != null || assignment.shift_id != null) {
       assignmentIdByPair.set(key, assignment.id);
     }
   }
@@ -69,10 +62,13 @@ export function createAssignmentDefinitionIdByPairMap<T extends AssignmentDefini
   return assignmentIdByPair;
 }
 
-export function deriveAssignmentDefinitionIdsFromAssignments(input: {
-  shiftIds?: Array<number | null> | null;
-  jobIds?: number[] | null;
-}, assignmentIdByPair: Map<string, number>): number[] {
+export function deriveAssignmentDefinitionIdsFromAssignments(
+  input: {
+    shiftIds?: Array<number | null> | null;
+    jobIds?: number[] | null;
+  },
+  assignmentIdByPair: Map<string, number>,
+): number[] {
   const shiftIds = input.shiftIds ?? [];
   const jobIds = input.jobIds ?? [];
   const count = Math.max(shiftIds.length, jobIds.length);
@@ -111,22 +107,16 @@ function buildSegmentLabel(
   }
 
   if (!shift) {
-    return shiftDisplayMode === "name"
-      ? (job?.name ?? "?")
-      : (job?.abbr ?? "?");
+    return shiftDisplayMode === "name" ? (job?.name ?? "?") : (job?.abbr ?? "?");
   }
 
-  const primary = shiftDisplayMode === "name"
-    ? shift.name
-    : (getShiftAbbr(shift) ?? shift.name);
+  const primary = shiftDisplayMode === "name" ? shift.name : (getShiftAbbr(shift) ?? shift.name);
 
   if (!job || !shouldShowJobOnGrid(job)) {
     return primary;
   }
 
-  const secondary = shiftDisplayMode === "name"
-    ? job.name
-    : job.abbr;
+  const secondary = shiftDisplayMode === "name" ? job.name : job.abbr;
 
   return `${primary} · ${secondary}`;
 }
@@ -182,13 +172,12 @@ export function resolveShiftJobSegments(
         ? (maps.assignmentById.get(explicitAssignmentDefinitionId) ?? null)
         : null;
 
-    const shiftId = explicitShiftIds[index]
-      ?? explicitAssignmentDefinition?.shiftId
-      ?? explicitAssignmentDefinition?.categoryId
-      ?? null;
-    const jobId = explicitJobIds[index]
-      ?? explicitAssignmentDefinition?.jobId
-      ?? null;
+    const shiftId =
+      explicitShiftIds[index] ??
+      explicitAssignmentDefinition?.shiftId ??
+      explicitAssignmentDefinition?.categoryId ??
+      null;
+    const jobId = explicitJobIds[index] ?? explicitAssignmentDefinition?.jobId ?? null;
 
     if (jobId == null) {
       continue;
@@ -207,9 +196,7 @@ export function resolveShiftJobSegments(
       jobId,
       position: index,
       assignmentId: assignment?.id ?? null,
-      label:
-        assignment?.label ??
-        buildSegmentLabel(shift, job, assignment, maps.shiftDisplayMode),
+      label: assignment?.label ?? buildSegmentLabel(shift, job, assignment, maps.shiftDisplayMode),
       shiftName: shift?.name ?? null,
       shiftAbbr: getShiftAbbr(shift),
       jobName: job?.name ?? null,
@@ -217,14 +204,15 @@ export function resolveShiftJobSegments(
       focusAreaId: shift?.focusAreaId ?? assignment?.focusAreaId ?? null,
       showJobOnGrid: shouldShowJobOnGrid(job),
       isShiftless: shift == null,
-      isShiftOnly: assignment != null
-        ? buildShiftDisplayParts({
-            shift,
-            job,
-            assignment,
-            shiftDisplayMode: maps.shiftDisplayMode,
-          }).isShiftOnly
-        : false,
+      isShiftOnly:
+        assignment != null
+          ? buildShiftDisplayParts({
+              shift,
+              job,
+              assignment,
+              shiftDisplayMode: maps.shiftDisplayMode,
+            }).isShiftOnly
+          : false,
       isMentored: false,
       startTime: assignment?.defaultStartTime ?? resolvedJobTimes.startTime,
       endTime: assignment?.defaultEndTime ?? resolvedJobTimes.endTime,
@@ -253,4 +241,24 @@ export function deriveAssignmentDefinitionIdsFromSegments(
 
 export function joinShiftJobSegmentLabels(segments: ShiftJobSegment[]): string {
   return segments.map((segment) => segment.label || "?").join("/");
+}
+
+/**
+ * Full-name sibling of {@link joinShiftJobSegmentLabels}. Spells out shift and
+ * job names for roomy surfaces (request board, dashboard cards, staff detail)
+ * instead of the space-constrained grid abbreviations.
+ */
+export function joinShiftJobSegmentNames(segments: ShiftJobSegment[]): string {
+  return segments
+    .map((segment) => {
+      const shiftName = segment.shiftName?.trim() ?? "";
+      const jobName = segment.jobName?.trim() ?? "";
+      if (!shiftName) return jobName || segment.label || "?"; // shiftless
+      if (segment.isShiftOnly || segment.showJobOnGrid === false || !jobName) {
+        return shiftName; // shift-only
+      }
+      return `${shiftName} · ${jobName}`;
+    })
+    .filter(Boolean)
+    .join("/");
 }

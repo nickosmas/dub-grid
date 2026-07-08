@@ -22,16 +22,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid query" }, { status: 400 });
     }
 
-    const summaries = await loadGridmasterOrgHealth(
-      getServiceClient(),
-      parsed.data.orgId,
-    );
+    const summaries = await loadGridmasterOrgHealth(getServiceClient(), parsed.data.orgId);
     return NextResponse.json({ organizations: summaries });
   } catch (error) {
     console.error("gridmaster org-health GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load organization health" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load organization health" }, { status: 500 });
   }
 }

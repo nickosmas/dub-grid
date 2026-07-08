@@ -15,6 +15,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { parseHost } from "@/lib/subdomain";
 import { getImpersonationFromCookie, IMPERSONATION_COOKIE_NAME } from "@/lib/impersonation";
+import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import {
   rowToAbsenceType,
@@ -44,19 +45,34 @@ function parseIncludeAssignments(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("includeAssignments") !== "0";
 }
 
-async function resolveOrganizationId(req: NextRequest, claims: Record<string, unknown>): Promise<{
+async function resolveOrganizationId(
+  req: NextRequest,
+  claims: Record<string, unknown>,
+  userId: string | null,
+): Promise<{
   orgId: string | null;
   isGridmaster: boolean;
 }> {
   const impersonationCookie = req.cookies.get(IMPERSONATION_COOKIE_NAME)?.value;
   const impersonation = impersonationCookie
-    ? getImpersonationFromCookie(
-        `${IMPERSONATION_COOKIE_NAME}=${impersonationCookie}`,
-      )
+    ? getImpersonationFromCookie(`${IMPERSONATION_COOKIE_NAME}=${impersonationCookie}`)
     : null;
 
   if (impersonation?.targetOrgId) {
     return { orgId: impersonation.targetOrgId, isGridmaster: false };
+  }
+
+  // Sandbox mode: when the user has an active sandbox cookie matching
+  // their auth id, treat the sandbox org as the bootstrap target. Middleware
+  // already verified the cookie + ownership before this request landed, but
+  // we do the userId check here too as a defense-in-depth before exposing
+  // org data.
+  const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
+  const sandbox = sandboxCookieValue
+    ? getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`)
+    : null;
+  if (sandbox && userId && sandbox.userId === userId) {
+    return { orgId: sandbox.sandboxOrgId, isGridmaster: false };
   }
 
   if (claims.platform_role === "gridmaster") {
@@ -94,7 +110,11 @@ export async function GET(req: NextRequest) {
     }
 
     const includeAssignments = parseIncludeAssignments(req);
-    const { orgId, isGridmaster } = await resolveOrganizationId(req, auth.claims);
+    const { orgId, isGridmaster } = await resolveOrganizationId(
+      req,
+      auth.claims,
+      auth.user?.id ?? null,
+    );
 
     if (isGridmaster && !orgId) {
       return NextResponse.json({
@@ -118,7 +138,7 @@ export async function GET(req: NextRequest) {
     }
 
     const orgAuth = await requireOrgPermissions(req, orgId, () => true, {
-      allowLockedWorkspace: true,
+      allowLockedOrganization: true,
       allowDuringSetup: true,
     });
     if ("response" in orgAuth) {
@@ -138,11 +158,7 @@ export async function GET(req: NextRequest) {
       coverageReqResult,
       absenceTypeResult,
     ] = await Promise.all([
-      serviceClient
-        .from("organizations")
-        .select(ORGANIZATION_COLS)
-        .eq("id", orgId)
-        .single(),
+      serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
       serviceClient
         .from("focus_areas")
         .select(FOCUS_AREA_COLS)
@@ -182,10 +198,7 @@ export async function GET(req: NextRequest) {
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("coverage_requirements")
-        .select(COVERAGE_REQ_COLS)
-        .eq("org_id", orgId),
+      serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
       serviceClient
         .from("absence_types")
         .select(ABSENCE_TYPE_COLS)
@@ -206,14 +219,22 @@ export async function GET(req: NextRequest) {
 
     const org = rowToOrganization(orgResult.data as DbOrganization);
     const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(rowToFocusArea);
-    const shiftCategories = ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(rowToShiftCategory);
+    const shiftCategories = ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(
+      rowToShiftCategory,
+    );
     const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(rowToJobDefinition);
-    const indicatorTypes = ((indicatorTypeResult.data ?? []) as DbIndicatorType[]).map(rowToIndicatorType);
+    const indicatorTypes = ((indicatorTypeResult.data ?? []) as DbIndicatorType[]).map(
+      rowToIndicatorType,
+    );
     const certifications = ((certificationResult.data ?? []) as DbNamedItem[]).map(rowToNamedItem);
     const orgRoles = ((orgRoleResult.data ?? []) as DbNamedItem[]).map(rowToNamedItem);
     const departments = ((departmentResult.data ?? []) as DbDepartment[]).map(rowToDepartment);
-    const coverageRequirements = ((coverageReqResult.data ?? []) as DbCoverageRequirement[]).map(rowToCoverageRequirement);
-    const allAbsenceTypes = ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map(rowToAbsenceType);
+    const coverageRequirements = ((coverageReqResult.data ?? []) as DbCoverageRequirement[]).map(
+      rowToCoverageRequirement,
+    );
+    const allAbsenceTypes = ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map(
+      rowToAbsenceType,
+    );
     const allAssignmentDefinitions = includeAssignments
       ? buildScheduleAssignmentOptions({
           orgId,
@@ -240,9 +261,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("organization bootstrap GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load organization bootstrap" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load organization bootstrap" }, { status: 500 });
   }
 }

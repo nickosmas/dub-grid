@@ -29,10 +29,31 @@ export class MobilePushDeliveryError extends Error {
 }
 
 const PUSH_ELIGIBLE_TYPES = new Set([
+  // existing
   "schedule_published",
   "shift_request_new",
   "shift_request_approved",
   "shift_request_rejected",
+  "shift_request_expired",
+  // schedule (recurring/series — touch a user's assignments directly)
+  "recurring_shift_updated",
+  "shift_series_updated",
+  // membership — user is removed or has their role/perms changed
+  "membership_removed",
+  // employee — user's own status changes (archived/restored)
+  "employee_status_changed",
+  // org-level — critical org state
+  "org_suspended",
+  // billing — payment failures + trial deadlines are time-sensitive
+  "billing_payment_failed",
+  "billing_trial_ending_soon",
+  "billing_trial_expired",
+  // security — always push so users notice quickly
+  "security_email_changed",
+  "security_password_changed",
+  "security_mfa_changed",
+  "security_new_device",
+  "security_session_revoked",
 ]);
 
 export function isPushEligibleNotificationType(type: string): boolean {
@@ -46,10 +67,7 @@ export async function deliverMobilePushNotifications(
     payload: MobilePushPayload;
   },
   deps: {
-    fetchPushTokens: (input: {
-      userId: string;
-      orgId: string;
-    }) => Promise<MobilePushToken[]>;
+    fetchPushTokens: (input: { userId: string; orgId: string }) => Promise<MobilePushToken[]>;
     sendMessages: (
       messages: MobileExpoPushMessage[],
     ) => Promise<{ ok: boolean; status?: number | null }>;
@@ -77,9 +95,6 @@ export async function deliverMobilePushNotifications(
 
   const result = await deps.sendMessages(messages);
   if (!result.ok) {
-    throw new MobilePushDeliveryError(
-      "Expo push delivery failed",
-      result.status,
-    );
+    throw new MobilePushDeliveryError("Expo push delivery failed", result.status);
   }
 }

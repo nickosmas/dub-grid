@@ -4,6 +4,7 @@ export const DEFAULT_TRIAL_DAYS = 14;
 
 export type BillingAccessState =
   | "active"
+  | "trial_pending"
   | "trialing"
   | "trial_ending_soon"
   | "trial_grace"
@@ -13,6 +14,7 @@ export type BillingAccessState =
 
 export type BillingAccessReason =
   | "active_subscription"
+  | "trial_not_started"
   | "trial_active"
   | "trial_ending_soon"
   | "trial_grace"
@@ -38,17 +40,9 @@ export interface BillingAccessResult {
   trialGraceEndsAt: string | null;
 }
 
-const LOCKED_STATUSES = new Set([
-  "canceled",
-  "incomplete_expired",
-  "unpaid",
-]);
+const LOCKED_STATUSES = new Set(["canceled", "incomplete_expired", "unpaid"]);
 
-const PAYMENT_ATTENTION_STATUSES = new Set([
-  "incomplete",
-  "past_due",
-  "paused",
-]);
+const PAYMENT_ATTENTION_STATUSES = new Set(["incomplete", "past_due", "paused"]);
 
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -64,9 +58,7 @@ function daysUntil(from: Date, to: Date): number {
   return Math.ceil((to.getTime() - from.getTime()) / 86_400_000);
 }
 
-export function evaluateOrganizationBillingAccess(
-  input: BillingAccessInput,
-): BillingAccessResult {
+export function evaluateOrganizationBillingAccess(input: BillingAccessInput): BillingAccessResult {
   const now = input.now ?? new Date();
   const status = input.subscriptionStatus ?? null;
   const trialEndsAt = parseDate(input.trialEndsAt);
@@ -119,9 +111,12 @@ export function evaluateOrganizationBillingAccess(
 
   if (status === "trialing" || !status) {
     if (!trialEndsAt) {
+      // Trialing with no end date = the trial clock has not started yet. It
+      // starts when the first super_admin signs in (custom_access_token_hook).
+      // Not locked, but non-super-admins are gated until it starts (middleware).
       return {
-        state: "trialing",
-        reason: "trial_active",
+        state: "trial_pending",
+        reason: "trial_not_started",
         isLocked: false,
         shouldNotifyAdmins: false,
         daysUntilTrialEnd: null,

@@ -10,9 +10,7 @@ import {
   removeBrowserRealtimeChannel,
 } from "@/features/account/client";
 
-export function getBillingRealtimeInvalidationKeys(
-  orgId: string,
-): readonly unknown[][] {
+export function getBillingRealtimeInvalidationKeys(orgId: string): readonly unknown[][] {
   return [
     [...queryKeys.org.billing(orgId)],
     [...queryKeys.org.bootstrapAll()],
@@ -65,9 +63,7 @@ export function useBillingRealtimeInvalidation(orgId: string | null) {
           invalidateBilling();
         } else if (status === "CHANNEL_ERROR") {
           hadError = true;
-          Sentry.captureException(
-            err ?? new Error("billing freshness channel error"),
-          );
+          Sentry.captureException(err ?? new Error("billing freshness channel error"));
         }
       });
 

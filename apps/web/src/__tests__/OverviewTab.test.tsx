@@ -11,19 +11,18 @@ describe("OverviewTab", () => {
         shifts={{}}
         assignmentById={new Map()}
         categoryById={new Map()}
-        focusAreas={[
-          makeFocusArea({ id: 1, name: "ICU" }),
-          makeFocusArea({ id: 2, name: "ED" }),
-        ]}
+        focusAreas={[makeFocusArea({ id: 1, name: "ICU" }), makeFocusArea({ id: 2, name: "ED" })]}
         focusAreaLabel="Care Units"
         certifications={[]}
         orgRoles={[]}
         pendingInvite={null}
         thisWeekHours={null}
-      />
+      />,
     );
 
-    expect(screen.getByText("Employment, care units, certification, roles, and internal notes.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Employment, care units, certification, roles, and internal notes."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Full-time")).toBeInTheDocument();
     expect(screen.getByText("Care Units")).toBeInTheDocument();
     expect(screen.getByText("ICU, ED")).toBeInTheDocument();

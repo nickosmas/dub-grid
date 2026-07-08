@@ -2,31 +2,35 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   activateEmployee,
-  benchEmployee,
-  deleteEmployee,
+  deactivateEmployee,
   EmployeeStatusConflictError,
   fetchEmployees,
   insertEmployee,
+  removeEmployee,
   updateEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
+import { SelfActionForbiddenError } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
+import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
 import type { Employee } from "@/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface EmployeesData {
   employees: Employee[];
-  benchedEmployees: Employee[];
-  terminatedEmployees: Employee[];
+  inactiveEmployees: Employee[];
+  removedEmployees: Employee[];
   loading: boolean;
-  handleAddEmployee: (dataList: Omit<Employee, "id" | "seniority">[]) => Promise<Employee[] | undefined>;
+  handleAddEmployee: (
+    dataList: Omit<Employee, "id" | "seniority">[],
+  ) => Promise<Employee[] | undefined>;
   handleSaveEmployee: (emp: Employee) => Promise<void>;
-  handleDeleteEmployee: (empId: string) => Promise<void>;
-  handleBenchEmployee: (empId: string, note?: string) => Promise<void>;
+  handleRemoveEmployee: (empId: string, note?: string) => Promise<void>;
+  handleDeactivateEmployee: (empId: string, note?: string) => Promise<void>;
   handleActivateEmployee: (empId: string) => Promise<void>;
 }
 
@@ -35,10 +39,15 @@ export interface EmployeesData {
 export function useEmployees(orgId: string | null): EmployeesData {
   const queryClient = useQueryClient();
 
+  // Subscribe to org-wide CDC so adds/edits made elsewhere (e.g. /people in
+  // another tab, or another step in the onboarding wizard) invalidate this
+  // hook's `employees.all` query and refetch automatically.
+  useOrgRealtimeInvalidation({ orgId, queryClient });
+
   // Fetch all employees via React Query
   const employeesQuery = useQuery({
     queryKey: queryKeys.employees.all(orgId!),
-    queryFn: () => fetchEmployees(orgId!, ["active", "benched", "terminated"]),
+    queryFn: () => fetchEmployees(orgId!, ["active", "inactive", "removed"]),
     enabled: !!orgId,
     staleTime: 2 * 60_000, // 2 min — mutations invalidate immediately
   });
@@ -56,8 +65,14 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   // Derive filtered arrays — no extra re-renders, no separate state.
   const employees = useMemo(() => allLocal.filter((e) => e.status === "active"), [allLocal]);
-  const benchedEmployees = useMemo(() => allLocal.filter((e) => e.status === "benched"), [allLocal]);
-  const terminatedEmployees = useMemo(() => allLocal.filter((e) => e.status === "terminated"), [allLocal]);
+  const inactiveEmployees = useMemo(
+    () => allLocal.filter((e) => e.status === "inactive"),
+    [allLocal],
+  );
+  const removedEmployees = useMemo(
+    () => allLocal.filter((e) => e.status === "removed"),
+    [allLocal],
+  );
 
   const loading = employeesQuery.isLoading;
 
@@ -91,10 +106,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
             ...added.map((e) => e.seniority),
             0,
           );
-          const newEmp = await insertEmployee(
-            { ...data, seniority: maxSen + 1 },
-            orgId,
-          );
+          const newEmp = await insertEmployee({ ...data, seniority: maxSen + 1 }, orgId);
           added.push(newEmp);
         }
         setAllLocal((prev) => [...prev, ...added]);
@@ -123,6 +135,16 @@ export function useEmployees(orgId: string | null): EmployeesData {
         toast.success("Employee saved");
         invalidateEmployees();
       } catch (err) {
+        // On version conflict, swap in the server's latest copy instead of
+        // rolling back to pre-edit state — that way the user sees what
+        // actually exists and can re-edit from the real current row.
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) =>
+            prev.map((employee) => (employee.id === emp.id ? err.latestEmployee : employee)),
+          );
+          toast.error("Employee changed elsewhere. Review the latest values and try again.");
+          return;
+        }
         setAllLocal(prevAll);
         toast.error(formatClientErrorMessage(err, "Failed to save employee"));
         Sentry.captureException(err);
@@ -131,122 +153,148 @@ export function useEmployees(orgId: string | null): EmployeesData {
     [orgId, invalidateEmployees],
   );
 
-  const handleDeleteEmployee = useCallback(async (empId: string) => {
-    const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
-    if (!targetEmployee || !orgId) return;
+  const handleRemoveEmployee = useCallback(
+    async (empId: string, note?: string) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return;
 
-    const now = new Date().toISOString();
-    let prevAll: Employee[] = [];
-    setAllLocal((prev) => {
-      prevAll = prev;
-      return prev.map((e) =>
-        e.id === empId ? { ...e, status: "terminated" as const, statusChangedAt: now } : e,
-      );
-    });
-    try {
-      const updatedEmployee = await deleteEmployee(empId, orgId, targetEmployee.version);
-      setAllLocal((prev) => prev.map((employee) => (
-        employee.id === empId ? updatedEmployee : employee
-      )));
-      toast.success("Employee terminated");
-      invalidateEmployees();
-    } catch (err) {
-      if (err instanceof EmployeeStatusConflictError) {
-        setAllLocal((prev) => prev.map((employee) => (
-          employee.id === empId ? err.latestEmployee : employee
-        )));
-        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-        return;
+      const now = new Date().toISOString();
+      let prevAll: Employee[] = [];
+      setAllLocal((prev) => {
+        prevAll = prev;
+        return prev.map((e) =>
+          e.id === empId ? { ...e, status: "removed" as const, statusChangedAt: now } : e,
+        );
+      });
+      try {
+        const updatedEmployee = await removeEmployee(empId, orgId, targetEmployee.version, note);
+        setAllLocal((prev) =>
+          prev.map((employee) => (employee.id === empId ? updatedEmployee : employee)),
+        );
+        toast.success("Employee removed");
+        invalidateEmployees();
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) =>
+            prev.map((employee) => (employee.id === empId ? err.latestEmployee : employee)),
+          );
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        setAllLocal(prevAll);
+        if (err instanceof SelfActionForbiddenError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error("Failed to remove employee");
+        Sentry.captureException(err);
       }
-      setAllLocal(prevAll);
-      toast.error("Failed to terminate employee");
-      Sentry.captureException(err);
-    }
-  }, [orgId, invalidateEmployees]);
+    },
+    [orgId, invalidateEmployees],
+  );
 
-  const handleBenchEmployee = useCallback(async (empId: string, note?: string) => {
-    const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
-    if (!targetEmployee || !orgId) return;
+  const handleDeactivateEmployee = useCallback(
+    async (empId: string, note?: string) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return;
 
-    let prevAll: Employee[] = [];
-    setAllLocal((prev) => {
-      prevAll = prev;
-      return prev.map((e) =>
-        e.id === empId
-          ? { ...e, status: "benched" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() }
-          : e,
-      );
-    });
-    try {
-      const updatedEmployee = await benchEmployee(
-        empId,
-        note,
-        orgId,
-        targetEmployee.version,
-      );
-      setAllLocal((prev) => prev.map((employee) => (
-        employee.id === empId ? updatedEmployee : employee
-      )));
-      toast.success("Employee benched");
-      invalidateEmployees();
-    } catch (err) {
-      if (err instanceof EmployeeStatusConflictError) {
-        setAllLocal((prev) => prev.map((employee) => (
-          employee.id === empId ? err.latestEmployee : employee
-        )));
-        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-        return;
+      let prevAll: Employee[] = [];
+      setAllLocal((prev) => {
+        prevAll = prev;
+        return prev.map((e) =>
+          e.id === empId
+            ? {
+                ...e,
+                status: "inactive" as const,
+                statusNote: note ?? "",
+                statusChangedAt: new Date().toISOString(),
+              }
+            : e,
+        );
+      });
+      try {
+        const updatedEmployee = await deactivateEmployee(
+          empId,
+          note,
+          orgId,
+          targetEmployee.version,
+        );
+        setAllLocal((prev) =>
+          prev.map((employee) => (employee.id === empId ? updatedEmployee : employee)),
+        );
+        toast.success("Employee marked inactive");
+        invalidateEmployees();
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) =>
+            prev.map((employee) => (employee.id === empId ? err.latestEmployee : employee)),
+          );
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        setAllLocal(prevAll);
+        if (err instanceof SelfActionForbiddenError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error("Failed to update employee status");
+        Sentry.captureException(err);
       }
-      setAllLocal(prevAll);
-      toast.error("Failed to bench employee");
-      Sentry.captureException(err);
-    }
-  }, [orgId, invalidateEmployees]);
+    },
+    [orgId, invalidateEmployees],
+  );
 
-  const handleActivateEmployee = useCallback(async (empId: string) => {
-    const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
-    if (!targetEmployee || !orgId) return;
+  const handleActivateEmployee = useCallback(
+    async (empId: string) => {
+      const targetEmployee = allEmployeesRef.current.find((employee) => employee.id === empId);
+      if (!targetEmployee || !orgId) return;
 
-    const now = new Date().toISOString();
-    let prevAll: Employee[] = [];
-    setAllLocal((prev) => {
-      prevAll = prev;
-      return prev.map((e) =>
-        e.id === empId
-          ? { ...e, status: "active" as const, statusNote: "", statusChangedAt: now }
-          : e,
-      );
-    });
-    try {
-      const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
-      setAllLocal((prev) => prev.map((employee) => (
-        employee.id === empId ? updatedEmployee : employee
-      )));
-      toast.success("Employee activated");
-      invalidateEmployees();
-    } catch (err) {
-      if (err instanceof EmployeeStatusConflictError) {
-        setAllLocal((prev) => prev.map((employee) => (
-          employee.id === empId ? err.latestEmployee : employee
-        )));
-        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-        return;
+      const now = new Date().toISOString();
+      let prevAll: Employee[] = [];
+      setAllLocal((prev) => {
+        prevAll = prev;
+        return prev.map((e) =>
+          e.id === empId
+            ? { ...e, status: "active" as const, statusNote: "", statusChangedAt: now }
+            : e,
+        );
+      });
+      try {
+        const updatedEmployee = await activateEmployee(empId, orgId, targetEmployee.version);
+        setAllLocal((prev) =>
+          prev.map((employee) => (employee.id === empId ? updatedEmployee : employee)),
+        );
+        toast.success("Employee activated");
+        invalidateEmployees();
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setAllLocal((prev) =>
+            prev.map((employee) => (employee.id === empId ? err.latestEmployee : employee)),
+          );
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        setAllLocal(prevAll);
+        if (err instanceof SelfActionForbiddenError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error("Failed to activate employee");
+        Sentry.captureException(err);
       }
-      setAllLocal(prevAll);
-      toast.error("Failed to activate employee");
-      Sentry.captureException(err);
-    }
-  }, [orgId, invalidateEmployees]);
+    },
+    [orgId, invalidateEmployees],
+  );
 
   return {
     employees,
-    benchedEmployees,
-    terminatedEmployees,
+    inactiveEmployees,
+    removedEmployees,
     loading,
     handleAddEmployee,
     handleSaveEmployee,
-    handleDeleteEmployee,
-    handleBenchEmployee,
+    handleRemoveEmployee,
+    handleDeactivateEmployee,
     handleActivateEmployee,
   };
 }

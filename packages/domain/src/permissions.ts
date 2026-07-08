@@ -10,6 +10,7 @@ export interface AdminPermissions {
   canPublishSchedule: boolean;
   canApplyRecurringSchedule: boolean;
   canEditNotes: boolean;
+  canEditScheduleIndicators: boolean;
   canViewRecurringShifts: boolean;
   canManageRecurringShifts: boolean;
   canManageShiftSeries: boolean;

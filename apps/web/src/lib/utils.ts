@@ -1,9 +1,9 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import { NamedItem } from "@/types"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+import { NamedItem } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 export function getInitials(name?: string): string {
@@ -17,48 +17,42 @@ export function getInitials(name?: string): string {
   return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }
 
-export function getAvatarInitials(
-  name?: string | null,
-  fallback = "?",
-): string {
-  const parts =
-    name?.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ??
-    [];
+export function getAvatarInitials(name?: string | null, fallback = "?"): string {
+  const parts = name?.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ?? [];
 
   if (parts.length === 0) {
     return fallback;
   }
 
   const first = parts[0]?.charAt(0).toUpperCase() ?? "";
-  const last =
-    parts.length > 1
-      ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "")
-      : "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "") : "";
 
   return `${first}${last}` || fallback;
 }
 
-export function getEmployeeDisplayName(emp: { firstName: string, lastName: string }): string {
+export function getEmployeeDisplayName(emp: { firstName: string; lastName: string }): string {
   return `${emp.firstName} ${emp.lastName}`.trim();
 }
 
 export function getCertAbbr(certId?: number | string | null, certifications?: NamedItem[]): string {
   if (certId == null || !certifications) return "";
-  const cert = certifications.find(c => c.id === Number(certId));
-  return cert ? (cert.abbr || cert.name) : "";
+  const cert = certifications.find((c) => c.id === Number(certId));
+  return cert ? cert.abbr || cert.name : "";
 }
 
 export function getRoleAbbrs(roleIds: (number | string)[], roles?: NamedItem[]): string[] {
   if (!roles || !roleIds?.length) return [];
-  return roleIds.map(id => {
-    const role = roles.find(r => r.id === Number(id));
-    return role ? (role.abbr || role.name) : "";
-  }).filter(Boolean);
+  return roleIds
+    .map((id) => {
+      const role = roles.find((r) => r.id === Number(id));
+      return role ? role.abbr || role.name : "";
+    })
+    .filter(Boolean);
 }
 
 export function getCertName(certId?: number | string | null, certifications?: NamedItem[]): string {
   if (certId == null || !certifications) return "";
-  const cert = certifications.find(c => c.id === Number(certId));
+  const cert = certifications.find((c) => c.id === Number(certId));
   return cert ? cert.name : "";
 }
 
@@ -82,7 +76,7 @@ export function formatDate(date: Date): string {
 }
 
 export function formatDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
 /**
@@ -100,14 +94,18 @@ export function* iterateDateRange(
   for (let ts = s; ts <= e; ts += MS_PER_DAY) {
     const d = new Date(ts);
     yield {
-      dateKey: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`,
+      dateKey: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`,
       dayOfWeek: d.getUTCDay(),
       dayIndex: i++,
     };
   }
 }
 
-export function parseTo12h(time24: string | null | undefined): { hour: string, minute: string, period: "AM" | "PM" } {
+export function parseTo12h(time24: string | null | undefined): {
+  hour: string;
+  minute: string;
+  period: "AM" | "PM";
+} {
   if (!time24) return { hour: "12", minute: "00", period: "AM" };
   const [hStr, mStr] = time24.split(":");
   let h = parseInt(hStr, 10) || 0;
@@ -121,7 +119,7 @@ export function to24h(hour: string, minute: string, period: "AM" | "PM"): string
   let h = parseInt(hour, 10) || 0;
   if (period === "PM" && h < 12) h += 12;
   if (period === "AM" && h === 12) h = 0;
-  return `${String(h).padStart(2, '0')}:${minute.padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${minute.padStart(2, "0")}`;
 }
 
 export function fmt12h(time24: string | null | undefined): string {
@@ -131,11 +129,14 @@ export function fmt12h(time24: string | null | undefined): string {
 }
 
 /** Calculate duration between two 24h time strings. Handles overnight spans. */
-export function calcTimeDuration(start: string | null | undefined, end: string | null | undefined): string | null {
+export function calcTimeDuration(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): string | null {
   if (!start || !end) return null;
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
-  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  let diff = eh * 60 + em - (sh * 60 + sm);
   if (diff <= 0) diff += 24 * 60; // overnight
   const h = Math.floor(diff / 60);
   const m = diff % 60;
@@ -151,7 +152,7 @@ export function calcNetDuration(
   if (!start || !end) return null;
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
-  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  let diff = eh * 60 + em - (sh * 60 + sm);
   if (diff <= 0) diff += 24 * 60;
   diff = Math.max(0, diff - (breakMinutes ?? 0));
   const h = Math.floor(diff / 60);
@@ -160,23 +161,38 @@ export function calcNetDuration(
 }
 
 /** Resolve effective break minutes for display. Returns the break in minutes or 0. */
-export function resolveEffectiveBreak(
-  breakMinutes: number | null | undefined,
-): number {
+export function resolveEffectiveBreak(breakMinutes: number | null | undefined): number {
   return breakMinutes ?? 0;
 }
 
 export function formatRelativeTime(date: Date | string): string {
+  const now = new Date();
   const d = new Date(date);
-  const diff = Math.max(0, Date.now() - d.getTime());
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffHr = Math.floor(diffMs / 3_600_000);
+
+  if (diffMin < 1) return "Just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) {
+    return `Yesterday at ${formatRelativeTimeClock(d)}`;
+  }
+
+  const sixDaysAgo = new Date(now);
+  sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
+  if (d >= sixDaysAgo) {
+    return `${d.toLocaleDateString(undefined, { weekday: "long" })} at ${formatRelativeTimeClock(d)}`;
+  }
+
+  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined })} at ${formatRelativeTimeClock(d)}`;
+}
+
+function formatRelativeTimeClock(d: Date): string {
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 export function arraysEqual<T>(a: T[], b: T[]): boolean {

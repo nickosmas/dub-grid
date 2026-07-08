@@ -18,6 +18,7 @@ import type {
 import type { DraftBreakdown } from "@/lib/draft-utils";
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { formatDateKey } from "@/lib/utils";
 
 export interface ScheduleActorNamesResponse {
   names: Record<string, string>;
@@ -36,17 +37,7 @@ export class OptimisticLockError extends Error {
   }
 }
 
-export class ScheduleDraftConflictError extends Error {
-  constructor(public readonly latestSummary: DraftBreakdown) {
-    super("Schedule drafts changed elsewhere.");
-    this.name = "ScheduleDraftConflictError";
-  }
-}
-
-async function requestScheduleJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestScheduleJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -54,9 +45,7 @@ async function requestScheduleJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Schedule request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Schedule request failed."));
   }
 
   return body as T;
@@ -194,11 +183,7 @@ export function resolveShiftRequest(
   }).then(() => undefined);
 }
 
-export function cancelShiftRequest(
-  requestId: string,
-  empId: string,
-  orgId: string,
-): Promise<void> {
+export function cancelShiftRequest(requestId: string, empId: string, orgId: string): Promise<void> {
   return requestScheduleAction<{ success: true }>({
     action: "cancelShiftRequest",
     orgId,
@@ -265,12 +250,8 @@ export function fetchRecurringShifts(
     action: "fetchRecurringShifts",
     orgId,
     employeeId,
-    assignmentLabels: assignmentLabelMap
-      ? [...assignmentLabelMap.entries()]
-      : undefined,
-    absenceTypeLabels: absenceTypeMap
-      ? [...absenceTypeMap.entries()]
-      : undefined,
+    assignmentLabels: assignmentLabelMap ? [...assignmentLabelMap.entries()] : undefined,
+    absenceTypeLabels: absenceTypeMap ? [...absenceTypeMap.entries()] : undefined,
     includeArchived,
   }).then((data) => data.rows);
 }
@@ -311,10 +292,7 @@ export function saveRecurringDraft(
   }).then(() => undefined);
 }
 
-export function deleteRecurringDraft(
-  orgId: string,
-  _userId: string,
-): Promise<void> {
+export function deleteRecurringDraft(orgId: string, _userId: string): Promise<void> {
   return requestRecurringAction<{ success: true }>({
     action: "deleteRecurringDraft",
     orgId,
@@ -421,21 +399,21 @@ export function updateScheduleLastViewed(orgId: string): Promise<void> {
   }).then(() => undefined);
 }
 
-async function requestManageWithLock(
+async function requestManageWithLockTyped<T extends Record<string, unknown>>(
   body: Record<string, unknown>,
-): Promise<void> {
+): Promise<T> {
   const response = await fetch("/api/schedule/manage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const payload = (await response.json().catch(() => null)) as
-    | {
+    | (T & {
         error?: string;
         shiftId?: string;
         expectedVersion?: number;
         actualVersion?: number;
-      }
+      })
     | null;
 
   if (response.status === 409) {
@@ -449,6 +427,12 @@ async function requestManageWithLock(
   if (!response.ok) {
     throw new Error(formatClientErrorMessage(payload?.error, "Schedule request failed."));
   }
+
+  return (payload ?? ({} as T)) as T;
+}
+
+async function requestManageWithLock(body: Record<string, unknown>): Promise<void> {
+  await requestManageWithLockTyped(body);
 }
 
 export function upsertShift(
@@ -468,22 +452,33 @@ export function upsertShift(
   });
 }
 
-export type UpsertShiftBatchItem = {
+export type ImportPreviousScheduleOutcomeKind = "imported" | "skipped";
+
+export type ImportPreviousScheduleOutcome = {
   employeeId: string;
-  date: string;
-  input: ScheduleCellInput;
-  expectedVersion?: number;
+  sourceDate: string;
+  targetDate: string;
+  outcome: ImportPreviousScheduleOutcomeKind;
+  /** Non-null only when outcome === "skipped". One of the documented reason
+   * codes returned by `public.import_previous_schedule`. */
+  reason: string | null;
 };
 
-export function upsertShiftBatch(
-  orgId: string,
-  shifts: UpsertShiftBatchItem[],
-): Promise<void> {
-  return requestManageWithLock({
-    action: "upsertShifts",
-    orgId,
-    shifts,
+export async function importPreviousSchedule(input: {
+  orgId: string;
+  sourceStartDate: string;
+  sourceEndDate: string;
+  targetStartDate: string;
+  targetEndDate: string;
+  dryRun: boolean;
+}): Promise<ImportPreviousScheduleOutcome[]> {
+  const payload = await requestManageWithLockTyped<{
+    outcomes?: ImportPreviousScheduleOutcome[];
+  }>({
+    action: "importPreviousSchedule",
+    ...input,
   });
+  return payload.outcomes ?? [];
 }
 
 export function deleteShift(
@@ -507,10 +502,7 @@ export type DeleteShiftBatchItem = {
   expectedVersion?: number;
 };
 
-export function deleteShiftBatch(
-  orgId: string,
-  shifts: DeleteShiftBatchItem[],
-): Promise<void> {
+export function deleteShiftBatch(orgId: string, shifts: DeleteShiftBatchItem[]): Promise<void> {
   return requestManageWithLock({
     action: "deleteShifts",
     orgId,
@@ -603,10 +595,7 @@ export function updateSeriesAllShifts(
   });
 }
 
-export function deleteShiftSeries(
-  seriesId: string,
-  orgId: string,
-): Promise<number> {
+export function deleteShiftSeries(seriesId: string, orgId: string): Promise<number> {
   return requestScheduleManage<{ deletedCount: number }>({
     action: "deleteShiftSeries",
     orgId,
@@ -618,9 +607,7 @@ export function applyRecurringSchedules(
   orgId: string,
   startDate: Date,
   endDate: Date,
-): Promise<
-  Array<{ empId: string; date: string; label: string; absenceTypeId?: number }>
-> {
+): Promise<Array<{ empId: string; date: string; label: string; absenceTypeId?: number }>> {
   return requestScheduleManage<{
     generated: Array<{
       empId: string;
@@ -631,54 +618,32 @@ export function applyRecurringSchedules(
   }>({
     action: "applyRecurringSchedules",
     orgId,
-    startDate: startDate.toISOString().slice(0, 10),
-    endDate: endDate.toISOString().slice(0, 10),
+    // Local-tz formatting: toISOString() converts to UTC and shifts the date
+    // by one for users east of UTC, silently truncating the range.
+    startDate: formatDateKey(startDate),
+    endDate: formatDateKey(endDate),
   }).then((data) => data.generated);
-}
-
-export async function fetchScheduleDraftSummary(input: {
-  orgId: string;
-  scope?: "all" | "mine";
-  startDate?: string;
-  endDate?: string;
-}): Promise<DraftBreakdown> {
-  const params = new URLSearchParams({ orgId: input.orgId });
-  if (input.scope) params.set("scope", input.scope);
-  if (input.startDate) params.set("startDate", input.startDate);
-  if (input.endDate) params.set("endDate", input.endDate);
-
-  const response = await fetch(`/api/shifts/draft-summary?${params.toString()}`);
-  const body = (await response.json().catch(() => null)) as
-    | { summary?: DraftBreakdown; error?: string }
-    | null;
-  if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to load schedule draft summary"));
-  }
-  return body.summary;
 }
 
 export async function publishSchedule(
   orgId: string,
   startDate: Date,
   endDate: Date,
-  expectedSummary?: DraftBreakdown,
 ): Promise<DraftBreakdown> {
   const response = await fetch("/api/shifts/publish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       orgId,
-      startDate: startDate.toISOString().slice(0, 10),
-      endDate: endDate.toISOString().slice(0, 10),
-      expectedSummary,
+      // See applyRecurringSchedules above — must format in local tz.
+      startDate: formatDateKey(startDate),
+      endDate: formatDateKey(endDate),
     }),
   });
-  const body = (await response.json().catch(() => null)) as
-    | { summary?: DraftBreakdown; error?: string }
-    | null;
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
+  const body = (await response.json().catch(() => null)) as {
+    summary?: DraftBreakdown;
+    error?: string;
+  } | null;
   if (!response.ok || !body?.summary) {
     throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
   }
@@ -688,7 +653,6 @@ export async function publishSchedule(
 export async function discardScheduleDrafts(
   orgId: string,
   userId?: string,
-  expectedSummary?: DraftBreakdown,
 ): Promise<DraftBreakdown> {
   const response = await fetch("/api/shifts/discard", {
     method: "POST",
@@ -696,15 +660,12 @@ export async function discardScheduleDrafts(
     body: JSON.stringify({
       orgId,
       scope: userId ? "mine" : "all",
-      expectedSummary,
     }),
   });
-  const body = (await response.json().catch(() => null)) as
-    | { summary?: DraftBreakdown; error?: string }
-    | null;
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
+  const body = (await response.json().catch(() => null)) as {
+    summary?: DraftBreakdown;
+    error?: string;
+  } | null;
   if (!response.ok || !body?.summary) {
     throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
   }

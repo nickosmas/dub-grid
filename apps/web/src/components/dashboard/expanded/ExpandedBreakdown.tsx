@@ -1,6 +1,7 @@
 import type { ShiftTypeBreakdown, FocusAreaBreakdown } from "@/lib/dashboard-stats";
 import DonutChart from "../DonutChart";
 import Modal from "@/components/Modal";
+import { EmptyState } from "@/components/EmptyState";
 
 interface ExpandedBreakdownProps {
   breakdown: ShiftTypeBreakdown;
@@ -12,14 +13,24 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
     <Modal title="Shift breakdown" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {/* Summary */}
-        <div style={{ fontSize: 13, color: "var(--color-text-subtle)", padding: "12px 14px", borderRadius: "var(--dg-radius-md)", background: "var(--color-bg)", border: "1px solid var(--color-border)" }}>
-          {breakdown.totalShifts} total shifts across {breakdown.byFocusArea.length} section{breakdown.byFocusArea.length !== 1 ? "s" : ""}
+        <div
+          style={{
+            fontSize: 13,
+            color: "var(--color-text-subtle)",
+            padding: "12px 14px",
+            borderRadius: "var(--dg-radius-md)",
+            background: "var(--color-bg)",
+            border: "1px solid var(--color-border)",
+          }}
+        >
+          {breakdown.totalShifts} total shifts across {breakdown.byFocusArea.length} section
+          {breakdown.byFocusArea.length !== 1 ? "s" : ""}
         </div>
 
         {/* Grid of focus area donuts */}
         <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {breakdown.byFocusArea.length === 0 ? (
-            <div style={emptyStyle}>No shifts this week</div>
+            <EmptyState size="compact" heading="No shifts this week" />
           ) : (
             <div
               style={{
@@ -52,15 +63,15 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
     <div style={cardStyle}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", flex: 1 }}>
+        <span
+          style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", flex: 1 }}
+        >
           {fa.focusAreaName}
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-primary)" }}>
           {fa.total}
         </span>
-        <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
-          ({pct}%)
-        </span>
+        <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>({pct}%)</span>
       </div>
 
       {/* Donut + legend */}
@@ -99,10 +110,25 @@ function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShift
                 >
                   {c.assignmentLabel}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-primary)", flexShrink: 0 }}>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "var(--color-text-primary)",
+                    flexShrink: 0,
+                  }}
+                >
                   {c.count}
                 </span>
-                <span style={{ fontSize: 10, color: "var(--color-text-subtle)", flexShrink: 0, minWidth: 30, textAlign: "right" }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "var(--color-text-subtle)",
+                    flexShrink: 0,
+                    minWidth: 30,
+                    textAlign: "right",
+                  }}
+                >
                   {codePct}%
                 </span>
               </div>
@@ -121,11 +147,4 @@ const cardStyle = {
   borderRadius: "var(--dg-radius-md)",
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
-};
-
-const emptyStyle = {
-  fontSize: 13,
-  color: "var(--color-text-subtle)",
-  textAlign: "center" as const,
-  padding: "32px 0",
 };

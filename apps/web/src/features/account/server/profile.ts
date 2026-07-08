@@ -28,11 +28,7 @@ import {
   createAssignmentDefinitionIdByPairMap,
   createShiftJobCompatibilityMaps,
 } from "@/lib/shift-job-segments";
-import type {
-  RecurringShift,
-  ShiftMap,
-  ShiftRequest,
-} from "@/types";
+import type { RecurringShift, ShiftMap, ShiftRequest } from "@/types";
 
 export interface SelfProfileSnapshot {
   firstName: string | null;
@@ -64,8 +60,7 @@ export interface AccountIdentitySnapshot {
   hasOrganizationMembership: boolean;
 }
 
-const FOCUS_AREA_COLS =
-  "id, org_id, department_id, name, color, sort_order, archived_at";
+const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 const SHIFT_CATEGORY_COLS =
   "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
 const JOB_COLS =
@@ -73,7 +68,7 @@ const JOB_COLS =
 const ABSENCE_TYPE_COLS =
   "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 const EMPLOYEE_COLS =
-  "id, org_id, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version";
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const RECURRING_SHIFT_COLS =
   "id, emp_id, org_id, day_of_week, state, effective_from, effective_until, created_at, updated_at, archived_at";
 const SCHEDULE_CELL_SELECT =
@@ -110,11 +105,7 @@ export async function fetchAccountIdentitySnapshot(
   const serviceClient = getServiceClient();
   const [{ data: profile, error: profileError }, { data: membership, error: membershipError }] =
     await Promise.all([
-      serviceClient
-        .from("profiles")
-        .select("first_name, last_name")
-        .eq("id", userId)
-        .maybeSingle(),
+      serviceClient.from("profiles").select("first_name, last_name").eq("id", userId).maybeSingle(),
       serviceClient
         .from("organization_memberships")
         .select("joined_at, organizations(slug)")
@@ -135,10 +126,8 @@ export async function fetchAccountIdentitySnapshot(
 
   const firstName = profile?.first_name?.trim() || null;
   const lastName = profile?.last_name?.trim() || null;
-  const displayName =
-    [firstName, lastName].filter(Boolean).join(" ").trim() || null;
-  const organization =
-    (membership?.organizations as { slug?: string | null } | null) ?? null;
+  const displayName = [firstName, lastName].filter(Boolean).join(" ").trim() || null;
+  const organization = (membership?.organizations as { slug?: string | null } | null) ?? null;
 
   return {
     firstName,
@@ -174,10 +163,7 @@ async function fetchLinkedEmployeeByUserId(
   return rowToEmployee(data as DbEmployee);
 }
 
-async function ensureOrganizationMembership(
-  userId: string,
-  orgId: string,
-): Promise<boolean> {
+async function ensureOrganizationMembership(userId: string, orgId: string): Promise<boolean> {
   const { data, error } = await getServiceClient()
     .from("organization_memberships")
     .select("user_id")
@@ -194,29 +180,24 @@ async function ensureOrganizationMembership(
 
 async function fetchAssignmentContext(orgId: string) {
   const serviceClient = getServiceClient();
-  const [focusAreaResult, shiftCategoryResult, jobResult, absenceTypeResult] =
-    await Promise.all([
-      serviceClient
-        .from("focus_areas")
-        .select(FOCUS_AREA_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order"),
-      serviceClient
-        .from("shift_categories")
-        .select(SHIFT_CATEGORY_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order"),
-      serviceClient
-        .from("jobs")
-        .select(JOB_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order"),
-      serviceClient
-        .from("absence_types")
-        .select(ABSENCE_TYPE_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order"),
-    ]);
+  const [focusAreaResult, shiftCategoryResult, jobResult, absenceTypeResult] = await Promise.all([
+    serviceClient
+      .from("focus_areas")
+      .select(FOCUS_AREA_COLS)
+      .eq("org_id", orgId)
+      .order("sort_order"),
+    serviceClient
+      .from("shift_categories")
+      .select(SHIFT_CATEGORY_COLS)
+      .eq("org_id", orgId)
+      .order("sort_order"),
+    serviceClient.from("jobs").select(JOB_COLS).eq("org_id", orgId).order("sort_order"),
+    serviceClient
+      .from("absence_types")
+      .select(ABSENCE_TYPE_COLS)
+      .eq("org_id", orgId)
+      .order("sort_order"),
+  ]);
 
   if (focusAreaResult.error) throw focusAreaResult.error;
   if (shiftCategoryResult.error) throw shiftCategoryResult.error;
@@ -224,13 +205,9 @@ async function fetchAssignmentContext(orgId: string) {
   if (absenceTypeResult.error) throw absenceTypeResult.error;
 
   const focusAreas = (focusAreaResult.data as DbFocusArea[]).map(rowToFocusArea);
-  const shiftCategories = (shiftCategoryResult.data as DbShiftCategory[]).map(
-    rowToShiftCategory,
-  );
+  const shiftCategories = (shiftCategoryResult.data as DbShiftCategory[]).map(rowToShiftCategory);
   const jobs = (jobResult.data as DbJobDefinition[]).map(rowToJobDefinition);
-  const absenceTypes = (absenceTypeResult.data as DbAbsenceType[]).map(
-    rowToAbsenceType,
-  );
+  const absenceTypes = (absenceTypeResult.data as DbAbsenceType[]).map(rowToAbsenceType);
   const assignments = buildScheduleAssignmentOptions({
     orgId,
     focusAreas,
@@ -243,9 +220,7 @@ async function fetchAssignmentContext(orgId: string) {
     assignments,
     shiftCategories,
     jobs,
-    absenceTypeMap: new Map(
-      absenceTypes.map((absenceType) => [absenceType.id, absenceType.name]),
-    ),
+    absenceTypeMap: new Map(absenceTypes.map((absenceType) => [absenceType.id, absenceType.name])),
   };
 }
 
@@ -258,12 +233,8 @@ function mapShiftRequestRows(
   },
 ): ShiftRequest[] {
   return rows.map((row) => {
-    const requester = row.requester as
-      | { first_name: string; last_name: string }
-      | null;
-    const target = row.target as
-      | { first_name: string; last_name: string }
-      | null;
+    const requester = row.requester as { first_name: string; last_name: string } | null;
+    const target = row.target as { first_name: string; last_name: string } | null;
 
     const mapped: DbShiftRequest = {
       id: row.id as string,
@@ -275,9 +246,7 @@ function mapShiftRequestRows(
       requester_state: row.requester_state as DbShiftRequest["requester_state"],
       target_emp_id: (row.target_emp_id as string | null) ?? null,
       target_shift_date: (row.target_shift_date as string | null) ?? null,
-      target_state:
-        (row.target_state as DbShiftRequest["target_state"] | null | undefined) ??
-        null,
+      target_state: (row.target_state as DbShiftRequest["target_state"] | null | undefined) ?? null,
       absence_type_id: (row.absence_type_id as number | null) ?? null,
       parent_request_id: (row.parent_request_id as string | null) ?? null,
       admin_user_id: (row.admin_user_id as string | null) ?? null,
@@ -301,9 +270,7 @@ function mapShiftRequestRows(
   });
 }
 
-async function fetchAuditNames(
-  userIds: Iterable<string>,
-): Promise<Array<[string, string]>> {
+async function fetchAuditNames(userIds: Iterable<string>): Promise<Array<[string, string]>> {
   const ids = Array.from(new Set(Array.from(userIds).filter(Boolean)));
   if (ids.length === 0) {
     return [];
@@ -320,9 +287,7 @@ async function fetchAuditNames(
 
   return (data ?? [])
     .map((row: { id: string; first_name: string | null; last_name: string | null }) => {
-      const name = [row.first_name?.trim(), row.last_name?.trim()]
-        .filter(Boolean)
-        .join(" ");
+      const name = [row.first_name?.trim(), row.last_name?.trim()].filter(Boolean).join(" ");
       return name ? ([row.id, name] as [string, string]) : null;
     })
     .filter((entry): entry is [string, string] => entry !== null);
@@ -383,33 +348,32 @@ export async function fetchSelfWorkProfileSnapshot(
   });
   const serviceClient = getServiceClient();
 
-  const [scheduleCellsResult, recurringResult, shiftRequestsResult] =
-    await Promise.all([
-      serviceClient
-        .from("schedule_cells")
-        .select(SCHEDULE_CELL_SELECT)
-        .eq("org_id", orgId)
-        .eq("emp_id", employee.id)
-        .order("date", { ascending: false }),
-      serviceClient
-        .from("recurring_shifts")
-        .select(RECURRING_SHIFT_COLS)
-        .eq("org_id", orgId)
-        .eq("emp_id", employee.id)
-        .is("archived_at", null)
-        .order("day_of_week")
-        .order("effective_from", { ascending: false }),
-      serviceClient
-        .from("shift_requests")
-        .select(
-          `*,
+  const [scheduleCellsResult, recurringResult, shiftRequestsResult] = await Promise.all([
+    serviceClient
+      .from("schedule_cells")
+      .select(SCHEDULE_CELL_SELECT)
+      .eq("org_id", orgId)
+      .eq("emp_id", employee.id)
+      .order("date", { ascending: false }),
+    serviceClient
+      .from("recurring_shifts")
+      .select(RECURRING_SHIFT_COLS)
+      .eq("org_id", orgId)
+      .eq("emp_id", employee.id)
+      .is("archived_at", null)
+      .order("day_of_week")
+      .order("effective_from", { ascending: false }),
+    serviceClient
+      .from("shift_requests")
+      .select(
+        `*,
            requester:employees!shift_requests_requester_emp_id_fkey(first_name, last_name),
            target:employees!shift_requests_target_emp_id_fkey(first_name, last_name)`,
-        )
-        .eq("org_id", orgId)
-        .or(`requester_emp_id.eq.${employee.id},target_emp_id.eq.${employee.id}`)
-        .order("created_at", { ascending: false }),
-    ]);
+      )
+      .eq("org_id", orgId)
+      .or(`requester_emp_id.eq.${employee.id},target_emp_id.eq.${employee.id}`)
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (scheduleCellsResult.error) throw scheduleCellsResult.error;
   if (recurringResult.error) throw recurringResult.error;
@@ -435,15 +399,14 @@ export async function fetchSelfWorkProfileSnapshot(
     shifts[`${row.emp_id}_${row.date}`] = entry;
   }
 
-  const recurringShifts = ((recurringResult.data ?? []) as DbRecurringShift[]).map(
-    (row) =>
-      rowToRecurringShift(
-        row,
-        assignmentLabelMap,
-        absenceTypeMap,
-        segmentCompatibility,
-        assignmentIdByPair,
-      ),
+  const recurringShifts = ((recurringResult.data ?? []) as DbRecurringShift[]).map((row) =>
+    rowToRecurringShift(
+      row,
+      assignmentLabelMap,
+      absenceTypeMap,
+      segmentCompatibility,
+      assignmentIdByPair,
+    ),
   );
   const shiftRequests = mapShiftRequestRows(
     (shiftRequestsResult.data ?? []) as Record<string, unknown>[],
@@ -556,9 +519,7 @@ export async function updateSelfLinkedEmployeePhone(input: {
     throw error;
   }
   if (!data) {
-    throw new Error(
-      "Your staff profile changed elsewhere. Refresh and try again.",
-    );
+    throw new Error("Your staff profile changed elsewhere. Refresh and try again.");
   }
 
   const updatedEmployee = rowToEmployee(data as DbEmployee);

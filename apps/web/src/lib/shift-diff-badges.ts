@@ -1,6 +1,6 @@
-export type ShiftDiffBorderKind = 'new' | 'modified' | null;
+export type ShiftDiffBorderKind = "new" | "modified" | null;
 
-export type ShiftDiffBadgeKind = 'new' | 'modified' | 'time';
+export type ShiftDiffBadgeKind = "new" | "modified" | "time";
 
 export type ShiftDiffTimeRange = {
   start: string | null;
@@ -39,10 +39,7 @@ type BuildShiftDiffDescriptorsInput = {
   afterShiftLabels?: Array<string | null | undefined>;
 };
 
-function resolveDiffLabel(
-  input: BuildShiftDiffDescriptorsInput,
-  assignmentId: number,
-): string {
+function resolveDiffLabel(input: BuildShiftDiffDescriptorsInput, assignmentId: number): string {
   return input.resolveAssignmentDefinitionLabel?.(assignmentId) ?? "?";
 }
 
@@ -66,10 +63,7 @@ function normalizeTimeRanges(
   });
 }
 
-function normalizeBooleanFlags(
-  flags: boolean[] | null | undefined,
-  count: number,
-): boolean[] {
+function normalizeBooleanFlags(flags: boolean[] | null | undefined, count: number): boolean[] {
   return Array.from({ length: count }, (_, index) => flags?.[index] ?? false);
 }
 
@@ -81,12 +75,10 @@ function formatTimeRange(range: ShiftDiffTimeRange | undefined): string {
   const start = normalizeTimeValue(range?.start);
   const end = normalizeTimeValue(range?.end);
   if (start && end) return `${start}-${end}`;
-  return start ?? end ?? '';
+  return start ?? end ?? "";
 }
 
-function normalizeShiftLabelValue(
-  value: string | null | undefined,
-): string | null {
+function normalizeShiftLabelValue(value: string | null | undefined): string | null {
   if (!value) return null;
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
@@ -107,15 +99,15 @@ function resolveShiftLabelAtIndex(args: {
 }
 
 function resolveStateLabel(
-  state: Required<Pick<ShiftDiffState, 'assignmentIds' | 'absenceTypeId'>>,
+  state: Required<Pick<ShiftDiffState, "assignmentIds" | "absenceTypeId">>,
   resolvers: Pick<
     BuildShiftDiffDescriptorsInput,
-    'resolveAssignmentDefinitionLabel' | 'resolveAbsenceLabel'
+    "resolveAssignmentDefinitionLabel" | "resolveAbsenceLabel"
   >,
   shiftLabels?: Array<string | null | undefined>,
 ): string | null {
   if (state.absenceTypeId != null) {
-    return resolvers.resolveAbsenceLabel?.(state.absenceTypeId) ?? '?';
+    return resolvers.resolveAbsenceLabel?.(state.absenceTypeId) ?? "?";
   }
   const assignmentIds = state.assignmentIds ?? [];
   if (assignmentIds.length > 0) {
@@ -128,9 +120,11 @@ function resolveStateLabel(
             index,
             resolveAssignmentDefinitionLabel:
               resolvers.resolveAssignmentDefinitionLabel ?? ((id) => id.toString()),
-          }) ?? (resolvers.resolveAssignmentDefinitionLabel?.(assignmentId) ?? assignmentId.toString()),
+          }) ??
+          resolvers.resolveAssignmentDefinitionLabel?.(assignmentId) ??
+          assignmentId.toString(),
       )
-      .join('/');
+      .join("/");
   }
   return null;
 }
@@ -147,15 +141,14 @@ function buildTimeBadge(args: {
 
   if (!hadTime && !hasTime) return null;
 
-  const detailSuffix =
-    includeLabel && label ? ` for ${label}` : '';
+  const detailSuffix = includeLabel && label ? ` for ${label}` : "";
   const previousTime = formatTimeRange(before);
   const nextTime = formatTimeRange(after);
 
   if (!hadTime && hasTime) {
     return {
-      kind: 'time',
-      text: '+ Time',
+      kind: "time",
+      text: "+ Time",
       detail: nextTime
         ? `Added custom time${detailSuffix} ${nextTime}.`
         : `Added custom time${detailSuffix}.`,
@@ -164,22 +157,22 @@ function buildTimeBadge(args: {
 
   if (hadTime && !hasTime) {
     return {
-      kind: 'time',
-      text: 'Time',
+      kind: "time",
+      text: "Time",
       detail: `Removed custom time${detailSuffix}.`,
     };
   }
 
   if (
-    normalizeTimeValue(before?.start) === normalizeTimeValue(after?.start)
-    && normalizeTimeValue(before?.end) === normalizeTimeValue(after?.end)
+    normalizeTimeValue(before?.start) === normalizeTimeValue(after?.start) &&
+    normalizeTimeValue(before?.end) === normalizeTimeValue(after?.end)
   ) {
     return null;
   }
 
   return {
-    kind: 'time',
-    text: 'Time',
+    kind: "time",
+    text: "Time",
     detail:
       previousTime && nextTime
         ? `Changed custom time${detailSuffix} ${previousTime} to ${nextTime}.`
@@ -187,19 +180,17 @@ function buildTimeBadge(args: {
   };
 }
 
-function buildNewShiftBadge(
-  label: string,
-): ShiftDiffBadgeDescriptor {
+function buildNewShiftBadge(label: string): ShiftDiffBadgeDescriptor {
   return {
-    kind: 'new',
-    text: 'New',
+    kind: "new",
+    text: "New",
     detail: `Added ${label}.`,
   };
 }
 
 function buildReplacementBadge(label: string): ShiftDiffBadgeDescriptor {
   return {
-    kind: 'modified',
+    kind: "modified",
     text: `Was ${label}`,
     detail: `Was ${label}.`,
   };
@@ -210,8 +201,8 @@ export function expandDelimitedTimeRanges(
   endTime: string | null | undefined,
   count: number,
 ): ShiftDiffTimeRange[] {
-  const startParts = (startTime ?? '').split('|');
-  const endParts = (endTime ?? '').split('|');
+  const startParts = (startTime ?? "").split("|");
+  const endParts = (endTime ?? "").split("|");
 
   return Array.from({ length: count }, (_, index) => ({
     start: normalizeTimeValue(startParts[index]),
@@ -242,10 +233,8 @@ export function buildShiftDiffDescriptors(
     input.after.isMentoredFlags,
     afterAssignmentDefinitionIds.length,
   );
-  const hasBeforeContent =
-    beforeAbsenceTypeId != null || beforeAssignmentDefinitionIds.length > 0;
-  const hasAfterContent =
-    afterAbsenceTypeId != null || afterAssignmentDefinitionIds.length > 0;
+  const hasBeforeContent = beforeAbsenceTypeId != null || beforeAssignmentDefinitionIds.length > 0;
+  const hasAfterContent = afterAbsenceTypeId != null || afterAssignmentDefinitionIds.length > 0;
   const usesMultiplePills =
     Math.max(beforeAssignmentDefinitionIds.length, afterAssignmentDefinitionIds.length) > 1;
 
@@ -262,15 +251,13 @@ export function buildShiftDiffDescriptors(
       if (beforeAbsenceTypeId != null) {
         if (pillIndex === 0) {
           return {
-            borderKind: 'modified',
-            badge: buildReplacementBadge(
-              input.resolveAbsenceLabel?.(beforeAbsenceTypeId) ?? '?',
-            ),
+            borderKind: "modified",
+            badge: buildReplacementBadge(input.resolveAbsenceLabel?.(beforeAbsenceTypeId) ?? "?"),
           };
         }
 
         return {
-          borderKind: 'new',
+          borderKind: "new",
           badge: buildNewShiftBadge(afterLabel),
         };
       }
@@ -278,20 +265,21 @@ export function buildShiftDiffDescriptors(
       const beforeAssignmentDefinitionId = beforeAssignmentDefinitionIds[pillIndex];
       if (beforeAssignmentDefinitionId == null) {
         return {
-          borderKind: 'new',
+          borderKind: "new",
           badge: buildNewShiftBadge(afterLabel),
         };
       }
 
       if (beforeAssignmentDefinitionId !== afterAssignmentDefinitionId) {
         return {
-          borderKind: 'modified',
+          borderKind: "modified",
           badge: buildReplacementBadge(
             resolveShiftLabelAtIndex({
               assignmentIds: beforeAssignmentDefinitionIds,
               shiftLabels: input.beforeShiftLabels,
               index: pillIndex,
-              resolveAssignmentDefinitionLabel: (assignmentId) => resolveDiffLabel(input, assignmentId),
+              resolveAssignmentDefinitionLabel: (assignmentId) =>
+                resolveDiffLabel(input, assignmentId),
             }) ?? resolveDiffLabel(input, beforeAssignmentDefinitionId),
           ),
         };
@@ -307,7 +295,7 @@ export function buildShiftDiffDescriptors(
         beforeIsMentoredFlags[pillIndex] !== afterIsMentoredFlags[pillIndex];
 
       return {
-        borderKind: timeBadge || isMentoredChanged ? 'modified' : null,
+        borderKind: timeBadge || isMentoredChanged ? "modified" : null,
         badge: timeBadge,
       };
     },
@@ -337,9 +325,9 @@ export function buildShiftDiffDescriptors(
       return {
         pillDiffs,
         cellBadge: {
-          kind: 'new',
-          text: 'New',
-          detail: `Added ${input.resolveAbsenceLabel?.(afterAbsenceTypeId) ?? '?'}.`,
+          kind: "new",
+          text: "New",
+          detail: `Added ${input.resolveAbsenceLabel?.(afterAbsenceTypeId) ?? "?"}.`,
         },
       };
     }
@@ -373,30 +361,34 @@ export function buildShiftDiffDescriptors(
     return {
       pillDiffs,
       cellBadge: {
-        kind: 'new',
-        text: 'New',
-        detail: `Added ${afterLabel ?? 'shift'}.`,
+        kind: "new",
+        text: "New",
+        detail: `Added ${afterLabel ?? "shift"}.`,
       },
     };
   }
 
-  const visibleActions = pillDiffs.flatMap((pillDiff) =>
-    pillDiff.badge ? [pillDiff.badge] : [],
-  );
-  const nonNewActions = visibleActions.filter(
-    (action) => action.kind !== 'new',
-  );
+  const visibleActions = pillDiffs.flatMap((pillDiff) => (pillDiff.badge ? [pillDiff.badge] : []));
+  const nonNewActions = visibleActions.filter((action) => action.kind !== "new");
   const removedDetails: string[] = [];
 
-  if (beforeAbsenceTypeId == null && beforeAssignmentDefinitionIds.length > afterAssignmentDefinitionIds.length) {
-    for (let index = afterAssignmentDefinitionIds.length; index < beforeAssignmentDefinitionIds.length; index += 1) {
+  if (
+    beforeAbsenceTypeId == null &&
+    beforeAssignmentDefinitionIds.length > afterAssignmentDefinitionIds.length
+  ) {
+    for (
+      let index = afterAssignmentDefinitionIds.length;
+      index < beforeAssignmentDefinitionIds.length;
+      index += 1
+    ) {
       removedDetails.push(
         `Removed ${
           resolveShiftLabelAtIndex({
             assignmentIds: beforeAssignmentDefinitionIds,
             shiftLabels: input.beforeShiftLabels,
             index,
-            resolveAssignmentDefinitionLabel: (assignmentId) => resolveDiffLabel(input, assignmentId),
+            resolveAssignmentDefinitionLabel: (assignmentId) =>
+              resolveDiffLabel(input, assignmentId),
           }) ?? resolveDiffLabel(input, beforeAssignmentDefinitionIds[index]!)
         }.`,
       );
@@ -411,15 +403,15 @@ export function buildShiftDiffDescriptors(
   }
 
   if (
-    nonNewActions.length === 1
-    && visibleActions.length > nonNewActions.length
-    && removedDetails.length === 0
+    nonNewActions.length === 1 &&
+    visibleActions.length > nonNewActions.length &&
+    removedDetails.length === 0
   ) {
     return {
       pillDiffs,
       cellBadge: {
         ...nonNewActions[0],
-        detail: visibleActions.map((action) => action.detail).join(' '),
+        detail: visibleActions.map((action) => action.detail).join(" "),
       },
     };
   }
@@ -434,12 +426,9 @@ export function buildShiftDiffDescriptors(
   return {
     pillDiffs,
     cellBadge: {
-      kind: 'modified',
-      text: 'Changed',
-      detail: [
-        ...visibleActions.map((action) => action.detail),
-        ...removedDetails,
-      ].join(' '),
+      kind: "modified",
+      text: "Changed",
+      detail: [...visibleActions.map((action) => action.detail), ...removedDetails].join(" "),
     },
   };
 }

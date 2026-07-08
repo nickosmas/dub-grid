@@ -8,10 +8,7 @@ const paramsSchema = z.object({
   userId: z.string().uuid(),
 });
 
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ userId: string }> },
-) {
+export async function GET(req: NextRequest, context: { params: Promise<{ userId: string }> }) {
   try {
     const auth = await requireGridmasterSession(req);
     if ("response" in auth) {
@@ -42,7 +39,9 @@ export async function GET(
 
     const { data, error } = await serviceClient
       .from("organization_memberships")
-      .select("org_id, org_role, joined_at, updated_at, admin_permissions, organizations(name, slug)")
+      .select(
+        "org_id, org_role, joined_at, updated_at, admin_permissions, organizations(name, slug)",
+      )
       .eq("user_id", parsed.data.userId)
       .is("archived_at", null);
 
@@ -50,28 +49,22 @@ export async function GET(
       throw error;
     }
 
-    const memberships: UserMembership[] = (data ?? []).map(
-      (row: Record<string, unknown>) => {
-        const org = row.organizations as { name?: string; slug?: string | null } | null;
-        return {
-          orgId: row.org_id as string,
-          orgName: org?.name ?? "Unknown",
-          orgSlug: org?.slug ?? null,
-          orgRole: row.org_role as OrganizationRole,
-          joinedAt: row.joined_at as string,
-          updatedAt: (row.updated_at as string | null) ?? null,
-          adminPermissions:
-            (row.admin_permissions as UserMembership["adminPermissions"]) ?? null,
-        };
-      },
-    );
+    const memberships: UserMembership[] = (data ?? []).map((row: Record<string, unknown>) => {
+      const org = row.organizations as { name?: string; slug?: string | null } | null;
+      return {
+        orgId: row.org_id as string,
+        orgName: org?.name ?? "Unknown",
+        orgSlug: org?.slug ?? null,
+        orgRole: row.org_role as OrganizationRole,
+        joinedAt: row.joined_at as string,
+        updatedAt: (row.updated_at as string | null) ?? null,
+        adminPermissions: (row.admin_permissions as UserMembership["adminPermissions"]) ?? null,
+      };
+    });
 
     return NextResponse.json({ memberships });
   } catch (error) {
     console.error("gridmaster memberships GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load memberships" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load memberships" }, { status: 500 });
   }
 }

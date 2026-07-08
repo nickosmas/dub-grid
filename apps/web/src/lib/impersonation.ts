@@ -4,7 +4,8 @@
 
 export const IMPERSONATION_COOKIE_NAME = "dubgrid-impersonation";
 
-const secureSuffix = typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+const secureSuffix =
+  typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
 
 export interface ImpersonationData {
   sessionId: string;
@@ -23,20 +24,14 @@ export interface ImpersonationData {
  * Parse the impersonation cookie from a raw cookie string.
  * Returns null if cookie is missing, malformed, or expired.
  */
-export function getImpersonationFromCookie(
-  cookieString: string,
-): ImpersonationData | null {
+export function getImpersonationFromCookie(cookieString: string): ImpersonationData | null {
   const prefix = `${IMPERSONATION_COOKIE_NAME}=`;
   // Handle both "; " and ";" separators (browser vs middleware)
-  const cookie = cookieString
-    .split(/;\s*/)
-    .find((c) => c.startsWith(prefix));
+  const cookie = cookieString.split(/;\s*/).find((c) => c.startsWith(prefix));
   if (!cookie) return null;
 
   try {
-    const data: ImpersonationData = JSON.parse(
-      decodeURIComponent(cookie.slice(prefix.length)),
-    );
+    const data: ImpersonationData = JSON.parse(decodeURIComponent(cookie.slice(prefix.length)));
     // Validate required fields — only the ones truly needed for
     // impersonation to function. targetOrgSlug, targetEmail, and
     // targetOrgName are display-only and can be empty.
@@ -61,10 +56,7 @@ export function getImpersonationFromCookie(
 
 /** Set the impersonation cookie (client-side only). */
 export function setImpersonationCookie(data: ImpersonationData): void {
-  const maxAge = Math.max(
-    0,
-    Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000),
-  );
+  const maxAge = Math.max(0, Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
   const value = encodeURIComponent(JSON.stringify(data));
   // Use domain-less cookie so it's sent on all subdomains automatically.
   // SameSite=Lax is fine — impersonation is same-site navigation.

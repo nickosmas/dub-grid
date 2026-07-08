@@ -1,25 +1,12 @@
-import {
-  supabase, logAudit, formatDateKey,
-  RECURRING_SHIFT_COLS,
-} from "./shared";
-import { fetchJobDefinitions, fetchShiftCategories } from "./config";
-import type { DbRecurringShift, DbScheduleNote, RecurringDraft, DbScheduleCell } from "./types";
-import { rowToRecurringShift, generateSeriesDates } from "./mappers";
+import { supabase, logAudit, formatDateKey, fetchAllRows } from "./shared";
+import type { DbScheduleNote, RecurringDraft } from "./types";
+import { generateSeriesDates } from "./mappers";
 import { upsertShift, deleteShift } from "./shifts";
-import type { DraftBreakdown } from "@/lib/draft-utils";
-import { formatClientErrorMessage } from "@/lib/client-facing";
-import {
-  joinShiftJobSegmentLabels,
-  resolveShiftJobSegments,
-  createShiftJobCompatibilityMaps,
-  type SegmentCompatibilityMaps,
-} from "@/lib/shift-job-segments";
 import type {
   PublishChange,
   PublishHistoryEntry,
   PublishHistoryEntryWithName,
   RecurringScheduleDraft,
-  RecurringShift,
   ScheduleCellInput,
   ScheduleNote,
   SeriesFrequency,
@@ -28,42 +15,21 @@ import type {
 
 const SHIFT_SERIES_UPSERT_BATCH_SIZE = 25;
 
-interface ScheduleDraftSummaryResponse {
-  summary?: DraftBreakdown;
-  error?: string;
-  code?: string;
-}
-
-export class ScheduleDraftConflictError extends Error {
-  constructor(public readonly latestSummary: DraftBreakdown) {
-    super("Schedule drafts changed elsewhere.");
-    this.name = "ScheduleDraftConflictError";
+/**
+ * Run an async task over each item in capped-concurrency batches. Used to turn
+ * per-cell schedule writes (each an independent RPC with its own optimistic
+ * version) from N sequential round-trips into ceil(N / size) parallel batches,
+ * without overwhelming the connection pool. Tasks run left-to-right within the
+ * overall ordering; failures reject as soon as a batch settles.
+ */
+async function runInBatches<T>(
+  items: T[],
+  size: number,
+  task: (item: T) => Promise<unknown>,
+): Promise<void> {
+  for (let i = 0; i < items.length; i += size) {
+    await Promise.all(items.slice(i, i + size).map(task));
   }
-}
-
-async function parseScheduleSummaryResponse(
-  response: Response,
-): Promise<ScheduleDraftSummaryResponse | null> {
-  try {
-    return (await response.json()) as ScheduleDraftSummaryResponse;
-  } catch {
-    return null;
-  }
-}
-
-function getScheduleDraftSummaryErrorMessage(
-  response: Response,
-  body: ScheduleDraftSummaryResponse | null,
-): string {
-  if (response.status === 429) {
-    return "Too many schedule review requests. Please wait a moment and try again.";
-  }
-
-  if (response.status === 503) {
-    return "Schedule review is temporarily unavailable. Please try again.";
-  }
-
-  return formatClientErrorMessage(body?.error, "Failed to load schedule draft summary");
 }
 
 type CreateShiftSeriesOptions = {
@@ -136,49 +102,6 @@ function getWorkedAssignments(input: ScheduleCellInput): Array<{
     }));
 }
 
-function buildRecurringStateFromRow(
-  row: DbRecurringShift,
-): ScheduleCellInput | null {
-  return normalizeScheduleCellInput(row.state, {
-    seriesId: row.state.seriesId ?? null,
-    fromRecurring: row.state.fromRecurring ?? true,
-  });
-}
-
-function getRecurringInputShiftLabel(
-  input: ScheduleCellInput,
-  args: {
-    absenceTypeLabelMap: Map<number, string>;
-    segmentCompatibility: SegmentCompatibilityMaps;
-  }
-): { label: string; absenceTypeId?: number } | null {
-  if (input.kind === "absence") {
-    const absenceTypeId = input.absenceTypeId ?? null;
-    if (absenceTypeId == null) return null;
-    return {
-      label: args.absenceTypeLabelMap.get(absenceTypeId) ?? "?",
-      absenceTypeId,
-    };
-  }
-
-  const assignments = getWorkedAssignments(input);
-  if (assignments.length === 0) return null;
-
-  const label = joinShiftJobSegmentLabels(
-    resolveShiftJobSegments(
-      {
-        shiftIds: assignments.map((assignment) => assignment.shiftId),
-        jobIds: assignments.map((assignment) => assignment.jobId),
-      },
-      args.segmentCompatibility,
-    ),
-  );
-
-  return {
-    label,
-  };
-}
-
 async function fetchScheduleCellVersionsForDates(
   orgId: string,
   empId: string,
@@ -201,73 +124,6 @@ async function fetchScheduleCellVersionsForDates(
       row.version,
     ]),
   );
-}
-
-function cellBlocksRecurringFill(cell: DbScheduleCell): boolean {
-  const snapshots = cell.snapshots ?? [];
-  const draft = snapshots.find((snapshot) => snapshot.snapshot_kind === "draft");
-  if (draft) {
-    return draft.state_kind !== "deleted";
-  }
-
-  return snapshots.some(
-    (snapshot) => snapshot.snapshot_kind === "published",
-  );
-}
-
-// ── Publish ──────────────────────────────────────────────────────────────────
-
-export async function publishSchedule(
-  orgId: string,
-  startDate: Date,
-  endDate: Date,
-  expectedSummary?: DraftBreakdown,
-): Promise<DraftBreakdown> {
-  const startKey = formatDateKey(startDate);
-  const endKey = formatDateKey(endDate);
-  const response = await fetch("/api/shifts/publish", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      orgId,
-      startDate: startKey,
-      endDate: endKey,
-      expectedSummary,
-    }),
-  });
-
-  const body = await parseScheduleSummaryResponse(response);
-
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
-
-  if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
-  }
-
-  return body.summary;
-}
-
-export async function fetchScheduleDraftSummary(input: {
-  orgId: string;
-  scope?: "all" | "mine";
-  startDate?: string;
-  endDate?: string;
-}): Promise<DraftBreakdown> {
-  const params = new URLSearchParams({ orgId: input.orgId });
-  if (input.scope) params.set("scope", input.scope);
-  if (input.startDate) params.set("startDate", input.startDate);
-  if (input.endDate) params.set("endDate", input.endDate);
-
-  const response = await fetch(`/api/shifts/draft-summary?${params.toString()}`);
-  const body = await parseScheduleSummaryResponse(response);
-
-  if (!response.ok || !body?.summary) {
-    throw new Error(getScheduleDraftSummaryErrorMessage(response, body));
-  }
-
-  return body.summary;
 }
 
 /**
@@ -367,47 +223,32 @@ export async function fetchPublishHistory(
   }));
 }
 
-export async function discardScheduleDrafts(
-  orgId: string,
-  userId?: string,
-  expectedSummary?: DraftBreakdown,
-): Promise<DraftBreakdown> {
-  const response = await fetch("/api/shifts/discard", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      orgId,
-      scope: userId ? "mine" : "all",
-      expectedSummary,
-    }),
-  });
-
-  const body = await parseScheduleSummaryResponse(response);
-
-  if (response.status === 409 && body?.summary) {
-    throw new ScheduleDraftConflictError(body.summary);
-  }
-
-  if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
-  }
-
-  return body.summary;
-}
-
 // ── Schedule Notes ───────────────────────────────────────────────────────────
 
-export async function fetchScheduleNotes(orgId: string, startDate?: string, endDate?: string): Promise<ScheduleNote[]> {
-  let query = supabase
-    .from("schedule_notes")
-    .select("id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at")
-    .eq("org_id", orgId);
-  if (startDate) query = query.gte("date", startDate);
-  if (endDate) query = query.lte("date", endDate);
-  const { data, error } = await query;
-  if (error) throw error;
+export async function fetchScheduleNotes(
+  orgId: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<ScheduleNote[]> {
+  const buildPage = (from: number, to: number) => {
+    let query = supabase
+      .from("schedule_notes")
+      .select(
+        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+      )
+      .eq("org_id", orgId);
+    if (startDate) query = query.gte("date", startDate);
+    if (endDate) query = query.lte("date", endDate);
+    return query
+      .order("date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to);
+  };
+  // See fetchNormalizedShifts in shifts.ts — an unpaged query here silently
+  // truncates at PostgREST's max_rows cap instead of erroring.
+  const data = await fetchAllRows<DbScheduleNote>(buildPage);
 
-  return (data as DbScheduleNote[]).map((row) => ({
+  return data.map((row) => ({
     id: row.id,
     orgId: row.org_id,
     empId: row.emp_id,
@@ -427,13 +268,13 @@ export async function upsertScheduleNote(
   date: string,
   indicatorTypeId: number,
   focusAreaId: number,
-  existingStatus?: 'published' | 'draft' | 'draft_deleted',
+  existingStatus?: "published" | "draft" | "draft_deleted",
 ): Promise<void> {
-  let status: 'draft' | 'published' | 'draft_deleted' = 'draft';
+  let status: "draft" | "published" | "draft_deleted" = "draft";
 
   // If we are "adding" a note that was marked for deletion, set it back to published
-  if (existingStatus === 'draft_deleted') {
-    status = 'published';
+  if (existingStatus === "draft_deleted") {
+    status = "published";
   }
 
   const { error } = await supabase.from("schedule_notes").upsert(
@@ -448,7 +289,13 @@ export async function upsertScheduleNote(
     { onConflict: "emp_id,date,indicator_type_id,focus_area_id" },
   );
   if (error) throw error;
-  void logAudit("schedule_note.upserted", "schedule_note", `${empId}_${date}`, { indicatorTypeId, focusAreaId, status }, orgId);
+  void logAudit(
+    "schedule_note.upserted",
+    "schedule_note",
+    `${empId}_${date}`,
+    { indicatorTypeId, focusAreaId, status },
+    orgId,
+  );
 }
 
 export async function deleteScheduleNote(
@@ -457,9 +304,9 @@ export async function deleteScheduleNote(
   date: string,
   indicatorTypeId: number,
   focusAreaId: number,
-  existingStatus?: 'published' | 'draft' | 'draft_deleted',
+  existingStatus?: "published" | "draft" | "draft_deleted",
 ): Promise<void> {
-  if (existingStatus === 'draft') {
+  if (existingStatus === "draft") {
     // If it was a new draft note, just delete it
     const { error } = await supabase
       .from("schedule_notes")
@@ -474,7 +321,7 @@ export async function deleteScheduleNote(
     // If it was already published, mark it as draft_deleted
     const { error } = await supabase
       .from("schedule_notes")
-      .update({ status: 'draft_deleted' })
+      .update({ status: "draft_deleted" })
       .eq("org_id", orgId)
       .eq("emp_id", empId)
       .eq("date", date)
@@ -482,279 +329,21 @@ export async function deleteScheduleNote(
       .eq("focus_area_id", focusAreaId);
     if (error) throw error;
   }
-  void logAudit("schedule_note.deleted", "schedule_note", `${empId}_${date}`, { indicatorTypeId, focusAreaId, existingStatus }, orgId);
-}
-
-// ── Recurring Shifts ─────────────────────────────────────────────────────────
-
-export async function fetchRecurringShifts(
-  orgId: string,
-  empId?: string,
-  assignmentLabelMap?: Map<number, string>,
-  includeArchived = false,
-  absenceTypeMap?: Map<number, string>,
-): Promise<RecurringShift[]> {
-  let query = supabase
-    .from("recurring_shifts")
-    .select(RECURRING_SHIFT_COLS)
-    .eq("org_id", orgId)
-    .order("day_of_week")
-    .order("effective_from", { ascending: false });
-  if (!includeArchived) query = query.is("archived_at", null);
-  if (empId) query = query.eq("emp_id", empId);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  const [shiftCategories, jobs] = await Promise.all([
-    fetchShiftCategories(orgId, true),
-    fetchJobDefinitions(orgId, true),
-  ]);
-  const segmentCompatibility = createShiftJobCompatibilityMaps(
-    {
-      shiftCategories,
-      jobs,
-      shiftDisplayMode: "code",
-    },
-  );
-  return (data as DbRecurringShift[]).map((row) =>
-    rowToRecurringShift(
-      row,
-      assignmentLabelMap ?? new Map(),
-      absenceTypeMap,
-      segmentCompatibility,
-    ),
-  );
-}
-
-export async function upsertRecurringShift(
-  empId: string,
-  orgId: string,
-  dayOfWeek: number,
-  input: ScheduleCellInput,
-  effectiveFrom: string,
-): Promise<void> {
-  const normalizedInput = normalizeScheduleCellInput(input, {
-    seriesId: input.seriesId ?? null,
-    fromRecurring: true,
-  });
-  if (normalizedInput.kind === "worked" && normalizedInput.segments.length === 0) {
-    throw new Error("Recurring schedules require at least one worked segment");
-  }
-
-  // Atomic RPC: archives existing active rows and inserts the new one
-  // in a single transaction, preventing template loss on insert failure.
-  const { error } = await supabase.rpc("upsert_recurring_shift", {
-    p_emp_id: empId,
-    p_org_id: orgId,
-    p_day_of_week: dayOfWeek,
-    p_state: normalizedInput,
-    p_effective_from: effectiveFrom,
-  });
-  if (error) {
-    if (error.code === "PGRST202" || error.message.includes("upsert_recurring_shift")) {
-      throw new Error("Recurring schedule saves require the latest database migration. Apply the current Supabase migrations and try again.");
-    }
-    throw new Error(error.message);
-  }
   void logAudit(
-    "recurring_shift.upserted",
-    "recurring_shift",
-    empId,
-    { dayOfWeek, input: normalizedInput, effectiveFrom },
+    "schedule_note.deleted",
+    "schedule_note",
+    `${empId}_${date}`,
+    { indicatorTypeId, focusAreaId, existingStatus },
     orgId,
   );
 }
 
-export async function deleteRecurringShift(empId: string, dayOfWeek: number, orgId?: string): Promise<void> {
-  let query = supabase
-    .from("recurring_shifts")
-    .update({ archived_at: new Date().toISOString() })
-    .eq("emp_id", empId)
-    .eq("day_of_week", dayOfWeek)
-    .is("archived_at", null);
-  if (orgId) query = query.eq("org_id", orgId);
-  const { error } = await query;
-  if (error) throw new Error(error.message);
-  void logAudit("recurring_shift.deleted", "recurring_shift", empId, { dayOfWeek }, orgId);
-}
-
-/**
- * Applies recurring shift templates to a date range as drafts.
- * Reads fresh recurring templates and canonical schedule cell snapshots from the DB
- * so the fill behavior matches the visible grid state.
- */
-export async function applyRecurringSchedules(
-  orgId: string,
-  startDate: Date,
-  endDate: Date,
-): Promise<{ empId: string; date: string; label: string; absenceTypeId?: number }[]> {
-  const startKey = formatDateKey(startDate);
-  const endKey = formatDateKey(endDate);
-
-  const [{ data: recurringRows, error: recurringError }, { data: existingCells, error: cellError }] = await Promise.all([
-    supabase
-      .from("recurring_shifts")
-      .select(RECURRING_SHIFT_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .lte("effective_from", endKey)
-      .or(`effective_until.is.null,effective_until.gte.${startKey}`),
-    supabase
-      .from("schedule_cells")
-      .select(
-        "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))",
-      )
-      .eq("org_id", orgId)
-      .gte("date", startKey)
-      .lte("date", endKey),
-  ]);
-
-  if (recurringError) throw new Error(recurringError.message);
-  if (cellError) throw new Error(cellError.message);
-
-  const recurring = (recurringRows ?? []) as DbRecurringShift[];
-  const cellsByKey = new Map<string, DbScheduleCell>();
-  for (const cell of (existingCells ?? []) as DbScheduleCell[]) {
-    cellsByKey.set(`${cell.emp_id}_${cell.date}`, cell);
-  }
-
-  const absenceTypeIds = Array.from(
-    new Set(
-      recurring
-        .map((row) =>
-          row.state.kind === "absence" ? (row.state.absenceTypeId ?? null) : null,
-        )
-        .filter((id): id is number => id != null),
-    ),
-  );
-  const [shiftCategories, jobs, { data: absenceRows, error: absenceError }] = await Promise.all([
-    fetchShiftCategories(orgId, true),
-    fetchJobDefinitions(orgId, true),
-    absenceTypeIds.length > 0
-      ? supabase.from("absence_types").select("id, name").in("id", absenceTypeIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (absenceError) throw new Error(absenceError.message);
-
-  const segmentCompatibility = createShiftJobCompatibilityMaps({
-    shiftCategories,
-    jobs,
-    shiftDisplayMode: "code",
-  });
-  const absenceTypeLabelMap = new Map(
-    ((absenceRows ?? []) as Array<{ id: number; name: string }>).map((row) => [
-      row.id,
-      row.name,
-    ]),
-  );
-
-  const templatesByEmpAndDay = new Map<string, DbRecurringShift>();
-  for (const row of recurring) {
-    const key = `${row.emp_id}_${row.day_of_week}`;
-    const current = templatesByEmpAndDay.get(key);
-    if (!current || row.effective_from > current.effective_from) {
-      templatesByEmpAndDay.set(key, row);
-    }
-  }
-
-  const generated: { empId: string; date: string; label: string; absenceTypeId?: number }[] = [];
-  const current = new Date(startDate);
-  while (current <= endDate) {
-    const dateKey = formatDateKey(current);
-    const dayOfWeek = current.getDay();
-
-    for (const template of templatesByEmpAndDay.values()) {
-      if (template.day_of_week !== dayOfWeek) continue;
-      if (template.effective_from > dateKey) continue;
-      if (template.effective_until != null && template.effective_until < dateKey) continue;
-
-      const cellKey = `${template.emp_id}_${dateKey}`;
-      const existingCell = cellsByKey.get(cellKey);
-      if (existingCell && cellBlocksRecurringFill(existingCell)) {
-        continue;
-      }
-
-      const input = buildRecurringStateFromRow(template);
-
-      if (!input) continue;
-
-      await upsertShift(
-        template.emp_id,
-        dateKey,
-        input,
-        orgId,
-        existingCell?.version,
-      );
-
-      const resolvedLabel = getRecurringInputShiftLabel(input, {
-        absenceTypeLabelMap,
-        segmentCompatibility,
-      });
-      if (resolvedLabel) {
-        generated.push({
-          empId: template.emp_id,
-          date: dateKey,
-          label: resolvedLabel.label,
-          absenceTypeId: resolvedLabel.absenceTypeId,
-        });
-      }
-
-      cellsByKey.set(cellKey, {
-        ...(existingCell ?? {
-          id: crypto.randomUUID(),
-          emp_id: template.emp_id,
-          date: dateKey,
-          org_id: orgId,
-          version: 0,
-          series_id: null,
-          from_recurring: true,
-          created_by: null,
-          updated_by: null,
-          created_at: null,
-          updated_at: null,
-        }),
-        version: existingCell?.version ?? 0,
-        from_recurring: true,
-        snapshots: [
-          {
-            id: crypto.randomUUID(),
-            cell_id: existingCell?.id ?? crypto.randomUUID(),
-            org_id: orgId,
-            snapshot_kind: "draft",
-            state_kind: input.kind,
-            absence_type_id: input.kind === "absence" ? input.absenceTypeId : null,
-            custom_start_time: null,
-            custom_end_time: null,
-            segments:
-              input.kind === "worked"
-                ? input.segments.map((segment) => ({
-                    id: crypto.randomUUID(),
-                    snapshot_id: crypto.randomUUID(),
-                    org_id: orgId,
-                    position: segment.position,
-                    shift_id: segment.shiftId,
-                    job_id: segment.jobId,
-                    is_mentored: segment.isMentored ?? false,
-                  }))
-                : [],
-          },
-        ],
-      });
-    }
-
-    current.setDate(current.getDate() + 1);
-  }
-
-  void logAudit("recurring_schedule.applied", "recurring_shift", null, {
-    startDate: startKey,
-    endDate: endKey,
-    count: generated.length,
-  }, orgId);
-  return generated;
-}
-
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
 
-export async function getRecurringDraft(orgId: string, userId: string): Promise<RecurringDraft | null> {
+export async function getRecurringDraft(
+  orgId: string,
+  userId: string,
+): Promise<RecurringDraft | null> {
   const { data, error } = await supabase
     .from("recurring_shifts_draft_sessions")
     .select("id, org_id, saved_by, draft_data, saved_at")
@@ -795,14 +384,12 @@ export async function saveRecurringDraft(
       .eq("id", existing.id);
     if (error) throw error;
   } else {
-    const { error } = await supabase
-      .from("recurring_shifts_draft_sessions")
-      .insert({
-        org_id: orgId,
-        saved_by: savedBy,
-        draft_data: draftData,
-        saved_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("recurring_shifts_draft_sessions").insert({
+      org_id: orgId,
+      saved_by: savedBy,
+      draft_data: draftData,
+      saved_at: new Date().toISOString(),
+    });
     if (error) throw error;
   }
 }
@@ -851,19 +438,17 @@ export async function createShiftSeries(
   reportProgress?.(5);
 
   // 1. Create the series master record
-  const { error } = await supabase
-    .from("shift_series")
-    .insert({
-      id,
-      emp_id: empId,
-      org_id: orgId,
-      state: normalizedInput,
-      frequency,
-      days_of_week: daysOfWeek,
-      start_date: startDate,
-      end_date: endDate,
-      max_occurrences: maxOccurrences,
-    });
+  const { error } = await supabase.from("shift_series").insert({
+    id,
+    emp_id: empId,
+    org_id: orgId,
+    state: normalizedInput,
+    frequency,
+    days_of_week: daysOfWeek,
+    start_date: startDate,
+    end_date: endDate,
+    max_occurrences: maxOccurrences,
+  });
   if (error) throw new Error(error.message);
 
   // 2. Generate and upsert occurrence rows
@@ -878,15 +463,7 @@ export async function createShiftSeries(
     for (let i = 0; i < dates.length; i += batchSize) {
       const batch = dates.slice(i, i + batchSize);
       await Promise.all(
-        batch.map((date) =>
-          upsertShift(
-            empId,
-            date,
-            baseInput,
-            orgId,
-            existingVersions.get(date),
-          ),
-        ),
+        batch.map((date) => upsertShift(empId, date, baseInput, orgId, existingVersions.get(date))),
       );
 
       const inserted = Math.min(dates.length, i + batch.length);
@@ -949,9 +526,10 @@ export async function updateSeriesAllShifts(
 
   const nextInput = normalizedInput;
 
-  for (const cell of (cells ?? []) as Array<{ emp_id: string; date: string; version: number }>) {
-    await upsertShift(cell.emp_id, cell.date, nextInput, orgId, cell.version);
-  }
+  const typedCells = (cells ?? []) as Array<{ emp_id: string; date: string; version: number }>;
+  await runInBatches(typedCells, SHIFT_SERIES_UPSERT_BATCH_SIZE, (cell) =>
+    upsertShift(cell.emp_id, cell.date, nextInput, orgId, cell.version),
+  );
 
   const { error } = await supabase
     .from("shift_series")
@@ -977,9 +555,9 @@ export async function deleteShiftSeries(seriesId: string, orgId: string): Promis
   if (cellError) throw new Error(cellError.message);
 
   const typedCells = (cells ?? []) as Array<{ emp_id: string; date: string; version: number }>;
-  for (const cell of typedCells) {
-    await deleteShift(cell.emp_id, cell.date, orgId, cell.version);
-  }
+  await runInBatches(typedCells, SHIFT_SERIES_UPSERT_BATCH_SIZE, (cell) =>
+    deleteShift(cell.emp_id, cell.date, orgId, cell.version),
+  );
 
   const { error } = await supabase
     .from("shift_series")
@@ -998,6 +576,12 @@ export async function deleteShiftSeries(seriesId: string, orgId: string): Promis
   if (clearSeriesError) throw new Error(clearSeriesError.message);
 
   const deletedCount = typedCells.length;
-  void logAudit("shift_series.archived", "shift_series", seriesId, { shiftsAffected: deletedCount }, orgId);
+  void logAudit(
+    "shift_series.archived",
+    "shift_series",
+    seriesId,
+    { shiftsAffected: deletedCount },
+    orgId,
+  );
   return deletedCount;
 }

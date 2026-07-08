@@ -5,14 +5,13 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { OrganizationUser, PlatformRole } from "@/types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
 });
 
-async function fetchOrganizationUserRows(
-  orgId: string,
-): Promise<OrganizationUser[]> {
+async function fetchOrganizationUserRows(orgId: string): Promise<OrganizationUser[]> {
   const serviceClient = getServiceClient();
   const { data: memberships, error } = await serviceClient
     .from("organization_memberships")
@@ -45,14 +44,13 @@ async function fetchOrganizationUserRows(
       {
         firstName: (profile.first_name as string | null) ?? null,
         lastName: (profile.last_name as string | null) ?? null,
-        platformRole: ((profile.platform_role as PlatformRole | null) ?? "none"),
+        platformRole: (profile.platform_role as PlatformRole | null) ?? "none",
         createdAt: (profile.created_at as string | null) ?? null,
       },
     ]),
   );
   const visibleMemberships = membershipRows.filter(
-    (membership) =>
-      (profiles.get(membership.user_id)?.platformRole ?? "none") !== "gridmaster",
+    (membership) => (profiles.get(membership.user_id)?.platformRole ?? "none") !== "gridmaster",
   );
 
   const authUsers = new Map(
@@ -79,29 +77,22 @@ async function fetchOrganizationUserRows(
 
 export async function GET(req: NextRequest) {
   try {
-    const parsed = searchSchema.safeParse(
-      Object.fromEntries(req.nextUrl.searchParams.entries()),
-    );
+    const parsed = searchSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
-    const orgAuth = await requireOrgPermissions(
-      req,
-      parsed.data.orgId,
-      () => true,
-    );
+    const orgAuth = await requireOrgPermissions(req, parsed.data.orgId, () => true);
     if ("response" in orgAuth) {
       return orgAuth.response;
     }
 
-    const users = await fetchOrganizationUserRows(parsed.data.orgId);
+    // Use the auth-effective orgId so sandbox callers see their
+    // sandbox's users, not the real organization's users.
+    const users = await fetchOrganizationUserRows(orgAuth.orgId);
     return NextResponse.json({ users });
   } catch (error) {
     console.error("organization users GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load organization users" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load organization users" }, { status: 500 });
   }
 }

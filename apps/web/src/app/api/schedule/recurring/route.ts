@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { DbRecurringShift } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
-import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { rowToRecurringShift } from "@/lib/db/mappers";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -64,35 +68,43 @@ function canManageRecurring(
   permissions: ReturnType<typeof import("@dubgrid/authz").buildPermissionContext>,
 ) {
   return (
-    permissions.isGridmaster ||
-    permissions.isSuperAdmin ||
-    permissions.canManageRecurringShifts
+    permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageRecurringShifts
   );
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const data = parsed.data;
 
+  // Sandbox redirect.
+  {
+    const auth = await requireAuthenticatedUser(req);
+    if (!("response" in auth)) {
+      const effective = await resolveEffectiveOrgId(req, auth.user.id, data.orgId);
+      if (effective !== data.orgId) {
+        (data as { orgId: string }).orgId = effective;
+      }
+    }
+  }
+
   try {
     switch (data.action) {
       case "fetchRecurringShifts": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canReadRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -115,16 +127,9 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        const assignmentLabelMap = new Map<number, string>(
-          data.assignmentLabels ?? [],
-        );
-        const absenceTypeMap = new Map<number, string>(
-          data.absenceTypeLabels ?? [],
-        );
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
-          auth.serviceClient,
-          data.orgId,
-        );
+        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels ?? []);
+        const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
 
         return NextResponse.json({
           rows: ((rows ?? []) as DbRecurringShift[]).map((row) =>
@@ -140,11 +145,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "getRecurringDraft": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -173,11 +174,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "saveRecurringDraft": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -222,11 +219,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringDraft": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -244,11 +237,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertRecurringShift": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -271,15 +260,18 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "recurring_shift_updated",
+          orgId: data.orgId,
+          empId: data.employeeId,
+          mode: "upsert",
+        });
+
         return NextResponse.json({ success: true });
       }
 
       case "deleteRecurringShift": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -295,14 +287,18 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        void dispatchNotificationEvent(auth.actor.id, {
+          action: "recurring_shift_updated",
+          orgId: data.orgId,
+          empId: data.employeeId,
+          mode: "delete",
+        });
+
         return NextResponse.json({ success: true });
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Recurring schedule operation failed";
+    const message = error instanceof Error ? error.message : "Recurring schedule operation failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

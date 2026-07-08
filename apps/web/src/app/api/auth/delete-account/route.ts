@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { canManageProfileChangeRequests } from "@/features/account/server";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { extractJwtClaims } from "@/features/permissions/shared";
+import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,8 @@ export async function DELETE(req: NextRequest) {
   // ── CSRF: validate Origin header ──────────────────────────────────
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   try {
     // Auth check
@@ -27,6 +31,21 @@ export async function DELETE(req: NextRequest) {
     if ("response" in auth) return auth.response;
     const { user } = auth;
     const { orgId } = extractJwtClaims(auth.session.access_token);
+
+    // Rate-limit: this is a destructive, irreversible endpoint.
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
+    if (misconfigured) {
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    }
+    if (limited) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) },
+        },
+      );
+    }
 
     const canDeleteDirectly = orgId
       ? await canManageProfileChangeRequests({
@@ -51,11 +70,14 @@ export async function DELETE(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     if (body.confirmation !== "DELETE MY ACCOUNT") {
-      return NextResponse.json({ error: "Confirmation text must be exactly: DELETE MY ACCOUNT" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Confirmation text must be exactly: DELETE MY ACCOUNT" },
+        { status: 400 },
+      );
     }
 
     const userId = user.id;
@@ -83,11 +105,11 @@ export async function DELETE(req: NextRequest) {
 
     for (const m of memberships ?? []) {
       if ((m as Record<string, unknown>).org_role === "super_admin") {
-        const orgId = (m as Record<string, unknown>).org_id as string;
+        const membershipOrgId = (m as Record<string, unknown>).org_id as string;
         const { count } = await serviceClient
           .from("organization_memberships")
           .select("*", { count: "exact", head: true })
-          .eq("org_id", orgId)
+          .eq("org_id", membershipOrgId)
           .eq("org_role", "super_admin");
         if ((count ?? 0) <= 1) {
           return NextResponse.json(
@@ -98,95 +120,74 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    // Delete auth first so we never leave a live user half-deleted if this hard
-    // gate fails. App-data cleanup is performed after the account is revoked.
-    const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
-    if (deleteError) {
-      Sentry.captureException(deleteError, { extra: { userId, context: "account-deletion" } });
-      logger.error({ error: deleteError, userId }, "Failed to delete auth user");
-      return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
-    }
-
-    const cleanupFailures: string[] = [];
+    // App-data cleanup runs BEFORE auth.admin.deleteUser. If any step throws,
+    // we abort with 500 and the auth user is preserved so the caller can retry.
+    // If cleanup succeeds but auth-delete fails, we land in a "data gone, auth
+    // lingers" state which is recoverable on next signin (vs. the previous
+    // "auth gone, data orphaned" which was irrecoverable).
+    //
+    // Order respects FK direction: memberships first (FK→profiles), employees
+    // nullified (FK→profiles via user_id), then profiles, then leaf tables.
     async function runCleanupStep(
       step: string,
       operation: () => Promise<{ error?: unknown } | void>,
     ) {
-      try {
-        const result = await operation();
-        if (
-          result &&
-          typeof result === "object" &&
-          "error" in result &&
-          result.error
-        ) {
-          throw result.error;
-        }
-      } catch (error) {
-        cleanupFailures.push(step);
-        Sentry.captureException(error, {
-          extra: { userId, context: "account-deletion-cleanup", step },
-        });
-        logger.error({ error, userId, step }, "Account deletion cleanup step failed");
+      const result = await operation();
+      if (result && typeof result === "object" && "error" in result && result.error) {
+        throw result.error;
       }
     }
 
-    await runCleanupStep("organization_memberships", () =>
-      Promise.resolve(
-        serviceClient
-          .from("organization_memberships")
-          .delete()
-          .eq("user_id", userId),
-      ),
-    );
-    await runCleanupStep("employees", () =>
-      Promise.resolve(
-        serviceClient
-          .from("employees")
-          .update({ user_id: null })
-          .eq("user_id", userId),
-      ),
-    );
-    await runCleanupStep("profiles", () =>
-      Promise.resolve(
-        serviceClient
-          .from("profiles")
-          .delete()
-          .eq("id", userId),
-      ),
-    );
-    await runCleanupStep("notification_preferences", () =>
-      Promise.resolve(
-        serviceClient
-          .from("notification_preferences")
-          .delete()
-          .eq("user_id", userId),
-      ),
-    );
-    await runCleanupStep("user_sessions", () =>
-      Promise.resolve(
-        serviceClient
-          .from("user_sessions")
-          .delete()
-          .eq("user_id", userId),
-      ),
-    );
-    await runCleanupStep("cookie_consents", () =>
-      Promise.resolve(
-        serviceClient
-          .from("cookie_consents")
-          .delete()
-          .eq("user_id", userId),
-      ),
-    );
-    await runCleanupStep("terms_acceptances", () =>
-      Promise.resolve(
-        serviceClient
-          .from("terms_acceptances")
-          .delete()
-          .eq("user_id", userId),
-      ),
-    );
+    try {
+      await runCleanupStep("organization_memberships", () =>
+        Promise.resolve(
+          serviceClient.from("organization_memberships").delete().eq("user_id", userId),
+        ),
+      );
+      await runCleanupStep("employees", () =>
+        Promise.resolve(
+          serviceClient.from("employees").update({ user_id: null }).eq("user_id", userId),
+        ),
+      );
+      await runCleanupStep("profiles", () =>
+        Promise.resolve(serviceClient.from("profiles").delete().eq("id", userId)),
+      );
+      await runCleanupStep("notification_preferences", () =>
+        Promise.resolve(
+          serviceClient.from("notification_preferences").delete().eq("user_id", userId),
+        ),
+      );
+      await runCleanupStep("user_sessions", () =>
+        Promise.resolve(serviceClient.from("user_sessions").delete().eq("user_id", userId)),
+      );
+      await runCleanupStep("cookie_consents", () =>
+        Promise.resolve(serviceClient.from("cookie_consents").delete().eq("user_id", userId)),
+      );
+      await runCleanupStep("terms_acceptances", () =>
+        Promise.resolve(serviceClient.from("terms_acceptances").delete().eq("user_id", userId)),
+      );
+    } catch (cleanupError) {
+      Sentry.captureException(cleanupError, {
+        extra: { userId, context: "account-deletion-cleanup" },
+      });
+      logger.error(
+        { error: cleanupError, userId },
+        "Account deletion cleanup failed; auth user preserved",
+      );
+      return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+    }
+
+    const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
+    if (deleteError) {
+      Sentry.captureException(deleteError, {
+        extra: { userId, context: "auth-delete-after-cleanup" },
+      });
+      logger.error(
+        { error: deleteError, userId },
+        "Auth delete failed after successful cleanup; user has no profile",
+      );
+      return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+    }
 
     try {
       await serviceClient.from("audit_log").insert({
@@ -195,10 +196,7 @@ export async function DELETE(req: NextRequest) {
         action: DELETE_ACCOUNT_AUDIT_ACTION,
         resource_type: "user",
         resource_id: userId,
-        details: {
-          email: user.email,
-          cleanupFailures,
-        },
+        details: { email: user.email },
       });
     } catch (auditError) {
       logger.error({ error: auditError, userId }, "Failed to write account deletion audit log");
@@ -206,11 +204,7 @@ export async function DELETE(req: NextRequest) {
 
     logger.info({ userId }, "User account deleted");
 
-    return NextResponse.json({
-      success: true,
-      cleanupPending: cleanupFailures.length > 0,
-      cleanupFailures: cleanupFailures.length > 0 ? cleanupFailures : undefined,
-    });
+    return NextResponse.json({ success: true });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "account-deletion" } });
     logger.error({ error: err }, "Account deletion failed");

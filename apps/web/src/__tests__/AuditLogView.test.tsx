@@ -8,8 +8,7 @@ import type { FullAuditLogEntry } from "@/types";
 const mockFetchGridmasterFullAuditLog = vi.fn();
 
 vi.mock("@/features/gridmaster/client", () => ({
-  fetchGridmasterFullAuditLog: (options: unknown) =>
-    mockFetchGridmasterFullAuditLog(options),
+  fetchGridmasterFullAuditLog: (options: unknown) => mockFetchGridmasterFullAuditLog(options),
 }));
 
 const billingEntry: FullAuditLogEntry = {
@@ -63,9 +62,7 @@ describe("AuditLogView", () => {
 
     await user.click(await screen.findByText("Canceled subscription"));
 
-    expect(
-      await screen.findByRole("dialog", { name: "Audit log details" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "Audit log details" })).toBeInTheDocument();
     expect(screen.getByText("Stripe Event Type")).toBeInTheDocument();
     expect(screen.getByText("Customer Subscription Deleted")).toBeInTheDocument();
     expect(screen.getByText("Record type")).toBeInTheDocument();

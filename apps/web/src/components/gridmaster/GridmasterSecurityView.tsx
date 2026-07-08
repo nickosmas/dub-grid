@@ -4,14 +4,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
-import {
-  fetchGridmasterSecurity,
-  fetchGridmasterSessions,
-} from "@/features/gridmaster/client";
-import {
-  formatClientErrorMessage,
-  formatOrganizationRoleLabel,
-} from "@/lib/client-facing";
+import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
+import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { EmptyState } from "@/components/EmptyState";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { GridmasterUserSession, Organization } from "@/types";
@@ -19,9 +14,35 @@ import type { GridmasterUserSession, Organization } from "@/types";
 function SecurityCard({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 170px" }}>
-      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 800, color: "var(--color-text-primary)", fontFamily: "var(--font-dm-mono), monospace" }}>{value}</div>
-      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", marginTop: 2 }}>{label}</div>
-      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", marginTop: 2 }}>{detail}</div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-card-title)",
+          fontWeight: 800,
+          color: "var(--color-text-primary)",
+          fontFamily: "var(--font-dm-mono), monospace",
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 700,
+          color: "var(--color-text-muted)",
+          marginTop: 2,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          color: "var(--color-text-subtle)",
+          marginTop: 2,
+        }}
+      >
+        {detail}
+      </div>
     </div>
   );
 }
@@ -99,10 +120,7 @@ function sessionOrgLabel(session: GridmasterUserSession): string {
   return session.org?.orgName ?? "Unknown org";
 }
 
-function sessionMatchesSearch(
-  session: GridmasterUserSession,
-  search: string,
-): boolean {
+function sessionMatchesSearch(session: GridmasterUserSession, search: string): boolean {
   if (!search) return true;
   const haystack = [
     session.userName,
@@ -220,11 +238,7 @@ function SessionDetailPanel({
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="dg-btn dg-btn-ghost dg-btn-sm"
-          >
+          <button type="button" onClick={onClose} className="dg-btn dg-btn-ghost dg-btn-sm">
             Close
           </button>
         </div>
@@ -238,11 +252,7 @@ function SessionDetailPanel({
           <DetailRow label="Org slug" value={session.org?.orgSlug ?? "—"} />
           <DetailRow
             label="Org role"
-            value={
-              session.org?.orgRole
-                ? formatOrganizationRoleLabel(session.org.orgRole)
-                : "—"
-            }
+            value={session.org?.orgRole ? formatOrganizationRoleLabel(session.org.orgRole) : "—"}
           />
           <DetailRow label="Registry ID" value={session.id} />
           <DetailRow label="Supabase session" value={session.supabaseSessionId ?? "—"} />
@@ -269,6 +279,32 @@ function SessionsTable({
   emptyMessage: string;
   onOpen: (session: GridmasterUserSession) => void;
 }) {
+  if (!isLoading && sessions.length === 0) {
+    return (
+      <div style={{ padding: 16 }}>
+        <EmptyState
+          size="compact"
+          icon={
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          }
+          title={emptyMessage}
+        />
+      </div>
+    );
+  }
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -286,15 +322,11 @@ function SessionsTable({
         <tbody>
           {isLoading && (
             <tr>
-              <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}>
+              <td
+                colSpan={7}
+                style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}
+              >
                 Loading sessions...
-              </td>
-            </tr>
-          )}
-          {!isLoading && sessions.length === 0 && (
-            <tr>
-              <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}>
-                {emptyMessage}
               </td>
             </tr>
           )}
@@ -319,12 +351,21 @@ function SessionsTable({
                   <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
                     {session.userName ?? "Unknown user"}
                   </div>
-                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+                  <div
+                    style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}
+                  >
                     {session.userEmail ?? "Unknown email"}
                   </div>
                 </td>
                 <td style={{ ...tdStyle, minWidth: 180 }}>
-                  <div style={{ color: session.org || session.userPlatformRole === "gridmaster" ? "var(--color-text-primary)" : "var(--color-text-muted)" }}>
+                  <div
+                    style={{
+                      color:
+                        session.org || session.userPlatformRole === "gridmaster"
+                          ? "var(--color-text-primary)"
+                          : "var(--color-text-muted)",
+                    }}
+                  >
                     {sessionOrgLabel(session)}
                   </div>
                 </td>
@@ -332,7 +373,9 @@ function SessionsTable({
                   <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
                     {session.deviceLabel ?? "Unknown device"}
                   </div>
-                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+                  <div
+                    style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}
+                  >
                     {session.platform ?? "unknown"}
                     {session.appVersion ? ` / ${session.appVersion}` : ""}
                   </div>
@@ -348,17 +391,12 @@ function SessionsTable({
   );
 }
 
-function GridmasterSessionsPanel({
-  organizations,
-}: {
-  organizations: Organization[];
-}) {
+function GridmasterSessionsPanel({ organizations }: { organizations: Organization[] }) {
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedSession, setSelectedSession] =
-    useState<GridmasterUserSession | null>(null);
+  const [selectedSession, setSelectedSession] = useState<GridmasterUserSession | null>(null);
   const sessionsQuery = useQuery({
     queryKey: queryKeys.gridmaster.sessions(),
     queryFn: fetchGridmasterSessions,
@@ -371,10 +409,7 @@ function GridmasterSessionsPanel({
     () =>
       sessions.filter((session) => {
         if (!sessionMatchesSearch(session, normalizedSearch)) return false;
-        if (
-          orgFilter !== "all" &&
-          session.org?.orgId !== orgFilter
-        ) {
+        if (orgFilter !== "all" && session.org?.orgId !== orgFilter) {
           return false;
         }
         if (platformFilter !== "all") {
@@ -439,7 +474,14 @@ function GridmasterSessionsPanel({
         </div>
 
         {sessionsQuery.error instanceof Error && (
-          <div style={{ padding: "12px 16px", color: "var(--color-danger)", fontSize: "var(--dg-fs-label)", fontWeight: 600 }}>
+          <div
+            style={{
+              padding: "12px 16px",
+              color: "var(--color-danger)",
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 600,
+            }}
+          >
             {formatClientErrorMessage(sessionsQuery.error, "Failed to load sessions")}
           </div>
         )}
@@ -562,10 +604,7 @@ function GridmasterSessionsPanel({
           onOpen={setSelectedSession}
         />
         {selectedSession && (
-          <SessionDetailPanel
-            session={selectedSession}
-            onClose={() => setSelectedSession(null)}
-          />
+          <SessionDetailPanel session={selectedSession} onClose={() => setSelectedSession(null)} />
         )}
       </div>
     </>
@@ -588,12 +627,29 @@ export default function GridmasterSecurityView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2
+        style={{
+          margin: "0 0 16px",
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+        }}
+      >
         Security Oversight
       </h2>
 
       {securityQuery.error instanceof Error && (
-        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--color-danger-bg)",
+            color: "var(--color-danger)",
+            borderRadius: "var(--dg-radius-lg)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
           {formatClientErrorMessage(securityQuery.error, "Failed to load security oversight")}
         </div>
       )}
@@ -601,35 +657,113 @@ export default function GridmasterSecurityView({
       {security && (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-            <SecurityCard label="Sessions 24h" value={security.sessionSummary.active24h} detail={`${security.sessionSummary.stale30d} stale over 30d`} />
-            <SecurityCard label="Mobile Devices" value={security.mobileDeviceSummary.active} detail={`${security.mobileDeviceSummary.disabled} disabled`} />
-            <SecurityCard label="Active Impersonations" value={security.impersonation.activeCount} detail={`${security.impersonation.expiredUnendedCount} expired but unended`} />
-            <SecurityCard label="High-Risk Events" value={security.highRiskAuditEvents.length} detail="Recent audited actions" />
+            <SecurityCard
+              label="Sessions 24h"
+              value={security.sessionSummary.active24h}
+              detail={`${security.sessionSummary.stale30d} stale over 30d`}
+            />
+            <SecurityCard
+              label="Mobile Devices"
+              value={security.mobileDeviceSummary.active}
+              detail={`${security.mobileDeviceSummary.disabled} disabled`}
+            />
+            <SecurityCard
+              label="Active Impersonations"
+              value={security.impersonation.activeCount}
+              detail={`${security.impersonation.expiredUnendedCount} expired but unended`}
+            />
+            <SecurityCard
+              label="High-Risk Events"
+              value={security.highRiskAuditEvents.length}
+              detail="Recent audited actions"
+            />
           </div>
 
           <div style={{ ...sectionStyle, marginBottom: 24 }}>
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontSize: "var(--dg-fs-label)", fontWeight: 800, color: "var(--color-text-primary)" }}>Impersonation Governance</div>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr><th style={thStyle}>Status</th><th style={thStyle}>Target</th><th style={thStyle}>Justification</th><th style={thStyle}>Started</th><th style={thStyle}>Ended</th></tr>
-                </thead>
-                <tbody>
-                  {security.impersonation.recent.slice(0, 8).map((entry) => {
-                    const active = !entry.endedAt && new Date(entry.expiresAt).getTime() > Date.now();
-                    return (
-                      <tr key={entry.sessionId}>
-                        <td style={{ ...tdStyle, fontWeight: 700, color: active ? "var(--color-warning)" : "var(--color-text-muted)" }}>{active ? "Active" : entry.endedAt ? "Ended" : "Expired"}</td>
-                        <td style={tdStyle}>{entry.targetUserId.slice(0, 8)}...</td>
-                        <td style={{ ...tdStyle, maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{entry.justification || "—"}</td>
-                        <td style={tdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
-                        <td style={tdStyle}>{entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div
+              style={{
+                padding: "12px 16px",
+                borderBottom: "1px solid var(--color-border-light)",
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 800,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Impersonation Governance
             </div>
+            {security.impersonation.recent.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  size="compact"
+                  icon={
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  }
+                  title="No impersonation sessions"
+                  description="Recent gridmaster impersonations appear here."
+                />
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={thStyle}>Status</th>
+                      <th style={thStyle}>Target</th>
+                      <th style={thStyle}>Justification</th>
+                      <th style={thStyle}>Started</th>
+                      <th style={thStyle}>Ended</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {security.impersonation.recent.slice(0, 8).map((entry) => {
+                      const active =
+                        !entry.endedAt && new Date(entry.expiresAt).getTime() > Date.now();
+                      return (
+                        <tr key={entry.sessionId}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontWeight: 700,
+                              color: active ? "var(--color-warning)" : "var(--color-text-muted)",
+                            }}
+                          >
+                            {active ? "Active" : entry.endedAt ? "Ended" : "Expired"}
+                          </td>
+                          <td style={tdStyle}>{entry.targetUserId.slice(0, 8)}...</td>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              maxWidth: 360,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {entry.justification || "—"}
+                          </td>
+                          <td style={tdStyle}>{new Date(entry.createdAt).toLocaleString()}</td>
+                          <td style={tdStyle}>
+                            {entry.endedAt ? new Date(entry.endedAt).toLocaleString() : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

@@ -88,10 +88,7 @@ describe("GET /api/billing", () => {
       error: null,
     });
     membershipIs.mockResolvedValue({
-      data: [
-        { user_id: "linked-user" },
-        { user_id: "management-only-user" },
-      ],
+      data: [{ user_id: "linked-user" }, { user_id: "management-only-user" }],
       error: null,
     });
     auditLimit.mockResolvedValue({
@@ -207,7 +204,7 @@ describe("GET /api/billing", () => {
       expect.any(NextRequest),
       ORG_ID,
       expect.any(Function),
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true, ignoreSandbox: true },
     );
     const isAllowed = requireOrgPermissions.mock.calls[0][2];
     expect(isAllowed({ isGridmaster: false, isSuperAdmin: true })).toBe(true);

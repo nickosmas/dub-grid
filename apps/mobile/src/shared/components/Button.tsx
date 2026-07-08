@@ -1,11 +1,6 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { hapticSelection } from "../lib/haptics";
 import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 
 export type ButtonTone =
@@ -48,9 +43,11 @@ export function Button({
           ? mobileColors.textMuted
           : mobileColors.brand;
   const rippleColor =
-    tone === "primary"
-      ? "rgba(255, 255, 255, 0.22)"
-      : "rgba(15, 23, 42, 0.08)";
+    tone === "primary" || tone === "dangerFilled" || tone === "warningFilled"
+      ? mobileColors.ripplePrimary
+      : tone === "danger"
+        ? mobileColors.rippleDanger
+        : mobileColors.rippleNeutral;
 
   return (
     <Pressable
@@ -58,7 +55,10 @@ export function Button({
       accessibilityState={{ disabled: isDisabled, busy: loading }}
       android_ripple={isDisabled ? undefined : { color: rippleColor }}
       disabled={isDisabled}
-      onPress={onPress}
+      onPress={() => {
+        hapticSelection();
+        onPress();
+      }}
       style={({ pressed }) => [
         styles.button,
         compact && styles.buttonCompact,

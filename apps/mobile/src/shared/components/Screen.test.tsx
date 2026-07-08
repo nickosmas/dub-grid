@@ -57,11 +57,7 @@ vi.mock("react-native", async () => {
   const React = await import("react");
   let layoutOffset = 0;
 
-  const View = ({
-    children,
-    onLayout,
-    ...props
-  }: Record<string, any>) => {
+  const View = ({ children, onLayout, ...props }: Record<string, any>) => {
     const layoutYRef = React.useRef<number | null>(null);
 
     if (layoutYRef.current == null) {
@@ -82,45 +78,40 @@ vi.mock("react-native", async () => {
       });
     }, [onLayout]);
 
-    return React.createElement(
-      "div",
-      pickDomProps(props),
-      children as React.ReactNode,
-    );
+    return React.createElement("div", pickDomProps(props), children as React.ReactNode);
   };
 
   const Text = ({ children, ...props }: Record<string, any>) =>
     React.createElement("span", pickDomProps(props), children as React.ReactNode);
 
-  const ScrollView = React.forwardRef<
-    { scrollTo: () => void },
-    Record<string, any>
-  >(({ children, contentContainerStyle, ...props }, ref) => {
-    React.useImperativeHandle(
-      ref,
-      () => ({
-        scrollTo: () => undefined,
-      }),
-      [],
-    );
+  const ScrollView = React.forwardRef<{ scrollTo: () => void }, Record<string, any>>(
+    ({ children, contentContainerStyle, ...props }, ref) => {
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          scrollTo: () => undefined,
+        }),
+        [],
+      );
 
-    return React.createElement(
-      "div",
-      {
-        ...pickDomProps(props),
-        "data-content-container-style": JSON.stringify(contentContainerStyle),
-        "data-content-inset-adjustment-behavior":
-          props.contentInsetAdjustmentBehavior,
-        "data-automatically-adjust-content-insets":
-          props.automaticallyAdjustContentInsets ? "true" : "false",
-        "data-automatically-adjusts-scroll-indicator-insets":
-          props.automaticallyAdjustsScrollIndicatorInsets ? "true" : "false",
-        "data-keyboard-dismiss-mode": props.keyboardDismissMode,
-        "data-testid": "screen-scroll-view",
-      },
-      children as React.ReactNode,
-    );
-  });
+      return React.createElement(
+        "div",
+        {
+          ...pickDomProps(props),
+          "data-content-container-style": JSON.stringify(contentContainerStyle),
+          "data-content-inset-adjustment-behavior": props.contentInsetAdjustmentBehavior,
+          "data-automatically-adjust-content-insets": props.automaticallyAdjustContentInsets
+            ? "true"
+            : "false",
+          "data-automatically-adjusts-scroll-indicator-insets":
+            props.automaticallyAdjustsScrollIndicatorInsets ? "true" : "false",
+          "data-keyboard-dismiss-mode": props.keyboardDismissMode,
+          "data-testid": "screen-scroll-view",
+        },
+        children as React.ReactNode,
+      );
+    },
+  );
   return {
     Platform: {
       OS: "ios",
@@ -174,20 +165,12 @@ describe("Screen", () => {
     const scrollView = screen.getByTestId("screen-scroll-view");
 
     expect(container.firstElementChild).toBe(scrollView);
-    expect(
-      scrollView.getAttribute("data-content-inset-adjustment-behavior"),
-    ).toBe("automatic");
-    expect(
-      scrollView.getAttribute("data-automatically-adjust-content-insets"),
-    ).toBe("true");
-    expect(
-      scrollView.getAttribute(
-        "data-automatically-adjusts-scroll-indicator-insets",
-      ),
-    ).toBe("true");
-    expect(scrollView.getAttribute("data-keyboard-dismiss-mode")).toBe(
-      "interactive",
+    expect(scrollView.getAttribute("data-content-inset-adjustment-behavior")).toBe("automatic");
+    expect(scrollView.getAttribute("data-automatically-adjust-content-insets")).toBe("true");
+    expect(scrollView.getAttribute("data-automatically-adjusts-scroll-indicator-insets")).toBe(
+      "true",
     );
+    expect(scrollView.getAttribute("data-keyboard-dismiss-mode")).toBe("interactive");
   });
 
   it("applies bottom padding modes to the scroll content container", () => {
@@ -235,9 +218,7 @@ describe("Screen", () => {
   it("renders overlays with the measured sticky header height", () => {
     render(
       <Screen
-        renderOverlay={({ stickyHeaderHeight }) => (
-          <span>{`Overlay ${stickyHeaderHeight}`}</span>
-        )}
+        renderOverlay={({ stickyHeaderHeight }) => <span>{`Overlay ${stickyHeaderHeight}`}</span>}
         stickyHeader={<span>Header</span>}
       >
         <div>Body</div>

@@ -1,5 +1,10 @@
 import type { MobilePerson, MobilePersonStatusUpdateBody } from "@dubgrid/contracts";
 import type { Employee } from "@dubgrid/domain";
+import {
+  isSelfAction,
+  SELF_ACTION_FORBIDDEN_CODE,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+} from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
@@ -67,6 +72,12 @@ type PeopleStatusResult =
       status: 409;
     }
   | {
+      kind: "self_action_forbidden";
+      error: string;
+      code: typeof SELF_ACTION_FORBIDDEN_CODE;
+      status: 403;
+    }
+  | {
       kind: "latest_unavailable";
       error: string;
       status: 500;
@@ -110,11 +121,21 @@ export async function updateMobilePersonStatus(
     };
   }
 
+  // Self-action guard: you can't change your own staffing status
+  // (deactivate / remove / activate). Another admin must act.
+  if (isSelfAction(auth.user.id, currentEmployee.userId)) {
+    return {
+      kind: "self_action_forbidden",
+      error: SELF_ACTION_FORBIDDEN_MESSAGE,
+      code: SELF_ACTION_FORBIDDEN_CODE,
+      status: 403,
+    };
+  }
+
   if (currentEmployee.version !== input.body.expectedVersion) {
     return {
       kind: "conflict",
-      error:
-        "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: "Employee status changed elsewhere. Review the latest values before saving again.",
       code: "EMPLOYEE_STATUS_CONFLICT",
       person: deps.mapEmployeeToMobilePerson(currentEmployee),
       status: 409,
@@ -123,18 +144,17 @@ export async function updateMobilePersonStatus(
 
   const now = new Date().toISOString();
   const nextStatus =
-    input.body.action === "bench"
-      ? "benched"
-      : input.body.action === "terminate"
-        ? "terminated"
+    input.body.action === "deactivate"
+      ? "inactive"
+      : input.body.action === "remove"
+        ? "removed"
         : "active";
-  const nextStatusNote =
-    input.body.action === "bench" ? (input.body.note ?? "") : "";
+  const nextStatusNote = input.body.action === "deactivate" ? (input.body.note ?? "") : "";
   const action =
-    input.body.action === "bench"
-      ? "employee.benched"
-      : input.body.action === "terminate"
-        ? "employee.archived"
+    input.body.action === "deactivate"
+      ? "employee.deactivated"
+      : input.body.action === "remove"
+        ? "employee.removed"
         : "employee.activated";
 
   const updatedEmployee = await deps.updateEmployeeStatus(auth.serviceClient, {
@@ -145,11 +165,7 @@ export async function updateMobilePersonStatus(
     statusNote: nextStatusNote,
     statusChangedAt: now,
     archivedAt:
-      input.body.action === "activate"
-        ? null
-        : input.body.action === "terminate"
-          ? now
-          : undefined,
+      input.body.action === "activate" ? null : input.body.action === "remove" ? now : undefined,
   });
 
   if (!updatedEmployee) {
@@ -169,8 +185,7 @@ export async function updateMobilePersonStatus(
 
     return {
       kind: "conflict",
-      error:
-        "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: "Employee status changed elsewhere. Review the latest values before saving again.",
       code: "EMPLOYEE_STATUS_CONFLICT",
       person: deps.mapEmployeeToMobilePerson(latestEmployee),
       status: 409,

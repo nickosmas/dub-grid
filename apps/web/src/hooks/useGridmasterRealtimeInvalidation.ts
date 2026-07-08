@@ -138,10 +138,7 @@ export function getGridmasterRealtimeInvalidationKeys(
         queryKeys.gridmaster.allUsers(),
         ...platformSummaryKeys,
         ...(orgId
-          ? [
-              queryKeys.gridmaster.orgUsers(orgId),
-              queryKeys.gridmaster.orgHealth(orgId),
-            ]
+          ? [queryKeys.gridmaster.orgUsers(orgId), queryKeys.gridmaster.orgHealth(orgId)]
           : []),
       ]);
     case "invitations":
@@ -159,12 +156,7 @@ export function getGridmasterRealtimeInvalidationKeys(
       return uniqueKeys([
         queryKeys.gridmaster.overview(),
         queryKeys.gridmaster.orgHealth(null),
-        ...(orgId
-          ? [
-              queryKeys.gridmaster.org(orgId),
-              queryKeys.gridmaster.orgHealth(orgId),
-            ]
-          : []),
+        ...(orgId ? [queryKeys.gridmaster.org(orgId), queryKeys.gridmaster.orgHealth(orgId)] : []),
       ]);
     case "schedule_cells":
     case "schedule_cell_snapshots":
@@ -173,12 +165,7 @@ export function getGridmasterRealtimeInvalidationKeys(
       return uniqueKeys([
         queryKeys.gridmaster.overview(),
         queryKeys.gridmaster.orgHealth(null),
-        ...(orgId
-          ? [
-              queryKeys.gridmaster.org(orgId),
-              queryKeys.gridmaster.orgHealth(orgId),
-            ]
-          : []),
+        ...(orgId ? [queryKeys.gridmaster.org(orgId), queryKeys.gridmaster.orgHealth(orgId)] : []),
       ]);
     case "focus_areas":
     case "jobs":
@@ -208,7 +195,12 @@ export function resolveGridmasterRealtimeOrgId(
   payload: RealtimePayload,
 ): string | null {
   const row = payload.new ?? payload.old ?? {};
-  const key = table === "organizations" ? "id" : table === "impersonation_sessions" ? "target_org_id" : "org_id";
+  const key =
+    table === "organizations"
+      ? "id"
+      : table === "impersonation_sessions"
+        ? "target_org_id"
+        : "org_id";
   const value = row[key];
   return typeof value === "string" && value.length > 0 ? value : null;
 }
@@ -239,10 +231,7 @@ export function useGridmasterRealtimeInvalidation({
       .toString(36)
       .slice(2, 8)}`;
     const channel = createBrowserRealtimeChannel(channelId);
-    const handleChange = (
-      table: GridmasterRealtimeTable,
-      payload: RealtimePayload,
-    ) => {
+    const handleChange = (table: GridmasterRealtimeTable, payload: RealtimePayload) => {
       invalidateGridmasterRealtimeQueries(
         queryClient,
         table,

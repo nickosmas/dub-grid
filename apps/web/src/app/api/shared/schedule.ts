@@ -1,19 +1,7 @@
-import type {
-  DbFocusArea,
-  DbJobDefinition,
-  DbShiftCategory,
-} from "@dubgrid/db-types";
+import type { DbFocusArea, DbJobDefinition, DbShiftCategory } from "@dubgrid/db-types";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
-import {
-  rowToFocusArea,
-  rowToJobDefinition,
-  rowToShiftCategory,
-} from "@/lib/db/mappers";
-import {
-  FOCUS_AREA_COLS,
-  JOB_COLS,
-  SHIFT_CATEGORY_COLS,
-} from "@/lib/db/shared";
+import { rowToFocusArea, rowToJobDefinition, rowToShiftCategory } from "@/lib/db/mappers";
+import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS } from "@/lib/db/shared";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
 import type { getServiceClient } from "@/lib/supabase-service";
 
@@ -51,9 +39,7 @@ async function fetchAssignmentOptions(
 
   return buildScheduleAssignmentOptions({
     orgId,
-    focusAreas: ((focusAreaResult.data ?? []) as DbFocusArea[]).map(
-      rowToFocusArea,
-    ),
+    focusAreas: ((focusAreaResult.data ?? []) as DbFocusArea[]).map(rowToFocusArea),
     shiftCategories: ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(
       rowToShiftCategory,
     ),
@@ -78,9 +64,6 @@ export async function fetchAssignmentLabelMap(
   const assignments = await fetchAssignmentOptions(serviceClient, orgId);
 
   return new Map(
-    assignments.map((assignment) => [
-      assignment.id,
-      assignment.label || assignment.name,
-    ]),
+    assignments.map((assignment) => [assignment.id, assignment.label || assignment.name]),
   );
 }

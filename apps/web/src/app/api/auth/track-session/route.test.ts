@@ -4,10 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireAuthenticatedSession = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const trackUserSessionForUser = vi.fn();
+const dispatchNotificationEvent = vi.fn();
+const newDeviceLookup = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedSession: (req: NextRequest) =>
-    requireAuthenticatedSession(req),
+  requireAuthenticatedSession: (req: NextRequest) => requireAuthenticatedSession(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -16,6 +17,33 @@ vi.mock("@/lib/csrf", () => ({
 
 vi.mock("@/features/account/server", () => ({
   trackUserSessionForUser: (input: unknown) => trackUserSessionForUser(input),
+}));
+
+vi.mock("@/features/notifications/server/events", () => ({
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
+}));
+
+vi.mock("@/lib/supabase-service", () => ({
+  getServiceClient: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({
+            eq: () => ({
+              limit: () => newDeviceLookup(),
+            }),
+          }),
+        }),
+      }),
+    }),
+  }),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  default: {
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 import { POST } from "@/app/api/auth/track-session/route";
@@ -34,13 +62,13 @@ describe("POST /api/auth/track-session", () => {
       user: { id: "session-user" },
     });
     trackUserSessionForUser.mockResolvedValue(undefined);
+    dispatchNotificationEvent.mockResolvedValue({ success: true });
+    // Default: an existing row matches this device → not a new device.
+    newDeviceLookup.mockResolvedValue({ data: [{ id: "existing-session" }] });
   });
 
   it("rejects unauthenticated requests", async () => {
-    const unauthenticated = NextResponse.json(
-      { error: "Unauthenticated" },
-      { status: 401 },
-    );
+    const unauthenticated = NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     requireAuthenticatedSession.mockResolvedValueOnce({
       response: unauthenticated,
     });
@@ -101,6 +129,45 @@ describe("POST /api/auth/track-session", () => {
     expect(response.status).toBe(403);
     expect(trackUserSessionForUser).not.toHaveBeenCalled();
   });
+
+  it("dispatches security_new_device when no prior session matches the device", async () => {
+    newDeviceLookup.mockResolvedValueOnce({ data: [] });
+
+    await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+        body: JSON.stringify({
+          platform: "web",
+          deviceLabel: "Chrome on macOS",
+        }),
+      }),
+    );
+
+    expect(dispatchNotificationEvent).toHaveBeenCalledWith("session-user", {
+      action: "security_new_device",
+      orgId: "org-id-1",
+      targetUserId: "session-user",
+      platform: "web",
+      deviceLabel: "Chrome on macOS",
+      ipAddress: null,
+    });
+  });
+
+  it("skips new-device dispatch when a prior session for the device exists", async () => {
+    await POST(
+      new NextRequest("http://localhost/api/auth/track-session", {
+        method: "POST",
+        headers: { origin: "http://localhost:3000" },
+        body: JSON.stringify({
+          platform: "web",
+          deviceLabel: "Chrome on macOS",
+        }),
+      }),
+    );
+
+    expect(dispatchNotificationEvent).not.toHaveBeenCalled();
+  });
 });
 
 function createJwt(payload: Record<string, unknown>): string {
@@ -112,6 +179,5 @@ function createJwt(payload: Record<string, unknown>): string {
 }
 
 function encodeJwtSegment(value: Record<string, unknown>): string {
-  return Buffer.from(JSON.stringify(value))
-    .toString("base64url");
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
 }

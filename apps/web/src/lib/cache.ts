@@ -8,6 +8,14 @@ export const TTL = {
   MODERATE: 120,
   /** 30 seconds — middleware profile/membership fallback */
   MIDDLEWARE: 30,
+  /**
+   * 24 hours — public, unauthenticated subdomain→org lookup. Safe this long
+   * because organizations.slug is write-once (set at creation, never
+   * rewritten); the cached `name` is invalidated explicitly on rename
+   * (organizations/settings/route.ts) and on archive
+   * (organizations/delete/route.ts) rather than relying on TTL expiry.
+   */
+  PUBLIC_LOOKUP: 86400,
 } as const;
 
 // ── Redis Client (lazy singleton) ───────────────────────────────────────
@@ -29,12 +37,9 @@ function getRedis(): Redis | null {
 export const CacheKey = {
   // Stable org config
   focusAreas: (orgId: string) => `dg:org:${orgId}:focusAreas`,
-  assignments: (orgId: string, all = false) =>
-    `dg:org:${orgId}:assignments${all ? ":all" : ""}`,
-  jobs: (orgId: string, all = false) =>
-    `dg:org:${orgId}:jobs${all ? ":all" : ""}`,
-  absenceTypes: (orgId: string, all = false) =>
-    `dg:org:${orgId}:absenceTypes${all ? ":all" : ""}`,
+  assignments: (orgId: string, all = false) => `dg:org:${orgId}:assignments${all ? ":all" : ""}`,
+  jobs: (orgId: string, all = false) => `dg:org:${orgId}:jobs${all ? ":all" : ""}`,
+  absenceTypes: (orgId: string, all = false) => `dg:org:${orgId}:absenceTypes${all ? ":all" : ""}`,
   shiftCategories: (orgId: string) => `dg:org:${orgId}:shiftCategories`,
   indicatorTypes: (orgId: string) => `dg:org:${orgId}:indicatorTypes`,
   certifications: (orgId: string) => `dg:org:${orgId}:certifications`,
@@ -55,10 +60,12 @@ export const CacheKey = {
 
   // Middleware
   mwProfile: (userId: string) => `dg:mw:profile:${userId}`,
-  mwMembership: (userId: string, slug: string) =>
-    `dg:mw:membership:${userId}:${slug}`,
+  mwMembership: (userId: string, slug: string) => `dg:mw:membership:${userId}:${slug}`,
   mwOrgSuspended: (orgId: string) => `dg:mw:orgSuspended:${orgId}`,
   mwOrgAccess: (orgId: string) => `dg:mw:orgAccess:${orgId}`,
+
+  // Public subdomain lookup (validate-domain)
+  orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
 } as const;
 
 // ── Typed Cache Operations ──────────────────────────────────────────────
@@ -76,10 +83,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     return raw ?? null;
   } catch (err) {
     if (_debugMode) {
-      console.warn(
-        `[cache] GET failed for ${key}:`,
-        err instanceof Error ? err.message : err,
-      );
+      console.warn(`[cache] GET failed for ${key}:`, err instanceof Error ? err.message : err);
     }
     return null;
   }
@@ -88,21 +92,14 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 /**
  * Set a cached value with TTL. Fails silently if Redis unavailable.
  */
-export async function cacheSet<T>(
-  key: string,
-  value: T,
-  ttlSeconds: number,
-): Promise<void> {
+export async function cacheSet<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
   const client = getRedis();
   if (!client) return;
   try {
     await client.set(key, value, { ex: ttlSeconds });
   } catch (err) {
     if (_debugMode) {
-      console.warn(
-        `[cache] SET failed for ${key}:`,
-        err instanceof Error ? err.message : err,
-      );
+      console.warn(`[cache] SET failed for ${key}:`, err instanceof Error ? err.message : err);
     }
   }
 }
@@ -117,10 +114,7 @@ export async function cacheDel(...keys: string[]): Promise<void> {
     await client.del(...keys);
   } catch (err) {
     if (_debugMode) {
-      console.warn(
-        `[cache] DEL failed:`,
-        err instanceof Error ? err.message : err,
-      );
+      console.warn(`[cache] DEL failed:`, err instanceof Error ? err.message : err);
     }
   }
 }

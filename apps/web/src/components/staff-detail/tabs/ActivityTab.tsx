@@ -25,7 +25,12 @@ interface ActivityTabProps {
 interface TimelineEvent {
   id: string;
   date: Date;
-  type: "role_change" | "invitation_sent" | "invitation_accepted" | "invitation_revoked" | "invitation_expired";
+  type:
+    | "role_change"
+    | "invitation_sent"
+    | "invitation_accepted"
+    | "invitation_revoked"
+    | "invitation_expired";
   category: string;
   description: string;
   meta?: string;
@@ -33,11 +38,7 @@ interface TimelineEvent {
   toRole?: string;
 }
 
-export function ActivityTab({
-  employee,
-  roleHistory,
-  invitations,
-}: ActivityTabProps) {
+export function ActivityTab({ employee, roleHistory, invitations }: ActivityTabProps) {
   const timeline = useMemo(() => {
     const events: TimelineEvent[] = [];
 

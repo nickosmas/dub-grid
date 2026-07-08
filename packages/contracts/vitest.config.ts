@@ -6,6 +6,9 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: "node",
+      // Pin to UTC (production runtime) so schedule date-range normalization is
+      // deterministic regardless of the dev machine's timezone.
+      env: { TZ: "UTC" },
     },
   }),
 );

@@ -31,15 +31,9 @@ export interface ScheduleGridAccessors {
   publishedSegmentsForKey?: (
     empId: string,
     date: Date,
-  ) => Array<
-    Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">
-  >;
+  ) => Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
-  activeIndicatorIdsForKey?: (
-    empId: string,
-    date: Date,
-    focusAreaId?: number,
-  ) => number[];
+  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   getCustomShiftTimes?: (
     empId: string,
     date: Date,
@@ -57,6 +51,7 @@ export interface ScheduleGridAccessors {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
+  fromRecurringForKey?: (empId: string, date: Date) => boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
@@ -204,10 +199,7 @@ export interface BuildScheduleGridModelInput {
   accessors: ScheduleGridAccessors;
 }
 
-function cellNeedsLayoutStack(args: {
-  draftKind: DraftKind;
-  showDiffOverlay: boolean;
-}): boolean {
+function cellNeedsLayoutStack(args: { draftKind: DraftKind; showDiffOverlay: boolean }): boolean {
   const { draftKind, showDiffOverlay } = args;
   return showDiffOverlay && !!draftKind && draftKind !== "deleted";
 }
@@ -247,15 +239,13 @@ export function buildScheduleGridModel({
 }: BuildScheduleGridModelInput): ScheduleGridModel {
   const allDates = spanWeeks === 2 ? [...week1, ...week2] : week1;
   const todayKey = formatDateKey(today);
-  const columns = allDates.map(
-    (date, columnIndex): GridColumnMeta => ({
-      columnIndex,
-      date,
-      dateKey: formatDateKey(date),
-      isToday: formatDateKey(date) === todayKey,
-      isWeekSplitStart: spanWeeks === 2 && columnIndex === 7,
-    }),
-  );
+  const columns = allDates.map((date, columnIndex): GridColumnMeta => ({
+    columnIndex,
+    date,
+    dateKey: formatDateKey(date),
+    isToday: formatDateKey(date) === todayKey,
+    isWeekSplitStart: spanWeeks === 2 && columnIndex === 7,
+  }));
 
   const departmentsById = new Map(departments.map((dept) => [dept.id, dept]));
   const focusAreasById = new Map(focusAreas.map((fa) => [fa.id, fa]));
@@ -290,9 +280,7 @@ export function buildScheduleGridModel({
         type: "scheduled",
         sortOrder: 999,
       },
-      focusAreas: orphanedFocusAreas.sort(
-        (left, right) => left.sortOrder - right.sortOrder,
-      ),
+      focusAreas: orphanedFocusAreas.sort((left, right) => left.sortOrder - right.sortOrder),
     });
   }
 
@@ -306,9 +294,7 @@ export function buildScheduleGridModel({
               (focusArea) => focusArea.id === activeFocusArea,
             ),
           }))
-          .filter(({ focusAreas: departmentFocusAreas }) =>
-            departmentFocusAreas.length > 0,
-          );
+          .filter(({ focusAreas: departmentFocusAreas }) => departmentFocusAreas.length > 0);
 
   const exclusiveCodeIdsBySection = new Map<number, Set<number>>();
   for (const focusArea of focusAreas) {
@@ -322,10 +308,7 @@ export function buildScheduleGridModel({
     );
   }
 
-  const sectionHasVisibleContent = (
-    focusArea: FocusArea,
-    exclusiveCodeIds: Set<number>,
-  ) => {
+  const sectionHasVisibleContent = (focusArea: FocusArea, exclusiveCodeIds: Set<number>) => {
     if (openShiftSectionIds.has(focusArea.id)) {
       return true;
     }
@@ -350,8 +333,7 @@ export function buildScheduleGridModel({
         employee.focusAreaIds.length > 0 &&
         !employee.focusAreaIds.includes(focusArea.id) &&
         allDates.some((date) => {
-          const codeIds =
-            accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
+          const codeIds = accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
           return codeIds.some((codeId) => exclusiveCodeIds.has(codeId));
         }),
     );
@@ -370,8 +352,7 @@ export function buildScheduleGridModel({
           ),
         )
         .map((focusArea) => {
-          const exclusiveCodeIds =
-            exclusiveCodeIdsBySection.get(focusArea.id) ?? new Set<number>();
+          const exclusiveCodeIds = exclusiveCodeIdsBySection.get(focusArea.id) ?? new Set<number>();
           const rawHomeEmployees = filteredEmployees.filter((employee) =>
             employee.focusAreaIds.includes(focusArea.id),
           );
@@ -379,8 +360,7 @@ export function buildScheduleGridModel({
             ? rawHomeEmployees
             : rawHomeEmployees.filter((employee) =>
                 allDates.some((date) => {
-                  const codeIds =
-                    accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
+                  const codeIds = accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
                   return codeIds.some((codeId) => {
                     if (exclusiveCodeIds.has(codeId)) return true;
                     return assignmentLookupById.get(codeId)?.focusAreaId == null;
@@ -392,8 +372,7 @@ export function buildScheduleGridModel({
               employee.focusAreaIds.length > 0 &&
               !employee.focusAreaIds.includes(focusArea.id) &&
               allDates.some((date) => {
-                const codeIds =
-                  accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
+                const codeIds = accessors.assignmentIdsForKey?.(employee.id, date) ?? [];
                 return codeIds.some((codeId) => exclusiveCodeIds.has(codeId));
               }),
           );
@@ -404,9 +383,7 @@ export function buildScheduleGridModel({
             departmentId: department.id,
             exclusiveCodeIds,
             employees: [...homeEmployees, ...guestEmployees],
-            openShifts: openShifts.filter(
-              (openShift) => openShift.focusAreaId === focusArea.id,
-            ),
+            openShifts: openShifts.filter((openShift) => openShift.focusAreaId === focusArea.id),
           };
         }),
     }))

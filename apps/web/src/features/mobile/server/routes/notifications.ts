@@ -1,13 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  mobileNotificationSchema,
   mobileNotificationsQuerySchema,
   mobileNotificationsResponseSchema,
 } from "@dubgrid/contracts";
 import { loadMobileNotificationsPayload } from "@dubgrid/mobile-api-core";
-import {
-  fetchMobileNotifications,
-  requireMobileAuth,
-} from "@/features/mobile/server";
+import { fetchMobileNotifications, requireMobileAuth } from "@/features/mobile/server";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +26,20 @@ export async function GET(req: NextRequest) {
       fetchMobileNotifications,
     });
 
-    return NextResponse.json(mobileNotificationsResponseSchema.parse(payload));
+    const notifications = payload.notifications.filter((raw) => {
+      const result = mobileNotificationSchema.safeParse(raw);
+      if (!result.success) {
+        logger.warn(
+          { notificationId: (raw as { id?: string }).id, issues: result.error.issues },
+          "Dropping mobile notification with unrecognized schema",
+        );
+      }
+      return result.success;
+    });
+
+    return NextResponse.json(
+      mobileNotificationsResponseSchema.parse({ ...payload, notifications }),
+    );
   } catch {
     return NextResponse.json(
       { error: "We couldn't load your mobile notifications right now." },

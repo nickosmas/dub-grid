@@ -32,9 +32,7 @@ interface UseSelfProfileDataResult {
 
 export type { SelfProfileRecord };
 
-export function useSelfProfileData({
-  orgId,
-}: UseSelfProfileDataOptions): UseSelfProfileDataResult {
+export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSelfProfileDataResult {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.account.self(user?.id ?? "anonymous", orgId);
@@ -56,48 +54,38 @@ export function useSelfProfileData({
 
   const setProfile = useCallback<Dispatch<SetStateAction<SelfProfileRecord | null>>>(
     (nextValue) => {
-      queryClient.setQueryData<AccountSelfProfileData | undefined>(
-        queryKey,
-        (current) => {
-          if (!current) {
-            return current;
-          }
+      queryClient.setQueryData<AccountSelfProfileData | undefined>(queryKey, (current) => {
+        if (!current) {
+          return current;
+        }
 
-          const nextProfile =
-            typeof nextValue === "function"
-              ? nextValue(current.profile ?? null)
-              : nextValue;
+        const nextProfile =
+          typeof nextValue === "function" ? nextValue(current.profile ?? null) : nextValue;
 
-          return {
-            ...current,
-            profile: nextProfile,
-          };
-        },
-      );
+        return {
+          ...current,
+          profile: nextProfile,
+        };
+      });
     },
     [queryClient, queryKey],
   );
 
   const setEmployee = useCallback<Dispatch<SetStateAction<Employee | null>>>(
     (nextValue) => {
-      queryClient.setQueryData<AccountSelfProfileData | undefined>(
-        queryKey,
-        (current) => {
-          if (!current) {
-            return current;
-          }
+      queryClient.setQueryData<AccountSelfProfileData | undefined>(queryKey, (current) => {
+        if (!current) {
+          return current;
+        }
 
-          const nextEmployee =
-            typeof nextValue === "function"
-              ? nextValue(current.employee ?? null)
-              : nextValue;
+        const nextEmployee =
+          typeof nextValue === "function" ? nextValue(current.employee ?? null) : nextValue;
 
-          return {
-            ...current,
-            employee: nextEmployee,
-          };
-        },
-      );
+        return {
+          ...current,
+          employee: nextEmployee,
+        };
+      });
     },
     [queryClient, queryKey],
   );

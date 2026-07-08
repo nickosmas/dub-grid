@@ -14,11 +14,10 @@ import {
   type BillingConfirmAction,
 } from "@/components/gridmaster/BillingActionDialogs";
 import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  formatBillingStatusLabel,
-  formatClientErrorMessage,
-} from "@/lib/client-facing";
+import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { GridmasterBillingOrgSummary } from "@/types";
 
@@ -32,7 +31,15 @@ const BILLING_STATUSES = [
   "incomplete_expired",
 ] as const;
 
-function MiniCard({ label, value, tone = "neutral" }: { label: string; value: number; tone?: "neutral" | "warning" | "danger" }) {
+function MiniCard({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: number;
+  tone?: "neutral" | "warning" | "danger";
+}) {
   const color =
     tone === "danger"
       ? "var(--color-danger)"
@@ -41,8 +48,26 @@ function MiniCard({ label, value, tone = "neutral" }: { label: string; value: nu
         : "var(--color-text-primary)";
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 160px" }}>
-      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 800, color, fontFamily: "var(--font-dm-mono), monospace" }}>{value}</div>
-      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", marginTop: 2 }}>{label}</div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-card-title)",
+          fontWeight: 800,
+          color,
+          fontFamily: "var(--font-dm-mono), monospace",
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 700,
+          color: "var(--color-text-muted)",
+          marginTop: 2,
+        }}
+      >
+        {label}
+      </div>
     </div>
   );
 }
@@ -51,11 +76,76 @@ function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleDateString() : "—";
 }
 
+// A trialing org with no end date hasn't started its trial yet (no super_admin
+// has signed in). Show that explicitly rather than an ambiguous dash.
+function formatTrialEnds(org: GridmasterBillingOrgSummary) {
+  if (org.trialEndsAt) return new Date(org.trialEndsAt).toLocaleDateString();
+  if (org.status === "trialing" || !org.status) return "Not started";
+  return "—";
+}
+
 function statusTone(status: string | null) {
   if (status === "active" || status === "trialing") return "var(--color-success)";
   if (status === "past_due" || status === "incomplete") return "var(--color-warning)";
-  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") return "var(--color-danger)";
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
+    return "var(--color-danger)";
   return "var(--color-text-muted)";
+}
+
+// A trialing org with no end date hasn't started its trial yet (no super_admin
+// has intentionally accessed it). Surface that as a distinct "pending" status
+// instead of the green "Trial active" the bare status maps to.
+function isTrialPending(org: GridmasterBillingOrgSummary) {
+  return org.status === "trialing" && !org.trialEndsAt;
+}
+
+function statusLabelFor(org: GridmasterBillingOrgSummary) {
+  return isTrialPending(org) ? "Trial pending" : formatBillingStatusLabel(org.status);
+}
+
+function statusToneFor(org: GridmasterBillingOrgSummary) {
+  return isTrialPending(org) ? "var(--color-text-muted)" : statusTone(org.status);
+}
+
+function BillingOversightSkeleton() {
+  return (
+    <div aria-hidden>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              ...sectionStyle,
+              padding: "14px 16px",
+              flex: "1 1 160px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div className="dg-skeleton" style={{ width: 48, height: 22, borderRadius: 4 }} />
+            <div className="dg-skeleton" style={{ width: 96, height: 10, borderRadius: 4 }} />
+          </div>
+        ))}
+      </div>
+      <div style={sectionStyle}>
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              <div
+                className="dg-skeleton"
+                style={{ flex: "1 1 160px", height: 12, borderRadius: 4 }}
+              />
+              <div className="dg-skeleton" style={{ width: 80, height: 18, borderRadius: 999 }} />
+              <div className="dg-skeleton" style={{ width: 90, height: 12, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 60, height: 12, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 120, height: 28, borderRadius: 6 }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BillingRowActions({
@@ -79,7 +169,7 @@ function BillingRowActions({
 }) {
   const [status, setStatus] = useState(
     BILLING_STATUSES.includes(org.status as (typeof BILLING_STATUSES)[number])
-      ? org.status ?? "active"
+      ? (org.status ?? "active")
       : "active",
   );
 
@@ -99,11 +189,7 @@ function BillingRowActions({
       <button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={
-          busy ||
-          !org.stripeSubscriptionId ||
-          org.seats === org.appUsers
-        }
+        disabled={busy || !org.stripeSubscriptionId || org.seats === org.appUsers}
         onClick={() => onSyncSeats(org)}
       >
         True up seats
@@ -111,7 +197,9 @@ function BillingRowActions({
       <button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={busy}
+        // Only a trialing org has a trial to extend; for active/canceled/past_due
+        // there is no trial clock, so the action would be a no-op.
+        disabled={busy || org.status !== "trialing"}
         onClick={() => onExtendTrial(org)}
       >
         Extend trial
@@ -119,12 +207,7 @@ function BillingRowActions({
       <button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
-        disabled={
-          busy ||
-          !org.stripeSubscriptionId ||
-          org.status === "canceled" ||
-          !!org.cancelAt
-        }
+        disabled={busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt}
         onClick={() => onCancelAtPeriodEnd(org)}
       >
         End period
@@ -132,7 +215,9 @@ function BillingRowActions({
       <button
         type="button"
         className="dg-btn dg-btn-danger dg-btn-xs"
-        disabled={busy || org.status === "canceled"}
+        // No Stripe subscription = nothing to cancel; use Override to change a
+        // local-only org's status instead.
+        disabled={busy || org.status === "canceled" || !org.stripeSubscriptionId}
         onClick={() => onCancel(org)}
       >
         Cancel
@@ -162,7 +247,11 @@ function BillingRowActions({
   );
 }
 
-export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (orgId: string, initialTab?: "billing") => void }) {
+export default function GridmasterBillingView({
+  onSelectOrg,
+}: {
+  onSelectOrg: (orgId: string, initialTab?: "billing") => void;
+}) {
   const queryClient = useQueryClient();
   const [busyOrgId, setBusyOrgId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<BillingConfirmAction | null>(null);
@@ -206,9 +295,9 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
             ? "Subscription canceled"
             : input.action === "cancel_at_period_end"
               ? "Cancellation scheduled"
-            : input.action === "sync_seats"
-              ? "Seats synced"
-              : "Billing status overridden",
+              : input.action === "sync_seats"
+                ? "Seats synced"
+                : "Billing status overridden",
       );
       invalidateBilling();
     },
@@ -296,13 +385,37 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
 
   return (
     <>
-      <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+      <div
+        style={{
+          marginBottom: 16,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "var(--dg-fs-page-title)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             Billing Oversight
           </h2>
-          <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", fontWeight: 600 }}>
-            Sync Stripe state, extend trials, cancel subscriptions, and correct local status when support needs to intervene.
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-muted)",
+              fontWeight: 600,
+            }}
+          >
+            Sync Stripe state, extend trials, cancel subscriptions, and correct local status when
+            support needs to intervene.
           </p>
         </div>
         <button
@@ -316,79 +429,189 @@ export default function GridmasterBillingView({ onSelectOrg }: { onSelectOrg: (o
       </div>
 
       {billingQuery.error instanceof Error && (
-        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--color-danger-bg)",
+            color: "var(--color-danger)",
+            borderRadius: "var(--dg-radius-lg)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
           {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
         </div>
       )}
 
+      <ProgressBar loading={billingQuery.isLoading || !billing} />
+
       {billingQuery.isLoading || !billing ? (
-        <div style={sectionStyle}>
-          <div style={{ padding: 24, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>Loading billing oversight...</div>
-        </div>
+        <BillingOversightSkeleton />
       ) : (
         <>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-            <MiniCard label="Trials Ending" value={billing.trialEndingSoon.length} tone={billing.trialEndingSoon.length ? "warning" : "neutral"} />
-            <MiniCard label="Billing Risk" value={billing.riskOrganizations.length} tone={billing.riskOrganizations.length ? "danger" : "neutral"} />
-            <MiniCard label="Missing Stripe" value={billing.missingStripeCustomer.length} tone={billing.missingStripeCustomer.length ? "warning" : "neutral"} />
-            <MiniCard label="Seat Mismatch" value={billing.seatMismatches.length} tone={billing.seatMismatches.length ? "danger" : "neutral"} />
+            <MiniCard
+              label="Trials Ending"
+              value={billing.trialEndingSoon.length}
+              tone={billing.trialEndingSoon.length ? "warning" : "neutral"}
+            />
+            <MiniCard label="Trials Not Started" value={billing.trialsNotStarted.length} />
+            <MiniCard
+              label="Billing Risk"
+              value={billing.riskOrganizations.length}
+              tone={billing.riskOrganizations.length ? "danger" : "neutral"}
+            />
+            <MiniCard
+              label="Missing Stripe"
+              value={billing.missingStripeCustomer.length}
+              tone={billing.missingStripeCustomer.length ? "warning" : "neutral"}
+            />
+            <MiniCard
+              label="Seat Mismatch"
+              value={billing.seatMismatches.length}
+              tone={billing.seatMismatches.length ? "danger" : "neutral"}
+            />
           </div>
 
           <div style={sectionStyle}>
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
-                <thead>
-                  <tr>
-                    {["Organization", "Status", "Trial Ends", "Period End", "Cancel At", "Seats", "App Users", "Delta", "Stripe", "Updated", "Actions"].map((heading) => (
-                      <th key={heading} style={thStyle}>{heading}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {billing.organizations.map((org) => {
-                    const risky = billing.riskOrganizations.some((candidate) => candidate.orgId === org.orgId) || (org.seatDelta != null && org.seatDelta < 0);
-                    return (
-                      <tr key={org.orgId} onClick={() => onSelectOrg(org.orgId, "billing")} style={{ cursor: "pointer", background: risky ? "var(--color-danger-bg)" : undefined }}>
-                        <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
-                        <td style={{ ...tdStyle, color: statusTone(org.status), fontWeight: 800 }}>{formatBillingStatusLabel(org.status)}</td>
-                        <td style={tdStyle}>{formatDate(org.trialEndsAt)}</td>
-                        <td style={tdStyle}>{formatDate(org.currentPeriodEnd)}</td>
-                        <td style={{ ...tdStyle, color: org.cancelAt ? "var(--color-warning)" : "var(--color-text-muted)", fontWeight: org.cancelAt ? 700 : undefined }}>{formatDate(org.cancelAt)}</td>
-                        <td style={tdStyle}>{org.seats ?? "—"}</td>
-                        <td style={tdStyle}>{org.appUsers}</td>
-                        <td style={{ ...tdStyle, color: org.seatDelta != null && org.seatDelta < 0 ? "var(--color-danger)" : "var(--color-text-muted)", fontWeight: 700 }}>{org.seatDelta ?? "—"}</td>
-                        <td style={tdStyle}>
-                          {org.stripeCustomerId ? (
-                            <a
-                              href={`https://dashboard.stripe.com/customers/${org.stripeCustomerId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(event) => event.stopPropagation()}
-                              style={{ color: "var(--color-brand)", fontWeight: 700 }}
-                            >
-                              Connected
-                            </a>
-                          ) : "Missing"}
-                        </td>
-                        <td style={tdStyle}>{formatDate(org.updatedAt)}</td>
-                        <td style={tdStyle}>
-                          <BillingRowActions
-                            org={org}
-                            busy={busyOrgId === org.orgId}
-                            onSync={handleSync}
-                            onSyncSeats={handleSyncSeats}
-                            onExtendTrial={handleExtendTrial}
-                            onCancel={handleCancel}
-                            onCancelAtPeriodEnd={handleCancelAtPeriodEnd}
-                            onOverrideStatus={handleOverrideStatus}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {billing.organizations.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <EmptyState
+                  size="compact"
+                  icon={
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="2" y="5" width="20" height="14" rx="2" />
+                      <line x1="2" y1="10" x2="22" y2="10" />
+                    </svg>
+                  }
+                  title="No organizations to bill"
+                  description="Billing rows show up once organizations sign up or start a trial."
+                />
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                  <thead>
+                    <tr>
+                      {[
+                        "Organization",
+                        "Status",
+                        "Trial Started",
+                        "Trial Ends",
+                        "Period End",
+                        "Cancel At",
+                        "Seats",
+                        "App Users",
+                        "Delta",
+                        "Stripe",
+                        "Updated",
+                        "Actions",
+                      ].map((heading) => (
+                        <th key={heading} style={thStyle}>
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {billing.organizations.map((org) => {
+                      const risky =
+                        billing.riskOrganizations.some(
+                          (candidate) => candidate.orgId === org.orgId,
+                        ) ||
+                        (org.seatDelta != null && org.seatDelta < 0);
+                      return (
+                        <tr
+                          key={org.orgId}
+                          onClick={() => onSelectOrg(org.orgId, "billing")}
+                          style={{
+                            cursor: "pointer",
+                            background: risky ? "var(--color-danger-bg)" : undefined,
+                          }}
+                        >
+                          <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
+                          <td style={{ ...tdStyle, color: statusToneFor(org), fontWeight: 800 }}>
+                            {statusLabelFor(org)}
+                          </td>
+                          <td style={tdStyle}>
+                            {org.trialStartedAt
+                              ? new Date(org.trialStartedAt).toLocaleDateString()
+                              : isTrialPending(org)
+                                ? "Not started"
+                                : "—"}
+                          </td>
+                          <td style={tdStyle}>{formatTrialEnds(org)}</td>
+                          <td style={tdStyle}>{formatDate(org.currentPeriodEnd)}</td>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              color: org.cancelAt
+                                ? "var(--color-warning)"
+                                : "var(--color-text-muted)",
+                              fontWeight: org.cancelAt ? 700 : undefined,
+                            }}
+                          >
+                            {formatDate(org.cancelAt)}
+                          </td>
+                          <td style={tdStyle}>{org.seats ?? "—"}</td>
+                          <td style={tdStyle}>{org.appUsers}</td>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              color:
+                                org.seatDelta != null && org.seatDelta < 0
+                                  ? "var(--color-danger)"
+                                  : "var(--color-text-muted)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {org.seatDelta ?? "—"}
+                          </td>
+                          <td style={tdStyle}>
+                            {org.stripeCustomerId ? (
+                              <a
+                                href={`https://dashboard.stripe.com/customers/${org.stripeCustomerId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(event) => event.stopPropagation()}
+                                style={{ color: "var(--color-brand)", fontWeight: 700 }}
+                              >
+                                Connected
+                              </a>
+                            ) : (
+                              "Missing"
+                            )}
+                          </td>
+                          <td style={tdStyle}>{formatDate(org.updatedAt)}</td>
+                          <td style={tdStyle}>
+                            <BillingRowActions
+                              org={org}
+                              busy={busyOrgId === org.orgId}
+                              onSync={handleSync}
+                              onSyncSeats={handleSyncSeats}
+                              onExtendTrial={handleExtendTrial}
+                              onCancel={handleCancel}
+                              onCancelAtPeriodEnd={handleCancelAtPeriodEnd}
+                              onOverrideStatus={handleOverrideStatus}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

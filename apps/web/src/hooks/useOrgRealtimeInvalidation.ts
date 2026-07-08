@@ -28,7 +28,12 @@ type OrgRealtimeTable =
   | "schedule_cells"
   | "schedule_cell_snapshots"
   | "schedule_cell_segments"
-  | "schedule_notes";
+  | "schedule_notes"
+  | "profile_change_requests"
+  | "invitations"
+  | "recurring_shifts"
+  | "publish_history"
+  | "audit_log";
 
 const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "focus_areas",
@@ -48,6 +53,11 @@ const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "schedule_cell_segments",
   "schedule_notes",
   "subscriptions",
+  "profile_change_requests",
+  "invitations",
+  "recurring_shifts",
+  "publish_history",
+  "audit_log",
 ];
 
 function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][] {
@@ -132,24 +142,30 @@ export function getOrgRealtimeInvalidationKeys(
         queryKeys.shiftRequests.all(orgId),
       ]);
     case "organization_memberships":
-      return uniqueKeys([
-        queryKeys.org.users(orgId),
-        queryKeys.org.directory(orgId),
-      ]);
+      return uniqueKeys([queryKeys.org.users(orgId), queryKeys.org.directory(orgId)]);
     case "shift_requests":
-      return uniqueKeys([
-        queryKeys.shiftRequests.all(orgId),
-        queryKeys.shifts.all(orgId),
-      ]);
+      return uniqueKeys([queryKeys.shiftRequests.all(orgId), queryKeys.shifts.all(orgId)]);
     case "schedule_cells":
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
-      return uniqueKeys([
-        queryKeys.shifts.all(orgId),
-        queryKeys.shiftRequests.all(orgId),
-      ]);
+      return uniqueKeys([queryKeys.shifts.all(orgId), queryKeys.shiftRequests.all(orgId)]);
     case "schedule_notes":
       return uniqueKeys([queryKeys.shifts.all(orgId)]);
+    case "profile_change_requests":
+      return uniqueKeys([queryKeys.org.peopleChangeRequests(orgId, "pending")]);
+    case "invitations":
+      return uniqueKeys([
+        queryKeys.org.invitations(orgId),
+        queryKeys.org.directory(orgId),
+        queryKeys.org.users(orgId),
+        queryKeys.org.employeeCount(orgId),
+      ]);
+    case "recurring_shifts":
+      return uniqueKeys([queryKeys.recurringShifts.all(orgId), queryKeys.shifts.all(orgId)]);
+    case "publish_history":
+      return uniqueKeys([queryKeys.org.publishHistory(orgId), queryKeys.shifts.all(orgId)]);
+    case "audit_log":
+      return uniqueKeys([queryKeys.org.auditLog(orgId)]);
   }
 }
 
@@ -181,8 +197,28 @@ export function useOrgRealtimeInvalidation({
       .toString(36)
       .slice(2, 8)}`;
     const channel = createBrowserRealtimeChannel(channelId);
+
+    // Coalesce bursts: a bulk save (e.g. saving N departments) emits one
+    // postgres_changes event per row. Rather than running the full
+    // invalidation set N times — and broadcasting it to every other tab N
+    // times — accumulate the affected tables and flush once on a short
+    // debounce. Correctness is unchanged: each changed table is still
+    // invalidated, just once per burst.
+    const pendingTables = new Set<OrgRealtimeTable>();
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      flushTimer = null;
+      const tables = [...pendingTables];
+      pendingTables.clear();
+      for (const table of tables) {
+        invalidateOrgRealtimeQueries(queryClient, orgId, table);
+      }
+    };
     const handleChange = (table: OrgRealtimeTable) => {
-      invalidateOrgRealtimeQueries(queryClient, orgId, table);
+      pendingTables.add(table);
+      if (flushTimer === null) {
+        flushTimer = setTimeout(flush, 150);
+      }
     };
 
     channel.on(
@@ -222,6 +258,7 @@ export function useOrgRealtimeInvalidation({
     });
 
     return () => {
+      if (flushTimer !== null) clearTimeout(flushTimer);
       void removeBrowserRealtimeChannel(channel);
     };
   }, [disabled, orgId, queryClient]);

@@ -94,14 +94,13 @@ describe("GET /api/schedule/publish-history", () => {
     const serviceClient = createServiceClient();
     requireOrgPermissions.mockResolvedValue({
       serviceClient,
+      orgId: ORG_ID,
       actor: { id: "user-1" },
       permissions: { canViewSchedule: true },
       userClient: {},
     });
 
-    const response = await GET(
-      makeRequest({ orgId: ORG_ID, limit: "5", offset: "10" }),
-    );
+    const response = await GET(makeRequest({ orgId: ORG_ID, limit: "5", offset: "10" }));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -113,9 +112,7 @@ describe("GET /api/schedule/publish-history", () => {
     });
     expect(publishHistoryRange).toHaveBeenCalledWith(10, 14);
     expect(serviceClient.from).toHaveBeenCalledWith("profiles");
-    expect(profilesIn).toHaveBeenCalledWith("id", [
-      "22222222-2222-4222-8222-222222222222",
-    ]);
+    expect(profilesIn).toHaveBeenCalledWith("id", ["22222222-2222-4222-8222-222222222222"]);
     expect(body.entries).toEqual([
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -165,10 +162,7 @@ describe("GET /api/schedule/publish-history", () => {
 
   it("returns permission responses from the org gate", async () => {
     requireOrgPermissions.mockResolvedValue({
-      response: NextResponse.json(
-        { error: "Insufficient permissions" },
-        { status: 403 },
-      ),
+      response: NextResponse.json({ error: "Insufficient permissions" }, { status: 403 }),
     });
 
     const response = await GET(makeRequest({ orgId: ORG_ID }));

@@ -7,9 +7,7 @@ import {
 } from "../../test/native";
 import * as envModule from "../lib/env";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
@@ -22,6 +20,28 @@ vi.mock("react-native-gesture-handler", async () =>
 vi.mock("expo-status-bar", () => ({
   StatusBar: () => null,
 }));
+
+vi.mock("expo-splash-screen", () => ({
+  preventAutoHideAsync: () => Promise.resolve(),
+  hideAsync: () => Promise.resolve(),
+}));
+
+vi.mock("@expo-google-fonts/dm-sans", () => ({
+  useFonts: () => [true, null],
+  DMSans_400Regular: "DMSans_400Regular",
+  DMSans_500Medium: "DMSans_500Medium",
+  DMSans_600SemiBold: "DMSans_600SemiBold",
+  DMSans_700Bold: "DMSans_700Bold",
+}));
+
+vi.mock("../../features/consent/components/ConsentGate", async () => {
+  const React = await import("react");
+
+  return {
+    ConsentGate: ({ children }: { children: React.ReactNode }) =>
+      React.createElement("div", { "data-testid": "consent-gate" }, children),
+  };
+});
 
 vi.mock("@react-navigation/native", async () => {
   const React = await import("react");
@@ -77,11 +97,7 @@ vi.mock("../../features/auth/providers/MobileRealtimeProvider", async () => {
 
   return {
     MobileRealtimeProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(
-        "div",
-        { "data-testid": "mobile-realtime-provider" },
-        children,
-      ),
+      React.createElement("div", { "data-testid": "mobile-realtime-provider" }, children),
   };
 });
 
@@ -133,9 +149,7 @@ describe("RootLayout", () => {
 
     render(<RootLayout />);
 
-    expect(
-      screen.getByText("Mobile configuration needs attention"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Mobile configuration needs attention")).toBeInTheDocument();
     expect(screen.getByText("Mobile connection")).toBeInTheDocument();
     expect(
       screen.getByText("This build is missing a reachable DubGrid web connection."),

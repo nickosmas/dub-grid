@@ -107,10 +107,7 @@ export function buildActionItems({
 
     // Coverage gaps
     const highUrgency = openShifts.filter((s) => s.urgency === "high");
-    const highUrgencySlotCount = highUrgency.reduce(
-      (total, shift) => total + shift.needed,
-      0,
-    );
+    const highUrgencySlotCount = highUrgency.reduce((total, shift) => total + shift.needed, 0);
     if (highUrgencySlotCount > 0) {
       items.push({
         id: "coverage-gaps",
@@ -183,21 +180,9 @@ const TYPE_LABELS: Record<string, string> = {
   draft: "Unpublished Changes",
 };
 
-const TYPE_ORDER = [
-  "approval",
-  "coverage_gap",
-  "draft",
-  "swap_proposal",
-  "pickup",
-];
+const TYPE_ORDER = ["approval", "coverage_gap", "draft", "swap_proposal", "pickup"];
 
-function ActionItemRow({
-  item,
-  showBorder,
-}: {
-  item: ActionItem;
-  showBorder: boolean;
-}) {
+function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boolean }) {
   const [pendingAction, setPendingAction] = useState<{
     label: string;
     onClick: () => void | Promise<unknown>;
@@ -207,9 +192,7 @@ function ActionItemRow({
     ? `${pendingAction.label} request?`
     : "Confirm request action?";
   const confirmationVariant =
-    pendingAction?.label === "Reject" || pendingAction?.label === "Decline"
-      ? "danger"
-      : "info";
+    pendingAction?.label === "Reject" || pendingAction?.label === "Decline" ? "danger" : "info";
 
   async function confirmAction() {
     if (!pendingAction || isRunning) return;
@@ -250,9 +233,7 @@ function ActionItemRow({
           alignItems: "center",
           gap: 10,
           padding: "10px 18px",
-          borderBottom: showBorder
-            ? "1px solid var(--color-border-light)"
-            : "none",
+          borderBottom: showBorder ? "1px solid var(--color-border-light)" : "none",
         }}
       >
         {/* Urgency dot */}
@@ -348,11 +329,7 @@ function ActionItemRow({
 
   if (item.href && !item.action) {
     return (
-      <Link
-        key={item.id}
-        href={item.href}
-        style={{ textDecoration: "none", color: "inherit" }}
-      >
+      <Link key={item.id} href={item.href} style={{ textDecoration: "none", color: "inherit" }}>
         {content}
       </Link>
     );
@@ -379,18 +356,13 @@ function GroupedItems({ items }: { items: ActionItem[] }) {
               color: "var(--color-text-subtle)",
               textTransform: "uppercase",
               letterSpacing: "0.04em",
-              borderTop:
-                gi > 0 ? "1px solid var(--color-border-light)" : "none",
+              borderTop: gi > 0 ? "1px solid var(--color-border-light)" : "none",
             }}
           >
             {TYPE_LABELS[group.type] || group.type} ({group.items.length})
           </div>
           {group.items.map((item, i) => (
-            <ActionItemRow
-              key={item.id}
-              item={item}
-              showBorder={i < group.items.length - 1}
-            />
+            <ActionItemRow key={item.id} item={item} showBorder={i < group.items.length - 1} />
           ))}
         </div>
       ))}
@@ -402,11 +374,7 @@ function FlatItems({ items }: { items: ActionItem[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {items.map((item, i) => (
-        <ActionItemRow
-          key={item.id}
-          item={item}
-          showBorder={i < items.length - 1}
-        />
+        <ActionItemRow key={item.id} item={item} showBorder={i < items.length - 1} />
       ))}
     </div>
   );
@@ -506,11 +474,7 @@ export default function ActionQueueCard({
     </div>
   );
 
-  const body = grouped ? (
-    <GroupedItems items={visible} />
-  ) : (
-    <FlatItems items={visible} />
-  );
+  const body = grouped ? <GroupedItems items={visible} /> : <FlatItems items={visible} />;
 
   if (isHero) {
     return (

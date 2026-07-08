@@ -2,8 +2,10 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { queryKeys } from "@/lib/query-keys";
 
 import type { Permissions } from "@/hooks";
 import type {
@@ -39,7 +41,6 @@ import {
   getWeekStart,
   getDatesInRange,
   addDays,
-  formatDateKey,
   filterShiftsByWeek,
   computeAllEmployeeHours,
   computeOTAlerts,
@@ -54,6 +55,8 @@ import {
   buildActivityFeed,
   computeCoverageTrendData,
 } from "@/lib/dashboard-stats";
+import { getScheduleStartForSpan } from "@/lib/schedule-view";
+import { formatDateKey } from "@/lib/utils";
 
 export type ViewMode = "day" | "week" | "2weeks";
 
@@ -62,6 +65,7 @@ import UserDashboard from "./UserDashboard";
 import AdminDashboard from "./AdminDashboard";
 import SuperAdminDashboard from "./SuperAdminDashboard";
 import { EmptyState } from "@/components/EmptyState";
+import DashboardGreeting from "./DashboardGreeting";
 import DashboardHero from "./DashboardHero";
 import DashboardChecklist from "./DashboardChecklist";
 import DashboardLoading from "./DashboardLoading";
@@ -71,32 +75,22 @@ const ExpandedStats = dynamic(() => import("./expanded/ExpandedStats"), {
 const ExpandedCoverage = dynamic(() => import("./expanded/ExpandedCoverage"), {
   ssr: false,
 });
-const ExpandedOpenShifts = dynamic(
-  () => import("./expanded/ExpandedOpenShifts"),
-  { ssr: false },
-);
-const ExpandedStaffHours = dynamic(
-  () => import("./expanded/ExpandedStaffHours"),
-  { ssr: false },
-);
-const ExpandedBreakdown = dynamic(
-  () => import("./expanded/ExpandedBreakdown"),
-  { ssr: false },
-);
+const ExpandedOpenShifts = dynamic(() => import("./expanded/ExpandedOpenShifts"), { ssr: false });
+const ExpandedStaffHours = dynamic(() => import("./expanded/ExpandedStaffHours"), { ssr: false });
+const ExpandedBreakdown = dynamic(() => import("./expanded/ExpandedBreakdown"), { ssr: false });
 const ExpandedActivity = dynamic(() => import("./expanded/ExpandedActivity"), {
   ssr: false,
 });
 
 type ExpandedPanel =
-  | "stats"
-  | "coverage"
-  | "openShifts"
-  | "staffHours"
-  | "breakdown"
-  | "activity"
-  | null;
+  "stats" | "coverage" | "openShifts" | "staffHours" | "breakdown" | "activity" | null;
 
 export type DashboardRoleVariant = "user" | "admin" | "super-admin";
+
+// On the user dashboard the hero highlights your current/next shift, which may
+// fall outside the period being browsed. Always load this many days forward
+// from today so the hero can find the genuine next upcoming shift.
+const HERO_LOOKAHEAD_DAYS = 21;
 
 interface DashboardViewProps {
   org: Organization;
@@ -115,35 +109,12 @@ interface DashboardViewProps {
   permissions: Permissions;
 }
 
-export function hasDashboardAdminCapability(
-  permissions: Pick<
-    Permissions,
-    | "level"
-    | "canManageOrg"
-    | "canEditShifts"
-    | "canManageEmployees"
-    | "canViewDashboardAnalytics"
-  >,
-): boolean {
-  return (
-    permissions.level >= 2 ||
-    permissions.canManageOrg ||
-    permissions.canEditShifts ||
-    permissions.canManageEmployees ||
-    permissions.canViewDashboardAnalytics
-  );
+export function hasDashboardAdminCapability(permissions: Pick<Permissions, "level">): boolean {
+  return permissions.level >= 2;
 }
 
 export function getDashboardRoleVariant(
-  permissions: Pick<
-    Permissions,
-    | "level"
-    | "isUserViewActive"
-    | "canManageOrg"
-    | "canEditShifts"
-    | "canManageEmployees"
-    | "canViewDashboardAnalytics"
-  >,
+  permissions: Pick<Permissions, "level" | "isUserViewActive">,
 ): DashboardRoleVariant {
   if (permissions.isUserViewActive) {
     return "user";
@@ -153,7 +124,11 @@ export function getDashboardRoleVariant(
     return "super-admin";
   }
 
-  return hasDashboardAdminCapability(permissions) ? "admin" : "user";
+  if (permissions.level >= 2) {
+    return "admin";
+  }
+
+  return "user";
 }
 
 export function getDashboardPeriodLabel(viewMode: ViewMode): string {
@@ -168,8 +143,11 @@ export function getDashboardPeriodLabel(viewMode: ViewMode): string {
   return "this week";
 }
 
-export function getDashboardOvertimeThreshold(periodDays: number): number {
-  return 40 * Math.max(1, Math.ceil(periodDays / 7));
+// Weekly overtime threshold. computeEmployeeWeeklyHours evaluates it per
+// 7-day chunk of the period, so this stays flat rather than scaling with
+// periodDays — scaling it here would let a light week mask a heavy one.
+export function getDashboardOvertimeThreshold(_periodDays: number): number {
+  return 40;
 }
 
 function useMinuteNow(): Date {
@@ -180,12 +158,14 @@ function useMinuteNow(): Date {
 
     function scheduleNextTick() {
       const current = new Date();
-      const delay =
-        60_000 - current.getSeconds() * 1000 - current.getMilliseconds();
-      timeoutId = window.setTimeout(() => {
-        setNow(new Date());
-        scheduleNextTick();
-      }, Math.max(250, delay));
+      const delay = 60_000 - current.getSeconds() * 1000 - current.getMilliseconds();
+      timeoutId = window.setTimeout(
+        () => {
+          setNow(new Date());
+          scheduleNextTick();
+        },
+        Math.max(250, delay),
+      );
     }
 
     scheduleNextTick();
@@ -233,27 +213,52 @@ export default function DashboardView({
 
   // ─── View mode + period navigation ─────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("week");
-  const effectiveViewMode = isUserDashboardMode ? "week" : viewMode;
-  const periodDays =
-    effectiveViewMode === "day" ? 1 : effectiveViewMode === "2weeks" ? 14 : 7;
+  // The user dashboard is built around a multi-day schedule view, so it offers
+  // Week and 2 Weeks only (no Day); any other selection falls back to Week.
+  const effectiveViewMode = isUserDashboardMode
+    ? viewMode === "2weeks"
+      ? "2weeks"
+      : "week"
+    : viewMode;
+  const periodDays = effectiveViewMode === "day" ? 1 : effectiveViewMode === "2weeks" ? 14 : 7;
   const periodLabel = getDashboardPeriodLabel(effectiveViewMode);
   const overtimeThreshold = getDashboardOvertimeThreshold(periodDays);
 
-  const [periodStart, setPeriodStart] = useState<Date>(() =>
-    getWeekStart(new Date()),
+  // The 2-week view aligns to the org's biweekly pay-period anchor (when set),
+  // matching the schedule page, so it shows the full published pay period
+  // rather than an arbitrary "current week + next week" window.
+  const payPeriodStartDate = org.payPeriodStartDate ?? null;
+  const alignPeriodStart = useCallback(
+    (date: Date, mode: ViewMode): Date => {
+      if (mode === "day") {
+        const d = new Date(date);
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
+      if (mode === "2weeks") {
+        return getScheduleStartForSpan({ date, span: 2, payPeriodStartDate });
+      }
+      return getWeekStart(date);
+    },
+    [payPeriodStartDate],
   );
+
+  const [periodStart, setPeriodStart] = useState<Date>(() => getWeekStart(new Date()));
   const currentTime = useMinuteNow();
+  // Day-granular "today" key: changes only at midnight, so it can drive the
+  // fetch window / hero look-ahead without re-running every minute.
+  const todayKey = formatDateKey(currentTime);
 
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    // Snap to appropriate start when changing modes
-    setPeriodStart((d) => (mode === "day" ? d : getWeekStart(d)));
-  }, []);
-
-  const periodEnd = useMemo(
-    () => addDays(periodStart, periodDays - 1),
-    [periodStart, periodDays],
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode);
+      // Snap to the aligned start for the new mode (pay period for 2 weeks).
+      setPeriodStart((d) => alignPeriodStart(d, mode));
+    },
+    [alignPeriodStart],
   );
+
+  const periodEnd = useMemo(() => addDays(periodStart, periodDays - 1), [periodStart, periodDays]);
   const periodDates = useMemo(
     () => getDatesInRange(periodStart, periodDays),
     [periodStart, periodDays],
@@ -263,24 +268,12 @@ export default function DashboardView({
     [periodStart, periodDays],
   );
 
-  const periodStartKey = useMemo(
-    () => formatDateKey(periodStart),
-    [periodStart],
-  );
+  const periodStartKey = useMemo(() => formatDateKey(periodStart), [periodStart]);
   const periodEndKey = useMemo(() => formatDateKey(periodEnd), [periodEnd]);
-  const prevPeriodStartKey = useMemo(
-    () => formatDateKey(prevPeriodStart),
-    [prevPeriodStart],
-  );
-  const prevPeriodEndKey = useMemo(
-    () => formatDateKey(addDays(periodStart, -1)),
-    [periodStart],
-  );
+  const prevPeriodStartKey = useMemo(() => formatDateKey(prevPeriodStart), [prevPeriodStart]);
+  const prevPeriodEndKey = useMemo(() => formatDateKey(addDays(periodStart, -1)), [periodStart]);
 
-  const periodDateKeys = useMemo(
-    () => periodDates.map(formatDateKey),
-    [periodDates],
-  );
+  const periodDateKeys = useMemo(() => periodDates.map(formatDateKey), [periodDates]);
   const prevPeriodDateKeys = useMemo(
     () => getDatesInRange(prevPeriodStart, periodDays).map(formatDateKey),
     [prevPeriodStart, periodDays],
@@ -297,31 +290,17 @@ export default function DashboardView({
     () => setPeriodStart((d) => addDays(d, -periodDays)),
     [periodDays],
   );
-  const handleNext = useCallback(
-    () => setPeriodStart((d) => addDays(d, periodDays)),
-    [periodDays],
-  );
+  const handleNext = useCallback(() => setPeriodStart((d) => addDays(d, periodDays)), [periodDays]);
   const handleToday = useCallback(() => {
-    const now = new Date();
-    setPeriodStart(
-      effectiveViewMode === "day"
-        ? (() => {
-            const d = new Date(now);
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })()
-        : getWeekStart(now),
-    );
-  }, [effectiveViewMode]);
+    setPeriodStart(alignPeriodStart(new Date(), effectiveViewMode));
+  }, [alignPeriodStart, effectiveViewMode]);
 
   // ─── Data fetching ──────────────────────────────────────
   const [allShifts, setAllShifts] = useState<ShiftMap>({});
-  const [publishHistory, setPublishHistory] =
-    useState<PublishHistoryEntry | null>(null);
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry | null>(null);
   const [activityPublishHistory, setActivityPublishHistory] = useState<
     PublishHistoryEntryWithName[]
   >([]);
-  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [activityRequests, setActivityRequests] = useState<ShiftRequest[]>([]);
   const [shiftsLoading, setShiftsLoading] = useState(true);
   const [publishedDateRanges, setPublishedDateRanges] = useState<
@@ -330,6 +309,12 @@ export default function DashboardView({
 
   const orgId = org.id;
   const isScheduler = permissions.level >= 2 || permissions.canEditShifts;
+
+  const invitationsQuery = useQuery<Invitation[]>({
+    queryKey: queryKeys.org.invitations(orgId),
+    queryFn: () => fetchOrganizationInvitations(orgId),
+  });
+  const invitations = invitationsQuery.data ?? [];
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
@@ -347,9 +332,18 @@ export default function DashboardView({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShiftsLoading(true);
 
-    // Fetch only the date range needed: previous period start → current period end
-    const fetchStart = formatDateKey(prevPeriodStart);
-    const fetchEnd = formatDateKey(periodEnd);
+    // Fetch the date range needed: previous period start → current period end.
+    // On the user dashboard the window is widened to always cover
+    // [today, today + HERO_LOOKAHEAD_DAYS] as well, so the hero can surface the
+    // next upcoming shift even when it falls outside the period being browsed.
+    const today = new Date(`${todayKey}T00:00:00`);
+    const lookaheadEnd = addDays(today, HERO_LOOKAHEAD_DAYS);
+    const fetchStart = formatDateKey(
+      isUserDashboardMode && today < prevPeriodStart ? today : prevPeriodStart,
+    );
+    const fetchEnd = formatDateKey(
+      isUserDashboardMode && lookaheadEnd > periodEnd ? lookaheadEnd : periodEnd,
+    );
     Promise.all([
       fetchShifts(
         orgId,
@@ -359,31 +353,19 @@ export default function DashboardView({
         fetchStart,
         fetchEnd,
       ),
-      fetchPublishedDateRanges(orgId, periodStartKey, periodEndKey).catch(
-        () => [],
-      ),
+      fetchPublishedDateRanges(orgId, periodStartKey, periodEndKey).catch(() => []),
       fetchPublishHistory(orgId, 20, 0).catch(() => []),
-      fetchOrganizationInvitations(orgId).catch(() => []),
       fetchShiftRequests(orgId, assignmentLabelMapRef.current).catch(() => []),
     ])
-      .then(
-        ([
-          shifts,
-          publishedRanges,
-          publishRows,
-          invitationRows,
-          requestRows,
-        ]) => {
-          if (cancelled) return;
-          setAllShifts(shifts);
-          setPublishedDateRanges(publishedRanges);
-          setPublishHistory(publishRows[0] ?? null);
-          setActivityPublishHistory(publishRows);
-          setInvitations(invitationRows);
-          setActivityRequests(requestRows);
-          setShiftsLoading(false);
-        },
-      )
+      .then(([shifts, publishedRanges, publishRows, requestRows]) => {
+        if (cancelled) return;
+        setAllShifts(shifts);
+        setPublishedDateRanges(publishedRanges);
+        setPublishHistory(publishRows[0] ?? null);
+        setActivityPublishHistory(publishRows);
+        setActivityRequests(requestRows);
+        setShiftsLoading(false);
+      })
       .catch(() => {
         if (!cancelled) setShiftsLoading(false);
       });
@@ -394,6 +376,8 @@ export default function DashboardView({
   }, [
     orgId,
     isScheduler,
+    isUserDashboardMode,
+    todayKey,
     periodEnd,
     periodEndKey,
     periodStartKey,
@@ -402,16 +386,12 @@ export default function DashboardView({
 
   // Shift requests
   const currentEmpId = useMemo(
-    () =>
-      authUser
-        ? (employees.find((e) => e.userId === authUser.id)?.id ?? null)
-        : null,
+    () => (authUser ? (employees.find((e) => e.userId === authUser.id)?.id ?? null) : null),
     [employees, authUser],
   );
 
   const currentEmployee = useMemo(
-    () =>
-      currentEmpId ? employees.find((e) => e.id === currentEmpId) : undefined,
+    () => (currentEmpId ? employees.find((e) => e.id === currentEmpId) : undefined),
     [employees, currentEmpId],
   );
 
@@ -437,10 +417,10 @@ export default function DashboardView({
     () => buildPublishedDateSet(publishedDateRanges),
     [publishedDateRanges],
   );
-  const publishedWindowState = useMemo<PublishedWindowState>(() => {
-    if (coverageRequirements.length === 0) return "published";
-    return getPublishedWindowState(periodDates, publishedDateSet);
-  }, [coverageRequirements.length, periodDates, publishedDateSet]);
+  const publishedWindowState = useMemo<PublishedWindowState>(
+    () => getPublishedWindowState(periodDates, publishedDateSet),
+    [periodDates, publishedDateSet],
+  );
   const publishedPeriodDates = useMemo(
     () =>
       coverageRequirements.length === 0
@@ -559,10 +539,7 @@ export default function DashboardView({
         shiftCount: countShifts(currentPeriodShifts, assignmentById),
         coveragePct: currentCoverage.pct,
         openSlots: currentCoverage.openSlots,
-        staffScheduled: countStaffScheduled(
-          currentPeriodShifts,
-          assignmentById,
-        ),
+        staffScheduled: countStaffScheduled(currentPeriodShifts, assignmentById),
         otCount: otAlerts.length,
       },
       {
@@ -636,9 +613,7 @@ export default function DashboardView({
 
       const remainingNeeded = openShift.needed - matchingRequestIds.size;
 
-      return remainingNeeded > 0
-        ? [{ ...openShift, needed: remainingNeeded }]
-        : [];
+      return remainingNeeded > 0 ? [{ ...openShift, needed: remainingNeeded }] : [];
     });
   }, [
     focusAreas,
@@ -678,13 +653,7 @@ export default function DashboardView({
 
   // Activity feed
   const activityItems = useMemo(
-    () =>
-      buildActivityFeed(
-        activityPublishHistory,
-        activityRequests,
-        invitations,
-        100,
-      ),
+    () => buildActivityFeed(activityPublishHistory, activityRequests, invitations, 100),
     [activityPublishHistory, activityRequests, invitations],
   );
 
@@ -713,30 +682,26 @@ export default function DashboardView({
   );
 
   // ─── Draft counts ──────────────────────────────────────
-  const { draftNewCount, draftModifiedCount, draftDeletedCount } =
-    useMemo(() => {
-      let newCount = 0;
-      let modifiedCount = 0;
-      let deletedCount = 0;
-      for (const key of Object.keys(currentPeriodShifts)) {
-        const shift = currentPeriodShifts[key];
-        if (shift.isDraft) {
-          if (shift.draftKind === "new") newCount++;
-          else if (shift.draftKind === "modified") modifiedCount++;
-          else if (shift.draftKind === "deleted") deletedCount++;
-        }
+  const { draftNewCount, draftModifiedCount, draftDeletedCount } = useMemo(() => {
+    let newCount = 0;
+    let modifiedCount = 0;
+    let deletedCount = 0;
+    for (const key of Object.keys(currentPeriodShifts)) {
+      const shift = currentPeriodShifts[key];
+      if (shift.isDraft) {
+        if (shift.draftKind === "new") newCount++;
+        else if (shift.draftKind === "modified") modifiedCount++;
+        else if (shift.draftKind === "deleted") deletedCount++;
       }
-      return {
-        draftNewCount: newCount,
-        draftModifiedCount: modifiedCount,
-        draftDeletedCount: deletedCount,
-      };
-    }, [currentPeriodShifts]);
+    }
+    return {
+      draftNewCount: newCount,
+      draftModifiedCount: modifiedCount,
+      draftDeletedCount: deletedCount,
+    };
+  }, [currentPeriodShifts]);
 
-  const openShiftSlotCount = openShifts.reduce(
-    (total, shift) => total + shift.needed,
-    0,
-  );
+  const openShiftSlotCount = openShifts.reduce((total, shift) => total + shift.needed, 0);
   const urgentGapCount = openShifts
     .filter((s) => s.urgency === "high")
     .reduce((total, shift) => total + shift.needed, 0);
@@ -744,28 +709,24 @@ export default function DashboardView({
   const coveragePct = periodStats.coverage?.pct ?? 100;
   const isCoverageUnpublished = publishedWindowState === "unpublished";
   const isCoveragePartial = publishedWindowState === "partial";
+  const hasCoverageRequirements = coverageRequirements.length > 0;
   const showOT = permissions.canEditShifts;
   const heroSummary = useMemo(() => {
     if (urgentGapCount > 0) {
       return {
         statusLabel: "Urgent",
         title: `${urgentGapCount} urgent coverage gap${urgentGapCount === 1 ? "" : "s"}`,
-        description:
-          "Resolve the most critical staffing gaps before the next shift starts.",
+        description: "Resolve the most critical staffing gaps before the next shift starts.",
         actionLabel: "Review schedule",
         actionHref: "/schedule",
       };
     }
 
-    if (
-      permissions.canApproveShiftRequests &&
-      shiftRequests.pendingApproval.length > 0
-    ) {
+    if (permissions.canApproveShiftRequests && shiftRequests.pendingApproval.length > 0) {
       return {
         statusLabel: "Approval",
         title: `${shiftRequests.pendingApproval.length} shift request${shiftRequests.pendingApproval.length === 1 ? "" : "s"} awaiting approval`,
-        description:
-          "Review pending requests and keep your schedule up to date.",
+        description: "Review pending requests and keep your schedule up to date.",
         actionLabel: "Review requests",
         actionHref: "/schedule",
       };
@@ -785,8 +746,7 @@ export default function DashboardView({
       return {
         statusLabel: "Drafts",
         title: `${draftTotal} unsaved schedule draft${draftTotal === 1 ? "" : "s"}`,
-        description:
-          "Finalize draft shifts before publishing them to your team.",
+        description: "Finalize draft shifts before publishing them to your team.",
         actionLabel: "View drafts",
         actionHref: "/schedule",
       };
@@ -796,10 +756,26 @@ export default function DashboardView({
       return {
         statusLabel: "Pending publish",
         title: "This period has not been published yet",
-        description:
-          "Coverage and open-gap metrics will appear after the first publish.",
+        description: hasCoverageRequirements
+          ? "Coverage and open-gap metrics will appear after the first publish."
+          : "Publish this period so the schedule is visible to your team.",
         actionLabel: "Open schedule",
         actionHref: "/schedule",
+      };
+    }
+
+    if (!hasCoverageRequirements) {
+      return {
+        statusLabel: "Setup",
+        title: "Coverage requirements not configured",
+        description:
+          "Set staffing requirements so coverage and open-gap tracking can surface here.",
+        actionLabel: permissions.canManageCoverageRequirements
+          ? "Configure coverage"
+          : "Open schedule",
+        actionHref: permissions.canManageCoverageRequirements
+          ? "/settings?section=schedule-coverage"
+          : "/schedule",
       };
     }
 
@@ -807,8 +783,7 @@ export default function DashboardView({
       return {
         statusLabel: "Coverage",
         title: "Coverage is below target",
-        description:
-          "There are still some sections with incomplete staffing this period.",
+        description: "There are still some sections with incomplete staffing this period.",
         actionLabel: "Review coverage",
         actionHref: "/schedule",
       };
@@ -817,43 +792,49 @@ export default function DashboardView({
     return {
       statusLabel: "Healthy",
       title: "Schedule health looks good",
-      description:
-        "No major alert items detected. Keep reviewing your schedule and requests.",
+      description: "No major alert items detected. Keep reviewing your schedule and requests.",
       actionLabel: "Open schedule",
       actionHref: "/schedule",
     };
   }, [
     urgentGapCount,
     permissions.canApproveShiftRequests,
+    permissions.canManageCoverageRequirements,
     shiftRequests.pendingApproval.length,
     showOT,
     otAlerts.length,
     draftTotal,
     isCoverageUnpublished,
+    hasCoverageRequirements,
     coveragePct,
   ]);
 
   const heroMetrics = useMemo(() => {
     const coverageDetail = isCoverageUnpublished
       ? "Not published yet"
-      : isCoveragePartial
-        ? "Published dates only"
-        : "Current staffing coverage";
+      : !hasCoverageRequirements
+        ? "Not configured"
+        : isCoveragePartial
+          ? "Published dates only"
+          : "Current staffing coverage";
     const openGapDetail = isCoverageUnpublished
       ? "Not published yet"
-      : isCoveragePartial
-        ? "Published dates only"
-        : "Staffing gaps this period";
+      : !hasCoverageRequirements
+        ? "Not configured"
+        : isCoveragePartial
+          ? "Published dates only"
+          : "Staffing gaps this period";
+    const hideCoverageValue = isCoverageUnpublished || !hasCoverageRequirements;
     const metrics = [
       {
         label: "Coverage",
-        value: isCoverageUnpublished ? "\u2014" : `${coveragePct}%`,
+        value: hideCoverageValue ? "\u2014" : `${coveragePct}%`,
         detail: coverageDetail,
         href: "/schedule",
       },
       {
         label: "Open gaps",
-        value: isCoverageUnpublished ? "\u2014" : `${openShiftSlotCount}`,
+        value: hideCoverageValue ? "\u2014" : `${openShiftSlotCount}`,
         detail: openGapDetail,
         href: "/schedule",
       },
@@ -877,6 +858,7 @@ export default function DashboardView({
     return metrics;
   }, [
     coveragePct,
+    hasCoverageRequirements,
     isCoveragePartial,
     isCoverageUnpublished,
     openShiftSlotCount,
@@ -886,20 +868,32 @@ export default function DashboardView({
   ]);
 
   // ─── Render ─────────────────────────────────────────────
+  // On a wide enough viewport the user dashboard becomes a fixed two-pane
+  // layout: the page itself never scrolls, and each pane scrolls on its own.
+  const userLockLayout = isUserDashboardMode && !isMobile && !isTablet;
   const contentStyle = {
-    padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px",
-    maxWidth: 1300,
+    // In the locked layout each pane owns its scroll, so the outer padding is
+    // dropped: content scrolls flush under the sticky header and runs to the
+    // bottom edge. The panes carry their own padding (incl. horizontal, so card
+    // borders/shadows aren't clipped by the scroll container's edge). A small
+    // outer gutter keeps the panes off the very screen edge.
+    padding: userLockLayout ? "16px 24px 0" : isMobile ? "16px" : isTablet ? "24px" : "32px 40px",
+    maxWidth: isUserDashboardMode ? 1560 : 1300,
     margin: "0 auto",
+    width: "100%" as const,
+    boxSizing: "border-box" as const,
     display: "flex" as const,
     flexDirection: "column" as const,
     gap: "var(--dg-space-xl)",
+    ...(userLockLayout ? { flex: 1, minHeight: 0, overflow: "hidden" as const } : {}),
   };
 
   const headerProps = {
     periodStart,
     periodEnd,
     viewMode: effectiveViewMode,
-    showViewModeTabs: !isUserDashboardMode,
+    showViewModeTabs: true,
+    availableViewModes: isUserDashboardMode ? (["week", "2weeks"] as ViewMode[]) : undefined,
     onPrev: handlePrev,
     onNext: handleNext,
     onToday: handleToday,
@@ -975,16 +969,52 @@ export default function DashboardView({
   }
 
   return (
-    <div style={{ fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+    <div
+      style={{
+        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        ...(userLockLayout
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              height: "calc(100vh - var(--app-shell-header-h, 56px))",
+              overflow: "hidden",
+            }
+          : {}),
+      }}
+    >
       {/* Sticky toolbar */}
-      <div className="no-print" style={stickyBarStyle}>
-        <div style={toolbarContainerStyle}>
+      <div
+        className="no-print"
+        style={userLockLayout ? { ...toolbarContainerStyle, flexShrink: 0 } : stickyBarStyle}
+      >
+        {userLockLayout ? (
           <DashboardHeader {...headerProps} />
-        </div>
+        ) : (
+          <div style={toolbarContainerStyle}>
+            <DashboardHeader {...headerProps} />
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div data-tour="dashboard-cards" style={contentStyle}>
+        <DashboardGreeting
+          name={currentEmployee?.firstName?.trim() || authUser?.email?.split("@")[0] || null}
+          now={currentTime}
+          userId={authUser?.id ?? null}
+          orgTimezone={org.timezone ?? null}
+          hasIncompleteWork={
+            draftTotal > 0 ||
+            (hasAdminCapability &&
+              (focusAreas.length === 0 ||
+                departments.length === 0 ||
+                orgRoles.length === 0 ||
+                certifications.length === 0 ||
+                assignments.length === 0 ||
+                employees.length === 0))
+          }
+        />
+
         {!isUserDashboardMode && (
           <DashboardHero
             headline={heroSummary.title}
@@ -1044,7 +1074,7 @@ export default function DashboardView({
         {/* Users see a "setup in progress" message if no employee record */}
         {employees.length === 0 && !isUserDashboardMode && !hasAdminCapability && (
           <EmptyState
-            heading="Your workspace is being set up"
+            heading="Your organization is being set up"
             description="Your administrator is configuring the organization. Check back soon."
           />
         )}
@@ -1100,10 +1130,7 @@ export default function DashboardView({
           />
         )}
         {expandedPanel === "breakdown" && (
-          <ExpandedBreakdown
-            breakdown={shiftBreakdown}
-            onClose={closeExpanded}
-          />
+          <ExpandedBreakdown breakdown={shiftBreakdown} onClose={closeExpanded} />
         )}
         {expandedPanel === "activity" && (
           <ExpandedActivity items={activityItems} onClose={closeExpanded} />

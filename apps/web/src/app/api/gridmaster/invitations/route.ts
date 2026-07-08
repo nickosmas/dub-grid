@@ -24,7 +24,9 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await getServiceClient()
       .from("invitations")
-      .select("id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id")
+      .select(
+        "id, org_id, email, role_to_assign, invited_by, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id",
+      )
       .eq("org_id", parsed.data.orgId)
       .order("created_at", { ascending: false });
 
@@ -35,9 +37,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ invitations: data ?? [] });
   } catch (error) {
     console.error("gridmaster invitations GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load invitations" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load invitations" }, { status: 500 });
   }
 }

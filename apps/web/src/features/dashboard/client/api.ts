@@ -11,9 +11,7 @@ async function requestJson<T>(input: string): Promise<T> {
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Dashboard request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Dashboard request failed."));
   }
 
   return body as T;
@@ -28,7 +26,5 @@ export function fetchDashboardAnalytics(input: {
     weeks: String(input.weeks),
   });
 
-  return requestJson<DashboardAnalyticsResponse>(
-    `/api/dashboard/analytics?${params.toString()}`,
-  );
+  return requestJson<DashboardAnalyticsResponse>(`/api/dashboard/analytics?${params.toString()}`);
 }

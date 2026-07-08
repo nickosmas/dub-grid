@@ -1,13 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createQueryStateCardModule,
   createReactNativeModule,
@@ -21,9 +13,7 @@ const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -41,9 +31,7 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
@@ -142,7 +130,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("Could not load requests")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Try Again"));
+    fireEvent.click(screen.getByText("Try again"));
     expect(refetch).toHaveBeenCalled();
   });
 
@@ -199,7 +187,7 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("No request activity yet")).toBeInTheDocument();
+    expect(screen.getByText("No requests yet")).toBeInTheDocument();
   });
 
   it("shows coverage-gap open shifts and volunteers from the requests tab", () => {
@@ -260,9 +248,7 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
     expect(screen.getByText("Day Shift")).toBeInTheDocument();
-    const mentoredJobPill = screen.getByLabelText(
-      "Job Nurse mentored assignment",
-    );
+    const mentoredJobPill = screen.getByLabelText("Job Nurse mentored assignment");
     expect(mentoredJobPill).toHaveTextContent("Nurse");
     expect(mentoredJobPill).toHaveTextContent("(Mentored)");
     expect(mentoredJobPill).not.toHaveTextContent("(MENTORED)");
@@ -271,12 +257,8 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
     expect(screen.getAllByText("7:00 AM - 3:00 PM")).toHaveLength(1);
     const pageText = document.body.textContent ?? "";
-    expect(pageText.indexOf("Day Shift")).toBeLessThan(
-      pageText.indexOf("7:00 AM - 3:00 PM"),
-    );
-    expect(pageText.indexOf("Skilled Nursing")).toBeLessThan(
-      pageText.indexOf("Nurse"),
-    );
+    expect(pageText.indexOf("Day Shift")).toBeLessThan(pageText.indexOf("7:00 AM - 3:00 PM"));
+    expect(pageText.indexOf("Skilled Nursing")).toBeLessThan(pageText.indexOf("Nurse"));
     fireEvent.click(screen.getByText("Volunteer"));
     expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
     expect(mutate).not.toHaveBeenCalled();
@@ -313,8 +295,7 @@ describe("RequestsScreen", () => {
             focusAreaName: "Skilled Nursing",
             needed: 1,
             canVolunteer: false,
-            volunteerBlockReason:
-              "You are not assigned to the focus area required for this shift.",
+            volunteerBlockReason: "You are not assigned to the focus area required for this shift.",
             state: {
               kind: "worked",
               segments: [{ shiftId: 1, jobId: 20, position: 0 }],
@@ -351,9 +332,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(
-      screen.getByText(
-        "You are not assigned to the focus area required for this shift.",
-      ),
+      screen.getByText("You are not assigned to the focus area required for this shift."),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText("Volunteer"));
 
@@ -443,12 +422,8 @@ describe("RequestsScreen", () => {
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
 
     const content = document.body.textContent ?? "";
-    expect(content.indexOf("Sat, Apr 18")).toBeLessThan(
-      content.indexOf("Mina Diaz"),
-    );
-    expect(content.indexOf("Ivy Stone")).toBeLessThan(
-      content.indexOf("Sun, Apr 19"),
-    );
+    expect(content.indexOf("Sat, Apr 18")).toBeLessThan(content.indexOf("Mina Diaz"));
+    expect(content.indexOf("Ivy Stone")).toBeLessThan(content.indexOf("Sun, Apr 19"));
   });
 
   it("shows split-shift segments on open shifts and request cards", () => {
@@ -705,9 +680,7 @@ describe("RequestsScreen", () => {
 
     expect(screen.queryByText("Could not update request")).not.toBeInTheDocument();
     expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
-    expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent(
-      "Mentored",
-    );
+    expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent("Mentored");
     expect(screen.queryByText("(Mentored)")).not.toBeInTheDocument();
     expect(screen.getByText("7:00 AM - 3:00 PM")).toBeInTheDocument();
   });
@@ -741,7 +714,7 @@ describe("RequestsScreen", () => {
     render(<RequestsScreen />);
 
     expect(screen.getByText("Approve")).toBeInTheDocument();
-    expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
   });
 
   it("shows the all-requests tab for schedule editors without a linked employee", () => {
@@ -806,6 +779,6 @@ describe("RequestsScreen", () => {
 
     expect(screen.getByText("All")).toBeInTheDocument();
     expect(screen.getByText(/Mina Diaz/)).toBeInTheDocument();
-    expect(screen.queryByText("Nothing waiting for approval")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing to approve")).not.toBeInTheDocument();
   });
 });

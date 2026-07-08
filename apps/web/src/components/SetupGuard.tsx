@@ -14,9 +14,13 @@ import { useLogout } from "@/hooks";
  */
 export default function SetupGuard({ children }: { children: React.ReactNode }) {
   const perms = usePermissions();
-  const { setupStatus, loading: orgLoading, org } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
+  const {
+    setupStatus,
+    loading: orgLoading,
+    org,
+  } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
 
   const isLoading = orgLoading || empLoading || perms.isLoading;
   const hasEmployees = employees.length > 0;
@@ -60,7 +64,16 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             justifyContent: "center",
           }}
         >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         </div>
@@ -84,7 +97,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
               margin: 0,
             }}
           >
-            Your admin is still configuring the workspace. Try refreshing in a few minutes.
+            Your admin is still configuring the organization. Try refreshing in a few minutes.
           </p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -104,7 +117,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             Refresh
           </button>
           <button
-            onClick={() => signOutLocal()}
+            onClick={() => signOut()}
             style={{
               padding: "10px 24px",
               borderRadius: 10,

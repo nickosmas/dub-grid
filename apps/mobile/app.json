@@ -10,17 +10,34 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#F8FAFC"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-notifications",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "backgroundColor": "#F8FAFC",
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "We use this only if you opt in to analytics. It helps us understand how people use DubGrid so we can make it better. You can change this any time in Profile, Privacy & data."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dubgrid.mobile"
+      "bundleIdentifier": "com.dubgrid.mobile",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "We use this only if you opt in to analytics. It helps us understand how people use DubGrid so we can make it better. You can change this any time in Profile, Privacy & data."
+      }
     },
     "android": {
       "package": "com.dubgrid.mobile",

@@ -35,9 +35,9 @@ describe("getWeekStart", () => {
 
 import * as fc from "fast-check";
 
-const arbDate = fc.date({ min: new Date("2000-01-01"), max: new Date("2099-12-31") }).filter(
-  (d) => !isNaN(d.getTime()),
-);
+const arbDate = fc
+  .date({ min: new Date("2000-01-01"), max: new Date("2099-12-31") })
+  .filter((d) => !isNaN(d.getTime()));
 
 describe("getWeekStart — property tests", () => {
   // Feature: comprehensive-test-suite, Property 1: getWeekStart returns a Sunday with zeroed time
@@ -236,9 +236,7 @@ describe("getInitials — property tests", () => {
   // Feature: comprehensive-test-suite, Property 7: getInitials returns only uppercase characters
   // Validates: Requirements 5.1, 5.2, 5.4
   it("returns a non-empty string of only uppercase letters for any name containing at least one letter", () => {
-    const arbNameWithLetter = fc.string().filter(
-      (s) => s.trim().length > 0 && /[a-zA-Z]/.test(s),
-    );
+    const arbNameWithLetter = fc.string().filter((s) => s.trim().length > 0 && /[a-zA-Z]/.test(s));
     fc.assert(
       fc.property(arbNameWithLetter, (name) => {
         const result = getInitials(name);

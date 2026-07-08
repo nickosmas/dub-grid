@@ -6,6 +6,25 @@ import type { NameMismatchDetails } from "@/types";
 
 export type ServiceClient = ReturnType<typeof getServiceClient>;
 
+export async function isOrgSuperAdminOrGridmaster(
+  serviceClient: ServiceClient,
+  actorId: string,
+  orgId: string,
+): Promise<boolean> {
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("org_role")
+      .eq("user_id", actorId)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .maybeSingle(),
+    serviceClient.from("profiles").select("platform_role").eq("id", actorId).maybeSingle(),
+  ]);
+
+  return profile?.platform_role === "gridmaster" || membership?.org_role === "super_admin";
+}
+
 export async function canManageEmployees(
   serviceClient: ServiceClient,
   actorId: string,
@@ -18,11 +37,7 @@ export async function canManageEmployees(
       .eq("user_id", actorId)
       .eq("org_id", orgId)
       .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", actorId)
-      .single(),
+    serviceClient.from("profiles").select("platform_role").eq("id", actorId).single(),
     serviceClient
       .from("organizations")
       .select("suspended_at, subscription_status, trial_ends_at")
@@ -62,12 +77,6 @@ export async function fetchProfileName(
   };
 }
 
-export function nameMismatchResponse(
-  details: NameMismatchDetails,
-  error?: string,
-): NextResponse {
-  return NextResponse.json(
-    createNameMismatchResponseBody(details, error),
-    { status: 409 },
-  );
+export function nameMismatchResponse(details: NameMismatchDetails, error?: string): NextResponse {
+  return NextResponse.json(createNameMismatchResponseBody(details, error), { status: 409 });
 }

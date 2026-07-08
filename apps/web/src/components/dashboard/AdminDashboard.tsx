@@ -3,6 +3,7 @@ import type { DashboardContentProps } from "./DashboardContentProps";
 import ActionQueueCard, { buildActionItems } from "./ActionQueueCard";
 import ActivityFeed from "./ActivityFeed";
 import CoverageBySectionCard from "./CoverageBySectionCard";
+import MyScheduleRow from "./MyScheduleRow";
 import OpenShiftsCard from "./OpenShiftsCard";
 import StaffHoursCard from "./StaffHoursCard";
 
@@ -20,6 +21,10 @@ export default function AdminDashboard(props: DashboardContentProps) {
     focusAreas,
     shiftRequests,
     currentEmpId,
+    currentPeriodShifts,
+    assignmentById,
+    absenceTypeById,
+    periodDates,
     draftNewCount,
     draftModifiedCount,
     draftDeletedCount,
@@ -33,17 +38,13 @@ export default function AdminDashboard(props: DashboardContentProps) {
     () =>
       buildActionItems({
         isAdmin: true,
-        pendingApproval: permissions.canApproveShiftRequests
-          ? shiftRequests.pendingApproval
-          : [],
+        pendingApproval: permissions.canApproveShiftRequests ? shiftRequests.pendingApproval : [],
         swapProposals: [],
         openPickups: [],
         openShifts,
         draftTotal,
         currentEmpId,
-        onResolve: permissions.canApproveShiftRequests
-          ? shiftRequests.resolve
-          : undefined,
+        onResolve: permissions.canApproveShiftRequests ? shiftRequests.resolve : undefined,
       }),
     [
       currentEmpId,
@@ -82,6 +83,15 @@ export default function AdminDashboard(props: DashboardContentProps) {
     <>
       <ActionQueueCard items={actionItems} maxVisible={5} grouped />
 
+      <MyScheduleRow
+        currentEmpId={currentEmpId}
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={periodDates}
+        periodLabel={periodLabel}
+      />
+
       <div
         style={{
           display: "grid",
@@ -95,6 +105,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
             focusAreaLabel={org.focusAreaLabel || "section"}
             isMobile={isMobile}
             hasRequirements={coverageRequirements.length > 0}
+            canManageCoverageRequirements={permissions.canManageCoverageRequirements}
             publishedWindowState={publishedWindowState}
             periodLabel={periodLabel}
             onExpand={() => onExpandPanel("coverage")}

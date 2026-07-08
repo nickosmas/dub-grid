@@ -3,11 +3,9 @@ import { cancelOwnProfileChangeRequest } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
+import { apiErrorResponse } from "@/lib/error-handling";
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 
@@ -23,8 +21,6 @@ export async function PATCH(
     });
     return NextResponse.json({ success: true, request });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to cancel request.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return apiErrorResponse(error, "Failed to cancel request.", 400);
   }
 }

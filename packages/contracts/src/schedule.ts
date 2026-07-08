@@ -115,6 +115,4 @@ export type ScheduleCellState = z.infer<typeof scheduleCellStateSchema>;
 export type ResolvedSchedulePresentationSegment = z.infer<
   typeof resolvedSchedulePresentationSegmentSchema
 >;
-export type ResolvedSchedulePresentation = z.infer<
-  typeof resolvedSchedulePresentationSchema
->;
+export type ResolvedSchedulePresentation = z.infer<typeof resolvedSchedulePresentationSchema>;

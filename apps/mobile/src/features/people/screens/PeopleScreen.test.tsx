@@ -13,11 +13,13 @@ const useBootstrap = vi.fn();
 const pushToast = vi.fn();
 const routerPush = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
+vi.mock("@expo/vector-icons/FontAwesome6", () => ({
   default: () => null,
 }));
 
@@ -41,9 +43,7 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
@@ -149,7 +149,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("Directory unavailable")).toBeInTheDocument();
   });
 
-  it("shows the empty state when the workspace has no teammates yet", () => {
+  it("shows the empty state when the organization has no teammates yet", () => {
     useQuery.mockReturnValue({
       data: {
         people: [],
@@ -173,6 +173,7 @@ describe("PeopleScreen", () => {
             id: "emp-1",
             firstName: "Mina",
             lastName: "Diaz",
+            orgRole: "admin",
             phone: "555-0100",
             email: "mina@dubgrid.com",
             status: "active",
@@ -199,6 +200,7 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
+    expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByText("Skilled Nursing")).toBeInTheDocument();
     expect(screen.queryByText("Details")).not.toBeInTheDocument();
 
@@ -266,10 +268,7 @@ describe("PeopleScreen", () => {
 
     const zoeRow = screen.getByText("Zoe Adams");
     const minaRow = screen.getByText("Mina Diaz");
-    expect(
-      zoeRow.compareDocumentPosition(minaRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(zoeRow.compareDocumentPosition(minaRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("can switch the directory sort to alphabetical", () => {
@@ -331,10 +330,7 @@ describe("PeopleScreen", () => {
 
     const minaRow = screen.getByText("Mina Diaz");
     const zoeRow = screen.getByText("Zoe Adams");
-    expect(
-      minaRow.compareDocumentPosition(zoeRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(minaRow.compareDocumentPosition(zoeRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("hides inactive staff and status pills from regular users", () => {
@@ -379,7 +375,7 @@ describe("PeopleScreen", () => {
             lastName: "Lee",
             phone: "555-0101",
             email: "owen@dubgrid.com",
-            status: "benched",
+            status: "inactive",
             certificationId: null,
             focusAreaIds: [2],
             roleIds: [],
@@ -472,7 +468,7 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
-  it("filters the directory by true management department from the refine modal", () => {
+  it("filters the directory by true management department from the filter modal", () => {
     useQuery.mockReturnValue({
       data: {
         people: [

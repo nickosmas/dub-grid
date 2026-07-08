@@ -129,10 +129,7 @@ export default function ShiftPicker({
     (option) => option.isShiftless || option.focusAreaId == null,
   );
   const optionByPairKey = new Map(
-    assignableOptions.map((option) => [
-      buildShiftJobPairKey(option.shiftId, option.jobId),
-      option,
-    ]),
+    assignableOptions.map((option) => [buildShiftJobPairKey(option.shiftId, option.jobId), option]),
   );
   const isMentoredByPairKey = new Map(
     currentSegments.map((segment) => [
@@ -143,15 +140,15 @@ export default function ShiftPicker({
   const selectedOptions =
     currentSegments.length > 0
       ? currentSegments
-          .map((segment) =>
-            optionByPairKey.get(
-              buildShiftJobPairKey(segment.shiftId, segment.jobId),
-            ) ?? null,
+          .map(
+            (segment) =>
+              optionByPairKey.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)) ?? null,
           )
           .filter((option): option is AssignableShiftOption => option != null)
       : currentAssignmentDefinitionIds
-          .map((assignmentId) =>
-            assignableOptions.find((option) => option.assignmentId === assignmentId) ?? null,
+          .map(
+            (assignmentId) =>
+              assignableOptions.find((option) => option.assignmentId === assignmentId) ?? null,
           )
           .filter((option): option is AssignableShiftOption => option != null);
   const selectedSegments: ScheduleCellSegmentInput[] =
@@ -167,9 +164,8 @@ export default function ShiftPicker({
           jobId: selected.jobId,
           position: index,
           isMentored:
-            isMentoredByPairKey.get(
-              buildShiftJobPairKey(selected.shiftId, selected.jobId),
-            ) ?? false,
+            isMentoredByPairKey.get(buildShiftJobPairKey(selected.shiftId, selected.jobId)) ??
+            false,
         }));
 
   function compareOptionsWithinGroup(
@@ -229,8 +225,7 @@ export default function ShiftPicker({
   function renderShiftButton(option: AssignableShiftOption) {
     const optionKey = buildShiftJobPairKey(option.shiftId, option.jobId);
     const isActive = selectedSegments.some(
-      (selected) =>
-        buildShiftJobPairKey(selected.shiftId, selected.jobId) === optionKey,
+      (selected) => buildShiftJobPairKey(selected.shiftId, selected.jobId) === optionKey,
     );
 
     const handleToggle = () => {
@@ -238,8 +233,7 @@ export default function ShiftPicker({
       if (multiSelect) {
         if (isActive) {
           nextSegments = selectedSegments.filter(
-            (selected) =>
-              buildShiftJobPairKey(selected.shiftId, selected.jobId) !== optionKey,
+            (selected) => buildShiftJobPairKey(selected.shiftId, selected.jobId) !== optionKey,
           );
         } else if (selectedSegments.length >= 2) {
           return; // Max 2 shifts per cell
@@ -266,14 +260,12 @@ export default function ShiftPicker({
       }
 
       onSelect(
-        nextSegments.map(
-          (segment, index): ScheduleCellSegmentInput => ({
-            shiftId: segment.shiftId,
-            jobId: segment.jobId,
-            position: index,
-            isMentored: segment.isMentored ?? false,
-          }),
-        ),
+        nextSegments.map((segment, index): ScheduleCellSegmentInput => ({
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: index,
+          isMentored: segment.isMentored ?? false,
+        })),
       );
 
       if (closeOnSelect && !multiSelect) {
@@ -456,7 +448,15 @@ export default function ShiftPicker({
             return (
               <Fragment key={fa.id}>
                 {i > 0 && (
-                  <div style={{ width: 1, height: 16, background: showDivider ? "var(--color-border)" : "transparent", flexShrink: 0, alignSelf: "center" }} />
+                  <div
+                    style={{
+                      width: 1,
+                      height: 16,
+                      background: showDivider ? "var(--color-border)" : "transparent",
+                      flexShrink: 0,
+                      alignSelf: "center",
+                    }}
+                  />
                 )}
                 <button
                   onClick={() => setPickerTab(fa.id)}
@@ -482,7 +482,11 @@ export default function ShiftPicker({
               <span style={countPill}>{generalOptions.length}</span>
               <div style={headingLine} />
             </div>
-            <div role="group" aria-label="General shift options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div
+              role="group"
+              aria-label="General shift options"
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}
+            >
               {[...generalOptions]
                 .sort(compareOptionsWithinGroup)
                 .map((option) => renderShiftButton(option))}
@@ -493,7 +497,17 @@ export default function ShiftPicker({
         {absenceTypes.length > 0 && (
           <div>
             <div style={sectionHeading}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.5 }}
+              >
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
@@ -503,7 +517,11 @@ export default function ShiftPicker({
               <span style={countPill}>{absenceTypes.length}</span>
               <div style={headingLine} />
             </div>
-            <div role="group" aria-label="Off day options" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            <div
+              role="group"
+              aria-label="Off day options"
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}
+            >
               {absenceTypes.map((at) => {
                 const isActive = currentAbsenceTypeId === at.id;
                 return (
@@ -580,7 +598,18 @@ export default function ShiftPicker({
                           {at.label}
                         </div>
                         <MaybeHint content={at.name} side="left">
-                          <div style={{ ...secondaryTextStyle, color: at.text, opacity: 0.82, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: isActive ? 20 : 0 }}>
+                          <div
+                            style={{
+                              ...secondaryTextStyle,
+                              color: at.text,
+                              opacity: 0.82,
+                              marginTop: 3,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              paddingRight: isActive ? 20 : 0,
+                            }}
+                          >
                             {at.name}
                           </div>
                         </MaybeHint>

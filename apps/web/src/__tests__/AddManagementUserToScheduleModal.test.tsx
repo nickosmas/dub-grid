@@ -2,16 +2,11 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
-import type { DirectoryPerson, FocusArea, NamedItem } from "@/types";
-import {
-  createEmployeeFromOrgUser,
-  reconcileEmployeeFromOrgUser,
-} from "@/features/employees/client";
-import { NameMismatchError } from "@/lib/account-linking";
+import type { DirectoryPerson, Employee, FocusArea, NamedItem } from "@/types";
+import { updateEmployee } from "@/features/employees/client";
 
 vi.mock("@/features/employees/client", () => ({
-  createEmployeeFromOrgUser: vi.fn(),
-  reconcileEmployeeFromOrgUser: vi.fn(),
+  updateEmployee: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -21,10 +16,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-const createEmployeeFromOrgUserMock = vi.mocked(createEmployeeFromOrgUser);
-const reconcileEmployeeFromOrgUserMock = vi.mocked(
-  reconcileEmployeeFromOrgUser,
-);
+const updateEmployeeMock = vi.mocked(updateEmployee);
 
 const focusAreas: FocusArea[] = [
   {
@@ -54,14 +46,15 @@ const roles: NamedItem[] = [
 function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
   return {
     personId: "u:user-1",
-    source: "user_only",
-    employeeId: null,
+    source: "employee",
+    employeeId: "emp-99",
+    employeeNumber: 1042,
     userId: "user-1",
     firstName: "Jordan",
     lastName: "Lee",
     email: "jordan@example.com",
     phone: "(415) 425-3334",
-    employeeStatus: null,
+    employeeStatus: "active",
     orgRole: "user",
     hasAppAccess: true,
     focusAreaIds: [],
@@ -81,55 +74,43 @@ function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
   };
 }
 
+function makeEmployee(overrides: Partial<Employee> = {}): Employee {
+  return {
+    id: "emp-99",
+    employeeNumber: 1042,
+    firstName: "Jordan",
+    lastName: "Lee",
+    employmentType: "full_time",
+    status: "active",
+    statusChangedAt: null,
+    statusNote: "",
+    certificationId: null,
+    roleIds: [],
+    seniority: 1,
+    focusAreaIds: [],
+    phone: "(415) 425-3334",
+    email: "jordan@example.com",
+    contactNotes: "",
+    userId: "user-1",
+    departmentIds: [10],
+    deptAdminIds: [],
+    version: 0,
+    createdAt: null,
+    ...overrides,
+  };
+}
+
 describe("AddManagementUserToScheduleModal", () => {
   beforeEach(() => {
-    createEmployeeFromOrgUserMock.mockResolvedValue({
-      id: "emp-99",
-      firstName: "Jordan",
-      lastName: "Lee",
-      employmentType: "full_time",
-      status: "active",
-      statusChangedAt: null,
-      statusNote: "",
-      certificationId: null,
-      roleIds: [],
-      seniority: 1,
-      focusAreaIds: [1],
-      phone: "(415) 425-3334",
-      email: "jordan@example.com",
-      contactNotes: "",
-      userId: "user-1",
-      departmentIds: [],
-      deptAdminIds: [],
-      version: 0,
-    });
-    reconcileEmployeeFromOrgUserMock.mockResolvedValue({
-      id: "emp-100",
-      firstName: "Jordan",
-      lastName: "Lee",
-      employmentType: "full_time",
-      status: "active",
-      statusChangedAt: null,
-      statusNote: "",
-      certificationId: null,
-      roleIds: [],
-      seniority: 1,
-      focusAreaIds: [1],
-      phone: "(415) 425-3334",
-      email: "jordan@example.com",
-      contactNotes: "",
-      userId: "user-1",
-      departmentIds: [],
-      deptAdminIds: [],
-      version: 0,
-    });
+    updateEmployeeMock.mockResolvedValue();
   });
 
-  it("requires at least one focus area before adding the management user to the schedule", async () => {
+  it("requires at least one focus area before patching the existing employee row", async () => {
     render(
       <AddManagementUserToScheduleModal
         orgId="org-1"
         person={makePerson()}
+        employee={makeEmployee()}
         focusAreas={focusAreas}
         certifications={certifications}
         roles={roles}
@@ -138,21 +119,21 @@ describe("AddManagementUserToScheduleModal", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: /add to schedule/i }),
-    ).toBeDisabled();
-    expect(createEmployeeFromOrgUserMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
+    expect(updateEmployeeMock).not.toHaveBeenCalled();
   });
 
-  it("creates a linked schedule employee from the selected management user", async () => {
+  it("patches the existing employee row with the new scheduling attributes", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     const onAdded = vi.fn();
+    const employee = makeEmployee();
 
     render(
       <AddManagementUserToScheduleModal
         orgId="org-1"
         person={makePerson()}
+        employee={employee}
         focusAreas={focusAreas}
         certifications={certifications}
         roles={roles}
@@ -186,96 +167,41 @@ describe("AddManagementUserToScheduleModal", () => {
     await user.click(addButton);
 
     await waitFor(() => {
-      expect(createEmployeeFromOrgUserMock).toHaveBeenCalledWith({
-        orgId: "org-1",
-        userId: "user-1",
-        firstName: "Jordyn",
-        lastName: "Lane",
-        email: "jordyn@example.com",
-        phone: "(415) 555-0199",
-        certificationId: null,
-        focusAreaIds: [1],
-        roleIds: [7],
-        contactNotes: "Internal note",
-      });
-      expect(onAdded).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "emp-99" }),
-      );
-      expect(onClose).toHaveBeenCalledOnce();
-    });
-  });
-
-  it("shows a reconcile step when the entered name does not match the user account and confirms with account name", async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-    const onAdded = vi.fn();
-
-    createEmployeeFromOrgUserMock.mockRejectedValue(
-      new NameMismatchError({
-        employeeId: null,
-        userId: "user-1",
-        employeeFirstName: "Jordyn",
-        employeeLastName: "Lane",
-        accountFirstName: "Jordan",
-        accountLastName: "Lee",
-      }),
-    );
-
-    render(
-      <AddManagementUserToScheduleModal
-        orgId="org-1"
-        person={makePerson()}
-        focusAreas={focusAreas}
-        certifications={certifications}
-        roles={roles}
-        onClose={onClose}
-        onAdded={onAdded}
-      />,
-    );
-
-    const firstNameInput = screen.getByDisplayValue("Jordan");
-    const lastNameInput = screen.getByDisplayValue("Lee");
-
-    await user.clear(firstNameInput);
-    await user.type(firstNameInput, "Jordyn");
-    await user.clear(lastNameInput);
-    await user.type(lastNameInput, "Lane");
-    await user.click(screen.getByRole("button", { name: "North" }));
-    await user.click(screen.getByRole("button", { name: /add to schedule/i }));
-
-    expect(await screen.findByText("Name mismatch found")).toBeInTheDocument();
-    expect(screen.getByText("Jordyn Lane")).toBeInTheDocument();
-    expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("button", {
-        name: "Use Account Name and Add to Schedule",
-      }),
-    );
-
-    await waitFor(() => {
-      expect(reconcileEmployeeFromOrgUserMock).toHaveBeenCalledWith(
+      // updateEmployee receives the merged Employee — preserves id /
+      // employeeNumber / userId / status / departmentIds (management) and
+      // overlays the new scheduling fields.
+      expect(updateEmployeeMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          orgId: "org-1",
+          id: "emp-99",
+          employeeNumber: 1042,
           userId: "user-1",
           firstName: "Jordyn",
           lastName: "Lane",
+          email: "jordyn@example.com",
+          phone: "(415) 555-0199",
+          certificationId: null,
+          focusAreaIds: [1],
+          roleIds: [7],
+          contactNotes: "Internal note",
         }),
+        "org-1",
+        0,
       );
       expect(onAdded).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "emp-100" }),
+        expect.objectContaining({ id: "emp-99", focusAreaIds: [1] }),
       );
       expect(onClose).toHaveBeenCalledOnce();
     });
   });
 
-  it("blocks adding the management user when the phone number is invalid", async () => {
+  it("blocks the patch when the phone number is invalid", async () => {
     const user = userEvent.setup();
 
     render(
       <AddManagementUserToScheduleModal
         orgId="org-1"
         person={makePerson()}
+        employee={makeEmployee()}
         focusAreas={focusAreas}
         certifications={certifications}
         roles={roles}
@@ -290,11 +216,7 @@ describe("AddManagementUserToScheduleModal", () => {
     await user.tab();
     await user.click(screen.getByRole("button", { name: "North" }));
 
-    expect(
-      screen.getByText("Enter a 10-digit US phone number"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /add to schedule/i }),
-    ).toBeDisabled();
+    expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
   });
 });

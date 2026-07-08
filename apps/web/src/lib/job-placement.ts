@@ -15,12 +15,17 @@ type JobPlacementScope = Pick<
 
 type ShiftlessJobTiming = Pick<
   JobDefinition,
-  "assignmentMode" | "defaultStartTime" | "defaultEndTime" | "defaultDurationHours" | "defaultDurationMinutes"
+  | "assignmentMode"
+  | "defaultStartTime"
+  | "defaultEndTime"
+  | "defaultDurationHours"
+  | "defaultDurationMinutes"
 >;
 
 export function normalizePlacementIds(values: readonly number[] | null | undefined): number[] {
-  return [...new Set((values ?? []).filter((value) => Number.isFinite(value)))]
-    .sort((left, right) => left - right);
+  return [...new Set((values ?? []).filter((value) => Number.isFinite(value)))].sort(
+    (left, right) => left - right,
+  );
 }
 
 export function getJobEligibilityMode(
@@ -29,9 +34,7 @@ export function getJobEligibilityMode(
   return job?.eligibilityMode ?? "and";
 }
 
-export function normalizeShiftlessJobTiming(
-  job: ShiftlessJobTiming,
-): {
+export function normalizeShiftlessJobTiming(job: ShiftlessJobTiming): {
   defaultStartTime: string | null;
   defaultEndTime: string | null;
   defaultDurationHours: number | null;
@@ -157,7 +160,10 @@ export function getJobShiftColorOverride(
 }
 
 export function resolveJobTimesForShift(
-  job: Pick<JobDefinition, "assignmentMode" | "defaultStartTime" | "defaultEndTime" | "shiftTimeOverrides"> | null,
+  job: Pick<
+    JobDefinition,
+    "assignmentMode" | "defaultStartTime" | "defaultEndTime" | "shiftTimeOverrides"
+  > | null,
   shift: Pick<ShiftCategory, "id" | "startTime" | "endTime"> | null,
 ): JobShiftTimeOverride {
   const shiftOverride = getJobShiftTimeOverride(job, shift?.id ?? null);
@@ -178,10 +184,10 @@ export function resolveJobTimesForShift(
 }
 
 export function resolveJobColorsForShift(
-  job: (
-    Pick<JobDefinition, "assignmentMode" | "color" | "shiftColorOverrides"> &
-      Partial<Pick<JobDefinition, "border" | "text">>
-  ) | null,
+  job:
+    | (Pick<JobDefinition, "assignmentMode" | "color" | "shiftColorOverrides"> &
+        Partial<Pick<JobDefinition, "border" | "text">>)
+    | null,
   shift: Pick<ShiftCategory, "id" | "color"> | null,
 ): {
   color: string;
@@ -190,11 +196,10 @@ export function resolveJobColorsForShift(
   isShiftOverride: boolean;
 } {
   const shiftOverrideColor = getJobShiftColorOverride(job, shift?.id ?? null);
-  const shouldUseShiftlessJobColor =
-    shift == null && job?.assignmentMode === "shiftless";
+  const shouldUseShiftlessJobColor = shift == null && job?.assignmentMode === "shiftless";
   const resolvedColor =
     shiftOverrideColor ??
-    (shift?.color ?? null) ??
+    shift?.color ??
     (shouldUseShiftlessJobColor ? (job?.color ?? null) : null) ??
     normalizePresetBg(null);
   const preset = getPresetByBg(resolvedColor);
@@ -219,9 +224,7 @@ export function getStoredJobFocusAreaIds(
   return job.focusAreaId != null ? [job.focusAreaId] : [];
 }
 
-export function getStoredJobDepartmentIds(
-  job: Pick<JobDefinition, "departmentIds">,
-): number[] {
+export function getStoredJobDepartmentIds(job: Pick<JobDefinition, "departmentIds">): number[] {
   return normalizePlacementIds(job.departmentIds);
 }
 
@@ -252,7 +255,9 @@ export function resolveEffectiveJobFocusAreaIds(
     .sort((left, right) => left - right);
 }
 
-export function getJobPlacementShiftPool<TShift extends Pick<ShiftCategory, "id" | "focusAreaId" | "archivedAt">>(
+export function getJobPlacementShiftPool<
+  TShift extends Pick<ShiftCategory, "id" | "focusAreaId" | "archivedAt">,
+>(
   job: JobPlacementScope,
   shiftCategories: TShift[],
   focusAreas: Array<Pick<FocusArea, "id" | "departmentId" | "archivedAt">>,

@@ -36,7 +36,10 @@ describe("isEmployeeQualified", () => {
 
   it("returns true when shift has undefined requiredCertificationIds", () => {
     const emp = makeEmployee({ certificationId: null, focusAreaIds: [1] });
-    const code = makeAssignmentDefinition({ requiredCertificationIds: undefined, focusAreaId: null });
+    const code = makeAssignmentDefinition({
+      requiredCertificationIds: undefined,
+      focusAreaId: null,
+    });
     expect(isEmployeeQualified(emp, code)).toBe(true);
   });
 
@@ -181,7 +184,10 @@ describe("getDisqualificationReasons", () => {
         fc.constantFrom(null as number | null, 1, 2, 3),
         (certId, focusAreaIds, reqCerts, focusAreaId) => {
           const emp = makeEmployee({ certificationId: certId, focusAreaIds });
-          const code = makeAssignmentDefinition({ requiredCertificationIds: reqCerts, focusAreaId });
+          const code = makeAssignmentDefinition({
+            requiredCertificationIds: reqCerts,
+            focusAreaId,
+          });
           const qualified = isEmployeeQualified(emp, code);
           const reasons = getDisqualificationReasons(emp, code);
           expect(reasons.length === 0).toBe(qualified);
@@ -196,43 +202,61 @@ describe("getDisqualificationReasons", () => {
 
 describe("rangesOverlap", () => {
   it("returns false for non-overlapping daytime ranges", () => {
-    expect(rangesOverlap({ start: "07:00", end: "15:00" }, { start: "15:00", end: "23:00" })).toBe(false);
+    expect(rangesOverlap({ start: "07:00", end: "15:00" }, { start: "15:00", end: "23:00" })).toBe(
+      false,
+    );
   });
 
   it("returns true for overlapping daytime ranges", () => {
-    expect(rangesOverlap({ start: "07:00", end: "16:00" }, { start: "15:00", end: "23:00" })).toBe(true);
+    expect(rangesOverlap({ start: "07:00", end: "16:00" }, { start: "15:00", end: "23:00" })).toBe(
+      true,
+    );
   });
 
   it("returns true for identical ranges", () => {
-    expect(rangesOverlap({ start: "07:00", end: "15:00" }, { start: "07:00", end: "15:00" })).toBe(true);
+    expect(rangesOverlap({ start: "07:00", end: "15:00" }, { start: "07:00", end: "15:00" })).toBe(
+      true,
+    );
   });
 
   it("returns true when one range contains the other", () => {
-    expect(rangesOverlap({ start: "06:00", end: "20:00" }, { start: "08:00", end: "16:00" })).toBe(true);
+    expect(rangesOverlap({ start: "06:00", end: "20:00" }, { start: "08:00", end: "16:00" })).toBe(
+      true,
+    );
   });
 
   it("returns false for overnight shift a vs non-overlapping daytime b", () => {
     // 22:00-06:00 overnight; 10:00-18:00 daytime — no overlap
-    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "10:00", end: "18:00" })).toBe(false);
+    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "10:00", end: "18:00" })).toBe(
+      false,
+    );
   });
 
   it("returns true for overnight shift a vs early morning b", () => {
     // 22:00-06:00 overnight; 04:00-08:00 early morning — overlaps in 04:00-06:00
-    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "04:00", end: "08:00" })).toBe(true);
+    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "04:00", end: "08:00" })).toBe(
+      true,
+    );
   });
 
   it("returns true for overnight shift a vs late evening b", () => {
     // 22:00-06:00 overnight; 20:00-23:00 late evening — overlaps in 22:00-23:00
-    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "20:00", end: "23:00" })).toBe(true);
+    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "20:00", end: "23:00" })).toBe(
+      true,
+    );
   });
 
   it("returns true for both overnight shifts overlapping", () => {
-    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "23:00", end: "07:00" })).toBe(true);
+    expect(rangesOverlap({ start: "22:00", end: "06:00" }, { start: "23:00", end: "07:00" })).toBe(
+      true,
+    );
   });
 
   it("returns false for adjacent but non-overlapping ranges (strict <)", () => {
     // start < end is strict, so 15:00 === 15:00 is not less than
-    expect(rangesOverlap({ start: "07:00", end: "15:00" }, { start: "15:00", end: "23:00" })).toBe(false);
+    expect(rangesOverlap({ start: "07:00", end: "15:00" }, { start: "15:00", end: "23:00" })).toBe(
+      false,
+    );
   });
 
   it("is commutative: overlap(a, b) === overlap(b, a)", () => {
@@ -351,7 +375,10 @@ describe("checkCrossDateOverlap", () => {
 describe("checkSameDayOverlaps", () => {
   it("returns empty for non-overlapping pair", () => {
     const warnings = checkSameDayOverlaps(
-      [{ start: "07:00", end: "12:00" }, { start: "13:00", end: "18:00" }],
+      [
+        { start: "07:00", end: "12:00" },
+        { start: "13:00", end: "18:00" },
+      ],
       ["Day", "Eve"],
     );
     expect(warnings).toEqual([]);
@@ -359,7 +386,10 @@ describe("checkSameDayOverlaps", () => {
 
   it("returns warning for overlapping pair", () => {
     const warnings = checkSameDayOverlaps(
-      [{ start: "07:00", end: "16:00" }, { start: "14:00", end: "22:00" }],
+      [
+        { start: "07:00", end: "16:00" },
+        { start: "14:00", end: "22:00" },
+      ],
       ["Day", "Eve"],
     );
     expect(warnings).toHaveLength(1);
@@ -380,10 +410,7 @@ describe("checkSameDayOverlaps", () => {
   });
 
   it("returns empty for single range", () => {
-    const warnings = checkSameDayOverlaps(
-      [{ start: "07:00", end: "15:00" }],
-      ["Day"],
-    );
+    const warnings = checkSameDayOverlaps([{ start: "07:00", end: "15:00" }], ["Day"]);
     expect(warnings).toEqual([]);
   });
 });
@@ -417,8 +444,20 @@ describe("resolveRequirement", () => {
 
   it("day-specific takes precedence over every-day", () => {
     const reqs = [
-      makeCoverageRequirement({ id: 1, focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
-      makeCoverageRequirement({ id: 2, focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 7 }),
+      makeCoverageRequirement({
+        id: 1,
+        focusAreaId: 1,
+        assignmentId: 10,
+        dayOfWeek: null,
+        minStaff: 3,
+      }),
+      makeCoverageRequirement({
+        id: 2,
+        focusAreaId: 1,
+        assignmentId: 10,
+        dayOfWeek: 1,
+        minStaff: 7,
+      }),
     ];
     const result = resolveRequirement(reqs, 1, 10, 1);
     expect(result).toEqual({ minStaff: 7 });
@@ -442,7 +481,9 @@ describe("computeCoverageStatus", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
     const idsForKey = () => [10];
-    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10]), [10], { minStaff: 2 });
+    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10]), [10], {
+      minStaff: 2,
+    });
     expect(result.actual).toBe(2);
     expect(result.required).toBe(2);
     expect(result.isMet).toBe(true);
@@ -452,7 +493,9 @@ describe("computeCoverageStatus", () => {
   it("reports not met when actual < required", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const idsForKey = () => [10];
-    const result = computeCoverageStatus([emp1], date, idsForKey, new Set([10]), [10], { minStaff: 3 });
+    const result = computeCoverageStatus([emp1], date, idsForKey, new Set([10]), [10], {
+      minStaff: 3,
+    });
     expect(result.actual).toBe(1);
     expect(result.required).toBe(3);
     expect(result.isMet).toBe(false);
@@ -465,7 +508,9 @@ describe("computeCoverageStatus", () => {
   });
 
   it("returns actual 0 when no employees", () => {
-    const result = computeCoverageStatus([], date, () => [10], new Set([10]), [10], { minStaff: 2 });
+    const result = computeCoverageStatus([], date, () => [10], new Set([10]), [10], {
+      minStaff: 2,
+    });
     expect(result.actual).toBe(0);
   });
 
@@ -473,8 +518,10 @@ describe("computeCoverageStatus", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
     // emp1 has shift 10, emp2 has shift 20
-    const idsForKey = (empId: string) => empId === "emp-1" ? [10] : [20];
-    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10, 20]), [10], { minStaff: 1 });
+    const idsForKey = (empId: string) => (empId === "emp-1" ? [10] : [20]);
+    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10, 20]), [10], {
+      minStaff: 1,
+    });
     expect(result.actual).toBe(1); // only emp1 on shift 10
   });
 
@@ -528,10 +575,7 @@ describe("computeCoverageGaps", () => {
     const icuCode = makeAssignmentDefinition({ id: 11, label: "D", focusAreaId: 1 });
     const erCode = makeAssignmentDefinition({ id: 12, label: "N", focusAreaId: 2 });
 
-    const result = buildAssignmentIdsByFocusArea(
-      [icu, er],
-      [generalCode, icuCode, erCode],
-    );
+    const result = buildAssignmentIdsByFocusArea([icu, er], [generalCode, icuCode, erCode]);
 
     expect(result.get(1)).toEqual(new Set([10, 11]));
     expect(result.get(2)).toEqual(new Set([10, 12]));
@@ -541,7 +585,12 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 1 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 1,
+    });
     const emp = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
 
     const gaps = computeCoverageGaps(
@@ -562,7 +611,12 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
 
     const gaps = computeCoverageGaps(
       [fa],
@@ -595,7 +649,12 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const code = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 2 }); // different focus area
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
 
     const gaps = computeCoverageGaps(
       [fa],
@@ -634,7 +693,12 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ER" });
     const cat = makeShiftCategory({ id: 2, name: "Evening" });
     const code = makeAssignmentDefinition({ id: 20, label: "E", categoryId: 2, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 20, dayOfWeek: null, minStaff: 2 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 20,
+      dayOfWeek: null,
+      minStaff: 2,
+    });
 
     const gaps = computeCoverageGaps(
       [fa],
@@ -656,9 +720,24 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const day = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const supervisor = makeAssignmentDefinition({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
-    const mentoring = makeAssignmentDefinition({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const supervisor = makeAssignmentDefinition({
+      id: 11,
+      label: "Ds",
+      categoryId: 1,
+      focusAreaId: 1,
+    });
+    const mentoring = makeAssignmentDefinition({
+      id: 12,
+      label: "(D)",
+      categoryId: 1,
+      focusAreaId: 1,
+    });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
     const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
@@ -670,8 +749,7 @@ describe("computeCoverageGaps", () => {
       [req],
       [date],
       new Map([[1, [emp1, emp2, emp3]]]),
-      (empId: string) =>
-        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12],
+      (empId: string) => (empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12]),
       new Map([
         [10, day],
         [11, supervisor],
@@ -687,10 +765,30 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const day = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const supervisor = makeAssignmentDefinition({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
-    const mentoring = makeAssignmentDefinition({ id: 12, label: "(D)", categoryId: 1, focusAreaId: 1 });
-    const dayReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
-    const supReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 11, dayOfWeek: null, minStaff: 1 });
+    const supervisor = makeAssignmentDefinition({
+      id: 11,
+      label: "Ds",
+      categoryId: 1,
+      focusAreaId: 1,
+    });
+    const mentoring = makeAssignmentDefinition({
+      id: 12,
+      label: "(D)",
+      categoryId: 1,
+      focusAreaId: 1,
+    });
+    const dayReq = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
+    const supReq = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 11,
+      dayOfWeek: null,
+      minStaff: 1,
+    });
     const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
@@ -724,9 +822,24 @@ describe("computeCoverageGaps", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const day = makeAssignmentDefinition({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const supervisor = makeAssignmentDefinition({ id: 11, label: "Ds", categoryId: 1, focusAreaId: 1 });
-    const dayReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
-    const supReq = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 11, dayOfWeek: null, minStaff: 1 });
+    const supervisor = makeAssignmentDefinition({
+      id: 11,
+      label: "Ds",
+      categoryId: 1,
+      focusAreaId: 1,
+    });
+    const dayReq = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
+    const supReq = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 11,
+      dayOfWeek: null,
+      minStaff: 1,
+    });
     const emp1 = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
@@ -738,8 +851,7 @@ describe("computeCoverageGaps", () => {
       [dayReq, supReq],
       [date],
       new Map([[1, [emp1, emp2, emp3]]]),
-      (empId: string) =>
-        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10],
+      (empId: string) => (empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10]),
       new Map([
         [10, day],
         [11, supervisor],
@@ -786,10 +898,7 @@ describe("computeCoverageGaps", () => {
         endDate: formatDateKey(march2),
       },
     ]);
-    const publishedDates = filterPublishedDates(
-      [march1, march2],
-      publishedDateSet,
-    );
+    const publishedDates = filterPublishedDates([march1, march2], publishedDateSet);
 
     const gaps = computeCoverageGaps(
       [fa],
@@ -816,9 +925,7 @@ describe("buildPublishedDateSet", () => {
   });
 
   it("expands a single range into individual date keys", () => {
-    const set = buildPublishedDateSet([
-      { startDate: "2026-03-02", endDate: "2026-03-04" },
-    ]);
+    const set = buildPublishedDateSet([{ startDate: "2026-03-02", endDate: "2026-03-04" }]);
     expect(set).toEqual(new Set(["2026-03-02", "2026-03-03", "2026-03-04"]));
   });
 
@@ -827,15 +934,11 @@ describe("buildPublishedDateSet", () => {
       { startDate: "2026-03-01", endDate: "2026-03-03" },
       { startDate: "2026-03-02", endDate: "2026-03-04" },
     ]);
-    expect(set).toEqual(
-      new Set(["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04"]),
-    );
+    expect(set).toEqual(new Set(["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04"]));
   });
 
   it("handles a single-day range", () => {
-    const set = buildPublishedDateSet([
-      { startDate: "2026-06-15", endDate: "2026-06-15" },
-    ]);
+    const set = buildPublishedDateSet([{ startDate: "2026-06-15", endDate: "2026-06-15" }]);
     expect(set).toEqual(new Set(["2026-06-15"]));
   });
 });
@@ -868,17 +971,12 @@ describe("getPublishedWindowState", () => {
   });
 
   it("returns partial when only some visible dates are published", () => {
-    expect(getPublishedWindowState(dates, new Set(["2026-03-02"]))).toBe(
-      "partial",
-    );
+    expect(getPublishedWindowState(dates, new Set(["2026-03-02"]))).toBe("partial");
   });
 
   it("returns published when every visible date is published", () => {
     expect(
-      getPublishedWindowState(
-        dates,
-        new Set(["2026-03-01", "2026-03-02", "2026-03-03"]),
-      ),
+      getPublishedWindowState(dates, new Set(["2026-03-01", "2026-03-02", "2026-03-03"])),
     ).toBe("published");
   });
 });

@@ -21,10 +21,9 @@ type NetworkStatusContextValue = {
 
 const NetworkStatusContext = createContext<NetworkStatusContextValue | null>(null);
 
-function toOnlineValue(state: Pick<
-  Network.NetworkState,
-  "isConnected" | "isInternetReachable"
->): boolean {
+function toOnlineValue(
+  state: Pick<Network.NetworkState, "isConnected" | "isInternetReachable">,
+): boolean {
   return Boolean(state.isInternetReachable ?? state.isConnected);
 }
 
@@ -129,11 +128,7 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
     return null;
   }
 
-  return (
-    <NetworkStatusContext.Provider value={value}>
-      {children}
-    </NetworkStatusContext.Provider>
-  );
+  return <NetworkStatusContext.Provider value={value}>{children}</NetworkStatusContext.Provider>;
 }
 
 export function useNetworkStatus() {

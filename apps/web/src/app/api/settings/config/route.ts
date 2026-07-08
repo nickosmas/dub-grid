@@ -13,9 +13,11 @@ import type {
   ScheduleCellState,
   ShiftCategory,
 } from "@/types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { apiErrorResponse } from "@/lib/error-handling";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   ABSENCE_TYPE_COLS,
@@ -62,12 +64,15 @@ import {
   isDefaultShiftSystemJob,
   isRegularStaffSystemJob,
 } from "@/lib/system-jobs";
+import { getShiftCategoryConflict } from "@/lib/shift-category-conflicts";
+import { getDepartmentConflict } from "@/lib/department-conflicts";
 
 export const dynamic = "force-dynamic";
 
 type DependencyInfo = {
   hasDependencies: boolean;
   summary: string;
+  hasAnyReferences: boolean;
 };
 
 type SettingsPermission =
@@ -85,10 +90,7 @@ type SettingsPermission =
 const POSTGREST_MUTATION_BATCH_SIZE = 50;
 
 type SettingsServiceClient = ReturnType<typeof getServiceClient>;
-type ArchivableSettingsTable =
-  | "certifications"
-  | "organization_roles"
-  | "departments";
+type ArchivableSettingsTable = "certifications" | "organization_roles" | "departments";
 
 function chunkNumberIds(ids: number[]): number[][] {
   const chunks: number[][] = [];
@@ -113,6 +115,19 @@ async function archiveSettingsRowsByIds(
       .update({ archived_at: archivedAt })
       .eq("org_id", orgId)
       .in("id", batch);
+    if (error) throw error;
+  }
+}
+
+async function hardDeleteSettingsRowsByIds(
+  serviceClient: SettingsServiceClient,
+  table: ArchivableSettingsTable,
+  orgId: string,
+  ids: number[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  for (const batch of chunkNumberIds(ids)) {
+    const { error } = await serviceClient.from(table).delete().eq("org_id", orgId).in("id", batch);
     if (error) throw error;
   }
 }
@@ -222,6 +237,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     orgId: z.string().uuid(),
     items: z.array(namedItemSchema),
     existing: z.array(namedItemSchema),
+    hardDeleteIds: z.array(z.number().int()).optional(),
   }),
   z.object({
     action: z.literal("restoreCertification"),
@@ -233,6 +249,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     orgId: z.string().uuid(),
     items: z.array(namedItemSchema),
     existing: z.array(namedItemSchema),
+    hardDeleteIds: z.array(z.number().int()).optional(),
   }),
   z.object({
     action: z.literal("restoreOrganizationRole"),
@@ -244,6 +261,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     orgId: z.string().uuid(),
     items: z.array(departmentSchema),
     existing: z.array(departmentSchema),
+    hardDeleteIds: z.array(z.number().int()).optional(),
   }),
   z.object({
     action: z.literal("restoreDepartment"),
@@ -258,6 +276,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     action: z.literal("deleteFocusArea"),
     orgId: z.string().uuid(),
     itemId: z.number().int(),
+    hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreFocusArea"),
@@ -272,6 +291,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     action: z.literal("deleteShiftCategory"),
     orgId: z.string().uuid(),
     itemId: z.number().int(),
+    hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreShiftCategory"),
@@ -286,6 +306,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     action: z.literal("deleteJobDefinition"),
     orgId: z.string().uuid(),
     itemId: z.number().int(),
+    hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreJobDefinition"),
@@ -308,6 +329,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     action: z.literal("deleteAbsenceType"),
     orgId: z.string().uuid(),
     itemId: z.number().int(),
+    hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreAbsenceType"),
@@ -322,6 +344,7 @@ const postBodySchema = z.discriminatedUnion("action", [
     action: z.literal("deleteIndicatorType"),
     orgId: z.string().uuid(),
     itemId: z.number().int(),
+    hard: z.boolean().optional(),
   }),
   z.object({
     action: z.literal("restoreIndicatorType"),
@@ -447,9 +470,7 @@ function validateNamedItems(
         : "",
   }));
 
-  const duplicateName = findDuplicateValue(
-    normalizedItems.map((item) => item.name.toLowerCase()),
-  );
+  const duplicateName = findDuplicateValue(normalizedItems.map((item) => item.name.toLowerCase()));
   if (duplicateName) {
     return {
       response: buildSettingsValidationResponse({
@@ -515,9 +536,7 @@ function validateDepartments(
 
   for (const type of ["scheduled", "management"] as const) {
     const duplicateName = findDuplicateValue(
-      normalizedItems
-        .filter((item) => item.type === type)
-        .map((item) => item.name.toLowerCase()),
+      normalizedItems.filter((item) => item.type === type).map((item) => item.name.toLowerCase()),
     );
     if (duplicateName) {
       return {
@@ -574,14 +593,13 @@ function validateShiftCategory(
     maxLength: SHIFT_CATEGORY_NAME_MAX,
     required: true,
   });
-  const abbrError =
-    shiftCategory.abbr?.trim()
-      ? getCodeError(shiftCategory.abbr, {
-          label: "Shift code",
-          maxLength: SHIFT_CATEGORY_ABBR_MAX,
-          uppercase: true,
-        })
-      : null;
+  const abbrError = shiftCategory.abbr?.trim()
+    ? getCodeError(shiftCategory.abbr, {
+        label: "Shift code",
+        maxLength: SHIFT_CATEGORY_ABBR_MAX,
+        uppercase: true,
+      })
+    : null;
   const fieldErrors = {
     "shiftCategory.name": nameError,
     "shiftCategory.abbr": abbrError,
@@ -616,9 +634,7 @@ function validateShiftCategory(
   };
 }
 
-function validateJob(
-  job: JobInput,
-): { job: JobInput } | { response: NextResponse } {
+function validateJob(job: JobInput): { job: JobInput } | { response: NextResponse } {
   const nameError = validateSettingsTextField({
     value: job.name,
     label: "Job name",
@@ -698,13 +714,14 @@ function validateAbsenceType(
   return {
     absenceType: {
       ...absenceType,
-      label: absenceType.label.trim().length > 0
-        ? normalizeCode(absenceType.label, {
-            label: "Absence code",
-            maxLength: ABSENCE_LABEL_MAX,
-            uppercase: true,
-          })
-        : "",
+      label:
+        absenceType.label.trim().length > 0
+          ? normalizeCode(absenceType.label, {
+              label: "Absence code",
+              maxLength: ABSENCE_LABEL_MAX,
+              uppercase: true,
+            })
+          : "",
       name: normalizeSettingsTextField({
         value: absenceType.name,
         label: "Absence name",
@@ -748,12 +765,19 @@ function validateIndicatorType(
   };
 }
 
-function buildSummary(parts: string[]): DependencyInfo {
+function buildSummary(parts: string[]): Omit<DependencyInfo, "hasAnyReferences"> {
   const active = parts.filter(Boolean);
   if (active.length === 0) {
     return { hasDependencies: false, summary: "" };
   }
   return { hasDependencies: true, summary: `Used by ${active.join(" and ")}` };
+}
+
+function withAnyRefs(
+  base: Omit<DependencyInfo, "hasAnyReferences">,
+  hasAnyReferences: boolean,
+): DependencyInfo {
+  return { ...base, hasAnyReferences };
 }
 
 function recurringStateUsesShift(state: ScheduleCellState, shiftId: number): boolean {
@@ -764,10 +788,7 @@ function recurringStateUsesJob(state: ScheduleCellState, jobId: number): boolean
   return state.kind === "worked" && state.segments.some((segment) => segment.jobId === jobId);
 }
 
-function recurringStateUsesAbsenceType(
-  state: ScheduleCellState,
-  absenceTypeId: number,
-): boolean {
+function recurringStateUsesAbsenceType(state: ScheduleCellState, absenceTypeId: number): boolean {
   return state.kind === "absence" && state.absenceTypeId === absenceTypeId;
 }
 
@@ -795,36 +816,78 @@ async function writeAudit(args: {
   }
 }
 
-async function authorize(
-  req: NextRequest,
-  orgId: string,
-  permission: SettingsPermission,
-) {
+async function authorize(req: NextRequest, orgId: string, permission: SettingsPermission) {
   const auth = await requireOrgPermissions(
     req,
     orgId,
     (permissions) => {
       switch (permission) {
         case "orgLabelsRead":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewOrgLabels || permissions.canManageOrgLabels;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewOrgLabels ||
+            permissions.canManageOrgLabels
+          );
         case "orgLabelsManage":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgLabels;
+          return (
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgLabels
+          );
         case "departmentsRead":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewFocusAreas || permissions.canManageFocusAreas || permissions.canViewOrgLabels || permissions.canManageOrgLabels;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewFocusAreas ||
+            permissions.canManageFocusAreas ||
+            permissions.canViewOrgLabels ||
+            permissions.canManageOrgLabels
+          );
         case "departmentsManage":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageFocusAreas || permissions.canManageOrgLabels;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageFocusAreas ||
+            permissions.canManageOrgLabels
+          );
         case "scheduleDefinitionsRead":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewScheduleDefinitions || permissions.canManageScheduleDefinitions;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewScheduleDefinitions ||
+            permissions.canManageScheduleDefinitions
+          );
         case "scheduleDefinitionsManage":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageScheduleDefinitions;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageScheduleDefinitions
+          );
         case "coverageRead":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewCoverageRequirements || permissions.canManageCoverageRequirements;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewCoverageRequirements ||
+            permissions.canManageCoverageRequirements
+          );
         case "coverageManage":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageCoverageRequirements;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageCoverageRequirements
+          );
         case "indicatorTypesRead":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewIndicatorTypes || permissions.canManageIndicatorTypes;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canViewIndicatorTypes ||
+            permissions.canManageIndicatorTypes
+          );
         case "indicatorTypesManage":
-          return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageIndicatorTypes;
+          return (
+            permissions.isGridmaster ||
+            permissions.isSuperAdmin ||
+            permissions.canManageIndicatorTypes
+          );
       }
     },
     { allowDuringSetup: true },
@@ -833,7 +896,11 @@ async function authorize(
     return { response: auth.response } as const;
   }
 
-  return { actor: auth.actor, serviceClient: auth.serviceClient } as const;
+  return {
+    actor: auth.actor,
+    serviceClient: auth.serviceClient,
+    orgId: auth.orgId,
+  } as const;
 }
 
 async function fetchCertificationsForOrg(
@@ -851,9 +918,7 @@ async function fetchCertificationsForOrg(
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    rowToNamedItem(row as Parameters<typeof rowToNamedItem>[0]),
-  );
+  return (data ?? []).map((row) => rowToNamedItem(row as Parameters<typeof rowToNamedItem>[0]));
 }
 
 async function fetchOrganizationRolesForOrg(
@@ -871,9 +936,7 @@ async function fetchOrganizationRolesForOrg(
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    rowToNamedItem(row as Parameters<typeof rowToNamedItem>[0]),
-  );
+  return (data ?? []).map((row) => rowToNamedItem(row as Parameters<typeof rowToNamedItem>[0]));
 }
 
 async function fetchDepartmentsForOrg(
@@ -891,15 +954,10 @@ async function fetchDepartmentsForOrg(
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    rowToDepartment(row as Parameters<typeof rowToDepartment>[0]),
-  );
+  return (data ?? []).map((row) => rowToDepartment(row as Parameters<typeof rowToDepartment>[0]));
 }
 
-async function fetchFocusAreasForOrg(
-  orgId: string,
-  includeArchived = false,
-): Promise<FocusArea[]> {
+async function fetchFocusAreasForOrg(orgId: string, includeArchived = false): Promise<FocusArea[]> {
   const serviceClient = getServiceClient();
   let query = serviceClient
     .from("focus_areas")
@@ -911,9 +969,7 @@ async function fetchFocusAreasForOrg(
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    rowToFocusArea(row as Parameters<typeof rowToFocusArea>[0]),
-  );
+  return (data ?? []).map((row) => rowToFocusArea(row as Parameters<typeof rowToFocusArea>[0]));
 }
 
 async function fetchShiftCategoriesForOrg(
@@ -942,11 +998,7 @@ async function fetchJobDefinitionsForOrg(
 ): Promise<JobDefinition[]> {
   const serviceClient = getServiceClient();
   await ensureDefaultShiftJobForOrg(orgId);
-  let query = serviceClient
-    .from("jobs")
-    .select(JOB_COLS)
-    .eq("org_id", orgId)
-    .order("sort_order");
+  let query = serviceClient.from("jobs").select(JOB_COLS).eq("org_id", orgId).order("sort_order");
   if (!includeArchived) {
     query = query.is("archived_at", null);
   }
@@ -980,44 +1032,37 @@ async function ensureDefaultShiftJobForOrg(orgId: string): Promise<void> {
     return;
   }
 
-  const { error } = await serviceClient
-    .from("jobs")
-    .insert({
-      org_id: orgId,
-      name: "Default shift job",
-      abbr: "SHIFT",
-      show_on_grid: false,
-      assignment_mode: "with_shift",
-      eligibility_mode: "and",
-      focus_area_ids: [],
-      department_ids: [],
-      applicable_shift_ids: [],
-      eligible_role_ids: [],
-      required_certification_ids: [],
-      color: "#E2E8F0",
-      border_color: "transparent",
-      text_color: "#1E293B",
-      shift_time_overrides: {},
-      shift_color_overrides: {},
-      default_start_time: null,
-      default_end_time: null,
-      default_duration_hours: null,
-      default_duration_minutes: null,
-      sort_order: -1000,
-      system_key: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
-    });
+  const { error } = await serviceClient.from("jobs").insert({
+    org_id: orgId,
+    name: "Default shift job",
+    abbr: "SHIFT",
+    show_on_grid: false,
+    assignment_mode: "with_shift",
+    eligibility_mode: "and",
+    focus_area_ids: [],
+    department_ids: [],
+    applicable_shift_ids: [],
+    eligible_role_ids: [],
+    required_certification_ids: [],
+    color: "#E2E8F0",
+    border_color: "transparent",
+    text_color: "#1E293B",
+    shift_time_overrides: {},
+    shift_color_overrides: {},
+    default_start_time: null,
+    default_end_time: null,
+    default_duration_hours: null,
+    default_duration_minutes: null,
+    sort_order: -1000,
+    system_key: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+  });
   if (error && error.code !== "23505") throw error;
 }
 
-async function fetchCoverageRequirementsForOrg(
-  orgId: string,
-): Promise<CoverageRequirement[]> {
+async function fetchCoverageRequirementsForOrg(orgId: string): Promise<CoverageRequirement[]> {
   const serviceClient = getServiceClient();
   const [{ data, error }, jobs] = await Promise.all([
-    serviceClient
-      .from("coverage_requirements")
-      .select(COVERAGE_REQ_COLS)
-      .eq("org_id", orgId),
+    serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
     fetchJobDefinitionsForOrg(orgId, true),
   ]);
 
@@ -1037,9 +1082,7 @@ async function fetchCoverageRequirementsForOrg(
   return ((data ?? []) as Array<Parameters<typeof rowToCoverageRequirement>[0]>)
     .map((row) => rowToCoverageRequirement(row))
     .filter(
-      (requirement) =>
-        (requirement.jobId ?? 0) > 0 &&
-        visibleJobIds.has(requirement.jobId ?? 0),
+      (requirement) => (requirement.jobId ?? 0) > 0 && visibleJobIds.has(requirement.jobId ?? 0),
     );
 }
 
@@ -1058,9 +1101,7 @@ async function fetchAbsenceTypesForOrg(
   }
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((row) =>
-    rowToAbsenceType(row as Parameters<typeof rowToAbsenceType>[0]),
-  );
+  return (data ?? []).map((row) => rowToAbsenceType(row as Parameters<typeof rowToAbsenceType>[0]));
 }
 
 async function fetchIndicatorTypesForOrg(
@@ -1083,10 +1124,7 @@ async function fetchIndicatorTypesForOrg(
   );
 }
 
-async function fetchAssignmentDefinitionsForOrg(
-  orgId: string,
-  includeArchived = false,
-) {
+async function fetchAssignmentDefinitionsForOrg(orgId: string, includeArchived = false) {
   const [focusAreas, shiftCategories, jobs] = await Promise.all([
     fetchFocusAreasForOrg(orgId, includeArchived),
     fetchShiftCategoriesForOrg(orgId, includeArchived),
@@ -1118,7 +1156,8 @@ async function loadActiveScheduleCellDependencies(orgId: string) {
   const serviceClient = getServiceClient();
   const { data, error } = await serviceClient
     .from("schedule_cells")
-    .select(`
+    .select(
+      `
       id,
       employees!inner(archived_at),
       snapshots:schedule_cell_snapshots(
@@ -1128,7 +1167,8 @@ async function loadActiveScheduleCellDependencies(orgId: string) {
           job_id
         )
       )
-    `)
+    `,
+    )
     .eq("org_id", orgId)
     .is("employees.archived_at", null);
 
@@ -1145,9 +1185,291 @@ async function loadActiveScheduleCellDependencies(orgId: string) {
   }>;
 }
 
-async function checkRoleDependenciesForOrg(roleId: number, orgId: string) {
+// ─── hasAnyReferences checks ────────────────────────────────────────────────
+//
+// Each of these returns true if anything anywhere references the entity —
+// active or archived, current or historical. A false return is the signal that
+// the row can be hard-deleted (DELETE FROM ...) instead of archived. We never
+// trust the caller's intent for this; the server always re-checks.
+
+type RecurringStateRow = { id: string; state: ScheduleCellState };
+
+async function loadAllRecurringStates(orgId: string): Promise<RecurringStateRow[]> {
+  const serviceClient = getServiceClient();
+  const { data, error } = await serviceClient
+    .from("recurring_shifts")
+    .select("id, state")
+    .eq("org_id", orgId);
+  if (error) throw error;
+  return (data ?? []) as RecurringStateRow[];
+}
+
+async function anyScheduleCellSegment(
+  orgId: string,
+  match: (segment: { shift_id?: number | null; job_id?: number | null }) => boolean,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const { data, error } = await serviceClient
+    .from("schedule_cells")
+    .select(
+      `
+      id,
+      snapshots:schedule_cell_snapshots(
+        absence_type_id,
+        segments:schedule_cell_segments(
+          shift_id,
+          job_id
+        )
+      )
+    `,
+    )
+    .eq("org_id", orgId);
+  if (error) throw error;
+  return (data ?? []).some((cell: any) =>
+    (cell.snapshots ?? []).some((snap: any) =>
+      (snap.segments ?? []).some((seg: any) => match(seg)),
+    ),
+  );
+}
+
+async function anyScheduleCellSnapshot(
+  orgId: string,
+  match: (snapshot: { absence_type_id?: number | null }) => boolean,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const { data, error } = await serviceClient
+    .from("schedule_cells")
+    .select(
+      `
+      id,
+      snapshots:schedule_cell_snapshots(absence_type_id)
+    `,
+    )
+    .eq("org_id", orgId);
+  if (error) throw error;
+  return (data ?? []).some((cell: any) => (cell.snapshots ?? []).some((snap: any) => match(snap)));
+}
+
+async function focusAreaHasAnyReferencesForOrg(
+  focusAreaId: number,
+  orgId: string,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const [shiftCatRes, scheduleCellRes, scheduleNoteRes, coverageRes, employeeRes, jobRes] =
+    await Promise.all([
+      serviceClient
+        .from("shift_categories")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("focus_area_id", focusAreaId),
+      serviceClient
+        .from("schedule_cells")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("focus_area_id", focusAreaId),
+      serviceClient
+        .from("schedule_notes")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("focus_area_id", focusAreaId),
+      serviceClient
+        .from("coverage_requirements")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("focus_area_id", focusAreaId),
+      serviceClient
+        .from("employees")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .contains("focus_area_ids", [focusAreaId]),
+      serviceClient
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .contains("focus_area_ids", [focusAreaId]),
+    ]);
+  return (
+    (shiftCatRes.count ?? 0) > 0 ||
+    (scheduleCellRes.count ?? 0) > 0 ||
+    (scheduleNoteRes.count ?? 0) > 0 ||
+    (coverageRes.count ?? 0) > 0 ||
+    (employeeRes.count ?? 0) > 0 ||
+    (jobRes.count ?? 0) > 0
+  );
+}
+
+type DepartmentRefCheck = {
+  hasAnyReferences: boolean;
+  cascadeFocusAreaIds: number[];
+};
+
+async function departmentRefCheckForOrg(
+  deptId: number,
+  orgId: string,
+): Promise<DepartmentRefCheck> {
+  const serviceClient = getServiceClient();
+  const [employeeRes, roleRes, certRes, jobRes, membershipRes, faRes] = await Promise.all([
+    serviceClient
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .contains("department_ids", [deptId]),
+    serviceClient
+      .from("organization_roles")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("department_id", deptId),
+    serviceClient
+      .from("certifications")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("department_id", deptId),
+    serviceClient
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .contains("department_ids", [deptId]),
+    serviceClient
+      .from("organization_memberships")
+      .select("user_id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .contains("department_ids", [deptId]),
+    serviceClient.from("focus_areas").select("id").eq("org_id", orgId).eq("department_id", deptId),
+  ]);
+
+  const nonStructural =
+    (employeeRes.count ?? 0) > 0 ||
+    (roleRes.count ?? 0) > 0 ||
+    (certRes.count ?? 0) > 0 ||
+    (jobRes.count ?? 0) > 0 ||
+    (membershipRes.count ?? 0) > 0;
+
+  if (nonStructural) {
+    return { hasAnyReferences: true, cascadeFocusAreaIds: [] };
+  }
+
+  const faIds = ((faRes.data ?? []) as Array<{ id: number }>).map((row) => row.id);
+  const faRefResults = await Promise.all(
+    faIds.map((id) => focusAreaHasAnyReferencesForOrg(id, orgId)),
+  );
+  const anyFaHasRefs = faRefResults.some(Boolean);
+
+  return {
+    hasAnyReferences: anyFaHasRefs,
+    cascadeFocusAreaIds: anyFaHasRefs ? [] : faIds,
+  };
+}
+
+async function roleHasAnyReferencesForOrg(roleId: number, orgId: string): Promise<boolean> {
   const serviceClient = getServiceClient();
   const [employeeRes, jobRes] = await Promise.all([
+    serviceClient
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .contains("role_ids", [roleId]),
+    serviceClient
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .contains("eligible_role_ids", [roleId]),
+  ]);
+  return (employeeRes.count ?? 0) > 0 || (jobRes.count ?? 0) > 0;
+}
+
+async function certificationHasAnyReferencesForOrg(
+  certId: number,
+  orgId: string,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const [employeeRes, jobRes] = await Promise.all([
+    serviceClient
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("certification_id", certId),
+    serviceClient
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .contains("required_certification_ids", [certId]),
+  ]);
+  return (employeeRes.count ?? 0) > 0 || (jobRes.count ?? 0) > 0;
+}
+
+async function jobHasAnyReferencesForOrg(jobId: number, orgId: string): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const coverageRes = await serviceClient
+    .from("coverage_requirements")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("job_id", jobId);
+  if ((coverageRes.count ?? 0) > 0) return true;
+
+  const [cellHasJob, recurring] = await Promise.all([
+    anyScheduleCellSegment(orgId, (seg) => seg.job_id === jobId),
+    loadAllRecurringStates(orgId),
+  ]);
+  if (cellHasJob) return true;
+  return recurring.some((row) => recurringStateUsesJob(row.state, jobId));
+}
+
+async function shiftCategoryHasAnyReferencesForOrg(
+  categoryId: number,
+  orgId: string,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const coverageRes = await serviceClient
+    .from("coverage_requirements")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("preferred_shift_id", categoryId);
+  if ((coverageRes.count ?? 0) > 0) return true;
+
+  const [cellHasShift, recurring] = await Promise.all([
+    anyScheduleCellSegment(orgId, (seg) => seg.shift_id === categoryId),
+    loadAllRecurringStates(orgId),
+  ]);
+  if (cellHasShift) return true;
+  return recurring.some((row) => recurringStateUsesShift(row.state, categoryId));
+}
+
+async function absenceTypeHasAnyReferencesForOrg(
+  absenceTypeId: number,
+  orgId: string,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const shiftReqRes = await serviceClient
+    .from("shift_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("absence_type_id", absenceTypeId);
+  if ((shiftReqRes.count ?? 0) > 0) return true;
+
+  const [cellHasAbsence, recurring] = await Promise.all([
+    anyScheduleCellSnapshot(orgId, (snap) => snap.absence_type_id === absenceTypeId),
+    loadAllRecurringStates(orgId),
+  ]);
+  if (cellHasAbsence) return true;
+  return recurring.some((row) => recurringStateUsesAbsenceType(row.state, absenceTypeId));
+}
+
+async function indicatorTypeHasAnyReferencesForOrg(
+  indicatorTypeId: number,
+  orgId: string,
+): Promise<boolean> {
+  const serviceClient = getServiceClient();
+  const noteRes = await serviceClient
+    .from("schedule_notes")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("indicator_type_id", indicatorTypeId);
+  return (noteRes.count ?? 0) > 0;
+}
+
+async function checkRoleDependenciesForOrg(roleId: number, orgId: string): Promise<DependencyInfo> {
+  const serviceClient = getServiceClient();
+  const [employeeRes, jobRes, hasAny] = await Promise.all([
     serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
@@ -1160,24 +1482,24 @@ async function checkRoleDependenciesForOrg(roleId: number, orgId: string) {
       .eq("org_id", orgId)
       .is("archived_at", null)
       .contains("eligible_role_ids", [roleId]),
+    roleHasAnyReferencesForOrg(roleId, orgId),
   ]);
 
-  return buildSummary([
-    employeeRes.count
-      ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}`
-      : "",
-    jobRes.count
-      ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}`
-      : "",
-  ]);
+  return withAnyRefs(
+    buildSummary([
+      employeeRes.count ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}` : "",
+      jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
+    ]),
+    hasAny,
+  );
 }
 
 async function checkCertificationDependenciesForOrg(
   certId: number,
   orgId: string,
-) {
+): Promise<DependencyInfo> {
   const serviceClient = getServiceClient();
-  const [employeeRes, assignments, jobRes] = await Promise.all([
+  const [employeeRes, assignments, jobRes, hasAny] = await Promise.all([
     serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
@@ -1191,43 +1513,42 @@ async function checkCertificationDependenciesForOrg(
       .eq("org_id", orgId)
       .is("archived_at", null)
       .contains("required_certification_ids", [certId]),
+    certificationHasAnyReferencesForOrg(certId, orgId),
   ]);
 
   const assignmentCount = assignments.filter(
     (assignment) =>
-      !assignment.archivedAt &&
-      (assignment.requiredCertificationIds ?? []).includes(certId),
+      !assignment.archivedAt && (assignment.requiredCertificationIds ?? []).includes(certId),
   ).length;
 
-  return buildSummary([
-    employeeRes.count
-      ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}`
-      : "",
-    assignmentCount
-      ? `${assignmentCount} schedule option${assignmentCount !== 1 ? "s" : ""}`
-      : "",
-    jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
-  ]);
+  return withAnyRefs(
+    buildSummary([
+      employeeRes.count ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}` : "",
+      assignmentCount
+        ? `${assignmentCount} schedule option${assignmentCount !== 1 ? "s" : ""}`
+        : "",
+      jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
+    ]),
+    hasAny,
+  );
 }
 
 async function checkDepartmentDependenciesForOrg(
   deptId: number,
   orgId: string,
-) {
+): Promise<DependencyInfo> {
+  // Focus areas are intentionally omitted from the active-deps summary:
+  // every scheduled department has at least one structural focus area, so
+  // counting them would always report "used". Real usage of a department
+  // surfaces through employees/roles/jobs (and via FA children separately).
   const serviceClient = getServiceClient();
-  const [employeeRes, focusAreaRes, roleRes, jobRes] = await Promise.all([
+  const [employeeRes, roleRes, jobRes, refCheck] = await Promise.all([
     serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .is("archived_at", null)
       .contains("department_ids", [deptId]),
-    serviceClient
-      .from("focus_areas")
-      .select("id", { count: "exact", head: true })
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .eq("department_id", deptId),
     serviceClient
       .from("organization_roles")
       .select("id", { count: "exact", head: true })
@@ -1240,62 +1561,104 @@ async function checkDepartmentDependenciesForOrg(
       .eq("org_id", orgId)
       .is("archived_at", null)
       .contains("department_ids", [deptId]),
+    departmentRefCheckForOrg(deptId, orgId),
   ]);
 
-  return buildSummary([
-    employeeRes.count
-      ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}`
-      : "",
-    focusAreaRes.count
-      ? `${focusAreaRes.count} focus area${focusAreaRes.count !== 1 ? "s" : ""}`
-      : "",
-    roleRes.count
-      ? `${roleRes.count} role${roleRes.count !== 1 ? "s" : ""}`
-      : "",
-    jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
+  return withAnyRefs(
+    buildSummary([
+      employeeRes.count ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}` : "",
+      roleRes.count ? `${roleRes.count} role${roleRes.count !== 1 ? "s" : ""}` : "",
+      jobRes.count ? `${jobRes.count} job${jobRes.count !== 1 ? "s" : ""}` : "",
+    ]),
+    refCheck.hasAnyReferences,
+  );
+}
+
+async function checkFocusAreaDependenciesForOrg(
+  focusAreaId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
+  const serviceClient = getServiceClient();
+  const [employeeRes, shiftCatRes, coverageRes, hasAny] = await Promise.all([
+    serviceClient
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .contains("focus_area_ids", [focusAreaId]),
+    serviceClient
+      .from("shift_categories")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .eq("focus_area_id", focusAreaId),
+    serviceClient
+      .from("coverage_requirements")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("focus_area_id", focusAreaId),
+    focusAreaHasAnyReferencesForOrg(focusAreaId, orgId),
   ]);
+
+  return withAnyRefs(
+    buildSummary([
+      employeeRes.count ? `${employeeRes.count} employee${employeeRes.count !== 1 ? "s" : ""}` : "",
+      shiftCatRes.count ? `${shiftCatRes.count} shift${shiftCatRes.count !== 1 ? "s" : ""}` : "",
+      coverageRes.count
+        ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
+        : "",
+    ]),
+    hasAny,
+  );
 }
 
 async function checkShiftCategoryDependenciesForOrg(
   categoryId: number,
   orgId: string,
-) {
+): Promise<DependencyInfo> {
+  // "Assignments" are virtual job × shift cross-joins derived from active
+  // jobs at read time — they are not persisted usage. Every non-archived
+  // shift will appear in at least one assignment so long as any permissive
+  // job exists, so counting them would always report "used". Real usage
+  // surfaces via schedule cells, recurring templates, and coverage rules.
   const serviceClient = getServiceClient();
-  const [assignments, recurringStates, coverageRes] = await Promise.all([
-    fetchAssignmentDefinitionsForOrg(orgId, true),
+  const [scheduleCells, recurringStates, coverageRes, hasAny] = await Promise.all([
+    loadActiveScheduleCellDependencies(orgId),
     loadActiveRecurringStateDependencies(orgId),
     serviceClient
       .from("coverage_requirements")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .eq("preferred_shift_id", categoryId),
+    shiftCategoryHasAnyReferencesForOrg(categoryId, orgId),
   ]);
 
-  const assignmentCount = assignments.filter(
-    (assignment) =>
-      !assignment.archivedAt &&
-      (assignment.shiftId === categoryId || assignment.categoryId === categoryId),
+  const scheduleCount = scheduleCells.filter((cell) =>
+    (cell.snapshots ?? []).some((snapshot) =>
+      (snapshot.segments ?? []).some((segment) => segment.shift_id === categoryId),
+    ),
   ).length;
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesShift(row.state, categoryId),
   ).length;
 
-  return buildSummary([
-    assignmentCount
-      ? `${assignmentCount} assignment${assignmentCount !== 1 ? "s" : ""}`
-      : "",
-    recurringCount
-      ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
-      : "",
-    coverageRes.count
-      ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
-      : "",
-  ]);
+  return withAnyRefs(
+    buildSummary([
+      scheduleCount ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}` : "",
+      recurringCount
+        ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
+        : "",
+      coverageRes.count
+        ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
+        : "",
+    ]),
+    hasAny,
+  );
 }
 
-async function checkJobDependenciesForOrg(jobId: number, orgId: string) {
+async function checkJobDependenciesForOrg(jobId: number, orgId: string): Promise<DependencyInfo> {
   const serviceClient = getServiceClient();
-  const [scheduleCells, recurringStates, coverageRes] = await Promise.all([
+  const [scheduleCells, recurringStates, coverageRes, hasAny] = await Promise.all([
     loadActiveScheduleCellDependencies(orgId),
     loadActiveRecurringStateDependencies(orgId),
     serviceClient
@@ -1303,6 +1666,7 @@ async function checkJobDependenciesForOrg(jobId: number, orgId: string) {
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .eq("job_id", jobId),
+    jobHasAnyReferencesForOrg(jobId, orgId),
   ]);
 
   const scheduleCount = scheduleCells.filter((cell) =>
@@ -1315,46 +1679,64 @@ async function checkJobDependenciesForOrg(jobId: number, orgId: string) {
     recurringStateUsesJob(row.state, jobId),
   ).length;
 
-  return buildSummary([
-    scheduleCount
-      ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}`
-      : "",
-    recurringCount
-      ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
-      : "",
-    coverageRes.count
-      ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
-      : "",
-  ]);
+  return withAnyRefs(
+    buildSummary([
+      scheduleCount ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}` : "",
+      recurringCount
+        ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
+        : "",
+      coverageRes.count
+        ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
+        : "",
+    ]),
+    hasAny,
+  );
 }
 
 async function checkAbsenceTypeDependenciesForOrg(
   absenceTypeId: number,
   orgId: string,
-) {
-  const [scheduleCells, recurringStates] = await Promise.all([
+): Promise<DependencyInfo> {
+  const [scheduleCells, recurringStates, hasAny] = await Promise.all([
     loadActiveScheduleCellDependencies(orgId),
     loadActiveRecurringStateDependencies(orgId),
+    absenceTypeHasAnyReferencesForOrg(absenceTypeId, orgId),
   ]);
 
   const scheduleCount = scheduleCells.filter((cell) =>
-    (cell.snapshots ?? []).some(
-      (snapshot) => snapshot.absence_type_id === absenceTypeId,
-    ),
+    (cell.snapshots ?? []).some((snapshot) => snapshot.absence_type_id === absenceTypeId),
   ).length;
 
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesAbsenceType(row.state, absenceTypeId),
   ).length;
 
-  return buildSummary([
-    scheduleCount
-      ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}`
-      : "",
-    recurringCount
-      ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
-      : "",
-  ]);
+  return withAnyRefs(
+    buildSummary([
+      scheduleCount ? `${scheduleCount} shift${scheduleCount !== 1 ? "s" : ""}` : "",
+      recurringCount
+        ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}`
+        : "",
+    ]),
+    hasAny,
+  );
+}
+
+async function checkIndicatorTypeDependenciesForOrg(
+  indicatorTypeId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
+  const serviceClient = getServiceClient();
+  const noteRes = await serviceClient
+    .from("schedule_notes")
+    .select("id", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("indicator_type_id", indicatorTypeId);
+  const count = noteRes.count ?? 0;
+  return withAnyRefs(
+    buildSummary([count ? `${count} schedule note${count !== 1 ? "s" : ""}` : ""]),
+    count > 0,
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -1365,8 +1747,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing action or orgId" }, { status: 400 });
   }
 
-  const includeArchived =
-    req.nextUrl.searchParams.get("includeArchived") === "1";
+  const includeArchived = req.nextUrl.searchParams.get("includeArchived") === "1";
   const itemId = req.nextUrl.searchParams.get("itemId");
 
   const permissionByAction: Record<string, SettingsPermission> = {
@@ -1377,6 +1758,7 @@ export async function GET(req: NextRequest) {
     fetchDepartments: "departmentsRead",
     checkDepartmentDependencies: "departmentsRead",
     fetchFocusAreas: "departmentsRead",
+    checkFocusAreaDependencies: "departmentsRead",
     fetchShiftCategories: "scheduleDefinitionsRead",
     checkShiftCategoryDependencies: "scheduleDefinitionsRead",
     fetchJobDefinitions: "scheduleDefinitionsRead",
@@ -1385,6 +1767,7 @@ export async function GET(req: NextRequest) {
     fetchAbsenceTypes: "scheduleDefinitionsRead",
     checkAbsenceTypeDependencies: "scheduleDefinitionsRead",
     fetchIndicatorTypes: "indicatorTypesRead",
+    checkIndicatorTypeDependencies: "indicatorTypesRead",
   };
 
   const permission = permissionByAction[action];
@@ -1397,73 +1780,81 @@ export async function GET(req: NextRequest) {
     return authorized.response;
   }
 
+  // Effective (sandbox-redirected) org, not the raw query param. A caller in
+  // sandbox mode must read their sandbox's config, never the real org's.
+  const effectiveOrgId = authorized.orgId;
+
   try {
     switch (action) {
       case "fetchCertifications":
         return NextResponse.json({
-          items: await fetchCertificationsForOrg(orgId, includeArchived),
+          items: await fetchCertificationsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkCertificationDependencies":
         return NextResponse.json(
-          await checkCertificationDependenciesForOrg(Number(itemId), orgId),
+          await checkCertificationDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchOrganizationRoles":
         return NextResponse.json({
-          items: await fetchOrganizationRolesForOrg(orgId, includeArchived),
+          items: await fetchOrganizationRolesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkRoleDependencies":
-        return NextResponse.json(
-          await checkRoleDependenciesForOrg(Number(itemId), orgId),
-        );
+        return NextResponse.json(await checkRoleDependenciesForOrg(Number(itemId), effectiveOrgId));
       case "fetchDepartments":
         return NextResponse.json({
-          items: await fetchDepartmentsForOrg(orgId, includeArchived),
+          items: await fetchDepartmentsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkDepartmentDependencies":
         return NextResponse.json(
-          await checkDepartmentDependenciesForOrg(Number(itemId), orgId),
+          await checkDepartmentDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchFocusAreas":
         return NextResponse.json({
-          items: await fetchFocusAreasForOrg(orgId, includeArchived),
+          items: await fetchFocusAreasForOrg(effectiveOrgId, includeArchived),
         });
+      case "checkFocusAreaDependencies":
+        return NextResponse.json(
+          await checkFocusAreaDependenciesForOrg(Number(itemId), effectiveOrgId),
+        );
       case "fetchShiftCategories":
         return NextResponse.json({
-          items: await fetchShiftCategoriesForOrg(orgId, includeArchived),
+          items: await fetchShiftCategoriesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkShiftCategoryDependencies":
         return NextResponse.json(
-          await checkShiftCategoryDependenciesForOrg(Number(itemId), orgId),
+          await checkShiftCategoryDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchJobDefinitions":
         return NextResponse.json({
-          items: await fetchJobDefinitionsForOrg(orgId, includeArchived),
+          items: await fetchJobDefinitionsForOrg(effectiveOrgId, includeArchived),
         });
       case "checkJobDependencies":
-        return NextResponse.json(
-          await checkJobDependenciesForOrg(Number(itemId), orgId),
-        );
+        return NextResponse.json(await checkJobDependenciesForOrg(Number(itemId), effectiveOrgId));
       case "fetchCoverageRequirements":
         return NextResponse.json({
-          items: await fetchCoverageRequirementsForOrg(orgId),
+          items: await fetchCoverageRequirementsForOrg(effectiveOrgId),
         });
       case "fetchAbsenceTypes":
         return NextResponse.json({
-          items: await fetchAbsenceTypesForOrg(orgId, includeArchived),
+          items: await fetchAbsenceTypesForOrg(effectiveOrgId, includeArchived),
         });
       case "checkAbsenceTypeDependencies":
         return NextResponse.json(
-          await checkAbsenceTypeDependenciesForOrg(Number(itemId), orgId),
+          await checkAbsenceTypeDependenciesForOrg(Number(itemId), effectiveOrgId),
         );
       case "fetchIndicatorTypes":
         return NextResponse.json({
-          items: await fetchIndicatorTypesForOrg(orgId, includeArchived),
+          items: await fetchIndicatorTypesForOrg(effectiveOrgId, includeArchived),
         });
+      case "checkIndicatorTypeDependencies":
+        return NextResponse.json(
+          await checkIndicatorTypeDependenciesForOrg(Number(itemId), effectiveOrgId),
+        );
       default:
         return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
   } catch (error) {
-    console.error("Settings GET failed", { action, orgId, error });
+    console.error("Settings GET failed", { action, orgId: effectiveOrgId, error });
     return NextResponse.json({ error: "Settings request failed" }, { status: 500 });
   }
 }
@@ -1478,24 +1869,27 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = postBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const data = parsed.data;
-  const orgId = "orgId" in data ? data.orgId : data.action === "upsertFocusArea"
-    ? data.focusArea.orgId
-    : data.action === "upsertShiftCategory"
-      ? data.shiftCategory.orgId
-      : data.action === "upsertJobDefinition"
-        ? data.job.orgId
-        : data.action === "upsertAbsenceType"
-          ? data.absenceType.orgId
-          : data.indicatorType.orgId;
+  const orgId =
+    "orgId" in data
+      ? data.orgId
+      : data.action === "upsertFocusArea"
+        ? data.focusArea.orgId
+        : data.action === "upsertShiftCategory"
+          ? data.shiftCategory.orgId
+          : data.action === "upsertJobDefinition"
+            ? data.job.orgId
+            : data.action === "upsertAbsenceType"
+              ? data.absenceType.orgId
+              : data.indicatorType.orgId;
 
   const permissionByAction: Record<typeof data.action, SettingsPermission> = {
     saveCertifications: "orgLabelsManage",
@@ -1527,6 +1921,32 @@ export async function POST(req: NextRequest) {
     return authorized.response;
   }
 
+  // Redirect the request body's orgId fields to the effective (possibly
+  // sandbox) org id from auth. This file has 100+ references to
+  // `data.orgId` / `data.X.orgId` in sub-handlers; mutating the parsed
+  // body here means every downstream read/write uses the right org id
+  // without touching each handler. Without this, writes leak to the
+  // real organization while the user is in sandbox mode.
+  const effectiveOrgId = authorized.orgId;
+  if ("orgId" in data) {
+    (data as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("focusArea" in data && data.focusArea) {
+    (data.focusArea as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("shiftCategory" in data && data.shiftCategory) {
+    (data.shiftCategory as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("job" in data && data.job) {
+    (data.job as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("absenceType" in data && data.absenceType) {
+    (data.absenceType as { orgId: string }).orgId = effectiveOrgId;
+  }
+  if ("indicatorType" in data && data.indicatorType) {
+    (data.indicatorType as { orgId: string }).orgId = effectiveOrgId;
+  }
+
   const { actor, serviceClient } = authorized;
 
   try {
@@ -1546,17 +1966,32 @@ export async function POST(req: NextRequest) {
         }
 
         const existingIds = new Set(validatedExisting.items.map((item) => item.id));
-        const newIds = new Set(validatedItems.items.filter((item) => item.id).map((item) => item.id));
+        const newIds = new Set(
+          validatedItems.items.filter((item) => item.id).map((item) => item.id),
+        );
         const toDelete = validatedExisting.items.filter((item) => !newIds.has(item.id));
 
-        if (toDelete.length > 0) {
-          await archiveSettingsRowsByIds(
-            serviceClient,
-            "certifications",
-            data.orgId,
-            toDelete.map((item) => item.id),
-          );
+        const hardDeleteHint = new Set(data.hardDeleteIds ?? []);
+        const toHardDelete: number[] = [];
+        const toArchive: number[] = [];
+        for (const item of toDelete) {
+          if (hardDeleteHint.has(item.id)) {
+            const hasAny = await certificationHasAnyReferencesForOrg(item.id, data.orgId);
+            if (!hasAny) {
+              toHardDelete.push(item.id);
+              continue;
+            }
+          }
+          toArchive.push(item.id);
         }
+
+        await hardDeleteSettingsRowsByIds(
+          serviceClient,
+          "certifications",
+          data.orgId,
+          toHardDelete,
+        );
+        await archiveSettingsRowsByIds(serviceClient, "certifications", data.orgId, toArchive);
 
         const toUpdate = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
@@ -1621,7 +2056,8 @@ export async function POST(req: NextRequest) {
           details: {
             created: toInsert.length,
             updated: toUpdate.length,
-            archived: toDelete.length,
+            archived: toArchive.length,
+            deleted: toHardDelete.length,
           },
           orgId: data.orgId,
         });
@@ -1662,17 +2098,32 @@ export async function POST(req: NextRequest) {
         }
 
         const existingIds = new Set(validatedExisting.items.map((item) => item.id));
-        const newIds = new Set(validatedItems.items.filter((item) => item.id).map((item) => item.id));
+        const newIds = new Set(
+          validatedItems.items.filter((item) => item.id).map((item) => item.id),
+        );
         const toDelete = validatedExisting.items.filter((item) => !newIds.has(item.id));
 
-        if (toDelete.length > 0) {
-          await archiveSettingsRowsByIds(
-            serviceClient,
-            "organization_roles",
-            data.orgId,
-            toDelete.map((item) => item.id),
-          );
+        const hardDeleteHint = new Set(data.hardDeleteIds ?? []);
+        const toHardDelete: number[] = [];
+        const toArchive: number[] = [];
+        for (const item of toDelete) {
+          if (hardDeleteHint.has(item.id)) {
+            const hasAny = await roleHasAnyReferencesForOrg(item.id, data.orgId);
+            if (!hasAny) {
+              toHardDelete.push(item.id);
+              continue;
+            }
+          }
+          toArchive.push(item.id);
         }
+
+        await hardDeleteSettingsRowsByIds(
+          serviceClient,
+          "organization_roles",
+          data.orgId,
+          toHardDelete,
+        );
+        await archiveSettingsRowsByIds(serviceClient, "organization_roles", data.orgId, toArchive);
 
         const toUpdate = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
@@ -1719,16 +2170,14 @@ export async function POST(req: NextRequest) {
               .eq("id", archived.id);
             if (error) throw error;
           } else {
-            const { error } = await serviceClient
-              .from("organization_roles")
-              .insert({
-                org_id: data.orgId,
-                name: item.name,
-                abbr: item.abbr,
-                is_schedule_role: item.isScheduleRole ?? true,
-                department_id: item.departmentId ?? null,
-                sort_order: sortOrder,
-              });
+            const { error } = await serviceClient.from("organization_roles").insert({
+              org_id: data.orgId,
+              name: item.name,
+              abbr: item.abbr,
+              is_schedule_role: item.isScheduleRole ?? true,
+              department_id: item.departmentId ?? null,
+              sort_order: sortOrder,
+            });
             if (error) throw error;
           }
         }
@@ -1742,7 +2191,8 @@ export async function POST(req: NextRequest) {
           details: {
             created: toInsert.length,
             updated: toUpdate.length,
-            archived: toDelete.length,
+            archived: toArchive.length,
+            deleted: toHardDelete.length,
           },
           orgId: data.orgId,
         });
@@ -1779,17 +2229,39 @@ export async function POST(req: NextRequest) {
         }
 
         const existingIds = new Set(validatedExisting.items.map((item) => item.id));
-        const newIds = new Set(validatedItems.items.filter((item) => item.id).map((item) => item.id));
+        const newIds = new Set(
+          validatedItems.items.filter((item) => item.id).map((item) => item.id),
+        );
         const toDelete = validatedExisting.items.filter((item) => !newIds.has(item.id));
 
-        if (toDelete.length > 0) {
-          await archiveSettingsRowsByIds(
-            serviceClient,
-            "departments",
-            data.orgId,
-            toDelete.map((item) => item.id),
-          );
+        const hardDeleteHint = new Set(data.hardDeleteIds ?? []);
+        const toHardDelete: number[] = [];
+        const toArchive: number[] = [];
+        const cascadeFocusAreaIds: number[] = [];
+        for (const item of toDelete) {
+          if (hardDeleteHint.has(item.id)) {
+            const refCheck = await departmentRefCheckForOrg(item.id, data.orgId);
+            if (!refCheck.hasAnyReferences) {
+              toHardDelete.push(item.id);
+              cascadeFocusAreaIds.push(...refCheck.cascadeFocusAreaIds);
+              continue;
+            }
+          }
+          toArchive.push(item.id);
         }
+
+        if (cascadeFocusAreaIds.length > 0) {
+          for (const batch of chunkNumberIds(cascadeFocusAreaIds)) {
+            const { error } = await serviceClient
+              .from("focus_areas")
+              .delete()
+              .eq("org_id", data.orgId)
+              .in("id", batch);
+            if (error) throw error;
+          }
+        }
+        await hardDeleteSettingsRowsByIds(serviceClient, "departments", data.orgId, toHardDelete);
+        await archiveSettingsRowsByIds(serviceClient, "departments", data.orgId, toArchive);
 
         const toUpdate = validatedItems.items
           .map((item, index) => ({ item, sortOrder: index }))
@@ -1848,7 +2320,11 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        await cacheDel(CacheKey.departments(data.orgId), CacheKey.orgDirectory(data.orgId));
+        await cacheDel(
+          CacheKey.departments(data.orgId),
+          CacheKey.orgDirectory(data.orgId),
+          CacheKey.focusAreas(data.orgId),
+        );
         await writeAudit({
           actor,
           action: "departments.saved",
@@ -1857,7 +2333,9 @@ export async function POST(req: NextRequest) {
           details: {
             created: toInsert.length,
             updated: toUpdate.length,
-            archived: toDelete.length,
+            archived: toArchive.length,
+            deleted: toHardDelete.length,
+            cascadedFocusAreas: cascadeFocusAreaIds.length,
           },
           orgId: data.orgId,
         });
@@ -1930,27 +2408,39 @@ export async function POST(req: NextRequest) {
         });
       }
       case "deleteFocusArea": {
-        const now = new Date().toISOString();
-        const { error: categoryError } = await serviceClient
-          .from("shift_categories")
-          .update({ archived_at: now })
-          .eq("org_id", data.orgId)
-          .eq("focus_area_id", data.itemId)
-          .is("archived_at", null);
-        if (categoryError) throw categoryError;
+        const wantHard =
+          data.hard === true && !(await focusAreaHasAnyReferencesForOrg(data.itemId, data.orgId));
 
-        const { error: employeeError } = await serviceClient.rpc(
-          "remove_focus_area_from_employees",
-          { p_focus_area_id: data.itemId },
-        );
-        if (employeeError) throw employeeError;
+        if (wantHard) {
+          const { error } = await serviceClient
+            .from("focus_areas")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        } else {
+          const now = new Date().toISOString();
+          const { error: categoryError } = await serviceClient
+            .from("shift_categories")
+            .update({ archived_at: now })
+            .eq("org_id", data.orgId)
+            .eq("focus_area_id", data.itemId)
+            .is("archived_at", null);
+          if (categoryError) throw categoryError;
 
-        const { error } = await serviceClient
-          .from("focus_areas")
-          .update({ archived_at: now })
-          .eq("org_id", data.orgId)
-          .eq("id", data.itemId);
-        if (error) throw error;
+          const { error: employeeError } = await serviceClient.rpc(
+            "remove_focus_area_from_employees",
+            { p_focus_area_id: data.itemId },
+          );
+          if (employeeError) throw employeeError;
+
+          const { error } = await serviceClient
+            .from("focus_areas")
+            .update({ archived_at: now })
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        }
 
         await cacheDel(
           CacheKey.focusAreas(data.orgId),
@@ -1962,7 +2452,7 @@ export async function POST(req: NextRequest) {
         );
         await writeAudit({
           actor,
-          action: "focus_area.archived",
+          action: wantHard ? "focus_area.deleted" : "focus_area.archived",
           resourceType: "focus_area",
           resourceId: String(data.itemId),
           orgId: data.orgId,
@@ -2043,12 +2533,25 @@ export async function POST(req: NextRequest) {
         });
       }
       case "deleteShiftCategory": {
-        const { error } = await serviceClient
-          .from("shift_categories")
-          .update({ archived_at: new Date().toISOString() })
-          .eq("org_id", data.orgId)
-          .eq("id", data.itemId);
-        if (error) throw error;
+        const wantHard =
+          data.hard === true &&
+          !(await shiftCategoryHasAnyReferencesForOrg(data.itemId, data.orgId));
+
+        if (wantHard) {
+          const { error } = await serviceClient
+            .from("shift_categories")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        } else {
+          const { error } = await serviceClient
+            .from("shift_categories")
+            .update({ archived_at: new Date().toISOString() })
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        }
         await cacheDel(CacheKey.shiftCategories(data.orgId));
         await cacheDel(
           CacheKey.assignments(data.orgId),
@@ -2058,7 +2561,7 @@ export async function POST(req: NextRequest) {
         );
         await writeAudit({
           actor,
-          action: "shift_category.archived",
+          action: wantHard ? "shift_category.deleted" : "shift_category.archived",
           resourceType: "shift_category",
           resourceId: String(data.itemId),
           orgId: data.orgId,
@@ -2126,8 +2629,7 @@ export async function POST(req: NextRequest) {
           text_color: storedStyle.text_color,
           shift_time_overrides: normalizeShiftTimeOverrides(
             validatedJob.job.shiftTimeOverrides as
-              | Record<string, JobShiftTimeOverride | undefined>
-              | undefined,
+              Record<string, JobShiftTimeOverride | undefined> | undefined,
           ),
           shift_color_overrides: normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides),
           default_start_time: normalizedTiming.defaultStartTime,
@@ -2178,12 +2680,24 @@ export async function POST(req: NextRequest) {
         });
       }
       case "deleteJobDefinition": {
-        const { error } = await serviceClient
-          .from("jobs")
-          .update({ archived_at: new Date().toISOString() })
-          .eq("org_id", data.orgId)
-          .eq("id", data.itemId);
-        if (error) throw error;
+        const wantHard =
+          data.hard === true && !(await jobHasAnyReferencesForOrg(data.itemId, data.orgId));
+
+        if (wantHard) {
+          const { error } = await serviceClient
+            .from("jobs")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        } else {
+          const { error } = await serviceClient
+            .from("jobs")
+            .update({ archived_at: new Date().toISOString() })
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        }
         await cacheDel(
           CacheKey.assignments(data.orgId),
           CacheKey.assignments(data.orgId, true),
@@ -2192,7 +2706,7 @@ export async function POST(req: NextRequest) {
         );
         await writeAudit({
           actor,
-          action: "job.archived",
+          action: wantHard ? "job.deleted" : "job.archived",
           resourceType: "job",
           resourceId: String(data.itemId),
           orgId: data.orgId,
@@ -2247,9 +2761,7 @@ export async function POST(req: NextRequest) {
           }));
 
         if (rows.length > 0) {
-          const { error } = await serviceClient
-            .from("coverage_requirements")
-            .insert(rows);
+          const { error } = await serviceClient.from("coverage_requirements").insert(rows);
           if (error) throw error;
         }
 
@@ -2321,19 +2833,28 @@ export async function POST(req: NextRequest) {
         });
       }
       case "deleteAbsenceType": {
-        const { error } = await serviceClient
-          .from("absence_types")
-          .update({ archived_at: new Date().toISOString() })
-          .eq("org_id", data.orgId)
-          .eq("id", data.itemId);
-        if (error) throw error;
-        await cacheDel(
-          CacheKey.absenceTypes(data.orgId),
-          CacheKey.absenceTypes(data.orgId, true),
-        );
+        const wantHard =
+          data.hard === true && !(await absenceTypeHasAnyReferencesForOrg(data.itemId, data.orgId));
+
+        if (wantHard) {
+          const { error } = await serviceClient
+            .from("absence_types")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        } else {
+          const { error } = await serviceClient
+            .from("absence_types")
+            .update({ archived_at: new Date().toISOString() })
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        }
+        await cacheDel(CacheKey.absenceTypes(data.orgId), CacheKey.absenceTypes(data.orgId, true));
         await writeAudit({
           actor,
-          action: "absence_type.archived",
+          action: wantHard ? "absence_type.deleted" : "absence_type.archived",
           resourceType: "absence_type",
           resourceId: String(data.itemId),
           orgId: data.orgId,
@@ -2347,10 +2868,7 @@ export async function POST(req: NextRequest) {
           .eq("org_id", data.orgId)
           .eq("id", data.itemId);
         if (error) throw error;
-        await cacheDel(
-          CacheKey.absenceTypes(data.orgId),
-          CacheKey.absenceTypes(data.orgId, true),
-        );
+        await cacheDel(CacheKey.absenceTypes(data.orgId), CacheKey.absenceTypes(data.orgId, true));
         await writeAudit({
           actor,
           action: "absence_type.restored",
@@ -2406,16 +2924,29 @@ export async function POST(req: NextRequest) {
         });
       }
       case "deleteIndicatorType": {
-        const { error } = await serviceClient
-          .from("indicator_types")
-          .update({ archived_at: new Date().toISOString() })
-          .eq("org_id", data.orgId)
-          .eq("id", data.itemId);
-        if (error) throw error;
+        const wantHard =
+          data.hard === true &&
+          !(await indicatorTypeHasAnyReferencesForOrg(data.itemId, data.orgId));
+
+        if (wantHard) {
+          const { error } = await serviceClient
+            .from("indicator_types")
+            .delete()
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        } else {
+          const { error } = await serviceClient
+            .from("indicator_types")
+            .update({ archived_at: new Date().toISOString() })
+            .eq("org_id", data.orgId)
+            .eq("id", data.itemId);
+          if (error) throw error;
+        }
         await cacheDel(CacheKey.indicatorTypes(data.orgId));
         await writeAudit({
           actor,
-          action: "indicator_type.archived",
+          action: wantHard ? "indicator_type.deleted" : "indicator_type.archived",
           resourceType: "indicator_type",
           resourceId: String(data.itemId),
           orgId: data.orgId,
@@ -2441,9 +2972,19 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    if (data.action === "upsertShiftCategory" || data.action === "deleteShiftCategory") {
+      const shiftConflict = getShiftCategoryConflict(error);
+      if (shiftConflict) {
+        return NextResponse.json(shiftConflict, { status: 409 });
+      }
+    }
+    if (data.action === "saveDepartments" || data.action === "restoreDepartment") {
+      const deptConflict = getDepartmentConflict(error);
+      if (deptConflict) {
+        return NextResponse.json(deptConflict, { status: 409 });
+      }
+    }
     console.error("Settings POST failed", { action: data.action, orgId, error });
-    const message =
-      error instanceof Error ? error.message : "Settings request failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Settings request failed");
   }
 }

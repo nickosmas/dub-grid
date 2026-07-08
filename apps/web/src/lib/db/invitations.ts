@@ -3,10 +3,7 @@ import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { rowToInvitation } from "./mappers";
 import type { DbInvitation } from "./types";
-import {
-  resendOrganizationInvitationGuarded,
-  revokeOrganizationInvitationGuarded,
-} from "./access";
+import { resendOrganizationInvitationGuarded, revokeOrganizationInvitationGuarded } from "./access";
 import type { Invitation, AssignableOrganizationRole } from "@/types";
 
 // ── Invitations ──────────────────────────────────────────────────────────────
@@ -31,7 +28,13 @@ export async function sendInvitation(
   role: AssignableOrganizationRole,
   orgId: string,
   employeeId?: string,
-  opts?: { firstName?: string; lastName?: string; phone?: string; departmentIds?: number[]; deptAdminIds?: number[] },
+  opts?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
 ): Promise<{ invitationId: string; token: string; expiresAt: string }> {
   const { data, error } = await supabase.rpc("send_invitation", {
     p_email: email,
@@ -58,7 +61,9 @@ export async function fetchInvitations(orgId: string): Promise<Invitation[]> {
   return cacheThrough(CacheKey.invitations(orgId), TTL.MODERATE, async () => {
     const { data, error } = await supabase
       .from("invitations")
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .select(
+        "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+      )
       .eq("org_id", orgId)
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -136,7 +141,10 @@ async function postLinkRequest(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const payload = await response.json().catch(() => null) as { error?: string; status?: string } | null;
+  const payload = (await response.json().catch(() => null)) as {
+    error?: string;
+    status?: string;
+  } | null;
   const mismatchError = parseNameMismatchResponse(payload);
   if (mismatchError) throw mismatchError;
   if (!response.ok) {

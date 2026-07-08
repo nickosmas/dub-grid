@@ -7,9 +7,7 @@ import {
 } from "@/features/billing/useBillingRealtimeInvalidation";
 import { queryKeys } from "@/lib/query-keys";
 
-const mockRemoveBrowserRealtimeChannel = vi.fn((_channel: unknown) =>
-  Promise.resolve(),
-);
+const mockRemoveBrowserRealtimeChannel = vi.fn((_channel: unknown) => Promise.resolve());
 const mockChannel = {
   on: vi.fn(),
   subscribe: vi.fn(),
@@ -17,10 +15,8 @@ const mockChannel = {
 const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => mockChannel);
 
 vi.mock("@/features/account/client", () => ({
-  createBrowserRealtimeChannel: (name: string) =>
-    mockCreateBrowserRealtimeChannel(name),
-  removeBrowserRealtimeChannel: (channel: unknown) =>
-    mockRemoveBrowserRealtimeChannel(channel),
+  createBrowserRealtimeChannel: (name: string) => mockCreateBrowserRealtimeChannel(name),
+  removeBrowserRealtimeChannel: (channel: unknown) => mockRemoveBrowserRealtimeChannel(channel),
 }));
 
 vi.mock("@/lib/cache-broadcast", () => ({
@@ -33,9 +29,7 @@ vi.mock("@/lib/sentry", () => ({
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
 
@@ -57,10 +51,9 @@ describe("billing realtime invalidation", () => {
   it("subscribes to organization and subscription changes for the org", () => {
     const queryClient = new QueryClient();
 
-    const { unmount } = renderHook(
-      () => useBillingRealtimeInvalidation("org-1"),
-      { wrapper: createWrapper(queryClient) },
-    );
+    const { unmount } = renderHook(() => useBillingRealtimeInvalidation("org-1"), {
+      wrapper: createWrapper(queryClient),
+    });
 
     expect(mockCreateBrowserRealtimeChannel).toHaveBeenCalledWith(
       expect.stringMatching(/^billing-freshness:org-1:/),

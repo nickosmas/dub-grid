@@ -8,7 +8,13 @@ interface StaffPaginationProps {
   onPageChange: (page: number) => void;
 }
 
-export function StaffPagination({ page, totalPages, totalCount, pageSize, onPageChange }: StaffPaginationProps) {
+export function StaffPagination({
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+  onPageChange,
+}: StaffPaginationProps) {
   if (totalPages <= 1) return null;
 
   return (

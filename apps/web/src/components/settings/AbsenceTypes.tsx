@@ -24,6 +24,7 @@ import {
 } from "@/lib/form-validation";
 import { PresetColorPicker, labelStyle } from "./shared";
 import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 type AbsenceTypeFormState = {
   label: string;
@@ -61,6 +62,7 @@ function AbsenceTypeRow({
   canEdit,
   allTypes,
   shiftDisplayMode,
+  isLast,
 }: {
   absenceType: AbsenceType & { isNew?: boolean };
   orgId: string;
@@ -69,6 +71,7 @@ function AbsenceTypeRow({
   canEdit: boolean;
   allTypes: Array<AbsenceType & { isNew?: boolean }>;
   shiftDisplayMode: ShiftDisplayMode;
+  isLast?: boolean;
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
@@ -76,22 +79,28 @@ function AbsenceTypeRow({
   const [expanded, setExpanded] = useState(!!absenceType.isNew);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
 
+  // Only resync from props when the editor is closed. Preserves the user's
+  // in-progress edits across parent re-renders that pass a new `absenceType`
+  // reference with identical data.
   useEffect(() => {
-    if (!absenceType.isNew) {
+    if (!expanded && !absenceType.isNew) {
       setForm(buildFormState(absenceType));
     }
-  }, [absenceType]);
+  }, [absenceType, expanded]);
 
   const isDirty =
     absenceType.isNew ||
     serializeFormState(form) !== serializeFormState(buildFormState(absenceType));
-  const duplicateLabel = form.label.trim().length > 0 && allTypes.some(
-    (candidate) => candidate.id !== absenceType.id && candidate.label.trim().toUpperCase() === form.label.trim().toUpperCase(),
-  );
+  const duplicateLabel =
+    form.label.trim().length > 0 &&
+    allTypes.some(
+      (candidate) =>
+        candidate.id !== absenceType.id &&
+        candidate.label.trim().toUpperCase() === form.label.trim().toUpperCase(),
+    );
   const labelError =
     form.label.trim().length > 0 || !isNameMode
       ? getCodeError(form.label, {
@@ -118,17 +127,19 @@ function AbsenceTypeRow({
     !labelError &&
     !nameError;
 
-  const discardDraft = useCallback((closeAfter: boolean) => {
-    if (absenceType.isNew && closeAfter) {
-      onDeleted(absenceType.id);
-      return;
-    }
-    setForm(buildFormState(absenceType));
-    setSaveError(null);
-    if (closeAfter) {
-      setExpanded(false);
-    }
-  }, [absenceType, onDeleted]);
+  const discardDraft = useCallback(
+    (closeAfter: boolean) => {
+      if (absenceType.isNew && closeAfter) {
+        onDeleted(absenceType.id);
+        return;
+      }
+      setForm(buildFormState(absenceType));
+      if (closeAfter) {
+        setExpanded(false);
+      }
+    },
+    [absenceType, onDeleted],
+  );
 
   const closeEditor = useCallback(() => {
     if (absenceType.isNew) {
@@ -136,7 +147,6 @@ function AbsenceTypeRow({
       return;
     }
     setExpanded(false);
-    setSaveError(null);
   }, [absenceType.id, absenceType.isNew, onDeleted]);
 
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -159,7 +169,6 @@ function AbsenceTypeRow({
   const handleSave = useCallback(async () => {
     if (!canSave) return;
     setSaving(true);
-    setSaveError(null);
     try {
       const saved = await upsertAbsenceType({
         id: absenceType.isNew ? undefined : absenceType.id,
@@ -188,13 +197,8 @@ function AbsenceTypeRow({
       setExpanded(false);
       toast.success("Absence type saved");
     } catch (error) {
-      const message =
-        error && typeof error === "object" && "message" in error
-          ? String((error as { message?: string }).message ?? "Unknown error")
-          : "Unknown error";
-      setSaveError(message);
       Sentry.captureException(error);
-      toast.error("Failed to save absence type");
+      toast.error(formatClientErrorMessage(error, "We couldn't save that absence type."));
     } finally {
       setSaving(false);
     }
@@ -210,26 +214,40 @@ function AbsenceTypeRow({
     setShowDeleteConfirm(true);
   }, [absenceType.id, absenceType.isNew, onDeleted, orgId]);
 
-  const handleDelete = useCallback(async () => {
-    setDeleting(true);
-    try {
-      await deleteAbsenceType(absenceType.id, orgId);
-      onDeleted(absenceType.id);
-      toast.success("Absence type archived");
-    } catch (error) {
-      Sentry.captureException(error);
-      toast.error("Failed to archive absence type");
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  }, [absenceType.id, onDeleted, orgId]);
+  const handleDelete = useCallback(
+    async (hard: boolean) => {
+      setDeleting(true);
+      try {
+        await deleteAbsenceType(absenceType.id, orgId, hard);
+        onDeleted(absenceType.id);
+        toast.success(hard ? "Absence type deleted" : "Absence type archived");
+      } catch (error) {
+        Sentry.captureException(error);
+        toast.error(hard ? "Failed to delete absence type" : "Failed to archive absence type");
+      } finally {
+        setDeleting(false);
+        setShowDeleteConfirm(false);
+      }
+    },
+    [absenceType.id, onDeleted, orgId],
+  );
 
   return (
-    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
+    <div
+      className="dg-list-row"
+      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+    >
       <div
         className="dg-hover-row"
-        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 8px", borderRadius: 8, cursor: "pointer", transition: "background 0.15s" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 8px",
+          borderRadius: 8,
+          cursor: "pointer",
+          transition: "background 0.15s",
+        }}
         onClick={toggleExpanded}
       >
         {!isNameMode && (
@@ -250,10 +268,24 @@ function AbsenceTypeRow({
             {form.label || "…"}
           </span>
         )}
-        <span style={{ flex: 1, fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <span
+          style={{
+            flex: 1,
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
           {form.name || "Untitled absence type"}
         </span>
-        <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+        <span
+          style={{
+            fontSize: "var(--dg-fs-body-sm)",
+            color: "var(--color-text-faint)",
+            transform: expanded ? "rotate(180deg)" : "none",
+            transition: "transform 150ms ease",
+          }}
+        >
           ▾
         </span>
       </div>
@@ -272,7 +304,13 @@ function AbsenceTypeRow({
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <div style={{ display: "grid", gridTemplateColumns: isNameMode ? "1fr" : (isMobile ? "1fr" : "120px 1fr"), gap: 10 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isNameMode ? "1fr" : isMobile ? "1fr" : "120px 1fr",
+              gap: 10,
+            }}
+          >
             {!isNameMode && (
               <div>
                 <label style={labelStyle}>CODE / LABEL</label>
@@ -288,7 +326,11 @@ function AbsenceTypeRow({
                 {labelError ? (
                   <p
                     role="alert"
-                    style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                    style={{
+                      margin: "4px 0 0",
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-danger)",
+                    }}
                   >
                     {labelError}
                   </p>
@@ -309,7 +351,11 @@ function AbsenceTypeRow({
               {nameError ? (
                 <p
                   role="alert"
-                  style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-danger)",
+                  }}
                 >
                   {nameError}
                 </p>
@@ -321,76 +367,124 @@ function AbsenceTypeRow({
             <label style={labelStyle}>COLOR PRESET</label>
             <PresetColorPicker
               valueBg={form.color}
-              onChange={(color) => setForm((prev) => ({
-                ...prev,
-                color: color.bg,
-                text: color.text,
-                border: TRANSPARENT_BORDER,
-              }))}
+              onChange={(color) =>
+                setForm((prev) => ({
+                  ...prev,
+                  color: color.bg,
+                  text: color.text,
+                  border: TRANSPARENT_BORDER,
+                }))
+              }
               disabled={!canEdit}
             />
           </div>
 
-          {(duplicateLabel || saveError) && (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
-              {duplicateLabel ? "Another absence type already uses that code." : null}
-              {duplicateLabel && saveError ? " " : null}
-              {saveError ? <><strong>Error:</strong> {saveError}</> : null}
+          {duplicateLabel && (
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
+              Another absence type already uses that code.
             </p>
           )}
 
           <EditorActionRow
             destructiveAction={
               canEdit && !absenceType.isNew ? (
-                <button onClick={handleDeleteClick} disabled={deleting} className="dg-btn dg-btn-danger dg-btn-sm">
+                <button
+                  onClick={handleDeleteClick}
+                  disabled={deleting}
+                  className="dg-btn dg-btn-danger dg-btn-sm"
+                >
                   {deleting ? "…" : "Archive"}
                 </button>
               ) : undefined
             }
-            secondaryAction={(
-              <button onClick={() => isDirty ? discardDraft(false) : closeEditor()} className="dg-btn dg-btn-secondary dg-btn-sm">
-                {getEditorDismissLabel(isDirty)}
+            secondaryAction={
+              <button
+                onClick={() =>
+                  absenceType.isNew || !isDirty ? closeEditor() : discardDraft(false)
+                }
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+              >
+                {getEditorDismissLabel({
+                  hasUnsavedChanges: isDirty,
+                  isCreating: Boolean(absenceType.isNew),
+                })}
               </button>
-            )}
-            primaryAction={(
-              <button onClick={handleSave} disabled={saving || !canSave || !canEdit} className="dg-btn dg-btn-primary dg-btn-sm">
+            }
+            primaryAction={
+              <button
+                onClick={handleSave}
+                disabled={saving || !canSave || !canEdit}
+                className="dg-btn dg-btn-primary dg-btn-sm"
+              >
                 {getEditorSaveLabel(saving)}
               </button>
-            )}
+            }
           />
         </div>
       )}
 
       {unsavedChangesDialog}
-      {showDeleteConfirm && (
-        dependencyInfo?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={
-              <>
-                <strong>{form.name}</strong> is currently {dependencyInfo.summary.toLowerCase()}.
-                <br /><br />
-                Archiving keeps history intact but removes the type from future scheduling.
-              </>
-            }
-            confirmLabel="Archive"
-            variant="warning"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        ) : (
-          <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={<>This will archive <strong>{form.name}</strong>. Historical records will stay intact.</>}
-            confirmLabel="Archive"
-            variant="danger"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        )
-      )}
+      {showDeleteConfirm &&
+        (() => {
+          const hasActive = dependencyInfo?.hasDependencies ?? false;
+          const hasAny = dependencyInfo?.hasAnyReferences ?? true;
+          if (hasActive) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${form.name}"?`}
+                message={
+                  <>
+                    <strong>{form.name}</strong> is currently{" "}
+                    {dependencyInfo!.summary.toLowerCase()}.
+                    <br />
+                    <br />
+                    Archiving keeps history intact but removes the type from future scheduling.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                isLoading={deleting}
+                onConfirm={() => handleDelete(false)}
+                onCancel={() => setShowDeleteConfirm(false)}
+              />
+            );
+          }
+          if (hasAny) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${form.name}"?`}
+                message={
+                  <>
+                    This will archive <strong>{form.name}</strong>. Historical records will stay
+                    intact.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                isLoading={deleting}
+                onConfirm={() => handleDelete(false)}
+                onCancel={() => setShowDeleteConfirm(false)}
+              />
+            );
+          }
+          return (
+            <ConfirmDialog
+              title={`Delete "${form.name}"?`}
+              message={
+                <>
+                  This will permanently delete <strong>{form.name}</strong>. Nothing references it.
+                </>
+              }
+              confirmLabel="Delete"
+              variant="danger"
+              isLoading={deleting}
+              onConfirm={() => handleDelete(true)}
+              onCancel={() => setShowDeleteConfirm(false)}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -434,27 +528,48 @@ export default function AbsenceTypesSettings({
     setLocal((previous) => [...previous, nextType]);
   }, [local.length, orgId]);
 
-  const handleSaved = useCallback((saved: AbsenceType, previousId: number) => {
-    const updated = local.map((type) => (type.id === previousId ? saved : type));
-    setLocal(updated);
-    onChange(updated.filter((type) => !(type as { isNew?: boolean }).isNew));
-  }, [local, onChange]);
+  const handleSaved = useCallback(
+    (saved: AbsenceType, previousId: number) => {
+      const updated = local.map((type) => (type.id === previousId ? saved : type));
+      setLocal(updated);
+      onChange(updated.filter((type) => !(type as { isNew?: boolean }).isNew));
+    },
+    [local, onChange],
+  );
 
-  const handleDeleted = useCallback((id: number) => {
-    const updated = local.filter((type) => type.id !== id);
-    setLocal(updated);
-    onChange(updated.filter((type) => !(type as { isNew?: boolean }).isNew));
-  }, [local, onChange]);
+  const handleDeleted = useCallback(
+    (id: number) => {
+      const updated = local.filter((type) => type.id !== id);
+      setLocal(updated);
+      onChange(updated.filter((type) => !(type as { isNew?: boolean }).isNew));
+    },
+    [local, onChange],
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+      <div
+        style={{
+          background: "var(--color-surface)",
+          borderRadius: "var(--dg-radius-md)",
+          border: "1px solid var(--color-border)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--color-border-light)",
+            fontWeight: 700,
+            fontSize: "var(--dg-fs-label)",
+            color: "var(--color-text-secondary)",
+          }}
+        >
           Absence Types
         </div>
         {local.length > 0 ? (
           <div style={{ padding: "0 16px" }}>
-            {local.map((absenceType) => (
+            {local.map((absenceType, absenceIndex) => (
               <AbsenceTypeRow
                 key={absenceType.id}
                 absenceType={absenceType}
@@ -464,25 +579,32 @@ export default function AbsenceTypesSettings({
                 canEdit={canManageScheduleDefinitions}
                 allTypes={local}
                 shiftDisplayMode={shiftDisplayMode}
+                isLast={absenceIndex === local.length - 1}
               />
             ))}
           </div>
         ) : (
           <EmptyState
-            compact
+            size="compact"
             title="No absence types yet"
             description="Create the off-day and calloff labels your schedulers use."
-            action={canManageScheduleDefinitions ? (
-              <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
-                + Add Absence Type
-              </button>
-            ) : undefined}
+            action={
+              canManageScheduleDefinitions ? (
+                <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
+                  + Add Absence Type
+                </button>
+              ) : undefined
+            }
             style={{ margin: "12px 16px" }}
           />
         )}
         {local.length > 0 && canManageScheduleDefinitions && (
           <div style={{ padding: "8px 16px 12px" }}>
-            <button onClick={handleAdd} className="dg-btn dg-btn-dashed dg-btn-sm" style={{ width: "100%" }}>
+            <button
+              onClick={handleAdd}
+              className="dg-btn dg-btn-dashed dg-btn-sm"
+              style={{ width: "100%" }}
+            >
               + Add Absence Type
             </button>
           </div>

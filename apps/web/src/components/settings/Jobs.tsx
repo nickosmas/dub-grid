@@ -23,23 +23,10 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import {
-  getEditorDismissLabel,
-  getEditorSaveLabel,
-} from "@/components/ui/editor-action-labels";
+import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
-import {
-  PresetColorPicker,
-  TimeInput12h,
-  inputStyle,
-  labelStyle,
-} from "./shared";
-import {
-  PREDEFINED_COLORS,
-  TRANSPARENT_BORDER,
-  borderColor,
-  getPresetByBg,
-} from "@/lib/colors";
+import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
+import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor, getPresetByBg } from "@/lib/colors";
 import { calcTimeDuration, fmt12h } from "@/lib/utils";
 import { getQualificationSeniorityRank } from "@/lib/assignable-shifts";
 import {
@@ -65,6 +52,7 @@ import {
   normalizeCode,
   normalizeLineText,
 } from "@/lib/form-validation";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 type JobSection = "defaultShift" | "scheduled" | "shiftless";
 
@@ -192,19 +180,15 @@ function buildJobFormState(
   const departmentIds = normalizePlacementIds(getStoredJobDepartmentIds(job));
   const explicitFocusAreaIds = normalizePlacementIds(getStoredJobFocusAreaIds(job));
   const focusAreasInSelectedDepartments = activeFocusAreas.filter(
-    (focusArea) =>
-      focusArea.departmentId != null &&
-      departmentIds.includes(focusArea.departmentId),
+    (focusArea) => focusArea.departmentId != null && departmentIds.includes(focusArea.departmentId),
   );
   const focusAreaIds =
     departmentIds.length > 0
-      ? (
-          explicitFocusAreaIds.length > 0
-            ? explicitFocusAreaIds.filter((focusAreaId) =>
-                focusAreasInSelectedDepartments.some((focusArea) => focusArea.id === focusAreaId),
-              )
-            : focusAreasInSelectedDepartments.map((focusArea) => focusArea.id)
-        )
+      ? explicitFocusAreaIds.length > 0
+        ? explicitFocusAreaIds.filter((focusAreaId) =>
+            focusAreasInSelectedDepartments.some((focusArea) => focusArea.id === focusAreaId),
+          )
+        : focusAreasInSelectedDepartments.map((focusArea) => focusArea.id)
       : explicitFocusAreaIds;
   const applicableShiftPool = activeShifts.filter(
     (shift) => shift.focusAreaId != null && focusAreaIds.includes(shift.focusAreaId),
@@ -213,13 +197,11 @@ function buildJobFormState(
   const applicableShiftIds =
     job.assignmentMode === "shiftless"
       ? []
-      : (
-          explicitShiftIds.length > 0
-            ? explicitShiftIds.filter((shiftId) =>
-                applicableShiftPool.some((shift) => shift.id === shiftId),
-              )
-            : applicableShiftPool.map((shift) => shift.id)
-        );
+      : explicitShiftIds.length > 0
+        ? explicitShiftIds.filter((shiftId) =>
+            applicableShiftPool.some((shift) => shift.id === shiftId),
+          )
+        : applicableShiftPool.map((shift) => shift.id);
 
   const isShiftlessJob = job.assignmentMode === "shiftless";
 
@@ -235,13 +217,19 @@ function buildJobFormState(
     shiftTimeOverrides: normalizeShiftTimeOverrides(job.shiftTimeOverrides),
     shiftColorOverrides: normalizeShiftColorOverrides(job.shiftColorOverrides),
     color: isShiftlessJob
-      ? (job.color !== "transparent" ? job.color : DEFAULT_JOB_PRESET_COLOR)
+      ? job.color !== "transparent"
+        ? job.color
+        : DEFAULT_JOB_PRESET_COLOR
       : EMPTY_SCHEDULED_JOB_STYLE.color,
     border: isShiftlessJob
-      ? (job.border !== "transparent" ? job.border : TRANSPARENT_BORDER)
+      ? job.border !== "transparent"
+        ? job.border
+        : TRANSPARENT_BORDER
       : EMPTY_SCHEDULED_JOB_STYLE.border,
     text: isShiftlessJob
-      ? (job.text !== "transparent" ? job.text : DEFAULT_JOB_PRESET_TEXT)
+      ? job.text !== "transparent"
+        ? job.text
+        : DEFAULT_JOB_PRESET_TEXT
       : EMPTY_SCHEDULED_JOB_STYLE.text,
     defaultStartTime: normalizedTiming.defaultStartTime,
     defaultEndTime: normalizedTiming.defaultEndTime,
@@ -278,14 +266,18 @@ function serializeJobFormState(form: JobFormState, section: JobSection): string 
     focusAreaIds: [...form.focusAreaIds].sort((left, right) => left - right),
     applicableShiftIds: [...form.applicableShiftIds].sort((left, right) => left - right),
     eligibleRoleIds: [...form.eligibleRoleIds].sort((left, right) => left - right),
-    requiredCertificationIds: [...form.requiredCertificationIds].sort((left, right) => left - right),
+    requiredCertificationIds: [...form.requiredCertificationIds].sort(
+      (left, right) => left - right,
+    ),
     shiftTimeOverrides: Object.fromEntries(
-      Object.entries(normalizeShiftTimeOverrides(form.shiftTimeOverrides))
-        .sort(([leftId], [rightId]) => Number(leftId) - Number(rightId)),
+      Object.entries(normalizeShiftTimeOverrides(form.shiftTimeOverrides)).sort(
+        ([leftId], [rightId]) => Number(leftId) - Number(rightId),
+      ),
     ),
     shiftColorOverrides: Object.fromEntries(
-      Object.entries(normalizeShiftColorOverrides(form.shiftColorOverrides))
-        .sort(([leftId], [rightId]) => Number(leftId) - Number(rightId)),
+      Object.entries(normalizeShiftColorOverrides(form.shiftColorOverrides)).sort(
+        ([leftId], [rightId]) => Number(leftId) - Number(rightId),
+      ),
     ),
     defaultStartTime: normalizedTiming.defaultStartTime,
     defaultEndTime: normalizedTiming.defaultEndTime,
@@ -543,8 +535,14 @@ function EligibilityModeToggle({
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <div style={{ ...labelStyle, marginBottom: 0 }}>MATCHING RULE</div>
-        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.35 }}>
-          Choose whether staff must match the role gate and certification gate, or just one gate.
+        <div
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--color-text-muted)",
+            lineHeight: 1.35,
+          }}
+        >
+          Decide whether staff must match both lists, or just one.
         </div>
       </div>
       <div
@@ -557,10 +555,12 @@ function EligibilityModeToggle({
           opacity: dimmed ? 0.65 : 1,
         }}
       >
-        {([
-          ["and", "Require both"],
-          ["or", "Allow either"],
-        ] as const).map(([mode, label]) => {
+        {(
+          [
+            ["and", "Require both"],
+            ["or", "Allow either"],
+          ] as const
+        ).map(([mode, label]) => {
           const active = value === mode;
           return (
             <button
@@ -592,20 +592,23 @@ function buildSectionHeaderText(section: JobSection): { title: string; descripti
   if (section === "defaultShift") {
     return {
       title: "Default Shift Job",
-      description: "Configure shift-only assignments like Day Shift. The job is hidden on the grid but still controls placement, qualifications, times, and colors.",
+      description:
+        "Configure shift-only assignments like Day Shift. The job is hidden on the grid but still controls placement, qualifications, times, and colors.",
     };
   }
 
   if (section === "shiftless") {
     return {
       title: "General Jobs",
-      description: "Use this for work that appears on its own without a paired shift, like Office or Admin.",
+      description:
+        "Use this for work that appears on its own without a paired shift, like Office or Admin.",
     };
   }
 
   return {
     title: "Scheduled Jobs",
-    description: "Choose departments first, narrow to focus areas, then define exactly how the job behaves on each selected shift.",
+    description:
+      "Choose departments first, narrow to focus areas, then define exactly how the job behaves on each selected shift.",
   };
 }
 
@@ -668,7 +671,7 @@ function JobSectionCard({
         <div style={{ padding: "0 16px" }}>{children}</div>
       ) : (
         <EmptyState
-          compact
+          size="compact"
           title={section === "shiftless" ? "No general jobs yet" : "No scheduled jobs yet"}
           description={
             section === "shiftless"
@@ -687,15 +690,17 @@ function JobSectionCard({
       )}
 
       {rows.length > 0 && canManageScheduleDefinitions ? (
-        !hideAddButton ? <div style={{ padding: "8px 16px 12px" }}>
-          <button
-            onClick={onAdd}
-            className="dg-btn dg-btn-dashed dg-btn-sm"
-            style={{ width: "100%" }}
-          >
-            {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
-          </button>
-        </div> : null
+        !hideAddButton ? (
+          <div style={{ padding: "8px 16px 12px" }}>
+            <button
+              onClick={onAdd}
+              className="dg-btn dg-btn-dashed dg-btn-sm"
+              style={{ width: "100%" }}
+            >
+              {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
+            </button>
+          </div>
+        ) : null
       ) : null}
     </div>
   );
@@ -717,6 +722,7 @@ function JobRow({
   canManageScheduleDefinitions,
   allJobs,
   shiftDisplayMode,
+  isLast,
 }: {
   job: JobDefinition & { isNew?: boolean };
   section: JobSection;
@@ -733,16 +739,18 @@ function JobRow({
   canManageScheduleDefinitions: boolean;
   allJobs: Array<JobDefinition & { isNew?: boolean }>;
   shiftDisplayMode: ShiftDisplayMode;
+  isLast?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isRegularStaffJob = isRegularStaffSystemJob(job);
   const isDefaultShiftJob = section === "defaultShift" || isDefaultShiftSystemJob(job);
   const isLockedIdentityJob = isProtectedSystemJob(job) || isDefaultShiftJob;
-  const [form, setForm] = useState<JobFormState>(() => buildJobFormState(job, shiftCategories, focusAreas));
+  const [form, setForm] = useState<JobFormState>(() =>
+    buildJobFormState(job, shiftCategories, focusAreas),
+  );
   const [expanded, setExpanded] = useState(!!job.isNew && !isDefaultShiftJob);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [dependencyInfo, setDependencyInfo] = useState<DependencyInfo | null>(null);
 
@@ -755,7 +763,9 @@ function JobRow({
   const activeScheduledDepartments = useMemo(
     () =>
       sortByOrder(
-        departments.filter((department) => !department.archivedAt && department.type === "scheduled"),
+        departments.filter(
+          (department) => !department.archivedAt && department.type === "scheduled",
+        ),
       ),
     [departments],
   );
@@ -775,8 +785,7 @@ function JobRow({
     () =>
       activeFocusAreas.filter(
         (focusArea) =>
-          focusArea.departmentId != null &&
-          form.departmentIds.includes(focusArea.departmentId),
+          focusArea.departmentId != null && form.departmentIds.includes(focusArea.departmentId),
       ),
     [activeFocusAreas, form.departmentIds],
   );
@@ -787,9 +796,7 @@ function JobRow({
   const availableShifts = useMemo(
     () =>
       activeShifts.filter(
-        (shift) =>
-          shift.focusAreaId != null &&
-          form.focusAreaIds.includes(shift.focusAreaId),
+        (shift) => shift.focusAreaId != null && form.focusAreaIds.includes(shift.focusAreaId),
       ),
     [activeShifts, form.focusAreaIds],
   );
@@ -806,19 +813,14 @@ function JobRow({
         activeShifts.map((shift) => {
           const focusAreaName =
             shift.focusAreaId != null ? focusAreaNameById.get(shift.focusAreaId) : null;
-          const shouldPrefix =
-            focusAreaName != null && (shiftNameCounts.get(shift.name) ?? 0) > 1;
-          return [
-            shift.id,
-            shouldPrefix ? `${focusAreaName} · ${shift.name}` : shift.name,
-          ];
+          const shouldPrefix = focusAreaName != null && (shiftNameCounts.get(shift.name) ?? 0) > 1;
+          return [shift.id, shouldPrefix ? `${focusAreaName} · ${shift.name}` : shift.name];
         }),
       ),
     [activeShifts, focusAreaNameById, shiftNameCounts],
   );
   const selectedShifts = useMemo(
-    () =>
-      availableShifts.filter((shift) => form.applicableShiftIds.includes(shift.id)),
+    () => availableShifts.filter((shift) => form.applicableShiftIds.includes(shift.id)),
     [availableShifts, form.applicableShiftIds],
   );
 
@@ -849,22 +851,16 @@ function JobRow({
   );
   const hasGeneralJobFixedTime =
     section === "shiftless" &&
-    (
-      normalizedShiftlessTiming.defaultStartTime != null ||
-      normalizedShiftlessTiming.defaultEndTime != null
-    );
+    (normalizedShiftlessTiming.defaultStartTime != null ||
+      normalizedShiftlessTiming.defaultEndTime != null);
   const hasGeneralJobDuration =
     section === "shiftless" &&
-    (
-      normalizedShiftlessTiming.defaultDurationHours != null ||
-      normalizedShiftlessTiming.defaultDurationMinutes != null
-    );
+    (normalizedShiftlessTiming.defaultDurationHours != null ||
+      normalizedShiftlessTiming.defaultDurationMinutes != null);
   const incompleteGeneralJobTime =
     section === "shiftless" &&
-    (
-      (normalizedShiftlessTiming.defaultStartTime == null) !==
-      (normalizedShiftlessTiming.defaultEndTime == null)
-    );
+    (normalizedShiftlessTiming.defaultStartTime == null) !==
+      (normalizedShiftlessTiming.defaultEndTime == null);
   const incompleteShiftOverride = useMemo(
     () =>
       selectedShifts.some((shift) => {
@@ -874,7 +870,10 @@ function JobRow({
     [normalizedShiftTimeOverrides, selectedShifts],
   );
 
-  const initialSerialized = serializeJobFormState(buildJobFormState(job, shiftCategories, focusAreas), section);
+  const initialSerialized = serializeJobFormState(
+    buildJobFormState(job, shiftCategories, focusAreas),
+    section,
+  );
   const currentSerialized = serializeJobFormState(form, section);
   const isDirty = job.isNew || initialSerialized !== currentSerialized;
   const normalizedName = form.name.trim().toLowerCase();
@@ -902,25 +901,21 @@ function JobRow({
     normalizedName.length > 0 &&
     allJobs.some(
       (candidate) =>
-        candidate.id !== job.id &&
-        candidate.name.trim().toLowerCase() === normalizedName,
+        candidate.id !== job.id && candidate.name.trim().toLowerCase() === normalizedName,
     );
   const duplicateAbbr =
     !isLockedIdentityJob &&
     normalizedAbbr.length > 0 &&
     allJobs.some(
       (candidate) =>
-        candidate.id !== job.id &&
-        candidate.abbr.trim().toUpperCase() === normalizedAbbr,
+        candidate.id !== job.id && candidate.abbr.trim().toUpperCase() === normalizedAbbr,
     );
 
   const hasRequiredPlacement =
     section === "shiftless" ||
-    (
-      form.departmentIds.length > 0 &&
+    (form.departmentIds.length > 0 &&
       form.focusAreaIds.length > 0 &&
-      form.applicableShiftIds.length > 0
-    );
+      form.applicableShiftIds.length > 0);
   const canSave =
     isDirty &&
     !!form.name.trim() &&
@@ -935,7 +930,6 @@ function JobRow({
 
   const resetDraft = useCallback(() => {
     setForm(buildJobFormState(job, shiftCategories, focusAreas));
-    setSaveError(null);
   }, [focusAreas, job, shiftCategories]);
 
   const discardDraft = useCallback(
@@ -958,7 +952,6 @@ function JobRow({
       return;
     }
     setExpanded(false);
-    setSaveError(null);
   }, [job.id, job.isNew, onDeleted]);
 
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
@@ -971,8 +964,7 @@ function JobRow({
       const validFocusAreaIds = activeFocusAreas
         .filter(
           (focusArea) =>
-            focusArea.departmentId != null &&
-            nextDepartmentIds.includes(focusArea.departmentId),
+            focusArea.departmentId != null && nextDepartmentIds.includes(focusArea.departmentId),
         )
         .map((focusArea) => focusArea.id);
       const trimmedFocusAreaIds = nextFocusAreaIds.filter((focusAreaId) =>
@@ -980,9 +972,7 @@ function JobRow({
       );
       const validShiftIds = activeShifts
         .filter(
-          (shift) =>
-            shift.focusAreaId != null &&
-            trimmedFocusAreaIds.includes(shift.focusAreaId),
+          (shift) => shift.focusAreaId != null && trimmedFocusAreaIds.includes(shift.focusAreaId),
         )
         .map((shift) => shift.id);
 
@@ -997,20 +987,25 @@ function JobRow({
           ),
         ),
         shiftColorOverrides: Object.fromEntries(
-          Object.entries(normalizeShiftColorOverrides(form.shiftColorOverrides)).filter(([shiftId]) =>
-            validShiftIds.includes(Number(shiftId)),
+          Object.entries(normalizeShiftColorOverrides(form.shiftColorOverrides)).filter(
+            ([shiftId]) => validShiftIds.includes(Number(shiftId)),
           ),
         ),
       };
     },
-    [activeFocusAreas, activeShifts, form.applicableShiftIds, form.shiftColorOverrides, form.shiftTimeOverrides],
+    [
+      activeFocusAreas,
+      activeShifts,
+      form.applicableShiftIds,
+      form.shiftColorOverrides,
+      form.shiftTimeOverrides,
+    ],
   );
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
 
     setSaving(true);
-    setSaveError(null);
     try {
       const timingDefaults = normalizeShiftlessJobTiming({
         assignmentMode: section === "shiftless" ? "shiftless" : "with_shift",
@@ -1054,7 +1049,8 @@ function JobRow({
         defaultStartTime: section === "shiftless" ? timingDefaults.defaultStartTime : null,
         defaultEndTime: section === "shiftless" ? timingDefaults.defaultEndTime : null,
         defaultDurationHours: section === "shiftless" ? timingDefaults.defaultDurationHours : null,
-        defaultDurationMinutes: section === "shiftless" ? timingDefaults.defaultDurationMinutes : null,
+        defaultDurationMinutes:
+          section === "shiftless" ? timingDefaults.defaultDurationMinutes : null,
         sortOrder: job.sortOrder,
         systemKey: isDefaultShiftJob ? DEFAULT_SHIFT_JOB_SYSTEM_KEY : (job.systemKey ?? null),
       });
@@ -1062,13 +1058,8 @@ function JobRow({
       setExpanded(false);
       toast.success("Job saved");
     } catch (error) {
-      const message =
-        error && typeof error === "object" && "message" in error
-          ? String((error as { message?: string }).message ?? "Unknown error")
-          : "Unknown error";
-      setSaveError(message);
       Sentry.captureException(error);
-      toast.error("Failed to save job");
+      toast.error(formatClientErrorMessage(error, "We couldn't save that job."));
     } finally {
       setSaving(false);
     }
@@ -1098,20 +1089,23 @@ function JobRow({
     setShowDeleteConfirm(true);
   }, [job.id, job.isNew, onDeleted, orgId]);
 
-  const handleDelete = useCallback(async () => {
-    setDeleting(true);
-    try {
-      await deleteJobDefinition(job.id, orgId);
-      onDeleted(job.id);
-      toast.success("Job archived");
-    } catch (error) {
-      Sentry.captureException(error);
-      toast.error("Failed to archive job");
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  }, [job.id, onDeleted, orgId]);
+  const handleDelete = useCallback(
+    async (hard: boolean) => {
+      setDeleting(true);
+      try {
+        await deleteJobDefinition(job.id, orgId, hard);
+        onDeleted(job.id);
+        toast.success(hard ? "Job deleted" : "Job archived");
+      } catch (error) {
+        Sentry.captureException(error);
+        toast.error(hard ? "Failed to delete job" : "Failed to archive job");
+      } finally {
+        setDeleting(false);
+        setShowDeleteConfirm(false);
+      }
+    },
+    [job.id, onDeleted, orgId],
+  );
 
   const toggleExpanded = useCallback(() => {
     if (!expanded) {
@@ -1125,10 +1119,9 @@ function JobRow({
     closeEditor();
   }, [closeEditor, expanded, isDirty, requestClose]);
 
-  const placementSummary =
-    isDefaultShiftJob
-      ? `Shift-only: ${form.departmentIds.length} dept · ${form.focusAreaIds.length} area · ${form.applicableShiftIds.length} shift`
-      : section === "shiftless"
+  const placementSummary = isDefaultShiftJob
+    ? `Shift-only: ${form.departmentIds.length} dept · ${form.focusAreaIds.length} area · ${form.applicableShiftIds.length} shift`
+    : section === "shiftless"
       ? "General / no shift"
       : `${formatCount(form.departmentIds.length, "department")} · ${formatCount(form.focusAreaIds.length, "focus area")} · ${formatCount(form.applicableShiftIds.length, "shift")}`;
 
@@ -1144,7 +1137,10 @@ function JobRow({
     form.eligibleRoleIds.length === 0 || form.requiredCertificationIds.length === 0;
 
   return (
-    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
+    <div
+      className="dg-list-row"
+      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+    >
       <div
         className="dg-hover-row"
         style={{
@@ -1212,8 +1208,8 @@ function JobRow({
               isDefaultShiftJob
                 ? "Use this row for assignments that should display as the shift only, like D or Day Shift."
                 : section === "scheduled"
-                ? "Name the job once, then configure exactly how it behaves on the selected shifts."
-                : "Use shiftless jobs for work that stands on its own without a scheduled shift."
+                  ? "Name the job once, then configure exactly how it behaves on the selected shifts."
+                  : "Use shiftless jobs for work that stands on its own without a scheduled shift."
             }
           >
             <div
@@ -1227,9 +1223,7 @@ function JobRow({
                 <label style={labelStyle}>JOB NAME</label>
                 <input
                   value={form.name}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, name: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                   placeholder={section === "shiftless" ? "e.g. Office" : "e.g. Supervisor"}
                   className="dg-input"
                   maxLength={50}
@@ -1239,7 +1233,11 @@ function JobRow({
                 {nameError ? (
                   <p
                     role="alert"
-                    style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                    style={{
+                      margin: "4px 0 0",
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-danger)",
+                    }}
                   >
                     {nameError}
                   </p>
@@ -1249,9 +1247,7 @@ function JobRow({
                 <label style={labelStyle}>GRID ABBR</label>
                 <input
                   value={form.abbr}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, abbr: event.target.value }))
-                  }
+                  onChange={(event) => setForm((prev) => ({ ...prev, abbr: event.target.value }))}
                   placeholder={section === "shiftless" ? "e.g. OFC" : "e.g. SUP"}
                   className="dg-input"
                   maxLength={6}
@@ -1261,7 +1257,11 @@ function JobRow({
                 {abbrError ? (
                   <p
                     role="alert"
-                    style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                    style={{
+                      margin: "4px 0 0",
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-danger)",
+                    }}
                   >
                     {abbrError}
                   </p>
@@ -1328,7 +1328,14 @@ function JobRow({
                           style={{ ...inputStyle, width: 72, textAlign: "center" }}
                           disabled={!canManageScheduleDefinitions}
                         />
-                        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>h</span>
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          h
+                        </span>
                         <input
                           type="number"
                           min={0}
@@ -1348,7 +1355,14 @@ function JobRow({
                           style={{ ...inputStyle, width: 72, textAlign: "center" }}
                           disabled={!canManageScheduleDefinitions}
                         />
-                        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>m</span>
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          m
+                        </span>
                       </div>
                       <p
                         style={{
@@ -1358,7 +1372,8 @@ function JobRow({
                           lineHeight: 1.45,
                         }}
                       >
-                        Use a duration when this general job should stay untethered from a fixed start and end time.
+                        Use a duration when this general job should stay untethered from a fixed
+                        start and end time.
                       </p>
                       {canManageScheduleDefinitions ? (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1396,7 +1411,9 @@ function JobRow({
                   ) : hasGeneralJobFixedTime ? (
                     <>
                       <label style={labelStyle}>DEFAULT START / END</label>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                      <div
+                        style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}
+                      >
                         <TimeInput12h
                           value={normalizedShiftlessTiming.defaultStartTime}
                           onChange={(value) =>
@@ -1409,7 +1426,12 @@ function JobRow({
                           }
                           disabled={!canManageScheduleDefinitions}
                         />
-                        <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
                           to
                         </span>
                         <TimeInput12h
@@ -1429,8 +1451,14 @@ function JobRow({
                         normalizedShiftlessTiming.defaultStartTime,
                         normalizedShiftlessTiming.defaultEndTime,
                       ) ? (
-                        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                          Duration: <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          Duration:{" "}
+                          <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>
                             {calcTimeDuration(
                               normalizedShiftlessTiming.defaultStartTime,
                               normalizedShiftlessTiming.defaultEndTime,
@@ -1446,7 +1474,8 @@ function JobRow({
                           lineHeight: 1.45,
                         }}
                       >
-                        Fixed times take priority over duration for general jobs, so only one timing mode can be saved at once.
+                        Fixed times take priority over duration for general jobs, so only one timing
+                        mode can be saved at once.
                       </p>
                       {canManageScheduleDefinitions ? (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1492,7 +1521,8 @@ function JobRow({
                           lineHeight: 1.45,
                         }}
                       >
-                        Choose one timing mode for general jobs. Use either a fixed start and end time or a duration.
+                        Choose one timing mode for general jobs. Use either a fixed start and end
+                        time or a duration.
                       </p>
                       {canManageScheduleDefinitions ? (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1539,9 +1569,13 @@ function JobRow({
                       )}
                     </>
                   )}
-                  {(normalizedShiftlessTiming.defaultStartTime != null && normalizedShiftlessTiming.defaultEndTime != null) ? (
-                    <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                      {fmt12h(normalizedShiftlessTiming.defaultStartTime)} to {fmt12h(normalizedShiftlessTiming.defaultEndTime)}
+                  {normalizedShiftlessTiming.defaultStartTime != null &&
+                  normalizedShiftlessTiming.defaultEndTime != null ? (
+                    <div
+                      style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}
+                    >
+                      {fmt12h(normalizedShiftlessTiming.defaultStartTime)} to{" "}
+                      {fmt12h(normalizedShiftlessTiming.defaultEndTime)}
                     </div>
                   ) : null}
                 </div>
@@ -1578,7 +1612,10 @@ function JobRow({
                       const nextDepartmentIds = prev.departmentIds.includes(departmentId)
                         ? prev.departmentIds.filter((value) => value !== departmentId)
                         : [...prev.departmentIds, departmentId];
-                      const trimmed = trimSelectionToPlacement(nextDepartmentIds, prev.focusAreaIds);
+                      const trimmed = trimSelectionToPlacement(
+                        nextDepartmentIds,
+                        prev.focusAreaIds,
+                      );
                       return {
                         ...prev,
                         departmentIds: nextDepartmentIds,
@@ -1595,7 +1632,10 @@ function JobRow({
                         prev.departmentIds.length === activeScheduledDepartments.length
                           ? []
                           : activeScheduledDepartments.map((department) => department.id);
-                      const trimmed = trimSelectionToPlacement(nextDepartmentIds, prev.focusAreaIds);
+                      const trimmed = trimSelectionToPlacement(
+                        nextDepartmentIds,
+                        prev.focusAreaIds,
+                      );
                       return {
                         ...prev,
                         departmentIds: nextDepartmentIds,
@@ -1643,14 +1683,14 @@ function JobRow({
                           nextShiftIds.includes(shiftId),
                         ),
                         shiftTimeOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftTimeOverrides(prev.shiftTimeOverrides)).filter(([shiftId]) =>
-                            nextShiftIds.includes(Number(shiftId)),
-                          ),
+                          Object.entries(
+                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                          ).filter(([shiftId]) => nextShiftIds.includes(Number(shiftId))),
                         ),
                         shiftColorOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftColorOverrides(prev.shiftColorOverrides)).filter(([shiftId]) =>
-                            nextShiftIds.includes(Number(shiftId)),
-                          ),
+                          Object.entries(
+                            normalizeShiftColorOverrides(prev.shiftColorOverrides),
+                          ).filter(([shiftId]) => nextShiftIds.includes(Number(shiftId))),
                         ),
                       };
                     })
@@ -1675,19 +1715,23 @@ function JobRow({
                           validShiftIds.includes(shiftId),
                         ),
                         shiftTimeOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftTimeOverrides(prev.shiftTimeOverrides)).filter(([shiftId]) =>
-                            validShiftIds.includes(Number(shiftId)),
-                          ),
+                          Object.entries(
+                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                          ).filter(([shiftId]) => validShiftIds.includes(Number(shiftId))),
                         ),
                         shiftColorOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftColorOverrides(prev.shiftColorOverrides)).filter(([shiftId]) =>
-                            validShiftIds.includes(Number(shiftId)),
-                          ),
+                          Object.entries(
+                            normalizeShiftColorOverrides(prev.shiftColorOverrides),
+                          ).filter(([shiftId]) => validShiftIds.includes(Number(shiftId))),
                         ),
                       };
                     })
                   }
-                  disabled={!canManageScheduleDefinitions || isRegularStaffJob || form.departmentIds.length === 0}
+                  disabled={
+                    !canManageScheduleDefinitions ||
+                    isRegularStaffJob ||
+                    form.departmentIds.length === 0
+                  }
                   emptyMessage={
                     form.departmentIds.length === 0
                       ? "Select scheduled departments first."
@@ -1722,12 +1766,16 @@ function JobRow({
                         ...prev,
                         applicableShiftIds: nextApplicableShiftIds,
                         shiftTimeOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftTimeOverrides(prev.shiftTimeOverrides)).filter(([overrideShiftId]) =>
+                          Object.entries(
+                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                          ).filter(([overrideShiftId]) =>
                             nextApplicableShiftIds.includes(Number(overrideShiftId)),
                           ),
                         ),
                         shiftColorOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftColorOverrides(prev.shiftColorOverrides)).filter(([overrideShiftId]) =>
+                          Object.entries(
+                            normalizeShiftColorOverrides(prev.shiftColorOverrides),
+                          ).filter(([overrideShiftId]) =>
                             nextApplicableShiftIds.includes(Number(overrideShiftId)),
                           ),
                         ),
@@ -1744,19 +1792,27 @@ function JobRow({
                         ...prev,
                         applicableShiftIds: nextApplicableShiftIds,
                         shiftTimeOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftTimeOverrides(prev.shiftTimeOverrides)).filter(([overrideShiftId]) =>
+                          Object.entries(
+                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                          ).filter(([overrideShiftId]) =>
                             nextApplicableShiftIds.includes(Number(overrideShiftId)),
                           ),
                         ),
                         shiftColorOverrides: Object.fromEntries(
-                          Object.entries(normalizeShiftColorOverrides(prev.shiftColorOverrides)).filter(([overrideShiftId]) =>
+                          Object.entries(
+                            normalizeShiftColorOverrides(prev.shiftColorOverrides),
+                          ).filter(([overrideShiftId]) =>
                             nextApplicableShiftIds.includes(Number(overrideShiftId)),
                           ),
                         ),
                       };
                     })
                   }
-                  disabled={!canManageScheduleDefinitions || isRegularStaffJob || form.focusAreaIds.length === 0}
+                  disabled={
+                    !canManageScheduleDefinitions ||
+                    isRegularStaffJob ||
+                    form.focusAreaIds.length === 0
+                  }
                   emptyMessage={
                     form.focusAreaIds.length === 0
                       ? "Select focus areas first."
@@ -1800,10 +1856,10 @@ function JobRow({
                     const previewSecondary = isDefaultShiftJob
                       ? null
                       : getJobPreviewLabel({
-                        jobName: form.name,
-                        jobAbbr: form.abbr,
-                        shiftDisplayMode,
-                      });
+                          jobName: form.name,
+                          jobAbbr: form.abbr,
+                          shiftDisplayMode,
+                        });
                     const resolvedTimes = resolveJobTimesForShift(
                       {
                         assignmentMode: "with_shift",
@@ -1876,7 +1932,14 @@ function JobRow({
                         >
                           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                             <label style={labelStyle}>COLOR OVERRIDE</label>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                flexWrap: "wrap",
+                              }}
+                            >
                               <PresetColorPicker
                                 valueBg={resolvedColor}
                                 onChange={(color) =>
@@ -1895,12 +1958,18 @@ function JobRow({
                                 className="dg-btn dg-btn-secondary dg-btn-sm"
                                 onClick={() =>
                                   setForm((prev) => {
-                                    const nextOverrides = { ...normalizeShiftColorOverrides(prev.shiftColorOverrides) };
+                                    const nextOverrides = {
+                                      ...normalizeShiftColorOverrides(prev.shiftColorOverrides),
+                                    };
                                     delete nextOverrides[String(shift.id)];
                                     return { ...prev, shiftColorOverrides: nextOverrides };
                                   })
                                 }
-                                disabled={!canManageScheduleDefinitions || isRegularStaffJob || colorOverride == null}
+                                disabled={
+                                  !canManageScheduleDefinitions ||
+                                  isRegularStaffJob ||
+                                  colorOverride == null
+                                }
                               >
                                 {colorOverride == null ? "Using shift color" : "Use shift color"}
                               </button>
@@ -1923,7 +1992,9 @@ function JobRow({
                                 checked={timeOverride != null}
                                 onChange={(event) =>
                                   setForm((prev) => {
-                                    const nextOverrides = { ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides) };
+                                    const nextOverrides = {
+                                      ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                                    };
                                     if (!event.target.checked) {
                                       delete nextOverrides[String(shift.id)];
                                       return { ...prev, shiftTimeOverrides: nextOverrides };
@@ -1941,44 +2012,58 @@ function JobRow({
                             </label>
 
                             {timeOverride ? (
-                              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                                <TimeInput12h
-                                  value={timeOverride.startTime}
-                                  onChange={(value) =>
-                                    setForm((prev) => ({
-                                      ...prev,
-                                      shiftTimeOverrides: {
-                                        ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
-                                        [String(shift.id)]: {
-                                          startTime: value,
-                                          endTime:
-                                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[String(shift.id)]?.endTime ?? null,
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 14,
+                                  alignItems: "end",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <div>
+                                  <label style={labelStyle}>START</label>
+                                  <TimeInput12h
+                                    value={timeOverride.startTime}
+                                    onChange={(value) =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        shiftTimeOverrides: {
+                                          ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                                          [String(shift.id)]: {
+                                            startTime: value,
+                                            endTime:
+                                              normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[
+                                                String(shift.id)
+                                              ]?.endTime ?? null,
+                                          },
                                         },
-                                      },
-                                    }))
-                                  }
-                                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
-                                />
-                                <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-                                  to
-                                </span>
-                                <TimeInput12h
-                                  value={timeOverride.endTime}
-                                  onChange={(value) =>
-                                    setForm((prev) => ({
-                                      ...prev,
-                                      shiftTimeOverrides: {
-                                        ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
-                                        [String(shift.id)]: {
-                                          startTime:
-                                            normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[String(shift.id)]?.startTime ?? null,
-                                          endTime: value,
+                                      }))
+                                    }
+                                    disabled={!canManageScheduleDefinitions || isRegularStaffJob}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={labelStyle}>END</label>
+                                  <TimeInput12h
+                                    value={timeOverride.endTime}
+                                    onChange={(value) =>
+                                      setForm((prev) => ({
+                                        ...prev,
+                                        shiftTimeOverrides: {
+                                          ...normalizeShiftTimeOverrides(prev.shiftTimeOverrides),
+                                          [String(shift.id)]: {
+                                            startTime:
+                                              normalizeShiftTimeOverrides(prev.shiftTimeOverrides)[
+                                                String(shift.id)
+                                              ]?.startTime ?? null,
+                                            endTime: value,
+                                          },
                                         },
-                                      },
-                                    }))
-                                  }
-                                  disabled={!canManageScheduleDefinitions || isRegularStaffJob}
-                                />
+                                      }))
+                                    }
+                                    disabled={!canManageScheduleDefinitions || isRegularStaffJob}
+                                  />
+                                </div>
                               </div>
                             ) : (
                               <div
@@ -1987,7 +2072,8 @@ function JobRow({
                                   color: "var(--color-text-muted)",
                                 }}
                               >
-                                Using {resolvedTimes.startTime?.slice(0, 5) ?? "—"}-{resolvedTimes.endTime?.slice(0, 5) ?? "—"} from the shift.
+                                Using {resolvedTimes.startTime?.slice(0, 5) ?? "—"}-
+                                {resolvedTimes.endTime?.slice(0, 5) ?? "—"} from the shift.
                               </div>
                             )}
                           </div>
@@ -2052,9 +2138,7 @@ function JobRow({
               >
                 <EligibilityModeToggle
                   value={form.eligibilityMode}
-                  onChange={(value) =>
-                    setForm((prev) => ({ ...prev, eligibilityMode: value }))
-                  }
+                  onChange={(value) => setForm((prev) => ({ ...prev, eligibilityMode: value }))}
                   disabled={!canManageScheduleDefinitions}
                   dimmed={eligibilityModeDimmed}
                 />
@@ -2063,13 +2147,14 @@ function JobRow({
                     fontSize: "var(--dg-fs-caption)",
                     color: "var(--color-text-muted)",
                     lineHeight: 1.45,
+                    minHeight: "calc(var(--dg-fs-caption) * 1.45 * 2)",
                   }}
                 >
                   {eligibilityModeDimmed
-                    ? "The rule above becomes active when both roles and certifications are selected."
+                    ? "Activates once both lists have selections."
                     : form.eligibilityMode === "and"
-                      ? `Staff must match one selected ${roleLabel.toLowerCase()} and one selected ${certificationLabel.toLowerCase()}.`
-                      : `Staff can qualify through either a selected ${roleLabel.toLowerCase()} or a selected ${certificationLabel.toLowerCase()}.`}
+                      ? "Staff need a match in both lists."
+                      : "Staff need a match in at least one list."}
                 </div>
               </div>
 
@@ -2085,7 +2170,9 @@ function JobRow({
                 onToggle={(certificationId) =>
                   setForm((prev) => ({
                     ...prev,
-                    requiredCertificationIds: prev.requiredCertificationIds.includes(certificationId)
+                    requiredCertificationIds: prev.requiredCertificationIds.includes(
+                      certificationId,
+                    )
                       ? prev.requiredCertificationIds.filter((value) => value !== certificationId)
                       : [...prev.requiredCertificationIds, certificationId],
                   }))
@@ -2105,8 +2192,10 @@ function JobRow({
             </div>
           </SectionBlock>
 
-          {(duplicateName || duplicateAbbr) ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
+          {duplicateName || duplicateAbbr ? (
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
               {duplicateName
                 ? "Another job already uses that name."
                 : "Another job already uses that abbreviation."}
@@ -2114,38 +2203,46 @@ function JobRow({
           ) : null}
 
           {isScheduledLikeSection(section) && form.departmentIds.length === 0 ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
               Select at least one scheduled department.
             </p>
           ) : null}
 
-          {isScheduledLikeSection(section) && form.departmentIds.length > 0 && form.focusAreaIds.length === 0 ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
+          {isScheduledLikeSection(section) &&
+          form.departmentIds.length > 0 &&
+          form.focusAreaIds.length === 0 ? (
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
               Select at least one focus area.
             </p>
           ) : null}
 
-          {isScheduledLikeSection(section) && form.focusAreaIds.length > 0 && form.applicableShiftIds.length === 0 ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
+          {isScheduledLikeSection(section) &&
+          form.focusAreaIds.length > 0 &&
+          form.applicableShiftIds.length === 0 ? (
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
               Select at least one shift.
             </p>
           ) : null}
 
           {incompleteShiftOverride ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
               Enter both a start and end time for each enabled time override.
             </p>
           ) : null}
 
           {incompleteGeneralJobTime ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
+            <p
+              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+            >
               Enter both a start and end time, or switch this general job to duration mode.
-            </p>
-          ) : null}
-
-          {saveError ? (
-            <p style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}>
-              <strong>Error:</strong> {saveError}
             </p>
           ) : null}
 
@@ -2161,15 +2258,15 @@ function JobRow({
                 </button>
               ) : undefined
             }
-            secondaryAction={(
+            secondaryAction={
               <button
-                onClick={() => (isDirty ? discardDraft(false) : closeEditor())}
+                onClick={() => (job.isNew || !isDirty ? closeEditor() : discardDraft(false))}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
-                {getEditorDismissLabel(isDirty)}
+                {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: job.isNew })}
               </button>
-            )}
-            primaryAction={(
+            }
+            primaryAction={
               <button
                 onClick={handleSave}
                 disabled={saving || !canSave || !canManageScheduleDefinitions}
@@ -2177,46 +2274,74 @@ function JobRow({
               >
                 {getEditorSaveLabel(saving)}
               </button>
-            )}
+            }
           />
         </div>
       ) : null}
 
       {unsavedChangesDialog}
-      {showDeleteConfirm ? (
-        dependencyInfo?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={(
-              <>
-                <strong>{form.name}</strong> is currently {dependencyInfo.summary.toLowerCase()}.
-                <br />
-                <br />
-                Archiving will preserve history but remove the job from future scheduling and coverage configuration.
-              </>
-            )}
-            confirmLabel="Archive"
-            variant="warning"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        ) : (
-          <ConfirmDialog
-            title={`Archive "${form.name}"?`}
-            message={(
-              <>
-                This will archive <strong>{form.name}</strong>. Historical records will stay intact.
-              </>
-            )}
-            confirmLabel="Archive"
-            variant="danger"
-            isLoading={deleting}
-            onConfirm={handleDelete}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        )
-      ) : null}
+      {showDeleteConfirm
+        ? (() => {
+            const hasActive = dependencyInfo?.hasDependencies ?? false;
+            const hasAny = dependencyInfo?.hasAnyReferences ?? true;
+            if (hasActive) {
+              return (
+                <ConfirmDialog
+                  title={`Archive "${form.name}"?`}
+                  message={
+                    <>
+                      <strong>{form.name}</strong> is currently{" "}
+                      {dependencyInfo!.summary.toLowerCase()}.
+                      <br />
+                      <br />
+                      Archiving will preserve history but remove the job from future scheduling and
+                      coverage configuration.
+                    </>
+                  }
+                  confirmLabel="Archive"
+                  variant="warning"
+                  isLoading={deleting}
+                  onConfirm={() => handleDelete(false)}
+                  onCancel={() => setShowDeleteConfirm(false)}
+                />
+              );
+            }
+            if (hasAny) {
+              return (
+                <ConfirmDialog
+                  title={`Archive "${form.name}"?`}
+                  message={
+                    <>
+                      This will archive <strong>{form.name}</strong>. Historical records will stay
+                      intact.
+                    </>
+                  }
+                  confirmLabel="Archive"
+                  variant="warning"
+                  isLoading={deleting}
+                  onConfirm={() => handleDelete(false)}
+                  onCancel={() => setShowDeleteConfirm(false)}
+                />
+              );
+            }
+            return (
+              <ConfirmDialog
+                title={`Delete "${form.name}"?`}
+                message={
+                  <>
+                    This will permanently delete <strong>{form.name}</strong>. Nothing references
+                    it.
+                  </>
+                }
+                confirmLabel="Delete"
+                variant="danger"
+                isLoading={deleting}
+                onConfirm={() => handleDelete(true)}
+                onCancel={() => setShowDeleteConfirm(false)}
+              />
+            );
+          })()
+        : null}
     </div>
   );
 }
@@ -2267,7 +2392,12 @@ export default function JobsSettings({
     [shiftCategories],
   );
   const activeScheduledDepartments = useMemo(
-    () => sortByOrder(departments.filter((department) => !department.archivedAt && department.type === "scheduled")),
+    () =>
+      sortByOrder(
+        departments.filter(
+          (department) => !department.archivedAt && department.type === "scheduled",
+        ),
+      ),
     [departments],
   );
   const visibleRows = useMemo(
@@ -2286,11 +2416,12 @@ export default function JobsSettings({
             activeShiftCategories.some((shift) => shift.focusAreaId === focusArea.id),
         ),
       )?.id ?? null;
-    const focusAreaIds = defaultDepartmentId == null
-      ? []
-      : focusAreas
-          .filter((focusArea) => focusArea.departmentId === defaultDepartmentId)
-          .map((focusArea) => focusArea.id);
+    const focusAreaIds =
+      defaultDepartmentId == null
+        ? []
+        : focusAreas
+            .filter((focusArea) => focusArea.departmentId === defaultDepartmentId)
+            .map((focusArea) => focusArea.id);
 
     return [
       {
@@ -2308,13 +2439,14 @@ export default function JobsSettings({
           defaultDepartmentId == null
             ? []
             : activeShiftCategories
-                .filter((shift) =>
-                  shift.focusAreaId != null &&
-                  focusAreas.some(
-                    (focusArea) =>
-                      focusArea.id === shift.focusAreaId &&
-                      focusArea.departmentId === defaultDepartmentId,
-                  ),
+                .filter(
+                  (shift) =>
+                    shift.focusAreaId != null &&
+                    focusAreas.some(
+                      (focusArea) =>
+                        focusArea.id === shift.focusAreaId &&
+                        focusArea.departmentId === defaultDepartmentId,
+                    ),
                 )
                 .map((shift) => shift.id),
         eligibleRoleIds: [],
@@ -2335,32 +2467,26 @@ export default function JobsSettings({
       },
     ];
   }, [activeScheduledDepartments, activeShiftCategories, focusAreas, orgId]);
-  const scheduledRows = useMemo(
-    () => {
-      const scheduled = visibleRows.filter((job) => getJobSection(job) === "scheduled");
-      const persisted = scheduled
-        .filter((job) => !job.isNew)
-        .sort((left, right) =>
-          compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
-        );
-      const drafts = scheduled.filter((job) => job.isNew);
-      return [...defaultShiftRows, ...persisted, ...drafts];
-    },
-    [certifications, defaultShiftRows, orgRoles, visibleRows],
-  );
-  const shiftlessRows = useMemo(
-    () => {
-      const shiftless = visibleRows.filter((job) => getJobSection(job) === "shiftless");
-      const persisted = shiftless
-        .filter((job) => !job.isNew)
-        .sort((left, right) =>
-          compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
-        );
-      const drafts = shiftless.filter((job) => job.isNew);
-      return [...persisted, ...drafts];
-    },
-    [certifications, orgRoles, visibleRows],
-  );
+  const scheduledRows = useMemo(() => {
+    const scheduled = visibleRows.filter((job) => getJobSection(job) === "scheduled");
+    const persisted = scheduled
+      .filter((job) => !job.isNew)
+      .sort((left, right) =>
+        compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
+      );
+    const drafts = scheduled.filter((job) => job.isNew);
+    return [...defaultShiftRows, ...persisted, ...drafts];
+  }, [certifications, defaultShiftRows, orgRoles, visibleRows]);
+  const shiftlessRows = useMemo(() => {
+    const shiftless = visibleRows.filter((job) => getJobSection(job) === "shiftless");
+    const persisted = shiftless
+      .filter((job) => !job.isNew)
+      .sort((left, right) =>
+        compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
+      );
+    const drafts = shiftless.filter((job) => job.isNew);
+    return [...persisted, ...drafts];
+  }, [certifications, orgRoles, visibleRows]);
   const canCreateScheduledJob =
     activeScheduledDepartments.length > 0 &&
     activeShiftCategories.some((shift) => shift.focusAreaId != null);
@@ -2390,24 +2516,27 @@ export default function JobsSettings({
       assignmentMode: "with_shift",
       eligibilityMode: "and",
       focusAreaId: null,
-      focusAreaIds: defaultDepartmentId == null
-        ? []
-        : focusAreas
-            .filter((focusArea) => focusArea.departmentId === defaultDepartmentId)
-            .map((focusArea) => focusArea.id),
+      focusAreaIds:
+        defaultDepartmentId == null
+          ? []
+          : focusAreas
+              .filter((focusArea) => focusArea.departmentId === defaultDepartmentId)
+              .map((focusArea) => focusArea.id),
       departmentIds: defaultDepartmentId != null ? [defaultDepartmentId] : [],
-      applicableShiftIds: defaultDepartmentId == null
-        ? []
-        : activeShiftCategories
-            .filter((shift) =>
-              shift.focusAreaId != null &&
-              focusAreas.some(
-                (focusArea) =>
-                  focusArea.id === shift.focusAreaId &&
-                  focusArea.departmentId === defaultDepartmentId,
-              ),
-            )
-            .map((shift) => shift.id),
+      applicableShiftIds:
+        defaultDepartmentId == null
+          ? []
+          : activeShiftCategories
+              .filter(
+                (shift) =>
+                  shift.focusAreaId != null &&
+                  focusAreas.some(
+                    (focusArea) =>
+                      focusArea.id === shift.focusAreaId &&
+                      focusArea.departmentId === defaultDepartmentId,
+                  ),
+              )
+              .map((shift) => shift.id),
       eligibleRoleIds: [],
       requiredCertificationIds: [],
       color: EMPTY_SCHEDULED_JOB_STYLE.color,
@@ -2495,7 +2624,9 @@ export default function JobsSettings({
             lineHeight: 1.5,
           }}
         >
-          No schedule-eligible roles are configured yet. Jobs can still be limited by {certificationLabel.toLowerCase()}, but role gating stays open until you mark roles as schedule-eligible.
+          No schedule-eligible roles are configured yet. Jobs can still be limited by{" "}
+          {certificationLabel.toLowerCase()}, but role gating stays open until you mark roles as
+          schedule-eligible.
         </div>
       ) : null}
 
@@ -2505,7 +2636,7 @@ export default function JobsSettings({
         canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
         onAdd={handleAddScheduledJob}
       >
-        {scheduledRows.map((job) => (
+        {scheduledRows.map((job, jobIndex) => (
           <JobRow
             key={job.id}
             job={job}
@@ -2523,6 +2654,7 @@ export default function JobsSettings({
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
             shiftDisplayMode={shiftDisplayMode}
+            isLast={jobIndex === scheduledRows.length - 1}
           />
         ))}
       </JobSectionCard>
@@ -2536,7 +2668,8 @@ export default function JobsSettings({
             lineHeight: 1.45,
           }}
         >
-          Create at least one scheduled department with a focus area and shift before adding scheduled jobs.
+          Create at least one scheduled department with a focus area and shift before adding
+          scheduled jobs.
         </div>
       ) : null}
 
@@ -2546,7 +2679,7 @@ export default function JobsSettings({
         canManageScheduleDefinitions={canManageScheduleDefinitions}
         onAdd={handleAddShiftlessJob}
       >
-        {shiftlessRows.map((job) => (
+        {shiftlessRows.map((job, jobIndex) => (
           <JobRow
             key={job.id}
             job={job}
@@ -2564,6 +2697,7 @@ export default function JobsSettings({
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
             shiftDisplayMode={shiftDisplayMode}
+            isLast={jobIndex === shiftlessRows.length - 1}
           />
         ))}
       </JobSectionCard>

@@ -51,25 +51,15 @@ export function getScheduleGridLayout({
   if (spanWeeks === 1) {
     return {
       nameColWidth: BASE_NAME_COL_WIDTH,
-      colWidth:
-        shiftDisplayMode === "name"
-          ? ONE_WEEK_NAME_COL_WIDTH
-          : ONE_WEEK_CODE_COL_WIDTH,
+      colWidth: shiftDisplayMode === "name" ? ONE_WEEK_NAME_COL_WIDTH : ONE_WEEK_CODE_COL_WIDTH,
       fitToContainer: false,
       minGridWidth:
         BASE_NAME_COL_WIDTH +
-        numDays *
-          (shiftDisplayMode === "name"
-            ? ONE_WEEK_NAME_COL_WIDTH
-            : ONE_WEEK_CODE_COL_WIDTH),
+        numDays * (shiftDisplayMode === "name" ? ONE_WEEK_NAME_COL_WIDTH : ONE_WEEK_CODE_COL_WIDTH),
     };
   }
 
-  const minimums = getTwoWeekMinimums(
-    shiftDisplayMode,
-    hasOpenShifts,
-    hasStackedCellContent,
-  );
+  const minimums = getTwoWeekMinimums(shiftDisplayMode, hasOpenShifts, hasStackedCellContent);
   const minGridWidth = minimums.nameColWidth + numDays * minimums.dayColWidth;
   const fitToContainer = containerWidth >= minGridWidth;
 

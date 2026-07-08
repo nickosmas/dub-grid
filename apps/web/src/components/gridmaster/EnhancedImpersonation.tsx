@@ -10,10 +10,7 @@ import {
 } from "@/features/gridmaster/client";
 import { setImpersonationCookie, clearImpersonationCookie } from "@/lib/impersonation";
 import { clearPermsCache } from "@/features/permissions/client";
-import {
-  formatClientErrorMessage,
-  formatOrganizationRoleLabel,
-} from "@/lib/client-facing";
+import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
 import CustomSelect from "@/components/CustomSelect";
@@ -87,7 +84,10 @@ export default function EnhancedImpersonation({
   // Countdown timer for active session
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!expiresAt) { setCountdown(null); return; }
+    if (!expiresAt) {
+      setCountdown(null);
+      return;
+    }
     const interval = setInterval(() => {
       const diff = new Date(expiresAt).getTime() - Date.now();
       if (diff <= 0) {
@@ -105,17 +105,15 @@ export default function EnhancedImpersonation({
   const filteredOrgs = useMemo(() => {
     const q = orgSearch.toLowerCase();
     if (!q) return organizations;
-    return organizations.filter((o) =>
-      o.name.toLowerCase().includes(q) || (o.slug ?? "").toLowerCase().includes(q),
+    return organizations.filter(
+      (o) => o.name.toLowerCase().includes(q) || (o.slug ?? "").toLowerCase().includes(q),
     );
   }, [organizations, orgSearch]);
 
   const filteredUsers = useMemo(() => {
     const q = search.toLowerCase();
     if (!q) return users.slice(0, 20);
-    return users.filter((u) =>
-      (u.email ?? "").toLowerCase().includes(q),
-    ).slice(0, 20);
+    return users.filter((u) => (u.email ?? "").toLowerCase().includes(q)).slice(0, 20);
   }, [users, search]);
 
   async function handleStart() {
@@ -158,7 +156,7 @@ export default function EnhancedImpersonation({
           justification: trimmedJustification,
         }),
       }).catch(() => {});
-      toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name} — redirecting…`);
+      toast.success(`Impersonating ${selectedUser.email} in ${selectedOrg.name}. Redirecting.`);
       window.location.replace("/schedule");
     } catch (err: unknown) {
       Sentry.captureException(err, { extra: { context: "impersonation-start" } });
@@ -203,10 +201,23 @@ export default function EnhancedImpersonation({
 
   return (
     <div style={{ maxWidth: 640 }}>
-      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2
+        style={{
+          margin: "0 0 4px",
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+        }}
+      >
         User Impersonation
       </h2>
-      <p style={{ margin: "0 0 20px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+      <p
+        style={{
+          margin: "0 0 20px",
+          fontSize: "var(--dg-fs-label)",
+          color: "var(--color-text-muted)",
+        }}
+      >
         {preSelected
           ? "Provide a justification to start the impersonation session. Sessions are capped at 30 minutes."
           : "Select an organization, then choose a user to impersonate. Sessions are capped at 30 minutes."}
@@ -227,15 +238,35 @@ export default function EnhancedImpersonation({
           }}
         >
           <div>
-            <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-info)" }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+                color: "var(--color-info)",
+              }}
+            >
               Active Session
             </div>
-            <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 4 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 4,
+              }}
+            >
               Impersonating <strong>{selectedUser?.email}</strong>
               {selectedOrg && ` in ${selectedOrg.name}`}
             </div>
             {countdown && (
-              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-info)", marginTop: 6, fontFamily: "var(--font-dm-mono), monospace" }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-card-title)",
+                  fontWeight: 700,
+                  color: "var(--color-info)",
+                  marginTop: 6,
+                  fontFamily: "var(--font-dm-mono), monospace",
+                }}
+              >
                 {countdown}
               </div>
             )}
@@ -246,7 +277,9 @@ export default function EnhancedImpersonation({
             disabled={loading}
             style={{ fontSize: "var(--dg-fs-caption)", flexShrink: 0 }}
           >
-            <ButtonLoading loading={loading} spinnerSize={14}>End Session</ButtonLoading>
+            <ButtonLoading loading={loading} spinnerSize={14}>
+              End Session
+            </ButtonLoading>
           </button>
         </div>
       )}
@@ -265,7 +298,14 @@ export default function EnhancedImpersonation({
             />
             <div style={{ maxHeight: 200, overflowY: "auto" }}>
               {filteredOrgs.length === 0 ? (
-                <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+                <div
+                  style={{
+                    padding: 16,
+                    textAlign: "center",
+                    color: "var(--color-text-muted)",
+                    fontSize: "var(--dg-fs-label)",
+                  }}
+                >
                   No matching organizations
                 </div>
               ) : (
@@ -281,7 +321,9 @@ export default function EnhancedImpersonation({
                         width: "100%",
                         padding: "8px 12px",
                         background: isSelected ? "var(--color-bg-secondary)" : "transparent",
-                        border: isSelected ? "1px solid var(--color-border)" : "1px solid transparent",
+                        border: isSelected
+                          ? "1px solid var(--color-border)"
+                          : "1px solid transparent",
                         borderRadius: 8,
                         cursor: "pointer",
                         fontFamily: "inherit",
@@ -291,17 +333,38 @@ export default function EnhancedImpersonation({
                       }}
                     >
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            fontWeight: 600,
+                            color: "var(--color-text-primary)",
+                          }}
+                        >
                           {o.name}
                         </div>
                         {o.slug && (
-                          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace", marginTop: 1 }}>
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--color-text-muted)",
+                              fontFamily: "var(--font-dm-mono), monospace",
+                              marginTop: 1,
+                            }}
+                          >
                             {o.slug}
                           </div>
                         )}
                       </div>
                       {isSelected && (
-                        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-info)", fontWeight: 600 }}>Selected</span>
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--color-info)",
+                            fontWeight: 600,
+                          }}
+                        >
+                          Selected
+                        </span>
                       )}
                     </button>
                   );
@@ -318,35 +381,98 @@ export default function EnhancedImpersonation({
           <div style={sectionHeaderStyle}>Confirm Impersonation</div>
           <div style={sectionBodyStyle}>
             {usersQuery.isLoading ? (
-              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
-                Loading user…
+              <div
+                aria-hidden
+                style={{
+                  padding: "10px 14px",
+                  background: "var(--color-bg-secondary)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--dg-radius-md)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                }}
+              >
+                <div className="dg-skeleton" style={{ width: 180, height: 14, borderRadius: 4 }} />
+                <div className="dg-skeleton" style={{ width: 220, height: 10, borderRadius: 4 }} />
+                <div className="dg-skeleton" style={{ width: 120, height: 10, borderRadius: 4 }} />
               </div>
             ) : usersQuery.error instanceof Error ? (
-              <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+              <div
+                style={{
+                  padding: 20,
+                  color: "var(--color-danger)",
+                  fontSize: "var(--dg-fs-label)",
+                }}
+              >
                 {formatClientErrorMessage(usersQuery.error, "Failed to load user")}
               </div>
             ) : !selectedUser ? (
-              <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+              <div
+                style={{
+                  padding: 20,
+                  color: "var(--color-danger)",
+                  fontSize: "var(--dg-fs-label)",
+                }}
+              >
                 Unable to find the selected user in this organization.
               </div>
             ) : (
               <>
-                <div style={{ padding: "10px 14px", background: "var(--color-bg-secondary)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)" }}>
-                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "var(--color-bg-secondary)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--dg-radius-md)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
                     {selectedUser.email}
                   </div>
-                  <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-muted)",
+                      marginTop: 2,
+                    }}
+                  >
                     {formatOrganizationRoleLabel(selectedUser.orgRole)} in {selectedOrg?.name}
                   </div>
                 </div>
                 <div style={{ marginTop: 16 }}>
-                  <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                    Role Override <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    Role Override{" "}
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 400,
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      (optional)
+                    </span>
                   </label>
                   <CustomSelect
                     value={roleOverride}
                     options={[
-                      { value: "", label: `Use actual role (${formatOrganizationRoleLabel(selectedUser.orgRole)})` },
+                      {
+                        value: "",
+                        label: `Use actual role (${formatOrganizationRoleLabel(selectedUser.orgRole)})`,
+                      },
                       { value: "user", label: "User (read-only)" },
                       { value: "admin", label: "Admin" },
                       { value: "super_admin", label: "Super Admin" },
@@ -356,7 +482,14 @@ export default function EnhancedImpersonation({
                   />
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
                     Justification <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <textarea
@@ -368,8 +501,15 @@ export default function EnhancedImpersonation({
                     style={{ marginTop: 4, resize: "vertical", width: "100%" }}
                   />
                   {justification.trim().length > 0 && justification.trim().length < 10 && (
-                    <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
-                      Justification must be at least 10 characters ({justification.trim().length}/10)
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--color-danger)",
+                        marginTop: 4,
+                      }}
+                    >
+                      Justification must be at least 10 characters ({justification.trim().length}
+                      /10)
                     </div>
                   )}
                 </div>
@@ -379,11 +519,18 @@ export default function EnhancedImpersonation({
                     onClick={requestStart}
                     disabled={loading || justification.trim().length < 10}
                   >
-                    <ButtonLoading loading={loading} spinnerSize={16}>{`Impersonate ${selectedUser.email}`}</ButtonLoading>
+                    <ButtonLoading
+                      loading={loading}
+                      spinnerSize={16}
+                    >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => { setSelectedUser(null); setJustification(""); setRoleOverride(""); }}
+                    onClick={() => {
+                      setSelectedUser(null);
+                      setJustification("");
+                      setRoleOverride("");
+                    }}
                   >
                     Cancel
                   </button>
@@ -410,17 +557,37 @@ export default function EnhancedImpersonation({
             />
 
             {usersQuery.isLoading ? (
-              <div style={{ padding: 20, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+              <div
+                style={{
+                  padding: 20,
+                  textAlign: "center",
+                  color: "var(--color-text-muted)",
+                  fontSize: "var(--dg-fs-label)",
+                }}
+              >
                 Loading users…
               </div>
             ) : usersQuery.error instanceof Error ? (
-              <div style={{ padding: 20, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
+              <div
+                style={{
+                  padding: 20,
+                  color: "var(--color-danger)",
+                  fontSize: "var(--dg-fs-label)",
+                }}
+              >
                 {formatClientErrorMessage(usersQuery.error, "Failed to load users")}
               </div>
             ) : (
               <div style={{ maxHeight: 280, overflowY: "auto" }}>
                 {filteredUsers.length === 0 ? (
-                  <div style={{ padding: 16, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+                  <div
+                    style={{
+                      padding: 16,
+                      textAlign: "center",
+                      color: "var(--color-text-muted)",
+                      fontSize: "var(--dg-fs-label)",
+                    }}
+                  >
                     No matching users in this organization
                   </div>
                 ) : (
@@ -436,7 +603,9 @@ export default function EnhancedImpersonation({
                           width: "100%",
                           padding: "8px 12px",
                           background: isSelected ? "var(--color-bg-secondary)" : "transparent",
-                          border: isSelected ? "1px solid var(--color-border)" : "1px solid transparent",
+                          border: isSelected
+                            ? "1px solid var(--color-border)"
+                            : "1px solid transparent",
                           borderRadius: 8,
                           cursor: "pointer",
                           fontFamily: "inherit",
@@ -446,15 +615,35 @@ export default function EnhancedImpersonation({
                         }}
                       >
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-label)",
+                              fontWeight: 600,
+                              color: "var(--color-text-primary)",
+                            }}
+                          >
                             {u.email ?? "No email"}
                           </div>
-                          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 1 }}>
+                          <div
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              color: "var(--color-text-muted)",
+                              marginTop: 1,
+                            }}
+                          >
                             {formatOrganizationRoleLabel(u.orgRole)}
                           </div>
                         </div>
                         {isSelected && (
-                          <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-info)", fontWeight: 600 }}>Selected</span>
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-info)",
+                              fontWeight: 600,
+                            }}
+                          >
+                            Selected
+                          </span>
                         )}
                       </button>
                     );
@@ -466,13 +655,32 @@ export default function EnhancedImpersonation({
             {selectedUser && (
               <>
                 <div style={{ marginTop: 16 }}>
-                  <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                    Role Override <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    Role Override{" "}
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 400,
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      (optional)
+                    </span>
                   </label>
                   <CustomSelect
                     value={roleOverride}
                     options={[
-                      { value: "", label: `Use actual role (${formatOrganizationRoleLabel(selectedUser.orgRole)})` },
+                      {
+                        value: "",
+                        label: `Use actual role (${formatOrganizationRoleLabel(selectedUser.orgRole)})`,
+                      },
                       { value: "user", label: "User (read-only)" },
                       { value: "admin", label: "Admin" },
                       { value: "super_admin", label: "Super Admin" },
@@ -482,7 +690,14 @@ export default function EnhancedImpersonation({
                   />
                 </div>
                 <div style={{ marginTop: 12 }}>
-                  <label style={{ display: "block", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
                     Justification <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <textarea
@@ -494,8 +709,15 @@ export default function EnhancedImpersonation({
                     style={{ marginTop: 4, resize: "vertical", width: "100%" }}
                   />
                   {justification.trim().length > 0 && justification.trim().length < 10 && (
-                    <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
-                      Justification must be at least 10 characters ({justification.trim().length}/10)
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--color-danger)",
+                        marginTop: 4,
+                      }}
+                    >
+                      Justification must be at least 10 characters ({justification.trim().length}
+                      /10)
                     </div>
                   )}
                 </div>
@@ -505,11 +727,18 @@ export default function EnhancedImpersonation({
                     onClick={requestStart}
                     disabled={loading || justification.trim().length < 10}
                   >
-                    <ButtonLoading loading={loading} spinnerSize={16}>{`Impersonate ${selectedUser.email}`}</ButtonLoading>
+                    <ButtonLoading
+                      loading={loading}
+                      spinnerSize={16}
+                    >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
                   </button>
                   <button
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => { setSelectedUser(null); setJustification(""); setRoleOverride(""); }}
+                    onClick={() => {
+                      setSelectedUser(null);
+                      setJustification("");
+                      setRoleOverride("");
+                    }}
                   >
                     Clear
                   </button>

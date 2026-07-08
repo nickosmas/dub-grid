@@ -1,131 +1,219 @@
-/* ── Focus area colors from Calm Haven seed — shown as a 6px dot inside neutral badges ── */
-const FOCUS_AREAS = [
-  { name: "Skilled Nursing", dotColor: "#FED7AA" },
-  { name: "Sheltered Care", dotColor: "#E9D5FF" },
-  { name: "Night Shift", dotColor: "#FECDD3" },
-  { name: "Visiting CSNS", dotColor: "#FDE68A" },
-];
+/* ── Staff view mockup ────────────────────────────────────────────────────
+   Mirrors the Members directory under /people. Real components:
+   apps/web/src/components/StaffView.tsx + staff/MembersSection + the row
+   markup in staff/StaffTableRow.tsx. Columns shown: # / checkbox, Name +
+   avatar (email subtitle), Status pill, Focus Areas (neutral StatusPills,
+   no color dots), Certification (plain text), Account (tonal StatusPill).
+   ── */
 
-/* ── Account statuses — matches real semantic colors ── */
-const STATUSES = [
-  { label: "Linked", bg: "var(--color-brand-bg)", text: "var(--color-link)" },
-  { label: "Invited", bg: "#FFFBEB", text: "#92400E" },
-  { label: "Not invited", bg: "var(--color-border-light)", text: "var(--color-text-muted)" },
-];
+/* ── Focus areas from Calm Haven seed ── */
+const FOCUS_AREAS = ["Skilled Nursing", "Sheltered Care", "Night Shift", "Visiting CSNS"];
 
-const STAFF = [
+type Tone = "success" | "warning" | "danger" | "neutral";
+
+/* ── StatusPill tone palette — mirrors components/ui/status-pill.tsx ── */
+const TONES: Record<Tone, { bg: string; text: string; border: string }> = {
+  success: {
+    bg: "var(--color-success-bg)",
+    text: "var(--color-success-text)",
+    border: "var(--color-success-border)",
+  },
+  warning: {
+    bg: "var(--color-warning-bg)",
+    text: "var(--color-warning-text)",
+    border: "var(--color-warning-border)",
+  },
+  danger: {
+    bg: "var(--color-danger-bg)",
+    text: "var(--color-danger-text)",
+    border: "var(--color-danger-border)",
+  },
+  neutral: {
+    bg: "var(--color-bg-secondary)",
+    text: "var(--color-text-secondary)",
+    border: "var(--color-border-light)",
+  },
+};
+
+function StatusPill({
+  tone = "neutral",
+  children,
+  dot,
+}: {
+  tone?: Tone;
+  children: React.ReactNode;
+  dot?: boolean;
+}) {
+  const vars = TONES[tone];
+  const showDot = dot ?? tone !== "neutral";
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 6,
+        padding: "2px 8px",
+        fontSize: 11,
+        fontWeight: 500,
+        background: vars.bg,
+        color: vars.text,
+        border: `1px solid ${vars.border}`,
+        whiteSpace: "nowrap" as const,
+        lineHeight: 1.4,
+      }}
+    >
+      {showDot && (
+        <span
+          aria-hidden="true"
+          style={{
+            width: 4,
+            height: 4,
+            borderRadius: "50%",
+            background: vars.text,
+            flexShrink: 0,
+          }}
+        />
+      )}
+      {children}
+    </span>
+  );
+}
+
+type Person = {
+  rank: number;
+  name: string;
+  email: string;
+  initials: string;
+  hue: number;
+  focusAreas: number[];
+  cert: string;
+  account: { label: string; tone: Tone };
+};
+
+const STAFF: Person[] = [
   {
+    rank: 1,
     name: "Margaret Sullivan",
+    email: "margaret.sullivan@calmhaven.test",
     initials: "MS",
     hue: 270,
     focusAreas: [0],
     cert: "JLCSN",
-    roles: "DCSN",
-    status: 0,
+    account: { label: "Linked", tone: "success" },
   },
   {
+    rank: 2,
     name: "Carol Henderson",
+    email: "carol.henderson@calmhaven.test",
     initials: "CH",
     hue: 150,
     focusAreas: [0, 1],
     cert: "JLCSN",
-    roles: "Supv",
-    status: 0,
+    account: { label: "Linked", tone: "success" },
   },
   {
+    rank: 3,
     name: "Evelyn Hartwell",
+    email: "evelyn.hartwell@calmhaven.test",
     initials: "EH",
     hue: 30,
-    focusAreas: [0, 1],
+    focusAreas: [0, 1, 2],
     cert: "JLCSN",
-    roles: "SC Mgr",
-    status: 0,
+    account: { label: "Linked", tone: "success" },
   },
   {
+    rank: 4,
     name: "Kevin Donovan",
+    email: "kevin.donovan@calmhaven.test",
     initials: "KD",
     hue: 210,
     focusAreas: [0],
     cert: "STAFF",
-    roles: "",
-    status: 1,
+    account: { label: "Invited", tone: "warning" },
   },
   {
+    rank: 5,
     name: "Hannah Stratton",
+    email: "hannah.stratton@calmhaven.test",
     initials: "HS",
     hue: 340,
     focusAreas: [2],
     cert: "JLCSN",
-    roles: "Supv",
-    status: 0,
+    account: { label: "Linked", tone: "success" },
   },
   {
+    rank: 6,
     name: "Marilyn Davenport",
+    email: "marilyn.davenport@calmhaven.test",
     initials: "MD",
     hue: 50,
     focusAreas: [3],
     cert: "JLCSN",
-    roles: "DVCSN",
-    status: 2,
+    account: { label: "Not invited", tone: "neutral" },
   },
 ];
 
-const HEADER_COLS = ["Name", "Assigned Wings", "Certification", "Roles", "Account"];
+const HEADER_COLS = ["Name", "Status", "Focus Areas", "Certification", "Account"];
+
+// 100px (#/checkbox) + Name + Status (110px) + Focus Areas + Certification + Account + chevron (40px)
+const GRID_TEMPLATE = "100px 1.4fr 110px 1.5fr 0.9fr 1fr 40px";
 
 export default function StaffViewMockup() {
   return (
     <div
       style={{
-        background: "#fff",
-        borderRadius: 14,
+        background: "var(--color-surface)",
+        borderRadius: 12,
         border: "1px solid var(--color-border)",
         overflow: "hidden",
         boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06)",
       }}
     >
-      {/* ── Tabs bar — matches real TabsTrigger line variant ── */}
+      {/* Tabs bar — counts mirror MembersSection tab labels */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 24px",
-          background: "#F8FAFC",
+          background: "var(--color-bg)",
           borderBottom: "1px solid var(--color-border)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
           {[
             { label: "Active", count: 6, active: true },
-            { label: "Benched", count: 0, active: false },
-            { label: "Terminated", count: 0, active: false },
+            { label: "Inactive", count: 1, active: false },
+            { label: "Removed", count: 0, active: false },
           ].map((tab) => (
             <span
               key={tab.label}
               style={{
-                padding: "12px 12px",
+                padding: "12px 14px",
                 fontSize: 13,
-                fontWeight: tab.active ? 600 : 400,
+                fontWeight: tab.active ? 600 : 500,
                 color: tab.active ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                borderBottom: tab.active ? "2px solid var(--color-text-primary)" : "2px solid transparent",
+                borderBottom: tab.active
+                  ? "2px solid var(--color-text-primary)"
+                  : "2px solid transparent",
                 cursor: "default",
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
-                position: "relative",
               }}
             >
               {tab.label}
               <span
                 style={{
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: 600,
-                  height: 16,
-                  minWidth: 16,
+                  height: 18,
+                  minWidth: 18,
                   borderRadius: 10,
-                  padding: "0 4px",
-                  background: tab.active ? "var(--color-bg-secondary)" : "var(--color-bg-secondary)",
-                  color: tab.active ? "var(--color-text-muted)" : "var(--color-text-subtle)",
+                  padding: "0 6px",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text-muted)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -138,8 +226,8 @@ export default function StaffViewMockup() {
           ))}
         </div>
 
-        {/* Search — matches .dg-input style */}
-        <div className="hidden sm:block" style={{ position: "relative", minWidth: 160 }}>
+        {/* Search — matches dg-input radius (6px) */}
+        <div style={{ position: "relative", width: 180 }}>
           <svg
             style={{
               position: "absolute",
@@ -153,7 +241,7 @@ export default function StaffViewMockup() {
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
@@ -162,10 +250,10 @@ export default function StaffViewMockup() {
           </svg>
           <div
             style={{
-              height: 34,
-              borderRadius: 10,
+              height: 32,
+              borderRadius: 6,
               border: "1px solid var(--color-border)",
-              background: "#fff",
+              background: "var(--color-surface)",
               paddingLeft: 32,
               fontSize: 13,
               fontWeight: 500,
@@ -179,27 +267,40 @@ export default function StaffViewMockup() {
         </div>
       </div>
 
-      {/* ── Header row — matches real grid columns and styling ── */}
+      {/* Header row */}
       <div
-        className="hidden sm:grid"
         style={{
-          gridTemplateColumns: "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px",
+          display: "grid",
+          gridTemplateColumns: GRID_TEMPLATE,
           padding: "12px 24px",
-          background: "#FAFBFC",
+          background: "var(--color-bg)",
           borderBottom: "1px solid var(--color-border-light)",
         }}
       >
-        {/* Checkbox column header */}
-        <div style={{ display: "flex", alignItems: "center" }}>
+        {/* Rank/checkbox column header — empty (placeholder for # and checkbox) */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11,
+            fontWeight: 700,
+            color: "var(--color-text-subtle)",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase" as const,
+          }}
+        >
           <div
             style={{
               width: 14,
               height: 14,
               borderRadius: 3,
               border: "1.5px solid var(--color-border)",
-              background: "#fff",
+              background: "var(--color-surface)",
+              flexShrink: 0,
             }}
           />
+          <span>#</span>
         </div>
         {HEADER_COLS.map((col) => (
           <span
@@ -209,6 +310,7 @@ export default function StaffViewMockup() {
               fontWeight: 700,
               color: "var(--color-text-subtle)",
               letterSpacing: "0.06em",
+              textTransform: "uppercase" as const,
               display: "flex",
               alignItems: "center",
             }}
@@ -216,186 +318,167 @@ export default function StaffViewMockup() {
             {col}
           </span>
         ))}
-        {/* Menu column spacer */}
         <div />
       </div>
 
-      {/* ── Rows ── */}
-      {STAFF.map((person, idx) => {
-        const status = STATUSES[person.status];
-        return (
+      {/* Rows */}
+      {STAFF.map((person, idx) => (
+        <div
+          key={person.name}
+          style={{
+            display: "grid",
+            gridTemplateColumns: GRID_TEMPLATE,
+            alignItems: "center",
+            padding: "12px 24px",
+            borderTop: idx > 0 ? "1px solid var(--color-border-light)" : undefined,
+          }}
+        >
+          {/* # rank + checkbox */}
           <div
-            key={person.name}
             style={{
-              display: "grid",
-              gridTemplateColumns: "48px 1.2fr 1fr 0.6fr 0.8fr 0.5fr 28px",
+              display: "flex",
               alignItems: "center",
-              padding: "14px 24px",
-              borderTop: idx > 0 ? "1px solid var(--color-border-light)" : undefined,
-              transition: "background 150ms ease",
+              gap: 8,
+              color: "var(--color-text-faint)",
             }}
           >
-            {/* Checkbox */}
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 3,
-                  border: "1.5px solid var(--color-border)",
-                  background: "#fff",
-                }}
-              />
-            </div>
-
-            {/* Name + avatar */}
             <div
               style={{
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                border: "1.5px solid var(--color-border)",
+                background: "var(--color-surface)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 500,
+                fontVariantNumeric: "tabular-nums" as const,
+              }}
+            >
+              #{person.rank}
+            </span>
+          </div>
+
+          {/* Name + avatar + email subtitle */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                minWidth: 0,
+                justifyContent: "center",
+                fontSize: 11,
+                fontWeight: 700,
+                background: `hsl(${person.hue}, 70%, 92%)`,
+                color: `hsl(${person.hue}, 70%, 35%)`,
+                border: `1px solid hsl(${person.hue}, 70%, 85%)`,
+                flexShrink: 0,
               }}
             >
+              {person.initials}
+            </div>
+            <div style={{ minWidth: 0 }}>
               <div
                 style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "var(--color-text-primary)",
+                  lineHeight: 1.3,
+                  whiteSpace: "nowrap" as const,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {person.name}
+              </div>
+              <div
+                style={{
                   fontSize: 12,
-                  fontWeight: 800,
-                  background: `hsl(${person.hue}, 70%, 92%)`,
-                  color: `hsl(${person.hue}, 70%, 35%)`,
-                  border: `1px solid hsl(${person.hue}, 70%, 85%)`,
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-                  flexShrink: 0,
-                }}
-              >
-                {person.initials}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: "var(--color-text-secondary)",
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {person.name}
-                </div>
-              </div>
-            </div>
-
-            {/* Focus areas — neutral badge with color dot (matches real StaffView) */}
-            <div
-              className="hidden sm:flex"
-              style={{
-                alignItems: "center",
-                gap: 4,
-                flexWrap: "wrap",
-              }}
-            >
-              {person.focusAreas.map((faIdx) => {
-                const fa = FOCUS_AREAS[faIdx];
-                return (
-                  <span
-                    key={fa.name}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      fontSize: 11,
-                      fontWeight: 600,
-                      borderRadius: 20,
-                      padding: "2px 8px",
-                      background: "var(--color-bg-secondary)",
-                      color: "var(--color-text-secondary)",
-                      border: "1px solid var(--color-border-light)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: fa.dotColor,
-                        flexShrink: 0,
-                      }}
-                    />
-                    {fa.name}
-                  </span>
-                );
-              })}
-            </div>
-
-            {/* Certification — matches real: var(--color-border-light) bg, var(--color-text-muted) text */}
-            <div className="hidden sm:block">
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  borderRadius: 20,
-                  padding: "3px 9px",
-                  background: "var(--color-border-light)",
                   color: "var(--color-text-muted)",
-                  whiteSpace: "nowrap",
+                  marginTop: 2,
+                  whiteSpace: "nowrap" as const,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
-                {person.cert}
-              </span>
-            </div>
-
-            {/* Roles — plain text, not badge (matches real StaffView) */}
-            <div className="hidden sm:block">
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--color-text-muted)",
-                }}
-              >
-                {person.roles || "—"}
-              </span>
-            </div>
-
-            {/* Account status */}
-            <div
-              className="hidden sm:flex"
-              style={{ justifyContent: "flex-start" }}
-            >
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  borderRadius: 10,
-                  padding: "2px 8px",
-                  background: status.bg,
-                  color: status.text,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {status.label}
-              </span>
-            </div>
-
-            {/* Menu chevron */}
-            <div
-              className="hidden sm:flex"
-              style={{
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--color-text-faint)",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+                {person.email}
+              </div>
             </div>
           </div>
-        );
-      })}
+
+          {/* Status — always Active in mockup */}
+          <div>
+            <StatusPill tone="success">Active</StatusPill>
+          </div>
+
+          {/* Focus areas — neutral pills capped at 2 + "+N more" overflow */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {(() => {
+              const visible = person.focusAreas.slice(0, 2);
+              const overflow = person.focusAreas.slice(2);
+              return (
+                <>
+                  {visible.map((faIdx) => (
+                    <StatusPill key={faIdx} tone="neutral">
+                      {FOCUS_AREAS[faIdx]}
+                    </StatusPill>
+                  ))}
+                  {overflow.length > 0 && (
+                    <StatusPill tone="neutral">+{overflow.length} more</StatusPill>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Certification — plain text (no badge), muted */}
+          <div>
+            <span
+              style={{
+                fontSize: 12,
+                color: "var(--color-text-muted)",
+                whiteSpace: "nowrap" as const,
+              }}
+            >
+              {person.cert}
+            </span>
+          </div>
+
+          {/* Account — tonal StatusPill with dot */}
+          <div>
+            <StatusPill tone={person.account.tone}>{person.account.label}</StatusPill>
+          </div>
+
+          {/* Chevron */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--color-text-faint)",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="9 6 15 12 9 18" />
+            </svg>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

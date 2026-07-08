@@ -1,7 +1,20 @@
-import type { ReactNode } from "react";
-import { Modal, Platform, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, type ReactNode } from "react";
+import {
+  Animated,
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Button, type ButtonTone } from "./Button";
+import { hapticImpact } from "../lib/haptics";
 import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+
+const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
+const SHEET_TRAVEL = Dimensions.get("window").height;
 
 type ConfirmationTone = Extract<
   ButtonTone,
@@ -31,69 +44,99 @@ export function ConfirmationModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const isDestructive = confirmTone === "danger" || confirmTone === "dangerFilled";
+
+  const handleConfirm = () => {
+    if (isDestructive) {
+      hapticImpact("medium");
+    }
+    onConfirm();
+  };
+
+  const handleCancel = () => {
+    if (loading) return;
+    onCancel();
+  };
+
+  const translateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
+
+  useEffect(() => {
+    Animated.timing(translateY, {
+      toValue: visible ? 0 : SHEET_TRAVEL,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, translateY]);
+
   return (
     <Modal
       animationType="fade"
-      onRequestClose={loading ? undefined : onCancel}
+      onRequestClose={handleCancel}
       presentationStyle="overFullScreen"
       transparent
       visible={visible}
     >
-      <View style={styles.overlay}>
-        <View pointerEvents="none" style={StyleSheet.absoluteFill} />
-        <View
+      <View style={styles.root}>
+        <Pressable
+          accessibilityLabel="Dismiss"
+          style={StyleSheet.absoluteFill}
+          onPress={handleCancel}
+        />
+        <Animated.View
           accessibilityRole="alert"
-          style={styles.dialog}
+          style={[styles.sheet, { transform: [{ translateY }] }]}
         >
+          <View style={styles.grabber} />
           <View style={styles.copy}>
             <Text style={styles.title}>{title}</Text>
             {body ? <Text style={styles.body}>{body}</Text> : null}
             {children}
           </View>
           <View style={styles.actions}>
+            <Button disabled={loading} label={cancelLabel} onPress={handleCancel} tone="neutral" />
             <Button
-              compact
-              disabled={loading}
-              label={cancelLabel}
-              onPress={onCancel}
-              tone="neutral"
-            />
-            <Button
-              compact
               label={confirmLabel}
               loading={loading}
-              onPress={onConfirm}
+              onPress={handleConfirm}
               tone={confirmTone}
             />
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  root: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.36)",
-    padding: 20,
+    justifyContent: "flex-end",
+    backgroundColor: mobileColors.overlay,
   },
-  dialog: {
+  sheet: {
     width: "100%",
-    maxWidth: 420,
-    borderRadius: mobileRadii.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: mobileColors.borderSubtle,
     backgroundColor: mobileColors.surface,
-    padding: 18,
-    gap: 18,
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 18 },
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: SHEET_BOTTOM_PADDING,
+    gap: 20,
+    shadowColor: mobileColors.textPrimary,
+    shadowOffset: { width: 0, height: -8 },
     shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
     shadowRadius: 28,
-    elevation: 12,
+    elevation: 16,
+  },
+  grabber: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: mobileRadii.pill,
+    backgroundColor: mobileColors.border,
+    marginBottom: 6,
   },
   copy: {
     gap: 8,
@@ -107,9 +150,6 @@ const styles = StyleSheet.create({
     color: mobileColors.textSecondary,
   },
   actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
     gap: 10,
   },
 });

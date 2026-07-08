@@ -55,22 +55,30 @@ if (process.env.NODE_ENV !== "development") {
 
 // captureException
 export const captureException: (error: unknown, context?: CaptureContext) => void = _sdk
-  ? (...args) => { _sdk!.captureException(...args); }
+  ? (...args) => {
+      _sdk!.captureException(...args);
+    }
   : noop;
 
 // captureMessage
 export const captureMessage: (message: string, level?: SeverityLevel) => void = _sdk
-  ? (...args) => { _sdk!.captureMessage(...args); }
+  ? (...args) => {
+      _sdk!.captureMessage(...args);
+    }
   : noop;
 
 // setUser
 export const setUser: (user: SentryUser) => void = _sdk
-  ? (...args) => { _sdk!.setUser(...args); }
+  ? (...args) => {
+      _sdk!.setUser(...args);
+    }
   : noop;
 
 // setTag
 export const setTag: (key: string, value: string) => void = _sdk
-  ? (...args) => { _sdk!.setTag(...args); }
+  ? (...args) => {
+      _sdk!.setTag(...args);
+    }
   : noop;
 
 // logger (structured logging via Sentry)
@@ -81,6 +89,18 @@ export const logger: typeof devLogger = _sdk?.logger ?? devLogger;
 export const replayIntegration: (...args: any[]) => any = _sdk
   ? (...args) => _sdk!.replayIntegration(...args)
   : () => ({});
+
+// addIntegration — lets us attach replay lazily once analytics consent is granted
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const addIntegration: (integration: any) => void = _sdk
+  ? (integration) => {
+      _sdk!.addIntegration(integration);
+    }
+  : noop;
+
+// getClient — used to detect whether replay was already attached
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const getClient: () => any = _sdk ? () => _sdk!.getClient() : () => undefined;
 
 // captureRouterTransitionStart — exported from instrumentation-client.ts
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,7 +116,9 @@ export const captureRequestError: (...args: any[]) => any = _sdk
 
 // init — used in sentry.server/edge/client config files
 export const init: (options: Record<string, unknown>) => void = _sdk
-  ? (...args) => { _sdk!.init(...args); }
+  ? (...args) => {
+      _sdk!.init(...args);
+    }
   : noop;
 
 // ── Convenience helpers ──────────────────────────────────────────────────────
@@ -105,7 +127,9 @@ export const init: (options: Record<string, unknown>) => void = _sdk
  * Set Sentry user context so errors are associated with a specific user.
  * Call on auth state changes (login/logout).
  */
-export function setSentryUser(user: { id: string; email?: string; orgId?: string; role?: string } | null) {
+export function setSentryUser(
+  user: { id: string; email?: string; orgId?: string; role?: string } | null,
+) {
   if (user) {
     setUser({ id: user.id, email: user.email });
     if (user.orgId) setTag("org_id", user.orgId);

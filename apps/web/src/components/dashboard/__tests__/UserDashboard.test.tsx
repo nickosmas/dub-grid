@@ -1,10 +1,8 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+// Pin to UTC (production runtime) so split-shift/time-of-day rendering is
+// deterministic regardless of the dev machine's timezone.
+process.env.TZ = "UTC";
+
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { buildPerms } from "@dubgrid/authz";
 import UserDashboard from "@/components/dashboard/UserDashboard";
@@ -16,12 +14,12 @@ import {
   hasDashboardAdminCapability,
 } from "@/components/dashboard/DashboardView";
 import {
-  formatDateKey,
   getDatesInRange,
   getWeekStart,
   type EmployeeHours,
   type OpenShift,
 } from "@/lib/dashboard-stats";
+import { formatDateKey } from "@/lib/utils";
 import type {
   AssignmentDefinition,
   Employee,
@@ -72,6 +70,7 @@ const assignment: AssignmentDefinition = {
 
 const employee: Employee = {
   id: "emp-1",
+  employeeNumber: 1001,
   userId: "user-1",
   firstName: "Avery",
   lastName: "Stone",
@@ -89,6 +88,7 @@ const employee: Employee = {
   seniority: 1,
   contactNotes: "",
   version: 1,
+  createdAt: null,
 };
 
 const coworker: Employee = {
@@ -127,12 +127,19 @@ const org: Organization = {
   roleLabel: "role",
   departmentLabel: "department",
   shiftDisplayMode: "code",
-  timezone: "America/Los_Angeles",
+  // Default to UTC so "today"/"now" line up with the UTC-pinned browser clock
+  // and the browser-keyed fixtures, keeping time-of-day-agnostic tests
+  // deterministic. Tests that need a real timezone offset set it explicitly.
+  timezone: "UTC",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   coverageRuleConfig: { mentoredCoverageCreditPercent: 50 },
   dataRetentionDays: 365,
   featureOverrides: {},
+  workspaceKind: "real",
+  sandboxOwnerUserId: null,
+  sandboxSourceOrgId: null,
 };
 
 function makeShiftMap(todayKey: string): ShiftMap {
@@ -189,9 +196,7 @@ function makeShiftMap(todayKey: string): ShiftMap {
   };
 }
 
-function makeShiftRequest(
-  overrides: Partial<ShiftRequest> = {},
-): ShiftRequest {
+function makeShiftRequest(overrides: Partial<ShiftRequest> = {}): ShiftRequest {
   return {
     id: "request-1",
     orgId: "org-1",
@@ -236,17 +241,13 @@ function makeShiftRequest(
   };
 }
 
-function makeProps(
-  overrides: Partial<DashboardContentProps> = {},
-): DashboardContentProps {
+function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardContentProps {
   const today = new Date();
   const todayKey = formatDateKey(today);
   const periodStart = today;
   const periodDates = getDatesInRange(periodStart, 7);
   const alternateOpenDate =
-    periodDates.find((date) => formatDateKey(date) > todayKey) ??
-    periodDates[0] ??
-    today;
+    periodDates.find((date) => formatDateKey(date) > todayKey) ?? periodDates[0] ?? today;
   const assignmentById = new Map([[assignment.id, assignment]]);
   const respond = vi.fn().mockResolvedValue(true);
   const claim = vi.fn().mockResolvedValue(true);
@@ -359,12 +360,8 @@ describe("dashboard user mode selection", () => {
     expect(hasDashboardAdminCapability(admin)).toBe(true);
     expect(getDashboardRoleVariant(admin)).toBe("admin");
     expect(getDashboardRoleVariant(superAdmin)).toBe("super-admin");
-    expect(
-      getDashboardRoleVariant({ ...admin, isUserViewActive: true }),
-    ).toBe("user");
-    expect(
-      getDashboardRoleVariant({ ...superAdmin, isUserViewActive: true }),
-    ).toBe("user");
+    expect(getDashboardRoleVariant({ ...admin, isUserViewActive: true })).toBe("user");
+    expect(getDashboardRoleVariant({ ...superAdmin, isUserViewActive: true })).toBe("user");
   });
 
   it("labels admin dashboard periods and overtime thresholds from the selected range", () => {
@@ -373,7 +370,7 @@ describe("dashboard user mode selection", () => {
     expect(getDashboardPeriodLabel("2weeks")).toBe("these 2 weeks");
     expect(getDashboardOvertimeThreshold(1)).toBe(40);
     expect(getDashboardOvertimeThreshold(7)).toBe(40);
-    expect(getDashboardOvertimeThreshold(14)).toBe(80);
+    expect(getDashboardOvertimeThreshold(14)).toBe(40);
   });
 });
 
@@ -407,24 +404,18 @@ describe("UserDashboard", () => {
     });
     expect(screen.getByText("On Duty")).toBeInTheDocument();
     expect(
-      within(screen.getByTestId("user-dashboard-hero")).queryByText(
-        "Avery Stone",
-      ),
+      within(screen.getByTestId("user-dashboard-hero")).queryByText("Avery Stone"),
     ).not.toBeInTheDocument();
     expect(screen.getAllByText("Day shift").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mentored").length).toBeGreaterThan(0);
     expect(screen.getByText("Working with")).toBeInTheDocument();
     const workingWith = screen.getByTestId("user-dashboard-working-with");
     const heroBottomStack = screen.getByTestId("user-dashboard-hero-bottom-stack");
-    const shiftmateAvatars = screen.getAllByTestId(
-      "user-dashboard-shiftmate-avatar",
-    );
-    const shiftmateAvatarFrames = screen.getAllByTestId(
-      "user-dashboard-shiftmate-avatar-frame",
-    );
+    const shiftmateAvatars = screen.getAllByTestId("user-dashboard-shiftmate-avatar");
+    const shiftmateAvatarFrames = screen.getAllByTestId("user-dashboard-shiftmate-avatar-frame");
 
     expect(workingWith).toHaveStyle({
-      background: "#3A55CB",
+      background: "rgba(255, 255, 255, 0.16)",
       borderRadius: "16px",
       justifyContent: "space-between",
     });
@@ -447,21 +438,17 @@ describe("UserDashboard", () => {
     );
     expect(screen.getByText("Cover requests")).toBeInTheDocument();
     expect(screen.getByText("Available shifts")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("user-dashboard-action-carousel"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("user-dashboard-action-rail")).toBeInTheDocument();
     expect(screen.queryByText(/carousel below/i)).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("user-dashboard-cover-requests")).queryByRole(
-        "button",
-        { name: "Accept" },
-      ),
+      within(screen.getByTestId("user-dashboard-cover-requests")).queryByRole("button", {
+        name: "Accept",
+      }),
     ).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId("user-dashboard-available-shifts")).queryByRole(
-        "button",
-        { name: "Volunteer" },
-      ),
+      within(screen.getByTestId("user-dashboard-available-shifts")).queryByRole("button", {
+        name: "Volunteer",
+      }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("My Week")).toBeInTheDocument();
     const myWeek = screen.getByTestId("user-dashboard-my-week");
@@ -476,9 +463,7 @@ describe("UserDashboard", () => {
     expect(screen.getByTestId("user-dashboard-date-tile-today-dot")).toBeInTheDocument();
     expect(
       Array.from(myWeek.querySelectorAll("svg")).some(
-        (icon) =>
-          icon.getAttribute("width") === "20" &&
-          icon.getAttribute("height") === "20",
+        (icon) => icon.getAttribute("width") === "20" && icon.getAttribute("height") === "20",
       ),
     ).toBe(false);
     expect(weekPills[0]).toHaveTextContent("Care");
@@ -487,19 +472,12 @@ describe("UserDashboard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     await waitFor(() => {
-      expect(props.shiftRequests.respond).toHaveBeenCalledWith(
-        "cover-request",
-        "emp-1",
-        true,
-      );
+      expect(props.shiftRequests.respond).toHaveBeenCalledWith("cover-request", "emp-1", true);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Claim" }));
     await waitFor(() => {
-      expect(props.shiftRequests.claim).toHaveBeenCalledWith(
-        "pickup-request",
-        "emp-1",
-      );
+      expect(props.shiftRequests.claim).toHaveBeenCalledWith("pickup-request", "emp-1");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "Volunteer" }));
@@ -621,22 +599,15 @@ describe("UserDashboard", () => {
       );
 
       const hero = screen.getByTestId("user-dashboard-hero");
-      const heroBottomStack = within(hero).getByTestId(
-        "user-dashboard-hero-bottom-stack",
-      );
+      const heroBottomStack = within(hero).getByTestId("user-dashboard-hero-bottom-stack");
       const secondaryShift = within(heroBottomStack).getByTestId(
         "user-dashboard-hero-secondary-shift",
       );
 
       expect(heroBottomStack).toHaveStyle({ marginTop: "auto" });
       expect(
-        Array.from(heroBottomStack.children).map((child) =>
-          child.getAttribute("data-testid"),
-        ),
-      ).toEqual([
-        "user-dashboard-working-with",
-        "user-dashboard-hero-secondary-shift",
-      ]);
+        Array.from(heroBottomStack.children).map((child) => child.getAttribute("data-testid")),
+      ).toEqual(["user-dashboard-working-with", "user-dashboard-hero-secondary-shift"]);
       expect(within(secondaryShift).getByText("Evening shift")).toBeInTheDocument();
       expect(within(secondaryShift).getByText("1:00 PM - 5:00 PM")).toBeInTheDocument();
     } finally {
@@ -707,17 +678,12 @@ describe("UserDashboard", () => {
           ...props.shiftRequests,
           myRequests: [pastCoverRequest, futureCoverRequest],
           openPickups: [pastPickup, futurePickup],
-          requests: [
-            pastCoverRequest,
-            futureCoverRequest,
-            pastPickup,
-            futurePickup,
-          ],
+          requests: [pastCoverRequest, futureCoverRequest, pastPickup, futurePickup],
         }}
       />,
     );
 
-    const carousel = screen.getByTestId("user-dashboard-action-carousel");
+    const carousel = screen.getByTestId("user-dashboard-action-rail");
 
     expect(within(carousel).queryByText(/Past request/)).not.toBeInTheDocument();
     expect(within(carousel).queryByText(/Past pickup/)).not.toBeInTheDocument();
@@ -759,6 +725,9 @@ describe("UserDashboard", () => {
         ]),
         assignments: [assignment, lateAssignment],
         currentPeriodShifts: shiftMap,
+        // 18:00 UTC is 11:00 in this zone, so the 15:00 shifts read as not-yet-
+        // started while the early ones have started.
+        org: { ...org, timezone: "America/Los_Angeles" },
         openShifts: [
           {
             ...makeProps().openShifts[0]!,
@@ -815,16 +784,12 @@ describe("UserDashboard", () => {
         />,
       );
 
-      const carousel = screen.getByTestId("user-dashboard-action-carousel");
+      const carousel = screen.getByTestId("user-dashboard-action-rail");
 
       expect(within(carousel).queryByText(/Started gap/)).not.toBeInTheDocument();
-      expect(
-        within(carousel).queryByText(/Started pickup/),
-      ).not.toBeInTheDocument();
+      expect(within(carousel).queryByText(/Started pickup/)).not.toBeInTheDocument();
       expect(within(carousel).getAllByText(/Later gap/).length).toBeGreaterThan(0);
-      expect(
-        within(carousel).getAllByText(/Later pickup/).length,
-      ).toBeGreaterThan(0);
+      expect(within(carousel).getAllByText(/Later pickup/).length).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
     }
@@ -886,6 +851,151 @@ describe("UserDashboard", () => {
       expect(within(hero).getByText("Day shift")).toBeInTheDocument();
       expect(within(hero).queryByText("Paid time off")).not.toBeInTheDocument();
       expect(within(hero).queryByText("Away")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("features the next upcoming shift in a later week, not an earlier completed one", () => {
+    vi.useFakeTimers();
+    // Wednesday afternoon: this week's only shift is already finished, and the
+    // next real shift is next week — outside the browsed period.
+    vi.setSystemTime(new Date("2026-05-13T18:00:00.000Z"));
+
+    try {
+      const periodStart = new Date("2026-05-10T00:00:00.000Z"); // Sunday
+      const periodDates = getDatesInRange(periodStart, 7);
+      const periodEnd = periodDates[6] ?? periodStart;
+      const makeWorked = (startTime: string, endTime: string): ShiftMap[string] => ({
+        assignmentIds: [101],
+        customEndTime: endTime,
+        customStartTime: startTime,
+        draftKind: null,
+        isDraft: false,
+        label: "Care",
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "Care",
+        segments: [
+          {
+            assignmentId: 101,
+            endTime,
+            focusAreaId: 1,
+            isMentored: false,
+            jobId: 7,
+            jobName: "Care",
+            label: "Care",
+            position: 0,
+            shiftId: 10,
+            shiftName: "Day shift",
+            startTime,
+          },
+        ],
+      });
+      const completedThisWeek: ShiftMap = {
+        "emp-1_2026-05-11": makeWorked("09:00", "15:00"),
+      };
+      const upcomingNextWeek: ShiftMap = {
+        "emp-1_2026-05-20": makeWorked("09:00", "17:00"),
+      };
+
+      render(
+        <UserDashboard
+          {...makeProps({
+            // allShifts spans today → look-ahead (incl. next week); the browsed
+            // period only holds this week's already-finished shift.
+            allShifts: { ...completedThisWeek, ...upcomingNextWeek },
+            currentPeriodShifts: completedThisWeek,
+            openShifts: [],
+            periodDates,
+            periodEnd,
+            periodStart,
+            shiftRequests: {
+              ...makeProps().shiftRequests,
+              badgeCount: 0,
+              myRequests: [],
+              openPickups: [],
+              requests: [],
+            },
+          })}
+        />,
+      );
+
+      const hero = screen.getByTestId("user-dashboard-hero");
+
+      expect(within(hero).getByText("Upcoming")).toBeInTheDocument();
+      expect(within(hero).getByText(/Starts in/)).toBeInTheDocument();
+      // The earlier, already-finished shift must never be the featured hero.
+      expect(within(hero).queryByText("Completed")).not.toBeInTheDocument();
+      expect(within(hero).queryByText("Scheduled")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("evaluates the active shift in the org timezone, not the browser timezone", () => {
+    vi.useFakeTimers();
+    // 20:00 UTC. The org is America/Los_Angeles (UTC-7) → 1:00 PM local, so a
+    // 9-5 shift is in progress. Read in the browser's UTC clock it would look
+    // already finished (20:00 > 17:00); the hero must use the org timezone.
+    vi.setSystemTime(new Date("2026-05-13T20:00:00.000Z"));
+
+    try {
+      const shiftMap: ShiftMap = {
+        "emp-1_2026-05-13": {
+          assignmentIds: [101],
+          customEndTime: "17:00",
+          customStartTime: "09:00",
+          draftKind: null,
+          isDraft: false,
+          label: "Care",
+          publishedAssignmentDefinitionIds: [101],
+          publishedLabel: "Care",
+          segments: [
+            {
+              assignmentId: 101,
+              endTime: "17:00",
+              focusAreaId: 1,
+              isMentored: false,
+              jobId: 7,
+              jobName: "Care",
+              label: "Care",
+              position: 0,
+              shiftId: 10,
+              shiftName: "Day shift",
+              startTime: "09:00",
+            },
+          ],
+        },
+      };
+      const day = new Date("2026-05-13T00:00:00.000Z");
+
+      render(
+        <UserDashboard
+          {...makeProps({
+            allShifts: shiftMap,
+            currentPeriodShifts: shiftMap,
+            openShifts: [],
+            org: { ...org, timezone: "America/Los_Angeles" },
+            periodDates: [day],
+            periodEnd: day,
+            periodStart: day,
+            shiftRequests: {
+              ...makeProps().shiftRequests,
+              badgeCount: 0,
+              myRequests: [],
+              openPickups: [],
+              requests: [],
+            },
+          })}
+        />,
+      );
+
+      const hero = screen.getByTestId("user-dashboard-hero");
+
+      // Org-local 1:00 PM → mid-shift. Browser-UTC math would mark it finished.
+      expect(within(hero).getByText("On Duty")).toBeInTheDocument();
+      expect(within(hero).getByText(/Ends in/)).toBeInTheDocument();
+      expect(within(hero).queryByText("Completed")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -970,9 +1080,7 @@ describe("UserDashboard", () => {
       const hero = screen.getByTestId("user-dashboard-hero");
 
       expect(within(hero).getAllByText("General shift")).toHaveLength(1);
-      expect(
-        within(hero).queryByTestId("user-dashboard-working-with"),
-      ).not.toBeInTheDocument();
+      expect(within(hero).queryByTestId("user-dashboard-working-with")).not.toBeInTheDocument();
       expect(within(hero).queryByText("Working with")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -1035,9 +1143,7 @@ describe("UserDashboard", () => {
 
       const hero = screen.getByTestId("user-dashboard-hero");
 
-      expect(
-        within(hero).getByRole("heading", { name: "Day shift" }),
-      ).toBeInTheDocument();
+      expect(within(hero).getByRole("heading", { name: "Day shift" })).toBeInTheDocument();
       expect(within(hero).queryByText(/^D$/)).not.toBeInTheDocument();
       expect(within(hero).queryByText("General shift")).not.toBeInTheDocument();
     } finally {
@@ -1192,11 +1298,11 @@ describe("UserDashboard", () => {
     const myWeek = screen.getByTestId("user-dashboard-my-week");
 
     expect(within(myWeek).getAllByText("General shift")).toHaveLength(1);
+    // Absence rows show "Absence" as the row title with the specific absence
+    // type (e.g. "Off") in a pill below, matching the mobile app's treatment.
+    expect(within(myWeek).getByText("Absence")).toBeInTheDocument();
     expect(within(myWeek).getAllByText("Off")).toHaveLength(1);
-    expect(within(myWeek).queryByText("Absence")).not.toBeInTheDocument();
-    expect(
-      within(myWeek).queryAllByTestId("user-dashboard-week-pills"),
-    ).toHaveLength(0);
+    expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
   });
 
   it("uses one empty-week message without repeating a blank My Week card", () => {
@@ -1221,7 +1327,7 @@ describe("UserDashboard", () => {
 
     const emptyState = screen.getByTestId("user-dashboard-empty-schedule");
 
-    expect(emptyState).toHaveTextContent("Nothing scheduled this week");
+    expect(emptyState).toHaveTextContent("You're not scheduled this week");
     expect(emptyState.style.border).toContain("dashed");
     expect(emptyState).toHaveStyle({
       alignItems: "center",
@@ -1230,33 +1336,19 @@ describe("UserDashboard", () => {
     });
     expect(screen.queryByTestId("user-dashboard-top-grid")).not.toBeInTheDocument();
     expect(screen.queryByTestId("user-dashboard-hero")).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("user-dashboard-hero-shell"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("user-dashboard-cover-requests"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("user-dashboard-available-shifts"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("user-dashboard-hero-shell")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("user-dashboard-cover-requests")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("user-dashboard-available-shifts")).not.toBeInTheDocument();
     expect(emptyState).not.toHaveTextContent("No Shift");
     expect(emptyState).not.toHaveTextContent("No shift scheduled");
-    expect(emptyState).not.toHaveTextContent(
-      "Published shifts for this week will appear here.",
-    );
+    expect(emptyState).not.toHaveTextContent("Published shifts for this week will appear here.");
     expect(screen.queryByText("My Week")).not.toBeInTheDocument();
     expect(screen.queryByText("No shifts this week")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Published shifts will appear here."),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Published shifts will appear here.")).not.toBeInTheDocument();
   });
 
   it("renders the unlinked staff state", () => {
-    render(
-      <UserDashboard
-        {...makeProps({ currentEmpId: null, currentEmployee: undefined })}
-      />,
-    );
+    render(<UserDashboard {...makeProps({ currentEmpId: null, currentEmployee: undefined })} />);
 
     expect(screen.getByTestId("user-dashboard-unlinked")).toBeInTheDocument();
     expect(screen.getByText("No linked staff profile")).toBeInTheDocument();

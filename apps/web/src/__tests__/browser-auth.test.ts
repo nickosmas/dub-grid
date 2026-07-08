@@ -12,6 +12,11 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
+vi.mock("@/lib/sentry", () => ({
+  captureMessage: vi.fn(),
+  setTag: vi.fn(),
+}));
+
 import {
   clearSupabaseBrowserAuthState,
   getBrowserSession,
@@ -104,6 +109,153 @@ describe("browser auth helpers", () => {
         status: 400,
       }),
     ).toBe(true);
+  });
+
+  it("recovers from 'Lock stolen' error on getSession by retrying", async () => {
+    mockGetSession
+      .mockResolvedValueOnce({
+        data: { session: null },
+        error: {
+          name: "Error",
+          message: "Lock 'lock:sb-127-auth-token' was released because another request stole it",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { session: { access_token: "abc" } },
+        error: null,
+      });
+
+    const result = await getBrowserSession();
+    expect(result).toEqual({ access_token: "abc" });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+  });
+
+  it("recovers from 'Lock broken with steal option' AbortError on getUser", async () => {
+    mockGetUser
+      .mockResolvedValueOnce({
+        data: { user: null },
+        error: {
+          name: "AbortError",
+          message: "Lock broken by another request with the 'steal' option.",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: { user: { id: "u-1" } },
+        error: null,
+      });
+
+    const result = await getVerifiedBrowserUser();
+    expect(result).toEqual({ id: "u-1" });
+    expect(mockGetUser).toHaveBeenCalledTimes(2);
+  });
+
+  it("dedupes concurrent getBrowserSession callers onto a single underlying call", async () => {
+    mockGetSession.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                data: { session: { access_token: "abc" } },
+                error: null,
+              }),
+            10,
+          ),
+        ),
+    );
+
+    const [a, b, c] = await Promise.all([
+      getBrowserSession(),
+      getBrowserSession(),
+      getBrowserSession(),
+    ]);
+
+    expect(a).toEqual({ access_token: "abc" });
+    expect(b).toEqual({ access_token: "abc" });
+    expect(c).toEqual({ access_token: "abc" });
+    // Three concurrent callers, one underlying SDK call.
+    expect(mockGetSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("dedupes concurrent getVerifiedBrowserUser callers onto a single underlying call", async () => {
+    mockGetUser.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ data: { user: { id: "u-1" } }, error: null }), 10),
+        ),
+    );
+
+    const [a, b] = await Promise.all([getVerifiedBrowserUser(), getVerifiedBrowserUser()]);
+
+    expect(a).toEqual({ id: "u-1" });
+    expect(b).toEqual({ id: "u-1" });
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls getSession then getUser sequentially (not in parallel)", async () => {
+    const order: string[] = [];
+
+    mockGetSession.mockImplementation(() => {
+      order.push("session:start");
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          order.push("session:end");
+          resolve({
+            data: { session: { access_token: "abc" } },
+            error: null,
+          });
+        }, 10),
+      );
+    });
+
+    mockGetUser.mockImplementation(() => {
+      order.push("user:start");
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          order.push("user:end");
+          resolve({ data: { user: { id: "u-1" } }, error: null });
+        }, 10),
+      );
+    });
+
+    await getVerifiedBrowserAuth();
+
+    // Sequential — user does not start until session has fully resolved.
+    expect(order).toEqual(["session:start", "session:end", "user:start", "user:end"]);
+  });
+
+  it("clearSupabaseBrowserAuthState releases the in-flight dedupe slots so a hung call can't deadlock future callers", async () => {
+    // Simulate the stale-cookie hang: first getSession() never resolves.
+    let neverResolve!: () => void;
+    mockGetSession.mockImplementationOnce(
+      () =>
+        new Promise(() => {
+          // Held forever — this is the hung promise.
+          neverResolve = () => {};
+        }),
+    );
+
+    // Kick off the hung call; intentionally do NOT await it.
+    const hungPromise = getBrowserSession();
+
+    // The slot is now occupied by the hung promise. Without clearing it,
+    // any subsequent caller would await `hungPromise` forever.
+    clearSupabaseBrowserAuthState();
+
+    // Now a fresh caller should get a brand-new underlying SDK call, not
+    // the hung one.
+    mockGetSession.mockResolvedValueOnce({
+      data: { session: { access_token: "fresh" } },
+      error: null,
+    });
+    const fresh = await getBrowserSession();
+    expect(fresh).toEqual({ access_token: "fresh" });
+    expect(mockGetSession).toHaveBeenCalledTimes(2);
+
+    // The hung promise stays alive but is now orphaned; tests don't care.
+    expect(hungPromise).toBeInstanceOf(Promise);
+    // Reference neverResolve so its assignment isn't dead-code-eliminated.
+    expect(typeof neverResolve).toBe("function");
   });
 
   it("clears persisted Supabase auth keys from storage and cookies", () => {

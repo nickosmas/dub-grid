@@ -21,9 +21,8 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
   const isSaOrientation = isSuperAdmin && (isOrgSetup ?? false);
   const isUser = role === "user";
 
-  const heading = isSuperAdmin && !isSaOrientation
-    ? "Your Workspace is Ready!"
-    : "You\u2019re All Set!";
+  const heading =
+    isSuperAdmin && !isSaOrientation ? "Your Organization is Ready!" : "You\u2019re All Set!";
 
   const subtext = isSaOrientation
     ? "You have full super admin access. Head to the dashboard to see how things are running."
@@ -43,13 +42,19 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
 
   const destination = isSaOrientation
     ? "/dashboard"
-    : isUser ? "/schedule" : isSuperAdmin ? "/people" : "/dashboard";
+    : isUser
+      ? "/schedule"
+      : isSuperAdmin
+        ? "/people"
+        : "/dashboard";
 
   async function handleComplete() {
     setLoading(true);
     try {
-      router.push(destination);
+      // Mark onboarding complete first so the destination route's gate sees
+      // the updated status and doesn't briefly re-render the wizard.
       await onComplete();
+      router.push(destination);
     } catch (err) {
       Sentry.captureException(err);
       toast.error("Something went wrong. Please try again.");
@@ -130,11 +135,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           boxShadow: "0 4px 16px rgba(37, 99, 235, 0.25)",
         }}
       >
-        <ButtonLoading
-          loading={loading}
-          spinnerColor="var(--color-text-inverse)"
-          spinnerSize={20}
-        >
+        <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={20}>
           {ctaLabel}
           {!loading && <ArrowRight size={18} />}
         </ButtonLoading>

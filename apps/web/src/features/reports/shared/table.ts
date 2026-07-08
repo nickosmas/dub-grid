@@ -33,7 +33,10 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   active: "Active",
   approved: "Approved",
   absence: "Scheduled absence",
-  benched: "Benched",
+  inactive: "Inactive",
+  // Historical key from the old enum — kept so reports against archived data
+  // still render with the current label.
+  benched: "Inactive",
   calloff: "Call-off",
   cancelled: "Cancelled",
   expired: "Expired",
@@ -46,7 +49,10 @@ const REPORT_VALUE_LABELS: Record<string, string> = {
   published: "Published",
   rejected: "Rejected",
   swap: "Swap",
-  terminated: "Terminated",
+  removed: "Removed",
+  // Historical key from the old enum — kept so reports against archived data
+  // still render with the current label.
+  terminated: "Removed",
   unknown: "Unknown",
 };
 
@@ -190,12 +196,7 @@ export function buildOperationsReportPreviewTable(
           ["Active staff", summary.activeStaffCount],
           ["Absences", summary.totalAbsences],
           ["Open slots", summary.openSlotCount],
-          [
-            "Coverage",
-            summary.coveragePct == null
-              ? "Not available"
-              : `${summary.coveragePct}%`,
-          ],
+          ["Coverage", summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`],
           ["Requests", summary.requestCount],
         ],
         emptyText: "No period data for this range.",
@@ -320,14 +321,10 @@ export function buildOperationsReportPreviewTable(
           })),
         ],
         rows: payload.reports.scheduleMatrix.rows
-          .filter((row) =>
-            payload.reports.scheduleMatrix.dates.some((date) => row.cells[date]),
-          )
+          .filter((row) => payload.reports.scheduleMatrix.dates.some((date) => row.cells[date]))
           .map((row) => [
             row.employeeName,
-            ...payload.reports.scheduleMatrix.dates.map(
-              (date) => row.cells[date] ?? "",
-            ),
+            ...payload.reports.scheduleMatrix.dates.map((date) => row.cells[date] ?? ""),
           ]),
         emptyText: "No published schedule for this range.",
       };

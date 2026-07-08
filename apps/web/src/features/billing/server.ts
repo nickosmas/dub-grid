@@ -53,10 +53,8 @@ function actorDisplayName(actor: BillingActorContext): string | null {
         : null;
   if (fullName) return fullName;
 
-  const firstName =
-    typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
-  const lastName =
-    typeof metadata.last_name === "string" ? metadata.last_name.trim() : "";
+  const firstName = typeof metadata.first_name === "string" ? metadata.first_name.trim() : "";
+  const lastName = typeof metadata.last_name === "string" ? metadata.last_name.trim() : "";
   const name = [firstName, lastName].filter(Boolean).join(" ").trim();
   return name || null;
 }
@@ -64,8 +62,8 @@ function actorDisplayName(actor: BillingActorContext): string | null {
 export function isStripeBillingConfigured(): boolean {
   return Boolean(
     process.env.STRIPE_SECRET_KEY &&
-      process.env.STRIPE_PRICE_ID_MONTHLY &&
-      process.env.STRIPE_WEBHOOK_SECRET,
+    process.env.STRIPE_PRICE_ID_MONTHLY &&
+    process.env.STRIPE_WEBHOOK_SECRET,
   );
 }
 
@@ -138,10 +136,7 @@ function describeBillingOperation(action: string): string {
   }
 }
 
-function actorLabelForBillingOperation(
-  row: BillingAuditRow,
-  actor: BillingActorContext,
-): string {
+function actorLabelForBillingOperation(row: BillingAuditRow, actor: BillingActorContext): string {
   const initiatedBy = row.details?.initiated_by;
   if (initiatedBy === "gridmaster" || initiatedBy === "gridmaster_sync") {
     return "Gridmaster";
@@ -230,12 +225,8 @@ export async function loadOrganizationBillingSummary(
   orgId: string,
   options: { canManageBilling: boolean; actor?: BillingActorContext },
 ): Promise<OrganizationBillingSummary> {
-  const [
-    { data: org, error: orgError },
-    { data: subscription },
-    appUserCount,
-    recentOperations,
-  ] = await Promise.all([
+  const [{ data: org, error: orgError }, { data: subscription }, appUserCount, recentOperations] =
+    await Promise.all([
       serviceClient
         .from("organizations")
         .select(
@@ -260,10 +251,8 @@ export async function loadOrganizationBillingSummary(
 
   const orgRow = org as OrganizationBillingRow;
   const subscriptionRow = subscription as SubscriptionBillingRow | null;
-  const subscriptionSeats =
-    orgRow.subscription_seats ?? subscriptionRow?.quantity ?? null;
-  const seatDelta =
-    subscriptionSeats == null ? null : subscriptionSeats - appUserCount;
+  const subscriptionSeats = orgRow.subscription_seats ?? subscriptionRow?.quantity ?? null;
+  const seatDelta = subscriptionSeats == null ? null : subscriptionSeats - appUserCount;
 
   return {
     orgId: orgRow.id,
@@ -277,9 +266,7 @@ export async function loadOrganizationBillingSummary(
     subscriptionSeats,
     appUserCount,
     seatDelta,
-    hasStripeCustomer: Boolean(
-      orgRow.stripe_customer_id ?? subscriptionRow?.stripe_customer_id,
-    ),
+    hasStripeCustomer: Boolean(orgRow.stripe_customer_id ?? subscriptionRow?.stripe_customer_id),
     hasStripeSubscription: Boolean(subscriptionRow?.stripe_subscription_id),
     stripeConfigured: isStripeBillingConfigured(),
     canManageBilling: options.canManageBilling,

@@ -2,9 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -55,6 +53,12 @@ describe("mobile shared state components", () => {
 
     expect(onRetry).toHaveBeenCalled();
     expect(onExplore).toHaveBeenCalled();
+  });
+
+  it("renders the compact empty-state variant without a body", () => {
+    render(<EmptyStateCard compact iconName="people-outline" title="No one in ICU yet" />);
+
+    expect(screen.getByText("No one in ICU yet")).toBeInTheDocument();
   });
 
   it("renders the shared skeleton variants", () => {

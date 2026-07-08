@@ -21,9 +21,7 @@ export type MobileAuthContext = ResolvedMobileAuthContext<Organization>;
 export async function requireMobileAuth(
   req: NextRequest,
 ): Promise<MobileAuthContext | { response: NextResponse }> {
-  const accessToken = extractMobileBearerToken(
-    req.headers.get("authorization"),
-  );
+  const accessToken = extractMobileBearerToken(req.headers.get("authorization"));
   if (!accessToken) {
     return {
       response: NextResponse.json(

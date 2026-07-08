@@ -5,10 +5,7 @@ import {
   type MobilePushPlatform,
   MobilePushDeliveryError,
 } from "@dubgrid/mobile-api-core";
-import {
-  fetchActiveMobilePushTokenRows,
-  upsertMobilePushTokenRow,
-} from "@dubgrid/data-access";
+import { fetchActiveMobilePushTokenRows, upsertMobilePushTokenRow } from "@dubgrid/data-access";
 import logger from "@/lib/logger";
 import { getServiceClient } from "@/lib/supabase-service";
 
@@ -50,14 +47,11 @@ export async function sendMobilePushNotifications(
             orgId: targetOrgId,
           }),
         sendMessages: async (messages) => {
-          const response = await fetch(
-            "https://exp.host/--/api/v2/push/send",
-            {
-              method: "POST",
-              headers,
-              body: JSON.stringify(messages),
-            },
-          );
+          const response = await fetch("https://exp.host/--/api/v2/push/send", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(messages),
+          });
 
           return {
             ok: response.ok,
@@ -68,10 +62,7 @@ export async function sendMobilePushNotifications(
     );
   } catch (error) {
     if (error instanceof MobilePushDeliveryError) {
-      logger.error(
-        { status: error.status, userId, orgId },
-        error.message,
-      );
+      logger.error({ status: error.status, userId, orgId }, error.message);
       return;
     }
 

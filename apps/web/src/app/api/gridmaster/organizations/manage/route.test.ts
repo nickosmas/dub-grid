@@ -49,6 +49,12 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
+const cacheDel = vi.fn();
+vi.mock("@/lib/cache", () => ({
+  cacheDel: (...args: unknown[]) => cacheDel(...args),
+  CacheKey: { orgBySlug: (slug: string) => `dg:org:slug:${slug}` },
+}));
+
 import { POST } from "./route";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -68,7 +74,15 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       user: { id: "gridmaster-user", email: "gm@example.com" },
       session: { access_token: "token" },
     });
-    organizationEq.mockResolvedValue({ error: null });
+    // Supports both `await update().eq(...)` (restoreOrganization) and
+    // `update().eq(...).select(...).maybeSingle()` (archiveOrganization,
+    // which needs the slug back to invalidate the subdomain-lookup cache).
+    organizationEq.mockReturnValue({
+      then: (resolve: (value: { error: null }) => void) => resolve({ error: null }),
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn(() => Promise.resolve({ data: { slug: "acme" }, error: null })),
+      })),
+    });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
     organizationInsert.mockReturnValue({
       select: vi.fn(() => ({
@@ -98,9 +112,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         return {
           insert: vi.fn(() => ({
             select: vi.fn(() => ({
-              single: vi.fn(() =>
-                Promise.resolve({ data: { id: "employee-id" }, error: null }),
-              ),
+              single: vi.fn(() => Promise.resolve({ data: { id: "employee-id" }, error: null })),
             })),
           })),
         };
@@ -117,9 +129,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     );
 
-    const response = await POST(
-      makeRequest({ action: "archiveOrganization", orgId: ORG_ID }),
-    );
+    const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
 
     expect(response.status).toBe(403);
     expect(requireGridmasterSession).not.toHaveBeenCalled();
@@ -150,9 +160,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
   });
 
   it("archives an organization and writes an audit event", async () => {
-    const response = await POST(
-      makeRequest({ action: "archiveOrganization", orgId: ORG_ID }),
-    );
+    const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
@@ -169,6 +177,9 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         resource_id: ORG_ID,
       }),
     );
+    // The subdomain-lookup cache must be invalidated so the archived org's
+    // subdomain stops resolving immediately instead of waiting out the TTL.
+    expect(cacheDel).toHaveBeenCalledWith("dg:org:slug:acme");
   });
 
   it("assigns an org role by email and writes an audit event", async () => {
@@ -240,11 +251,13 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         resource_id: ORG_ID,
       }),
     );
+    // Trial is "pending" at creation: subscription_status is trialing but
+    // trial_ends_at is left unset until the first super_admin signs in.
     expect(organizationInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         subscription_status: "trialing",
-        trial_ends_at: expect.any(String),
       }),
     );
+    expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("trial_ends_at");
   });
 });

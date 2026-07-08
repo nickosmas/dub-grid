@@ -3,7 +3,4 @@ export interface NotificationPreferenceChannels {
   email: boolean;
 }
 
-export type NotificationPreferenceMap = Record<
-  string,
-  NotificationPreferenceChannels
->;
+export type NotificationPreferenceMap = Record<string, NotificationPreferenceChannels>;

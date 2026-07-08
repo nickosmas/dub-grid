@@ -50,7 +50,9 @@ export default function OnboardingPage() {
         setChecking(false);
       }
     }, 15000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [user]);
 
   if (isAuthLoading || loading) {
@@ -95,19 +97,21 @@ export default function OnboardingPage() {
         }}
       >
         <div style={{ display: "flex", justifyContent: "center", marginBottom: "32px" }}>
-          <div style={{ 
-            padding: "16px", 
-            background: "var(--color-brand)",
-            borderRadius: "20px",
-            boxShadow: "0 8px 16px rgba(37, 99, 235, 0.25)"
-          }}>
+          <div
+            style={{
+              padding: "16px",
+              background: "var(--color-brand)",
+              borderRadius: "20px",
+              boxShadow: "0 8px 16px rgba(37, 99, 235, 0.25)",
+            }}
+          >
             <DubGridLogo size={40} color="var(--color-text-inverse)" />
           </div>
         </div>
 
         <h1
           style={{
-            fontSize: "28px",
+            fontSize: "var(--dg-fs-page-title)",
             fontWeight: 800,
             marginBottom: "16px",
             color: "var(--color-text-primary)",
@@ -120,14 +124,14 @@ export default function OnboardingPage() {
         <p
           style={{
             fontSize: "16px",
-            color:"var(--color-text-muted)",
+            color: "var(--color-text-muted)",
             lineHeight: 1.6,
             marginBottom: "40px",
           }}
         >
-          Your account has been successfully created, but you haven&apos;t been
-          assigned to an organization yet. Please contact your administrator and
-          ask them to invite you to their workspace.
+          Your account has been successfully created, but you haven&apos;t been assigned to an
+          organization yet. Please contact your administrator and ask them to invite you to their
+          organization.
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -174,11 +178,22 @@ export default function OnboardingPage() {
             Sign Out
           </button>
         </div>
-        
-        <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid var(--color-bg-secondary)" }}>
-          <p style={{ fontSize: "14px", color:"var(--color-text-subtle)" }}>
+
+        <div
+          style={{
+            marginTop: "40px",
+            paddingTop: "24px",
+            borderTop: "1px solid var(--color-bg-secondary)",
+          }}
+        >
+          <p style={{ fontSize: "14px", color: "var(--color-text-subtle)" }}>
             Setting up a new facility? <br />
-            <a href="mailto:support@dubgrid.com" style={{ color: "var(--color-link)", fontWeight: 600, textDecoration: "none" }}>Contact us</a>
+            <a
+              href="mailto:support@dubgrid.com"
+              style={{ color: "var(--color-link)", fontWeight: 600, textDecoration: "none" }}
+            >
+              Contact us
+            </a>
           </p>
         </div>
       </div>

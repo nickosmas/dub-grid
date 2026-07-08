@@ -29,10 +29,7 @@ function DashboardContent() {
     loading: refLoading,
     loadError,
   } = useOrganizationData();
-  const {
-    employees,
-    loading: empLoading,
-  } = useEmployees(perms.orgId ?? org?.id ?? null);
+  const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
 
   const isLoading = refLoading || empLoading || perms.isLoading;
 
@@ -86,8 +83,9 @@ function DashboardContent() {
 export default function DashboardPageContent() {
   const { isGridmaster, isLoading } = usePermissions();
 
-  if (isLoading) return <ProgressBar loading />;
-
+  if (isLoading) {
+    return <ProgressBar loading />;
+  }
 
   // Gridmaster users see the gridmaster portal at /dashboard
   // (the gridmaster subdomain makes the role obvious, no need for /gridmaster path)

@@ -4,15 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 import { ManagementStaffPanel } from "@/components/staff/ManagementStaffPanel";
 import type { DirectoryPerson } from "@/types";
 
-vi.mock("@/components/staff-detail/EmployeeStatusActions", () => ({
-  EmployeeStatusActions: () => <div data-testid="employee-status-actions" />,
-}));
-
 function makePerson(overrides: Partial<DirectoryPerson> = {}): DirectoryPerson {
   return {
     personId: "user-1",
     source: "user_only",
     employeeId: null,
+    employeeNumber: null,
     userId: "user-1",
     firstName: "Jordan",
     lastName: "Lee",
@@ -91,6 +88,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordyn",
         lastName: "Lee",
+        email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [10],
       });
@@ -144,6 +142,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordyn",
         lastName: "Lane",
+        email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [10],
       });
@@ -160,6 +159,10 @@ describe("ManagementStaffPanel", () => {
         userId: "user-1",
         employeeStatus: "active",
         hasAppAccess: true,
+        // "On schedule" is gated on focusAreaIds (matches the schedule
+        // grid's own filter), not just `source === "employee"` — every
+        // member now has an employees row regardless of scheduling.
+        focusAreaIds: [1],
         managementDepartmentIds: [10],
         isManagementUser: true,
       },
@@ -174,10 +177,8 @@ describe("ManagementStaffPanel", () => {
       ],
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /remove from management/i }),
-    );
-    expect(screen.getByText(/keep them on the schedule/i)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /remove from management/i }));
+    expect(screen.getByText(/stay on the schedule/i)).toBeInTheDocument();
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeEnabled();
@@ -187,6 +188,7 @@ describe("ManagementStaffPanel", () => {
       expect(onSave).toHaveBeenCalledWith({
         firstName: "Jordan",
         lastName: "Lee",
+        email: "jordan@example.com",
         phone: "(415) 425-3334",
         managementDepartmentIds: [],
       });
@@ -214,9 +216,7 @@ describe("ManagementStaffPanel", () => {
     await user.click(screen.getByRole("button", { name: "Leadership" }));
 
     expect(
-      screen.getByText(
-        /must stay assigned to at least one management department/i,
-      ),
+      screen.getByText(/must stay assigned to at least one management department/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
   });
@@ -229,16 +229,13 @@ describe("ManagementStaffPanel", () => {
     await user.clear(firstNameInput);
     await user.type(firstNameInput, "Jordyn");
 
-    const footerCloseButton = screen
-      .getAllByRole("button", { name: /^close$/i })
-      .find((button) => button.textContent === "Close");
-    if (!footerCloseButton) throw new Error("Expected footer Close button");
+    // The footer dismiss button now reads "Discard" while dirty (it resets
+    // the draft in place and never auto-closes). The icon close button in
+    // the header is the only remaining "Close" affordance, and still goes
+    // through the confirm-before-closing flow.
+    await user.click(screen.getByRole("button", { name: /^close$/i }));
 
-    await user.click(footerCloseButton);
-
-    expect(
-      screen.getByRole("dialog", { name: /unsaved changes/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: /discard changes/i }));

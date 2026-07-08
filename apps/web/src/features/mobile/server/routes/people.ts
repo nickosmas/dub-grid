@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { mobilePeopleResponseSchema } from "@dubgrid/contracts";
-import {
-  loadMobilePeoplePayload,
-  MobileApiAuthorizationError,
-} from "@dubgrid/mobile-api-core";
+import { mobilePeopleResponseSchema, type MobilePerson } from "@dubgrid/contracts";
+import { loadMobilePeoplePayload, MobileApiAuthorizationError } from "@dubgrid/mobile-api-core";
 import { fetchMobilePeople, requireMobileAuth } from "@/features/mobile/server";
 import type { Employee } from "@/types";
 
@@ -12,6 +9,7 @@ export const dynamic = "force-dynamic";
 type MobilePersonSource = Pick<
   Employee,
   | "id"
+  | "employeeNumber"
   | "firstName"
   | "lastName"
   | "employmentType"
@@ -32,6 +30,7 @@ type MobilePersonSource = Pick<
 > & {
   managementDepartmentIds?: number[];
   managementDeptAdminIds?: number[];
+  orgRole?: MobilePerson["orgRole"];
   pendingInvitation?: {
     id: string;
     email: string;
@@ -43,12 +42,14 @@ type MobilePersonSource = Pick<
 export function mapEmployeeToMobilePerson(person: MobilePersonSource) {
   return {
     id: person.id,
+    employeeNumber: person.employeeNumber ?? 0,
     firstName: person.firstName,
     lastName: person.lastName,
     employmentType: person.employmentType,
     phone: person.phone,
     email: person.email,
     status: person.status,
+    orgRole: person.orgRole ?? null,
     certificationId: person.certificationId,
     roleIds: person.roleIds,
     seniority: person.seniority,

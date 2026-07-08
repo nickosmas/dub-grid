@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { metadata } from "../app/layout";
 
-const TAGLINE = "Smart staff scheduling for care facilities";
+const TAGLINE = "Staff scheduling, built for care teams.";
 
 describe("layout metadata — DubGrid rebrand", () => {
   it("title contains DubGrid", () => {

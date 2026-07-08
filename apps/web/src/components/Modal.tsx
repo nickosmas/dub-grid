@@ -28,6 +28,13 @@ interface ModalProps {
   style?: React.CSSProperties;
   onRequestClose?: () => boolean;
   showCloseButton?: boolean;
+  /** When true, clicking the backdrop does not close the modal. */
+  disableOverlayClose?: boolean;
+  /**
+   * When true, the overlay starts below the sticky app header so the top
+   * nav remains visible and clickable. Use for non-blocking detail views.
+   */
+  headerSafe?: boolean;
   "aria-describedby"?: string;
 }
 
@@ -38,6 +45,8 @@ export default function Modal({
   style,
   onRequestClose,
   showCloseButton = true,
+  disableOverlayClose = false,
+  headerSafe = false,
   "aria-describedby": ariaDescribedby,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -59,7 +68,9 @@ export default function Modal({
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, []);
 
   // Clear timeout on unmount to prevent stale onClose calls
@@ -90,9 +101,7 @@ export default function Modal({
       if (e.key === "Tab") {
         const dialog = dialogRef.current;
         if (!dialog) return;
-        const focusable = Array.from(
-          dialog.querySelectorAll<HTMLElement>(FOCUSABLE)
-        );
+        const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
         if (focusable.length === 0) return;
 
         const first = focusable[0];
@@ -111,13 +120,13 @@ export default function Modal({
         }
       }
     },
-    [handleClose]
+    [handleClose],
   );
 
   return createPortal(
     <div
-      className={`dg-modal-overlay${closing ? " closing" : ""}`}
-      onClick={handleClose}
+      className={`dg-modal-overlay${closing ? " closing" : ""}${headerSafe ? " is-header-safe" : ""}`}
+      onClick={disableOverlayClose ? undefined : handleClose}
       onKeyDown={handleKeyDown}
       role="presentation"
     >
@@ -133,15 +142,19 @@ export default function Modal({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={headerStyle}>
-          <span style={titleStyle}>
-            {title}
-          </span>
+          <span style={titleStyle}>{title}</span>
           {showCloseButton ? (
             <button
               onClick={handleClose}
               aria-label="Close modal"
               className="dg-btn dg-btn-ghost"
-              style={{ fontSize: "var(--dg-fs-card-title)", lineHeight: 1, padding: isMobile ? "8px 10px" : "2px 6px", minWidth: isMobile ? 44 : undefined, minHeight: isMobile ? 44 : undefined }}
+              style={{
+                fontSize: "var(--dg-fs-card-title)",
+                lineHeight: 1,
+                padding: isMobile ? "8px 10px" : "2px 6px",
+                minWidth: isMobile ? 44 : undefined,
+                minHeight: isMobile ? 44 : undefined,
+              }}
             >
               &times;
             </button>
@@ -150,6 +163,6 @@ export default function Modal({
         {children}
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

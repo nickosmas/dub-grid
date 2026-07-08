@@ -6,9 +6,7 @@ const routerPush = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,

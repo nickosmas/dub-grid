@@ -29,6 +29,7 @@ function buildSource(
     employees: [
       {
         id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        employee_number: 1001,
         first_name: "Avery",
         last_name: "Ng",
         employment_type: "full_time",
@@ -44,12 +45,13 @@ function buildSource(
       },
       {
         id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        employee_number: 1002,
         first_name: "Blake",
         last_name: "Diaz",
         employment_type: "part_time",
         email: "blake@example.com",
         phone: "",
-        status: "benched",
+        status: "inactive",
         seniority: 2,
         focus_area_ids: [10],
         certification_id: null,
@@ -244,17 +246,12 @@ describe("operations reports", () => {
       employeeName: "Blake Diaz",
       accountAccessStatus: "Invitation pending",
     });
-    expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe(
-      "DAY Caregiver",
-    );
+    expect(payload.reports.scheduleMatrix.rows[0].cells["2026-05-03"]).toBe("DAY Caregiver");
   });
 
   it("resolves the current pay period from the organization anchor", () => {
     expect(
-      resolveCurrentPayPeriodRange(
-        "2026-04-19",
-        new Date("2026-05-05T12:00:00.000Z"),
-      ),
+      resolveCurrentPayPeriodRange("2026-04-19", new Date("2026-05-05T12:00:00.000Z")),
     ).toEqual({
       startDate: "2026-05-03",
       endDate: "2026-05-16",
@@ -453,16 +450,13 @@ describe("operations reports", () => {
     expect(buildOperationsReportCsv(payload, "staff-hours")).toContain(
       "Employee,Scheduled hours,Shifts worked,Days worked,Absence days,Overtime hours\r\nAvery Ng,8,1,1,0,0",
     );
-    const employeeDirectoryCsv = buildOperationsReportCsv(
-      payload,
-      "employee-directory",
-    );
+    const employeeDirectoryCsv = buildOperationsReportCsv(payload, "employee-directory");
     expect(employeeDirectoryCsv).toContain(
       "Employee,Staff status,Employment type,Email,Phone,Focus areas,Roles,Certification\r\nAvery Ng,Active,Full-time,avery@example.com,555-0101,North,RN,CNA",
     );
     expect(employeeDirectoryCsv).not.toContain("full_time");
     expect(buildOperationsReportCsv(payload, "account-access")).toContain(
-      "Blake Diaz,Benched,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
+      "Blake Diaz,Inactive,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
     );
     expect(buildOperationsReportCsv(payload, "schedule-matrix")).toContain(
       'Employee,"May 3, 2026","May 4, 2026"',
@@ -516,15 +510,7 @@ describe("operations reports", () => {
       },
       {
         report: "coverage",
-        headers: [
-          "Date",
-          "Focus area",
-          "Shift",
-          "Job",
-          "Required",
-          "Scheduled",
-          "Open slots",
-        ],
+        headers: ["Date", "Focus area", "Shift", "Job", "Required", "Scheduled", "Open slots"],
         firstRow: ["May 3, 2026", "North", "Day", "Caregiver", 2, 1, 1],
       },
       {
@@ -542,14 +528,7 @@ describe("operations reports", () => {
           "Shift date",
           "Time to resolution",
         ],
-        firstRow: [
-          "Call-off",
-          "Approved",
-          "Avery Ng",
-          "No teammate",
-          "May 3, 2026",
-          "2.5 hours",
-        ],
+        firstRow: ["Call-off", "Approved", "Avery Ng", "No teammate", "May 3, 2026", "2.5 hours"],
       },
       {
         report: "absences-calloffs",
@@ -652,9 +631,7 @@ describe("operations reports", () => {
     expect(text.startsWith("%PDF-1.4")).toBe(true);
     expect(text).toContain("/Subtype /Image");
     expect(text).toContain("q 24.00 0 0 24.00 32.00 556.00 cm /Logo Do Q");
-    expect(text).toContain(
-      "q 72.00 0 0 25.50 64.00 555.25 cm /Wordmark Do Q",
-    );
+    expect(text).toContain("q 72.00 0 0 25.50 64.00 555.25 cm /Wordmark Do Q");
     expect(text).toContain("q 0.059 0.090 0.141 rg 32.00 532.00 728.00 1.40 re f Q");
     expect(text).not.toContain(`/F2 18 Tf 1 0 0 1 64.00 563.00 Tm <${pdfHex("dubgrid")}> Tj`);
     expect(text).toContain("q 0.580 0.639 0.722 rg 141.80 560.00 0.80 16.00 re f Q");
@@ -684,15 +661,11 @@ describe("operations reports", () => {
       endDate: "2026-05-04",
     });
 
-    const text = new TextDecoder().decode(
-      buildOperationsReportPdf(payload, "employee-directory"),
-    );
+    const text = new TextDecoder().decode(buildOperationsReportPdf(payload, "employee-directory"));
 
     expect(text).toContain(pdfHex("Acme Health"));
     expect(text).toContain(pdfHex("Employee directory"));
     expect(text).toContain(pdfHex("Printed May 4, 2026"));
-    expect(text).not.toContain(
-      pdfHex("Employee directory - May 3, 2026 to May 4, 2026"),
-    );
+    expect(text).not.toContain(pdfHex("Employee directory - May 3, 2026 to May 4, 2026"));
   });
 });

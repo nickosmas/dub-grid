@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useRef,
-  useCallback,
-} from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
@@ -190,20 +184,9 @@ function DayPopover({
                     >
                       {focusArea}
                     </div>
-                    <div
-                      style={{ display: "flex", flexDirection: "column", gap: 2 }}
-                    >
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       {workers.map(
-                        (
-                          {
-                            name,
-                            shift,
-                            style: s,
-                            draftKind: dk,
-                            isHighlighted,
-                          },
-                          ni,
-                        ) => (
+                        ({ name, shift, style: s, draftKind: dk, isHighlighted }, ni) => (
                           <div
                             key={`${name}-${shift}-${ni}`}
                             style={{
@@ -220,10 +203,7 @@ function DayPopover({
                                 hasHighlightedSearch && isHighlighted
                                   ? "inset 3px 0 0 0 var(--color-brand)"
                                   : undefined,
-                              opacity:
-                                hasHighlightedSearch && !isHighlighted
-                                  ? 0.35
-                                  : 1,
+                              opacity: hasHighlightedSearch && !isHighlighted ? 0.35 : 1,
                               transition:
                                 "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
                             }}
@@ -235,17 +215,12 @@ function DayPopover({
                                   ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
                                   : `1px solid ${borderColor(s.text)}`,
                                 borderRadius: 4,
-                                padding: isNameMode
-                                  ? "3px 6px"
-                                  : dk
-                                    ? "1px 5px"
-                                    : "2px 6px",
+                                padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
                                 fontSize: "var(--dg-fs-footnote)",
                                 fontWeight: 600,
                                 color: s.text,
                                 opacity: dk === "deleted" ? 0.5 : 1,
-                                textDecoration:
-                                  dk === "deleted" ? "line-through" : "none",
+                                textDecoration: dk === "deleted" ? "line-through" : "none",
                                 maxWidth: 120,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -304,9 +279,7 @@ export default function MonthView({
   const todayKey = useMemo(() => formatDateKey(today), [today]);
   const cells = useMemo(() => buildMonthCells(monthStart), [monthStart]);
   const focusAreaNames = focusAreas.map((w) => w.name);
-  const hasHighlightedSearch = !!(
-    highlightEmpIds && highlightEmpIds.size > 0
-  );
+  const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Look up assignments by ID so cross-focus-area shifts render in their own color
@@ -385,23 +358,16 @@ export default function MonthView({
         if (isAbsenceForKey?.(emp.id, date)) return;
 
         const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
-        const empHomeFas = focusAreas.filter((fa) =>
-          emp.focusAreaIds.includes(fa.id),
-        );
+        const empHomeFas = focusAreas.filter((fa) => emp.focusAreaIds.includes(fa.id));
         const isHighlighted = highlightEmpIds?.has(emp.id) ?? false;
         const shiftLabels = combinedLabel.split("/");
         shiftLabels.forEach((label, li) => {
           const codeEntry =
-            cellCodeIds[li] != null
-              ? assignmentById.get(cellCodeIds[li])
-              : undefined;
+            cellCodeIds[li] != null ? assignmentById.get(cellCodeIds[li]) : undefined;
           const style = codeEntry ?? getShiftStyle(label, empHomeFas[0]?.name);
 
           if (style.categoryId != null) {
-            categoryCounts.set(
-              style.categoryId,
-              (categoryCounts.get(style.categoryId) ?? 0) + 1,
-            );
+            categoryCounts.set(style.categoryId, (categoryCounts.get(style.categoryId) ?? 0) + 1);
           }
 
           if (isHighlighted) {
@@ -559,24 +525,16 @@ export default function MonthView({
 
           const dateKey = formatDateKey(date);
           const data = dayDataMap.get(dateKey)!;
-          const {
-            isToday,
-            focusAreaSections,
-            byFocusArea,
-            hasHighlightedEmployee,
-          } = data;
+          const { isToday, focusAreaSections, byFocusArea, hasHighlightedEmployee } = data;
           const isOpen = popoverDateKey === dateKey;
-          const isSearchHighlightedDay =
-            hasHighlightedSearch && hasHighlightedEmployee;
+          const isSearchHighlightedDay = hasHighlightedSearch && hasHighlightedEmployee;
 
           return (
             <div
               key={dateKey}
               role="button"
               tabIndex={0}
-              data-search-highlight={
-                isSearchHighlightedDay ? "true" : undefined
-              }
+              data-search-highlight={isSearchHighlightedDay ? "true" : undefined}
               aria-label={date.toLocaleDateString("en-US", {
                 weekday: "long",
                 year: "numeric",
@@ -602,9 +560,9 @@ export default function MonthView({
                   ? "2px solid var(--color-brand-border)"
                   : isSearchHighlightedDay
                     ? "2px solid var(--color-brand-border)"
-                  : isToday
-                    ? "2px solid var(--color-today-text)"
-                    : "1px solid var(--color-border)",
+                    : isToday
+                      ? "2px solid var(--color-today-text)"
+                      : "1px solid var(--color-border)",
                 borderRadius: 10,
                 padding: isOpen || isToday ? "8px 9px 7px" : "9px 10px 8px",
                 minHeight: 64,
@@ -612,10 +570,9 @@ export default function MonthView({
                   ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
                   : isSearchHighlightedDay
                     ? "0 0 0 2px rgba(37, 99, 235, 0.12)"
-                  : "0 1px 3px rgba(0,0,0,0.04)",
+                    : "0 1px 3px rgba(0,0,0,0.04)",
                 cursor: "pointer",
-                opacity:
-                  hasHighlightedSearch && !hasHighlightedEmployee ? 0.35 : 1,
+                opacity: hasHighlightedSearch && !hasHighlightedEmployee ? 0.35 : 1,
                 transition:
                   "border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease, background 150ms ease",
               }}
@@ -631,17 +588,13 @@ export default function MonthView({
                     width: 24,
                     height: 24,
                     borderRadius: "50%",
-                    background: isToday
-                      ? "var(--color-today-text)"
-                      : "transparent",
+                    background: isToday ? "var(--color-today-text)" : "transparent",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
-                    color: isToday
-                      ? "var(--color-text-inverse)"
-                      : "var(--color-text-secondary)",
+                    color: isToday ? "var(--color-text-inverse)" : "var(--color-text-secondary)",
                   }}
                 >
                   {date.getDate()}
@@ -650,9 +603,7 @@ export default function MonthView({
 
               {/* Focus areas + total shift count */}
               {focusAreaSections.length > 0 && (
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 3 }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                   {focusAreaSections.map((focusArea) => {
                     const workers = byFocusArea.get(focusArea)!;
                     const wc = NEUTRAL_FA_STYLE;

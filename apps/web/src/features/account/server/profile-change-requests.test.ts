@@ -18,13 +18,11 @@ vi.mock("@/lib/cache", () => ({
 }));
 
 vi.mock("@/features/account/server/account-deletion", () => ({
-  deleteUserAccountWithCleanup: (...args: unknown[]) =>
-    deleteUserAccountWithCleanup(...args),
+  deleteUserAccountWithCleanup: (...args: unknown[]) => deleteUserAccountWithCleanup(...args),
 }));
 
 vi.mock("@/features/mobile/server", () => ({
-  fetchLinkedEmployeeForUser: (...args: unknown[]) =>
-    fetchLinkedEmployeeForUser(...args),
+  fetchLinkedEmployeeForUser: (...args: unknown[]) => fetchLinkedEmployeeForUser(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -33,10 +31,7 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
-import {
-  createProfileChangeRequest,
-  resolveProfileChangeRequest,
-} from "./profile-change-requests";
+import { createProfileChangeRequest, resolveProfileChangeRequest } from "./profile-change-requests";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
@@ -109,6 +104,7 @@ function makeSelectMaybeSingleBuilder(row: Record<string, unknown>) {
         eq: vi.fn(() => ({
           maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
         })),
+        maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
       })),
     })),
   };
@@ -117,10 +113,8 @@ function makeSelectMaybeSingleBuilder(row: Record<string, unknown>) {
 function makeThenableUpdateBuilder() {
   const chain = {
     eq: vi.fn(() => chain),
-    then: (
-      resolve: (value: { error: null }) => unknown,
-      reject: (reason?: unknown) => unknown,
-    ) => Promise.resolve({ error: null }).then(resolve, reject),
+    then: (resolve: (value: { error: null }) => unknown, reject: (reason?: unknown) => unknown) =>
+      Promise.resolve({ error: null }).then(resolve, reject),
   };
   return {
     update: vi.fn(() => chain),
@@ -249,10 +243,12 @@ describe("createProfileChangeRequest", () => {
       version: 0,
       requested_changes: { firstName: "Alexandra" },
     });
-    const membershipFrom = vi.fn()
+    const membershipFrom = vi
+      .fn()
       .mockReturnValueOnce(makeRequesterMembershipBuilder())
       .mockReturnValueOnce(makeReviewerMembershipBuilder());
-    const requestFrom = vi.fn()
+    const requestFrom = vi
+      .fn()
       .mockReturnValueOnce(makeExistingRequestBuilder())
       .mockReturnValueOnce(makeRequestInsertBuilder(createdRequestRow));
     const notificationInsert = vi.fn().mockResolvedValue({ error: null });
@@ -288,12 +284,14 @@ describe("createProfileChangeRequest", () => {
         user_id: "66666666-6666-4666-8666-666666666666",
         org_id: ORG_ID,
         type: "system",
-        title: "Profile change request",
-        message: "Alex Old submitted a profile change request.",
+        title: "Name change request",
+        message: 'Alex Old requested name change: "Alex Old" → "Alexandra Old".',
         metadata: expect.objectContaining({
-          requestId: REQUEST_ID,
-          requestType: "profile_update",
-          href: "/people?section=requests",
+          requestedBy: "Alex Old",
+          Name: "Alex Old → Alexandra Old",
+          note: "Please update my legal name.",
+          actionUrl: "/people?section=requests",
+          actionLabel: "Review request",
         }),
       }),
       expect.objectContaining({
@@ -326,13 +324,20 @@ describe("resolveProfileChangeRequest", () => {
     const profileUpdate = makeThenableUpdateBuilder();
     const auditInsert = vi.fn().mockResolvedValue({ error: null });
     const notificationInsert = vi.fn().mockResolvedValue({ error: null });
-    const profileChangeRequestFrom = vi.fn()
+    const profileChangeRequestFrom = vi
+      .fn()
       .mockReturnValueOnce(makeSelectMaybeSingleBuilder(requestRow))
       .mockReturnValueOnce(makeRequestResolveBuilder(resolvedRequestRow));
-    const employeeFrom = vi.fn()
+    const employeeFrom = vi
+      .fn()
       .mockReturnValueOnce(makeSelectMaybeSingleBuilder(makeEmployeeRow()))
       .mockReturnValueOnce(employeeUpdate);
-    const profileFrom = vi.fn().mockReturnValue(profileUpdate);
+    // profiles is called twice: an UPDATE in syncLinkedProfileName, then a
+    // SELECT to look up the resolver's display name for the notification.
+    const profileFrom = vi
+      .fn()
+      .mockReturnValueOnce(profileUpdate)
+      .mockReturnValueOnce(makeSelectMaybeSingleBuilder({ first_name: "Sam", last_name: "Reed" }));
 
     const serviceClient = {
       from: vi.fn((table: string) => {

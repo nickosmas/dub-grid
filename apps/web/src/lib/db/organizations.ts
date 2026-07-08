@@ -1,4 +1,13 @@
-import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, parseHost, ORGANIZATION_COLS } from "./shared";
+import {
+  supabase,
+  cacheThrough,
+  cacheDel,
+  CacheKey,
+  TTL,
+  logAudit,
+  parseHost,
+  ORGANIZATION_COLS,
+} from "./shared";
 import type { DbOrganization } from "./types";
 import { rowToOrganization, rowToOrganizationUser } from "./mappers";
 import type {
@@ -11,10 +20,7 @@ import type {
 } from "@/types";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
-import {
-  updateOrganizationInvitationGuarded,
-  updateOrganizationMembershipGuarded,
-} from "./access";
+import { updateOrganizationInvitationGuarded, updateOrganizationMembershipGuarded } from "./access";
 
 export async function fetchUserOrganization(): Promise<Organization | null> {
   let query = supabase.from("organizations").select(ORGANIZATION_COLS);
@@ -30,7 +36,7 @@ export async function fetchUserOrganization(): Promise<Organization | null> {
   const { data, error } = await query.limit(1).single();
 
   if (error) {
-    if (error.code === 'PGRST116') {
+    if (error.code === "PGRST116") {
       return null;
     }
     throw new Error(`fetchUserOrganization error: ${error.message} (code: ${error.code})`);
@@ -39,8 +45,6 @@ export async function fetchUserOrganization(): Promise<Organization | null> {
 
   return rowToOrganization(data as DbOrganization);
 }
-
-
 
 /** Fetch a single organization by its ID (used during impersonation). */
 export async function fetchOrganizationById(orgId: string): Promise<Organization | null> {
@@ -75,7 +79,7 @@ export async function updateOrganization(org: Organization): Promise<void> {
       certification_label: org.certificationLabel || null,
       role_label: org.roleLabel || null,
       department_label: org.departmentLabel || null,
-      shift_display_mode: org.shiftDisplayMode || 'code',
+      shift_display_mode: org.shiftDisplayMode || "code",
       timezone: org.timezone || null,
       pay_period_start_date: org.payPeriodStartDate || null,
       enforce_conflict_prevention: org.enforceConflictPrevention ?? false,
@@ -89,8 +93,7 @@ export async function updateOrganization(org: Organization): Promise<void> {
   void logAudit("org.updated", "organization", org.id, { name: org.name, address }, org.id);
 }
 
-export interface UpdateOrganizationSettingsInput
-  extends Partial<OrganizationSettingsEditable> {
+export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSettingsEditable> {
   orgId: string;
   expectedUpdatedAt: string;
 }
@@ -135,10 +138,7 @@ export async function updateOrganizationSettings(
 
   if (!response.ok) {
     const message =
-      body &&
-      typeof body === "object" &&
-      "error" in body &&
-      typeof body.error === "string"
+      body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
         : "Failed to update organization settings";
     throw new Error(message);
@@ -167,9 +167,7 @@ export async function fetchOrganizationUsers(orgId: string): Promise<Organizatio
       p_org_id: orgId,
     });
     if (error) throw error;
-    return (data ?? []).map((row: Record<string, unknown>) =>
-      rowToOrganizationUser(row),
-    );
+    return (data ?? []).map((row: Record<string, unknown>) => rowToOrganizationUser(row));
   });
 }
 
@@ -182,24 +180,29 @@ export async function fetchOrgDirectory(orgId: string): Promise<DirectoryPerson[
     });
     if (error) throw error;
     return (data ?? []).map((row: Record<string, unknown>) => {
-      const scheduledDepartmentIds = (row.scheduled_department_ids as number[] | undefined)
-        ?? (row.employee_department_ids as number[] | undefined)
-        ?? [];
-      const scheduledDeptAdminIds = (row.scheduled_dept_admin_ids as number[] | undefined)
-        ?? (row.employee_dept_admin_ids as number[] | undefined)
-        ?? [];
-      const managementDepartmentIds = (row.management_department_ids as number[] | undefined)
-        ?? (row.department_ids as number[] | undefined)
-        ?? [];
-      const managementDeptAdminIds = (row.management_dept_admin_ids as number[] | undefined)
-        ?? (row.dept_admin_ids as number[] | undefined)
-        ?? [];
+      const scheduledDepartmentIds =
+        (row.scheduled_department_ids as number[] | undefined) ??
+        (row.employee_department_ids as number[] | undefined) ??
+        [];
+      const scheduledDeptAdminIds =
+        (row.scheduled_dept_admin_ids as number[] | undefined) ??
+        (row.employee_dept_admin_ids as number[] | undefined) ??
+        [];
+      const managementDepartmentIds =
+        (row.management_department_ids as number[] | undefined) ??
+        (row.department_ids as number[] | undefined) ??
+        [];
+      const managementDeptAdminIds =
+        (row.management_dept_admin_ids as number[] | undefined) ??
+        (row.dept_admin_ids as number[] | undefined) ??
+        [];
       const hasAppAccess = (row.has_app_access as boolean) ?? false;
 
       return {
         personId: row.person_id as string,
-        source: row.source as 'employee' | 'user_only' | 'pending_invite',
+        source: row.source as "employee" | "user_only" | "pending_invite",
         employeeId: (row.employee_id as string | null) ?? null,
+        employeeNumber: (row.employee_number as number | null) ?? null,
         userId: (row.user_id as string | null) ?? null,
         firstName: (row.first_name as string) ?? "",
         lastName: (row.last_name as string) ?? "",
@@ -208,12 +211,12 @@ export async function fetchOrgDirectory(orgId: string): Promise<DirectoryPerson[
         employeeStatus: (row.employee_status as EmployeeStatus | null) ?? null,
         orgRole: (row.org_role as OrganizationRole | null) ?? null,
         hasAppAccess,
-        focusAreaIds: ((row.focus_area_ids as number[]) ?? []),
+        focusAreaIds: (row.focus_area_ids as number[]) ?? [],
         certificationId: (row.certification_id as number | null) ?? null,
-        roleIds: ((row.role_ids as number[]) ?? []),
+        roleIds: (row.role_ids as number[]) ?? [],
         seniority: (row.seniority as number | null) ?? null,
         lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
-        invitationStatus: (row.invitation_status as 'pending' | 'expired' | null) ?? null,
+        invitationStatus: (row.invitation_status as "pending" | "expired" | null) ?? null,
         scheduledDepartmentIds,
         scheduledDeptAdminIds,
         managementDepartmentIds,
@@ -233,7 +236,13 @@ export async function invalidateOrgDirectory(orgId: string): Promise<void> {
 export async function updateAppOnlyUser(
   userId: string,
   orgId: string,
-  data: { firstName?: string; lastName?: string; phone?: string; departmentIds?: number[]; deptAdminIds?: number[] },
+  data: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    departmentIds?: number[];
+    deptAdminIds?: number[];
+  },
 ): Promise<void> {
   // Update profile name
   if (data.firstName !== undefined || data.lastName !== undefined) {
@@ -244,7 +253,11 @@ export async function updateAppOnlyUser(
     if (error) throw error;
   }
   // Update membership phone + departments
-  if (data.phone !== undefined || data.departmentIds !== undefined || data.deptAdminIds !== undefined) {
+  if (
+    data.phone !== undefined ||
+    data.departmentIds !== undefined ||
+    data.deptAdminIds !== undefined
+  ) {
     const membershipUpdate: Record<string, unknown> = {};
     if (data.phone !== undefined) membershipUpdate.phone = data.phone;
     if (data.departmentIds !== undefined) {
@@ -252,12 +265,16 @@ export async function updateAppOnlyUser(
       // Auto-prune dept_admin_ids to remain a subset of department_ids
       if (data.deptAdminIds !== undefined) {
         const deptSet = new Set(data.departmentIds);
-        membershipUpdate.dept_admin_ids = data.deptAdminIds.filter(id => deptSet.has(id));
+        membershipUpdate.dept_admin_ids = data.deptAdminIds.filter((id) => deptSet.has(id));
       }
     } else if (data.deptAdminIds !== undefined) {
       membershipUpdate.dept_admin_ids = data.deptAdminIds;
     }
-    const { error } = await supabase.from("organization_memberships").update(membershipUpdate).eq("user_id", userId).eq("org_id", orgId);
+    const { error } = await supabase
+      .from("organization_memberships")
+      .update(membershipUpdate)
+      .eq("user_id", userId)
+      .eq("org_id", orgId);
     if (error) throw error;
   }
   await cacheDel(CacheKey.orgDirectory(orgId), CacheKey.orgUsers(orgId));
@@ -357,11 +374,17 @@ export async function changeOrganizationUserRole(
     userId: targetUserId,
     expectedUpdatedAt: membershipRow.updated_at,
     orgRole: newRole,
-    adminPermissions: newRole === "admin"
-      ? ((membershipRow.admin_permissions as AdminPermissions | null) ?? null)
-      : null,
+    adminPermissions:
+      newRole === "admin"
+        ? ((membershipRow.admin_permissions as AdminPermissions | null) ?? null)
+        : null,
   });
-  await cacheDel(CacheKey.allUsers(), CacheKey.mwProfile(targetUserId), CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId));
+  await cacheDel(
+    CacheKey.allUsers(),
+    CacheKey.mwProfile(targetUserId),
+    CacheKey.orgUsers(orgId),
+    CacheKey.orgDirectory(orgId),
+  );
 }
 
 export async function assignOrgRoleByEmail(

@@ -96,6 +96,33 @@ async function confirmDialogAction(user: ReturnType<typeof userEvent.setup>, lab
 }
 
 describe("ShiftRequestBoard", () => {
+  it("spells out shift and job names from segments instead of the grid abbreviation", () => {
+    const request = makeRequest({
+      requesterShiftLabel: "D RN",
+      requesterSegments: [
+        {
+          shiftId: 1,
+          jobId: 1,
+          label: "D RN",
+          shiftName: "Day Shift",
+          jobName: "Registered Nurse",
+          showJobOnGrid: true,
+        },
+      ],
+    });
+    renderBoard({ openPickups: [request] });
+
+    expect(screen.getByText(/Day Shift · Registered Nurse shift on/)).toBeInTheDocument();
+    expect(screen.queryByText(/D RN shift on/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the abbreviated label when a request has no resolvable segments", () => {
+    const request = makeRequest({ requesterShiftLabel: "Day", requesterSegments: [] });
+    renderBoard({ openPickups: [request] });
+
+    expect(screen.getByText(/Day shift on/)).toBeInTheDocument();
+  });
+
   it("claims an available open pickup", async () => {
     const user = userEvent.setup();
     const request = makeRequest();

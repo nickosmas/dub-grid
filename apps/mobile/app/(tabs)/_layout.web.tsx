@@ -1,24 +1,23 @@
 import { Redirect, Tabs } from "expo-router";
 import { LoadingScreen } from "../../src/shared/components/LoadingScreen";
 import { useBootstrap } from "../../src/features/auth/hooks/useBootstrap";
-import { WorkspaceLockedScreen } from "../../src/features/auth/screens/WorkspaceLockedScreen";
+import { OrganizationLockedScreen } from "../../src/features/auth/screens/OrganizationLockedScreen";
 import { handleExpiredMobileSession } from "../../src/shared/lib/auth-reset";
-import { getWorkspaceUnavailableMessage } from "../../src/shared/lib/errors";
+import { getOrgUnavailableMessage } from "../../src/shared/lib/errors";
 import { useSessionState } from "../../src/shared/providers/AuthSessionProvider";
 import { mobileColors } from "../../src/shared/theme/tokens";
 
 export default function TabsLayoutWeb() {
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
-  const lockedMessage = getWorkspaceUnavailableMessage(bootstrapQuery.error);
-  const canViewTeamSchedule = bootstrapQuery.data && !lockedMessage
-    ? bootstrapQuery.data.permissions.canViewSchedule
-    : false;
+  const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);
+  const canViewTeamSchedule =
+    bootstrapQuery.data && !lockedMessage ? bootstrapQuery.data.permissions.canViewSchedule : false;
 
   if (isLoading) {
     return (
       <LoadingScreen
-        title="Loading your workspace"
+        title="Loading your organization"
         body="Getting your schedule and mobile tools ready."
       />
     );
@@ -30,7 +29,7 @@ export default function TabsLayoutWeb() {
 
   if (lockedMessage) {
     return (
-      <WorkspaceLockedScreen
+      <OrganizationLockedScreen
         isRetrying={bootstrapQuery.isFetching}
         message={lockedMessage}
         onRetry={() => {
@@ -59,10 +58,8 @@ export default function TabsLayoutWeb() {
         },
       }}
     >
-      <Tabs.Screen name="me" options={{ title: "Me" }} />
-      {canViewTeamSchedule ? (
-        <Tabs.Screen name="team" options={{ title: "Schedule" }} />
-      ) : null}
+      <Tabs.Screen name="home" options={{ title: "Home" }} />
+      {canViewTeamSchedule ? <Tabs.Screen name="team" options={{ title: "Schedule" }} /> : null}
       <Tabs.Screen name="requests" options={{ title: "Requests" }} />
       <Tabs.Screen name="people" options={{ title: "People" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />

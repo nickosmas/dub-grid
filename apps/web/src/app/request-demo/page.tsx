@@ -10,6 +10,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { openConsentPreferences } from "@/components/CookieConsent";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import {
@@ -71,12 +72,7 @@ export default function RequestDemoPage() {
     maxLength: 2000,
   });
   const hasValidationErrors = Boolean(
-    contactNameError ||
-      emailError ||
-      phoneError ||
-      orgNameError ||
-      industryError ||
-      messageError,
+    contactNameError || emailError || phoneError || orgNameError || industryError || messageError,
   );
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -194,8 +190,7 @@ export default function RequestDemoPage() {
               margin: "0 0 32px",
             }}
           >
-            Thanks, {contactName}! We&apos;ll review your request and get back
-            to you shortly.
+            Thanks, {contactName}! We&apos;ll review your request and get back to you shortly.
           </p>
           <Link
             href="/"
@@ -253,9 +248,7 @@ export default function RequestDemoPage() {
               <ArrowLeft size={16} />
               Back
             </Link>
-            <div
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <DubGridLogo size={28} />
               <DubGridWordmark fontSize={16} />
             </div>
@@ -288,8 +281,7 @@ export default function RequestDemoPage() {
               {/* Contact Name */}
               <div>
                 <label style={labelStyle}>
-                  Contact Name{" "}
-                  <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Contact Name <span style={{ color: "var(--color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -299,17 +291,14 @@ export default function RequestDemoPage() {
                   placeholder="Your full name"
                   style={inputStyle}
                 />
-                {contactNameError ? (
-                  <p style={errorStyle}>{contactNameError}</p>
-                ) : null}
+                {contactNameError ? <p style={errorStyle}>{contactNameError}</p> : null}
               </div>
 
               {/* Email + Phone row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <div>
                   <label style={labelStyle}>
-                    Email{" "}
-                    <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Email <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <input
                     type="email"
@@ -342,8 +331,7 @@ export default function RequestDemoPage() {
               {/* Organization Name */}
               <div>
                 <label style={labelStyle}>
-                  Organization Name{" "}
-                  <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Organization Name <span style={{ color: "var(--color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -360,8 +348,7 @@ export default function RequestDemoPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                 <div>
                   <label style={labelStyle}>
-                    Employee Count{" "}
-                    <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Employee Count <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <CustomSelect
                     value={orgSize || ""}
@@ -428,7 +415,9 @@ export default function RequestDemoPage() {
                 opacity: loading ? 0.85 : 1,
               }}
             >
-              <ButtonLoading loading={loading} spinnerColor="#fff" spinnerSize={28}>Submit Request</ButtonLoading>
+              <ButtonLoading loading={loading} spinnerColor="#fff" spinnerSize={28}>
+                Submit Request
+              </ButtonLoading>
             </button>
           </form>
         </div>
@@ -462,6 +451,22 @@ export default function RequestDemoPage() {
         >
           Terms of Service
         </Link>
+        <span style={{ margin: "0 4px" }}>·</span>
+        <button
+          type="button"
+          onClick={openConsentPreferences}
+          style={{
+            color: "var(--color-text-faint)",
+            textDecoration: "none",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            font: "inherit",
+          }}
+        >
+          Cookie preferences
+        </button>
       </footer>
     </div>
   );

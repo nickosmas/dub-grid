@@ -60,11 +60,7 @@ export async function createJsonApiRequest<T>(input: {
   handleAuthFailure?: boolean;
   onAuthFailure?: () => Promise<void> | void;
   onTransportErrorMessage?: (baseUrl: string, error: unknown) => string;
-  onNonJsonErrorMessage?: (
-    baseUrl: string,
-    path: string,
-    response: Response,
-  ) => string;
+  onNonJsonErrorMessage?: (baseUrl: string, path: string, response: Response) => string;
 }): Promise<T> {
   const {
     baseUrl,
@@ -92,8 +88,7 @@ export async function createJsonApiRequest<T>(input: {
 
   const contentType = response.headers?.get?.("content-type") ?? "";
   const payload = await response.json().catch(() => null);
-  const isJsonResponse =
-    contentType.includes("application/json") || payload !== null;
+  const isJsonResponse = contentType.includes("application/json") || payload !== null;
 
   if (!response.ok) {
     if (!isJsonResponse) {
@@ -110,9 +105,7 @@ export async function createJsonApiRequest<T>(input: {
 
     if (
       handleAuthFailure &&
-      (response.status === 401 ||
-        message === "Invalid session" ||
-        message === "Unauthenticated")
+      (response.status === 401 || message === "Invalid session" || message === "Unauthenticated")
     ) {
       await onAuthFailure?.();
     }

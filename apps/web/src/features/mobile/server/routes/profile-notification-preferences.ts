@@ -25,8 +25,7 @@ function normalizeMobileNotificationPreferences(
       email: prefs?.schedule?.email ?? DEFAULT_PREFS.schedule.email,
     },
     shift_requests: {
-      in_app:
-        prefs?.shift_requests?.in_app ?? DEFAULT_PREFS.shift_requests.in_app,
+      in_app: prefs?.shift_requests?.in_app ?? DEFAULT_PREFS.shift_requests.in_app,
       email: prefs?.shift_requests?.email ?? DEFAULT_PREFS.shift_requests.email,
     },
     system: {

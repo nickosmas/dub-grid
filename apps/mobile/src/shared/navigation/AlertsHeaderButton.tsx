@@ -17,21 +17,12 @@ export function AlertsHeaderButton() {
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
       hitSlop={10}
       onPress={() => router.push("/alerts")}
-      style={({ pressed }) => [
-        styles.button,
-        pressed && styles.buttonPressed,
-      ]}
+      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
     >
-      <Ionicons
-        color={mobileColors.textPrimary}
-        name="notifications-outline"
-        size={20}
-      />
+      <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
       {unreadCount > 0 ? (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </Text>
+          <Text style={styles.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
         </View>
       ) : null}
     </Pressable>

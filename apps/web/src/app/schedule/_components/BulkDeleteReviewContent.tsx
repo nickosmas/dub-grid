@@ -8,9 +8,7 @@ export type BulkDeleteReviewTarget = {
 };
 
 export function getBulkDeleteReviewCounts(targets: BulkDeleteReviewTarget[]) {
-  const publishedBacked = targets.filter(
-    (target) => target.isPublishedBacked,
-  ).length;
+  const publishedBacked = targets.filter((target) => target.isPublishedBacked).length;
   return {
     publishedBacked,
     draftOnly: targets.length - publishedBacked,

@@ -3,15 +3,32 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import {
+  Employee,
+  FocusArea,
+  NamedItem,
+  Invitation,
+  OrganizationRole,
+  AdminPermissions,
+} from "@/types";
+import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
-import InlineEditEmployee from "@/components/EditEmployeePanel";
+import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
+import { MemberAccessControls } from "./MemberAccessControls";
+import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+
+function statusTone(status: Employee["status"]): StatusPillTone {
+  if (status === "inactive") return "warning";
+  if (status === "removed") return "danger";
+  return "success";
+}
 
 function hashCode(s: string): number {
   let h = 0;
@@ -35,8 +52,8 @@ interface StaffDetailPanelProps {
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onSave: (emp: Employee) => void;
-  onDelete: (empId: string) => void;
-  onBench: (empId: string, note?: string) => void;
+  onRemove: (empId: string) => void;
+  onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onClose: () => void;
   onInvite?: (emp: Employee) => void;
@@ -46,6 +63,10 @@ interface StaffDetailPanelProps {
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   onRevokeAccess?: (userId: string) => void;
+  orgRole?: OrganizationRole | null;
+  adminPermissions?: AdminPermissions | null;
+  onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
+  onPermissionsChange?: (perms: AdminPermissions) => Promise<void>;
 }
 
 export function StaffDetailPanel({
@@ -62,8 +83,8 @@ export function StaffDetailPanel({
   orgId,
   pendingInviteByEmployeeId,
   onSave,
-  onDelete,
-  onBench,
+  onRemove,
+  onDeactivate,
   onActivate,
   onClose,
   onInvite,
@@ -73,10 +94,16 @@ export function StaffDetailPanel({
   onManageManagementAccess,
   onRevoke,
   onRevokeAccess,
+  orgRole,
+  adminPermissions,
+  onRoleChange,
+  onPermissionsChange,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
+  const isSelf = isSelfAction(currentUser?.id, employee.userId);
   const hue = hashCode(employee.id) % 360;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [closing, setClosing] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [revokingInvite, setRevokingInvite] = useState(false);
@@ -84,18 +111,22 @@ export function StaffDetailPanel({
     "reinvite" | "revoke" | null
   >(null);
   const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; });
-  const pendingInvitation = canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined;
-  const canEditEmployee = employee.status === "active" || employee.status === "benched";
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  const pendingInvitation = canManageEmployees
+    ? pendingInviteByEmployeeId.get(employee.id)
+    : undefined;
+  const canEditEmployee = employee.status === "active" || employee.status === "inactive";
   const showInviteActions =
     canEditEmployee &&
     canManageEmployees &&
     !employee.userId &&
     Boolean(employee.email) &&
     Boolean(pendingInvitation || (orgId && onInvite));
-  const showManagementAccessAction =
-    Boolean(canManageManagementAccess && onManageManagementAccess && employee.status !== "terminated");
-  const showStatusActions = canEditEmployee;
+  const showManagementAccessAction = Boolean(
+    canManageManagementAccess && onManageManagementAccess && employee.status !== "removed",
+  );
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
 
@@ -156,19 +187,22 @@ export function StaffDetailPanel({
     setHasUnsavedChanges(false);
   }, [employee.id]);
 
-  const statusConfig = {
-    active: { bg: "var(--color-success-bg)", text: "var(--color-success-text)", dot: "var(--color-success)" },
-    benched: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", dot: "var(--color-warning)" },
-    terminated: { bg: "var(--color-danger-bg)", text: "var(--color-danger-text)", dot: "var(--color-danger)" },
-  }[employee.status];
+  const statusLabel = employee.status.charAt(0).toUpperCase() + employee.status.slice(1);
 
   return createPortal(
     <>
-      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={handleRequestClose} />
+      <div
+        className={`staff-detail-overlay${closing ? " closing" : ""}`}
+        onClick={handleRequestClose}
+      />
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Panel header */}
         <div className="staff-detail-header">
-          <button className="staff-detail-close" onClick={handleRequestClose} aria-label="Close detail panel">
+          <button
+            className="staff-detail-close"
+            onClick={handleRequestClose}
+            aria-label="Close detail panel"
+          >
             <svg
               width="15"
               height="15"
@@ -185,7 +219,9 @@ export function StaffDetailPanel({
           </button>
 
           {/* Profile card area */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingTop: 4 }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingTop: 4 }}
+          >
             <div
               style={{
                 width: 44,
@@ -206,35 +242,49 @@ export function StaffDetailPanel({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: "var(--dg-fs-body)", color: "var(--color-text-primary)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {getEmployeeDisplayName(employee)}
-                </span>
                 <span
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 600,
-                    padding: "2px 8px",
-                    borderRadius: 20,
-                    background: statusConfig.bg,
-                    color: statusConfig.text,
-                    flexShrink: 0,
+                    fontWeight: 700,
+                    fontSize: "var(--dg-fs-body)",
+                    color: "var(--color-text-primary)",
+                    letterSpacing: "-0.01em",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: statusConfig.dot, flexShrink: 0 }} />
-                  {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+                  {getEmployeeDisplayName(employee)}
                 </span>
+                <StatusPill
+                  tone={statusTone(employee.status)}
+                  className="shrink-0"
+                  aria-label={`Status: ${statusLabel}`}
+                >
+                  {statusLabel}
+                </StatusPill>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                 {employee.email && (
-                  <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-muted)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {employee.email}
                   </span>
                 )}
                 {employee.phone && (
-                  <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-faint)",
+                      flexShrink: 0,
+                    }}
+                  >
                     {employee.phone}
                   </span>
                 )}
@@ -253,7 +303,16 @@ export function StaffDetailPanel({
                 }}
               >
                 View full profile
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="9 6 15 12 9 18" />
                 </svg>
               </Link>
@@ -273,6 +332,8 @@ export function StaffDetailPanel({
             certificationLabel={certificationLabel}
             departments={departments}
             departmentLabel={departmentLabel}
+            ref={editorRef}
+            hideActions
             onSave={onSave}
             onCancel={closePanel}
             onDirtyChange={setHasUnsavedChanges}
@@ -385,7 +446,8 @@ export function StaffDetailPanel({
                   </div>
                 </div>
               ) : (
-                showInviteActions && onInvite && (
+                showInviteActions &&
+                onInvite && (
                   <button
                     onClick={() => onInvite(employee)}
                     className="dg-btn dg-btn-secondary"
@@ -417,54 +479,66 @@ export function StaffDetailPanel({
                   className="dg-btn dg-btn-secondary"
                   style={{ width: "100%" }}
                 >
-                  {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Grant Management Access"}
+                  {hasManagementAccess || hasPendingManagementInvite
+                    ? "Edit Management Access"
+                    : "Add to Management"}
                 </button>
               )}
+              <MemberAccessControls
+                orgRole={orgRole}
+                adminPermissions={adminPermissions}
+                onRoleChange={onRoleChange}
+                onPermissionsChange={onPermissionsChange}
+                isSelf={isSelf}
+              />
             </div>
           )}
         </div>
 
-        {/* Sticky bottom status actions */}
-        {showStatusActions && (
-          <div style={{ flexShrink: 0, padding: "16px 24px", borderTop: "1px solid var(--color-border-light)" }}>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 700,
-                  color: "var(--color-text-subtle)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Staffing status
-              </div>
-              <EmployeeStatusActions
-                employee={employee}
-                canEdit={canEditEmployee}
-                onBench={onBench}
-                onActivate={onActivate}
-                onTerminate={onDelete}
-                onRevokeAccess={canManageEmployees ? onRevokeAccess : undefined}
-                variant="panel"
-              />
-            </div>
-          </div>
-        )}
+        {/* Sticky bottom actions */}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "16px 24px",
+            borderTop: "1px solid var(--color-border-light)",
+          }}
+        >
+          {canEditEmployee ? (
+            <EditorActionRow
+              secondaryAction={
+                <button
+                  onClick={() => editorRef.current?.requestDismiss()}
+                  className="dg-btn dg-btn-secondary"
+                >
+                  {getEditorDismissLabel({ hasUnsavedChanges })}
+                </button>
+              }
+              primaryAction={
+                <button
+                  onClick={() => editorRef.current?.save()}
+                  disabled={!hasUnsavedChanges}
+                  className="dg-btn dg-btn-primary"
+                >
+                  {EDITOR_ACTION_LABELS.save}
+                </button>
+              }
+            />
+          ) : (
+            <EditorActionRow
+              secondaryAction={
+                <button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
+                  {EDITOR_ACTION_LABELS.close}
+                </button>
+              }
+            />
+          )}
+        </div>
       </div>
       {unsavedChangesDialog}
       {pendingInvitationAction && pendingInvitation && (
         <ConfirmDialog
           title={
-            pendingInvitationAction === "reinvite"
-              ? "Reissue Invitation?"
-              : "Revoke Invitation?"
+            pendingInvitationAction === "reinvite" ? "Reissue Invitation?" : "Revoke Invitation?"
           }
           message={
             pendingInvitationAction === "reinvite"
@@ -472,9 +546,7 @@ export function StaffDetailPanel({
               : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
           }
           confirmLabel={
-            pendingInvitationAction === "reinvite"
-              ? "Reissue Invitation"
-              : "Revoke Invitation"
+            pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
           }
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revokingInvite}
@@ -487,6 +559,6 @@ export function StaffDetailPanel({
         />
       )}
     </>,
-    document.body
+    document.body,
   );
 }

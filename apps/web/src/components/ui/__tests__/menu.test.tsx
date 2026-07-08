@@ -37,8 +37,7 @@ describe("ui/menu", () => {
     expect(container).not.toHaveTextContent("First action");
     expect(screen.getByRole("menuitem", { name: "First action" })).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "First action" })
-        .closest('[data-slot="menu-content"]')
+      screen.getByRole("menuitem", { name: "First action" }).closest('[data-slot="menu-content"]')
         ?.parentElement,
     ).toHaveStyle({ zIndex: "10002" });
     const arrow = document.body.querySelector('[data-slot="menu-arrow"]');
@@ -54,9 +53,7 @@ describe("ui/menu", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole("menuitem", { name: "First action" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: "First action" })).not.toBeInTheDocument();
     });
   });
 });

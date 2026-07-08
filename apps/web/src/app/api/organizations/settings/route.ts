@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeOptionalUsPhone } from "@dubgrid/contracts";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
@@ -13,6 +14,7 @@ import {
 import { rowToOrganization } from "@/lib/db/mappers";
 import type { DbOrganization } from "@/lib/db/types";
 import { ORGANIZATION_COLS } from "@/lib/db/shared";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -37,7 +39,6 @@ const bodySchema = z.object({
   focusAreaLabel: z.string().trim().max(50).optional(),
   certificationLabel: z.string().trim().max(50).optional(),
   roleLabel: z.string().trim().max(50).optional(),
-  departmentLabel: z.string().trim().max(50).optional(),
   shiftDisplayMode: z.enum(["code", "name"]).optional(),
   timezone: z.string().trim().optional(),
   payPeriodStartDate: z
@@ -46,14 +47,25 @@ const bodySchema = z.object({
     .nullable()
     .optional(),
   enforceConflictPrevention: z.boolean().optional(),
-  coverageRuleConfig: z.object({
-    mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
-  }).optional(),
+  coverageRuleConfig: z
+    .object({
+      mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
+    })
+    .optional(),
+  openShiftVisibility: z
+    .object({
+      coverageGap: z.enum(["hidden", "matched", "always"]),
+      calloff: z.enum(["hidden", "matched", "always"]),
+    })
+    .optional(),
   dataRetentionDays: z.number().int().min(1).max(3650).optional(),
   featureOverrides: z.record(z.string(), z.boolean()).optional(),
 });
 
-function timestampsMatch(left: string | null | undefined, right: string | null | undefined): boolean {
+function timestampsMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
   if (!left || !right) return false;
   return new Date(left).getTime() === new Date(right).getTime();
 }
@@ -107,15 +119,19 @@ export async function PUT(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { orgId, expectedUpdatedAt, ...fields } = parsed.data;
+  // bodyOrgId is what the client sent. The effective orgId we ultimately
+  // read and write against is `orgId`, assigned below from the auth
+  // result — it may have been redirected to the user's sandbox by
+  // requireOrgPermissions.
+  const { orgId: bodyOrgId, expectedUpdatedAt, ...fields } = parsed.data;
   const fieldErrors = {
     ...(fields.name !== undefined
       ? {
@@ -126,9 +142,7 @@ export async function PUT(req: NextRequest) {
           }),
         }
       : {}),
-    ...(fields.phone !== undefined
-      ? { phone: getOptionalUsPhoneFieldError(fields.phone) }
-      : {}),
+    ...(fields.phone !== undefined ? { phone: getOptionalUsPhoneFieldError(fields.phone) } : {}),
     ...(fields.addressLine1 !== undefined
       ? {
           addressLine1: getLineTextError(fields.addressLine1, {
@@ -204,38 +218,29 @@ export async function PUT(req: NextRequest) {
           }),
         }
       : {}),
-    ...(fields.departmentLabel !== undefined
-      ? {
-          departmentLabel: getLineTextError(fields.departmentLabel, {
-            label: "Department label",
-            maxLength: 50,
-            required: true,
-          }),
-        }
-      : {}),
   } as const;
   const firstFieldError = Object.values(fieldErrors).find(Boolean);
   if (firstFieldError) {
-    return NextResponse.json(
-      { error: firstFieldError, fieldErrors },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: firstFieldError, fieldErrors }, { status: 400 });
   }
 
   try {
     // ── Permission check ──────────────────────────────────────────────
     const orgAuth = await requireOrgPermissions(
       req,
-      orgId,
+      bodyOrgId,
       (permissions) =>
-        permissions.isGridmaster ||
-        permissions.isSuperAdmin ||
-        permissions.canManageOrgSettings,
+        permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgSettings,
       { allowDuringSetup: true },
     );
     if ("response" in orgAuth) {
       return orgAuth.response;
     }
+    // requireOrgPermissions may have redirected the orgId to the user's
+    // sandbox. Every read/write below uses the effective orgId, not the
+    // body's — otherwise the validation lands on sandbox while writes
+    // hit the real organization.
+    const orgId = orgAuth.orgId;
     const serviceClient = orgAuth.serviceClient;
 
     const { data: existingRow, error: existingError } = await serviceClient
@@ -298,10 +303,7 @@ export async function PUT(req: NextRequest) {
               required: true,
             })
           : currentOrg.name,
-      phone:
-        fields.phone !== undefined
-          ? normalizeOptionalUsPhone(fields.phone)
-          : currentOrg.phone,
+      phone: fields.phone !== undefined ? normalizeOptionalUsPhone(fields.phone) : currentOrg.phone,
       addressLine1: normalizedAddress.addressLine1,
       addressLine2: normalizedAddress.addressLine2,
       addressCity: normalizedAddress.addressCity,
@@ -333,32 +335,18 @@ export async function PUT(req: NextRequest) {
               required: true,
             })
           : currentOrg.roleLabel,
-      departmentLabel:
-        fields.departmentLabel !== undefined
-          ? normalizeLineText(fields.departmentLabel, {
-              label: "Department label",
-              maxLength: 50,
-              required: true,
-            })
-          : currentOrg.departmentLabel,
       shiftDisplayMode: fields.shiftDisplayMode ?? currentOrg.shiftDisplayMode,
-      timezone:
-        fields.timezone !== undefined
-          ? fields.timezone || null
-          : currentOrg.timezone,
+      timezone: fields.timezone !== undefined ? fields.timezone || null : currentOrg.timezone,
       payPeriodStartDate:
         fields.payPeriodStartDate !== undefined
           ? fields.payPeriodStartDate
           : currentOrg.payPeriodStartDate,
       enforceConflictPrevention:
-        fields.enforceConflictPrevention ??
-        currentOrg.enforceConflictPrevention,
-      coverageRuleConfig:
-        fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
-      dataRetentionDays:
-        fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
-      featureOverrides:
-        fields.featureOverrides ?? currentOrg.featureOverrides,
+        fields.enforceConflictPrevention ?? currentOrg.enforceConflictPrevention,
+      coverageRuleConfig: fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
+      openShiftVisibility: fields.openShiftVisibility ?? currentOrg.openShiftVisibility,
+      dataRetentionDays: fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
+      featureOverrides: fields.featureOverrides ?? currentOrg.featureOverrides,
     };
 
     const changes = buildOrganizationSettingsChanges(
@@ -400,9 +388,6 @@ export async function PUT(req: NextRequest) {
     if (changeKeys.has("roleLabel")) {
       update.role_label = nextOrg.roleLabel;
     }
-    if (changeKeys.has("departmentLabel")) {
-      update.department_label = nextOrg.departmentLabel;
-    }
     if (changeKeys.has("shiftDisplayMode")) {
       update.shift_display_mode = nextOrg.shiftDisplayMode;
     }
@@ -417,6 +402,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("coverageRuleConfig")) {
       update.coverage_rule_config = nextOrg.coverageRuleConfig;
+    }
+    if (changeKeys.has("openShiftVisibility")) {
+      update.open_shift_visibility = nextOrg.openShiftVisibility;
     }
     if (changeKeys.has("dataRetentionDays")) {
       update.data_retention_days = nextOrg.dataRetentionDays;
@@ -443,12 +431,17 @@ export async function PUT(req: NextRequest) {
         .single();
 
       if (latestError) throw latestError;
-      return buildConflictResponse(
-        rowToOrganization(latestRow as DbOrganization),
-      );
+      return buildConflictResponse(rowToOrganization(latestRow as DbOrganization));
     }
 
     const updatedOrg = rowToOrganization(updatedRow as DbOrganization);
+
+    // The public subdomain lookup caches {id, name} by slug with a long TTL
+    // (organizations.slug is write-once, but name isn't) — invalidate on
+    // rename so the cached display name doesn't linger stale for a day.
+    if (changeKeys.has("name") && updatedOrg.slug) {
+      void cacheDel(CacheKey.orgBySlug(updatedOrg.slug));
+    }
 
     const auditPayload = {
       org_id: orgId,
@@ -470,9 +463,7 @@ export async function PUT(req: NextRequest) {
       user_agent: req.headers.get("user-agent"),
     };
 
-    const { error: auditError } = await serviceClient
-      .from("audit_log")
-      .insert(auditPayload);
+    const { error: auditError } = await serviceClient.from("audit_log").insert(auditPayload);
 
     if (auditError) {
       logger.error(
@@ -482,22 +473,20 @@ export async function PUT(req: NextRequest) {
     }
 
     if (changeKeys.has("featureOverrides")) {
-      const { error: featureAuditError } = await serviceClient
-        .from("audit_log")
-        .insert({
-          org_id: orgId,
-          actor_id: user.id,
-          actor_email: user.email ?? null,
-          action: "feature_flags.updated",
-          resource_type: "organization",
-          resource_id: orgId,
-          details: {
-            from: currentOrg.featureOverrides,
-            to: nextOrg.featureOverrides,
-          },
-          ip_address: getRequestIp(req),
-          user_agent: req.headers.get("user-agent"),
-        });
+      const { error: featureAuditError } = await serviceClient.from("audit_log").insert({
+        org_id: orgId,
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        action: "feature_flags.updated",
+        resource_type: "organization",
+        resource_id: orgId,
+        details: {
+          from: currentOrg.featureOverrides,
+          to: nextOrg.featureOverrides,
+        },
+        ip_address: getRequestIp(req),
+        user_agent: req.headers.get("user-agent"),
+      });
 
       if (featureAuditError) {
         logger.error(
@@ -509,8 +498,10 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json({ success: true, organization: updatedOrg });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "organizations/settings", orgId } });
-    logger.error({ error: err, orgId }, "Organization settings update failed");
+    Sentry.captureException(err, {
+      extra: { context: "organizations/settings", orgId: bodyOrgId },
+    });
+    logger.error({ error: err, orgId: bodyOrgId }, "Organization settings update failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

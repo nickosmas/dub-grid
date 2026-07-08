@@ -3,6 +3,7 @@ import type { DirectoryPerson, Employee } from "@/types";
 export interface ManagementDirectoryUpdate {
   firstName: string;
   lastName: string;
+  email: string;
   phone: string;
   managementDepartmentIds: number[];
 }
@@ -17,6 +18,7 @@ export function mergeEmployeeIntoDirectoryPerson(
     ...person,
     source: "employee",
     employeeId: employee.id,
+    employeeNumber: employee.employeeNumber ?? null,
     userId: employee.userId,
     firstName: employee.firstName,
     lastName: employee.lastName,
@@ -46,6 +48,7 @@ export function applyManagementDirectoryUpdate(
     ...person,
     firstName: update.firstName,
     lastName: update.lastName,
+    email: update.email,
     phone: update.phone,
     managementDepartmentIds: update.managementDepartmentIds,
     managementDeptAdminIds: nextManagementDeptAdminIds,
@@ -55,10 +58,7 @@ export function applyManagementDirectoryUpdate(
   };
 }
 
-export function upsertEmployeeInList(
-  employees: Employee[],
-  employee: Employee,
-): Employee[] {
+export function upsertEmployeeInList(employees: Employee[], employee: Employee): Employee[] {
   const existingIndex = employees.findIndex((current) => current.id === employee.id);
 
   if (existingIndex === -1) {

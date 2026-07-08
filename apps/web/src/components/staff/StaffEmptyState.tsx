@@ -14,17 +14,17 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
     ? "No results found"
     : activeTab === "active"
       ? "No active employees"
-      : activeTab === "benched"
-        ? "No benched employees"
-        : "No terminated employees";
+      : activeTab === "inactive"
+        ? "No inactive employees"
+        : "No removed employees";
 
   const description = hasFilters
     ? "Try adjusting your search or filters."
     : activeTab === "active"
       ? "Get started by adding your first staff member."
-      : activeTab === "benched"
-        ? "Employees you bench will appear here."
-        : "Terminated employees will appear here.";
+      : activeTab === "inactive"
+        ? "Employees you mark inactive will appear here."
+        : "Removed employees will appear here.";
 
   return (
     <EmptyState
@@ -47,11 +47,17 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       }
       title={title}
       description={description}
-      action={hasFilters ? (
-        <button onClick={onClearFilters} className="dg-btn dg-btn-secondary" style={{ marginTop: 8 }}>
-          Clear filters
-        </button>
-      ) : undefined}
+      action={
+        hasFilters ? (
+          <button
+            onClick={onClearFilters}
+            className="dg-btn dg-btn-secondary"
+            style={{ marginTop: 8 }}
+          >
+            Clear filters
+          </button>
+        ) : undefined
+      }
     />
   );
 }

@@ -8,10 +8,7 @@ import {
   fetchOrganizationEmployeeCount,
   updateOrganizationSettings,
 } from "@/features/organization/client";
-import {
-  fetchGridmasterBilling,
-  updateGridmasterSubscription,
-} from "@/features/gridmaster/client";
+import { fetchGridmasterBilling, updateGridmasterSubscription } from "@/features/gridmaster/client";
 import type { Organization } from "@/types";
 
 vi.mock("@/features/organization/client", () => ({
@@ -97,6 +94,7 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
     suspendedAt: null,
     suspendedReason: null,
     enforceConflictPrevention: false,
+    openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
     stripeCustomerId: null,
     subscriptionStatus: "active",
     trialEndsAt: null,
@@ -106,17 +104,16 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
     featureOverrides: {
       disable_realtime: false,
     },
+    workspaceKind: "real",
+    sandboxOwnerUserId: null,
+    sandboxSourceOrgId: null,
     ...overrides,
   };
 }
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 describe("gridmaster dirty save controls", () => {
@@ -136,6 +133,7 @@ describe("gridmaster dirty save controls", () => {
           status: "active",
           stripeCustomerId: "cus_123",
           stripeSubscriptionId: "sub_123",
+          trialStartedAt: null,
           trialEndsAt: null,
           currentPeriodEnd: "2026-06-01T00:00:00.000Z",
           cancelAt: null,
@@ -148,6 +146,7 @@ describe("gridmaster dirty save controls", () => {
         },
       ],
       trialEndingSoon: [],
+      trialsNotStarted: [],
       riskOrganizations: [],
       missingStripeCustomer: [],
       seatMismatches: [],

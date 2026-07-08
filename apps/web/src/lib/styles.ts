@@ -53,29 +53,25 @@ export const labelStyle: CSSProperties = {
   marginBottom: 5,
 };
 
-/** Role badge color mapping. */
-export const ROLE_BADGE_COLORS: Record<
-  string,
-  { bg: string; text: string; border: string }
-> = {
+/**
+ * Role badge color mapping. Org roles (super_admin/admin/user) share a uniform
+ * neutral gray; the variation comes from the label, not the chip color. The
+ * platform-level `gridmaster` role keeps a distinct brand tint so it reads as
+ * an elevation, not an org role.
+ */
+const NEUTRAL_ROLE_BADGE = {
+  bg: "var(--color-bg-secondary)",
+  text: "var(--color-text-muted)",
+  border: "var(--color-border-light)",
+} as const;
+
+export const ROLE_BADGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   gridmaster: {
     bg: "#DBEAFE",
     text: "#1D4ED8",
     border: "#93C5FD",
   },
-  super_admin: {
-    bg: "#FEF3C7",
-    text: "#92400E",
-    border: "#FDE68A",
-  },
-  admin: {
-    bg: "#EFF6FF",
-    text: "#1D4ED8",
-    border: "#BFDBFE",
-  },
-  user: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-muted)",
-    border: "var(--color-border-light)",
-  },
+  super_admin: { ...NEUTRAL_ROLE_BADGE },
+  admin: { ...NEUTRAL_ROLE_BADGE },
+  user: { ...NEUTRAL_ROLE_BADGE },
 };

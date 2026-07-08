@@ -106,10 +106,7 @@ describe("POST /api/stripe/create-checkout", () => {
             })),
             is: vi.fn(() =>
               Promise.resolve({
-                data: [
-                  { user_id: "linked-user" },
-                  { user_id: "management-only-user" },
-                ],
+                data: [{ user_id: "linked-user" }, { user_id: "management-only-user" }],
                 error: null,
               }),
             ),
@@ -175,7 +172,7 @@ describe("POST /api/stripe/create-checkout", () => {
       expect.any(NextRequest),
       ORG_ID,
       expect.any(Function),
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true },
     );
     const isAllowed = requireOrgPermissions.mock.calls[0][2];
     expect(isAllowed({ isGridmaster: false, isSuperAdmin: true })).toBe(true);
@@ -275,11 +272,7 @@ describe("POST /api/stripe/create-checkout", () => {
 
     expect(response.status).toBe(200);
     expect(getUserById).toHaveBeenCalledWith("super-admin-user");
-    expect(createStripeCustomer).toHaveBeenCalledWith(
-      ORG_ID,
-      "Acme Health",
-      "owner@example.com",
-    );
+    expect(createStripeCustomer).toHaveBeenCalledWith(ORG_ID, "Acme Health", "owner@example.com");
     expect(organizationUpdate).toHaveBeenCalledWith({
       stripe_customer_id: "cus_created",
     });

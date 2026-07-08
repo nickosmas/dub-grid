@@ -1,8 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  mobileOrgScheduleResponseSchema,
-  mobileScheduleQuerySchema,
-} from "@dubgrid/contracts";
+import { mobileOrgScheduleResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
 import {
   loadMobileOrgSchedulePayload,
   MobileApiAuthorizationError,
@@ -46,7 +43,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     if (error instanceof MobileApiAuthorizationError) {
       return json(
-        { error: "You don't have permission to view the workspace schedule." },
+        { error: "You don't have permission to view the organization schedule." },
         { status: 403 },
       );
     }

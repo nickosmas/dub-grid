@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 
-
 interface MainNavItem {
   id: string;
   href: string;
@@ -72,9 +71,7 @@ export default function MobileNavSheet({
       if (e.key === "Tab") {
         const sheet = sheetRef.current;
         if (!sheet) return;
-        const focusable = Array.from(
-          sheet.querySelectorAll<HTMLElement>(FOCUSABLE)
-        );
+        const focusable = Array.from(sheet.querySelectorAll<HTMLElement>(FOCUSABLE));
         if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
@@ -142,11 +139,7 @@ export default function MobileNavSheet({
 
   return createPortal(
     <>
-      <div
-        className="dg-bottom-sheet-overlay"
-        onClick={close}
-        aria-hidden="true"
-      />
+      <div className="dg-bottom-sheet-overlay" onClick={close} aria-hidden="true" />
       <div
         className="dg-bottom-sheet"
         ref={sheetRef}
@@ -171,7 +164,16 @@ export default function MobileNavSheet({
                     <span className="dg-bottom-sheet-item-icon">{item.icon}</span>
                     <span className="dg-bottom-sheet-item-label">{item.label}</span>
                     <span className="dg-bottom-sheet-chevron">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
                     </span>
@@ -184,7 +186,16 @@ export default function MobileNavSheet({
                   className="dg-bottom-sheet-main-item dg-bottom-sheet-main-item--gridmaster"
                 >
                   <span className="dg-bottom-sheet-item-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                       <polyline points="15 3 21 3 21 9" />
                       <line x1="10" y1="14" x2="21" y2="3" />
@@ -192,7 +203,16 @@ export default function MobileNavSheet({
                   </span>
                   <span className="dg-bottom-sheet-item-label">Gridmaster</span>
                   <span className="dg-bottom-sheet-chevron">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </span>
@@ -203,20 +223,24 @@ export default function MobileNavSheet({
             {/* Footer: Profile + Sign out */}
             <div className="dg-bottom-sheet-footer">
               <div className="dg-bottom-sheet-user">
-                <div className="dg-bottom-sheet-avatar">
-                  {initials}
-                </div>
+                <div className="dg-bottom-sheet-avatar">{initials}</div>
                 <div>
                   <div className="dg-bottom-sheet-user-name">{displayName}</div>
                   <div className="dg-bottom-sheet-user-role">{roleLabel}</div>
                 </div>
               </div>
               <div className="dg-bottom-sheet-footer-actions">
-                <button
-                  onClick={() => navigate("/profile")}
-                  className="dg-bottom-sheet-footer-btn"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <button onClick={() => navigate("/profile")} className="dg-bottom-sheet-footer-btn">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
@@ -224,10 +248,22 @@ export default function MobileNavSheet({
                 </button>
                 {actualLevel >= 2 && !isImpersonating && onToggleUserView && (
                   <button
-                    onClick={() => { close(); onToggleUserView(); }}
+                    onClick={() => {
+                      close();
+                      onToggleUserView();
+                    }}
                     className="dg-bottom-sheet-footer-btn"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
@@ -235,10 +271,22 @@ export default function MobileNavSheet({
                   </button>
                 )}
                 <button
-                  onClick={() => { close(); onSignOut(); }}
+                  onClick={() => {
+                    close();
+                    onSignOut();
+                  }}
                   className="dg-bottom-sheet-footer-btn dg-bottom-sheet-footer-btn--danger"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                     <polyline points="16 17 21 12 16 7" />
                     <line x1="21" y1="12" x2="9" y2="12" />
@@ -257,7 +305,16 @@ export default function MobileNavSheet({
                 onClick={() => setDrillSection(null)}
                 aria-label="Back to main navigation"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
               </button>
@@ -271,9 +328,7 @@ export default function MobileNavSheet({
                 return (
                   <React.Fragment key={item.id}>
                     {showGroupHeader && (
-                      <div className="dg-bottom-sheet-group-label">
-                        {item.group}
-                      </div>
+                      <div className="dg-bottom-sheet-group-label">{item.group}</div>
                     )}
                     <button
                       onClick={() => handleSubItemClick(item)}

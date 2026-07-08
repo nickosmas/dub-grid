@@ -23,18 +23,30 @@ interface AllPrefs {
 const DEFAULT_PREFS: AllPrefs = {
   schedule: { in_app: true, email: false },
   shift_requests: { in_app: true, email: false },
+  membership: { in_app: true, email: false },
+  account: { in_app: true, email: false },
+  billing: { in_app: true, email: true },
+  security: { in_app: true, email: true },
   system: { in_app: true, email: false },
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
   schedule: "Schedule Changes",
   shift_requests: "Shift Requests",
+  membership: "Membership & Invitations",
+  account: "Account & Organization",
+  billing: "Billing & Payments",
+  security: "Security Alerts",
   system: "System Notifications",
 };
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  schedule: "Shift changes, published schedules",
+  schedule: "Shift changes, published schedules, recurring updates",
   shift_requests: "New, approved, or rejected shift requests",
+  membership: "Invitations, role changes, and removal from organizations",
+  account: "Employee record updates and organization settings",
+  billing: "Subscription changes, payment failures, receipts",
+  security: "Password, email, MFA, and new-device alerts",
   system: "Impersonation notices and system updates",
 };
 
@@ -70,7 +82,9 @@ function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
   ) as AllPrefs;
 }
 
-export function NotificationPreferences({ visibleCategories }: { visibleCategories?: string[] } = {}) {
+export function NotificationPreferences({
+  visibleCategories,
+}: { visibleCategories?: string[] } = {}) {
   const { user, isLoading: authLoading } = useAuth();
   const [prefs, setPrefs] = useState<AllPrefs>(DEFAULT_PREFS);
   const [savedPrefs, setSavedPrefs] = useState<AllPrefs>(normalizePrefs(DEFAULT_PREFS));
@@ -109,7 +123,9 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
       }
     }
     void load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [authLoading, user]);
 
   async function save() {
@@ -146,15 +162,25 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
       </p>
 
       {/* Header row */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: preferenceGridTemplate,
-        gap: 8,
-        alignItems: "center",
-        paddingBottom: 8,
-        borderBottom: "1px solid var(--color-border-light)",
-      }}>
-        <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: preferenceGridTemplate,
+          gap: 8,
+          alignItems: "center",
+          paddingBottom: 8,
+          borderBottom: "1px solid var(--color-border-light)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            fontWeight: 600,
+            color: "var(--color-text-muted)",
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
           Category
         </span>
         <MaybeHint content="In-App" side="top">
@@ -170,42 +196,57 @@ export function NotificationPreferences({ visibleCategories }: { visibleCategori
       </div>
 
       {/* Category rows */}
-      {Object.entries(CATEGORY_LABELS).filter(([category]) => !visibleCategories || visibleCategories.includes(category)).map(([category, label]) => (
-        <div
-          key={category}
-          style={{
-            display: "grid",
-            gridTemplateColumns: preferenceGridTemplate,
-            gap: 8,
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <span style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 500, color: "var(--color-text-primary)" }}>
-              {label}
-            </span>
-            <span style={{ display: "block", fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
-              {CATEGORY_DESCRIPTIONS[category]}
-            </span>
+      {Object.entries(CATEGORY_LABELS)
+        .filter(([category]) => !visibleCategories || visibleCategories.includes(category))
+        .map(([category, label]) => (
+          <div
+            key={category}
+            style={{
+              display: "grid",
+              gridTemplateColumns: preferenceGridTemplate,
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-body-sm)",
+                  fontWeight: 500,
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                {label}
+              </span>
+              <span
+                style={{
+                  display: "block",
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                  marginTop: 2,
+                }}
+              >
+                {CATEGORY_DESCRIPTIONS[category]}
+              </span>
+            </div>
+            <div style={centeredChannelCellStyle}>
+              <input
+                type="checkbox"
+                checked={prefs[category]?.in_app ?? true}
+                onChange={() => toggle(category, "in_app")}
+                style={checkboxStyle}
+              />
+            </div>
+            <div style={centeredChannelCellStyle}>
+              <input
+                type="checkbox"
+                checked={prefs[category]?.email ?? false}
+                onChange={() => toggle(category, "email")}
+                style={checkboxStyle}
+              />
+            </div>
           </div>
-          <div style={centeredChannelCellStyle}>
-            <input
-              type="checkbox"
-              checked={prefs[category]?.in_app ?? true}
-              onChange={() => toggle(category, "in_app")}
-              style={checkboxStyle}
-            />
-          </div>
-          <div style={centeredChannelCellStyle}>
-            <input
-              type="checkbox"
-              checked={prefs[category]?.email ?? false}
-              onChange={() => toggle(category, "email")}
-              style={checkboxStyle}
-            />
-          </div>
-        </div>
-      ))}
+        ))}
 
       <button
         onClick={save}

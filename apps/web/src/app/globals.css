@@ -2,7 +2,6 @@
 @import "tw-animate-css";
 @import "./shadcn-tailwind.css";
 
-
 /*
   ┌────────────────────────────────────────────────────────────────────┐
   │  DubGrid Design System — Responsive Strategy                      │
@@ -22,8 +21,8 @@
 */
 
 @theme {
-  --font-sans: var(--font-dm-sans), 'DM Sans', system-ui, sans-serif;
-  --font-mono: var(--font-dm-mono), 'DM Mono', monospace;
+  --font-sans: var(--font-dm-sans), "DM Sans", system-ui, sans-serif;
+  --font-mono: var(--font-dm-mono), "DM Mono", monospace;
 
   /* DubGrid palette — sourced from @dubgrid/design-tokens runtime vars */
   --color-bg: var(--dg-color-bg);
@@ -96,7 +95,7 @@ body {
   margin: 0;
   padding: 0;
   background: var(--color-bg);
-  font-family: var(--font-dm-sans), 'DM Sans', sans-serif;
+  font-family: var(--font-dm-sans), "DM Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none; /* Prevent bounce effect */
@@ -126,7 +125,13 @@ textarea {
   min-height: var(--dg-btn-h);
   padding: 0 var(--dg-btn-px);
   border-radius: var(--dg-btn-radius);
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 80ms ease, opacity 150ms ease, filter 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 80ms ease,
+    opacity 150ms ease,
+    filter 150ms ease;
   white-space: nowrap;
   text-decoration: none;
 }
@@ -245,6 +250,36 @@ textarea {
   filter: brightness(0.9);
 }
 
+/* Buttons that sit ON a solid danger surface (e.g. the sandbox banner).
+   Solid = filled inverse with danger text; outline = inverse border/text. */
+.dg-btn-on-danger-solid {
+  background: var(--color-text-inverse);
+  color: var(--color-danger);
+  border: 1px solid var(--color-text-inverse);
+}
+
+.dg-btn-on-danger-solid:hover {
+  filter: brightness(0.92);
+}
+
+.dg-btn-on-danger-solid:active {
+  filter: brightness(0.85);
+}
+
+.dg-btn-on-danger-outline {
+  background: transparent;
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-text-inverse);
+}
+
+.dg-btn-on-danger-outline:hover {
+  background: color-mix(in srgb, var(--color-text-inverse) 18%, transparent);
+}
+
+.dg-btn-on-danger-outline:active {
+  background: color-mix(in srgb, var(--color-text-inverse) 28%, transparent);
+}
+
 /* Warning filled (bench/attention CTA) */
 .dg-btn-warning-filled {
   background: var(--color-warning);
@@ -308,7 +343,9 @@ textarea {
   color: var(--color-text-secondary);
   background: var(--color-surface);
   outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .dg-input::placeholder {
@@ -342,6 +379,12 @@ textarea {
   margin-bottom: 5px;
 }
 
+.dg-form-error {
+  color: var(--color-danger);
+  font-size: var(--dg-fs-footnote);
+  margin: 4px 0 0;
+}
+
 /* ── Segment Control ────────────────────────────────────── */
 .dg-segment {
   display: flex;
@@ -360,13 +403,15 @@ textarea {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
   font-family: inherit;
   line-height: 1;
   height: 100%;
 }
 
-.dg-segment-btn+.dg-segment-btn {
+.dg-segment-btn + .dg-segment-btn {
   border-left: 1px solid var(--color-border);
 }
 
@@ -411,7 +456,9 @@ textarea {
   font-family: inherit;
   line-height: 1;
   white-space: nowrap;
-  transition: color 200ms ease, background 200ms ease;
+  transition:
+    color 200ms ease,
+    background 200ms ease;
   flex: 1 0 auto;
 }
 
@@ -470,6 +517,16 @@ textarea {
   display: none;
 }
 
+/* Hide scrollbars while keeping scroll behaviour (Firefox, IE, WebKit) */
+.dg-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dg-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Fade overlays — hidden by default, shown via .visible */
 .dg-scroll-fade {
   position: absolute;
@@ -492,7 +549,11 @@ textarea {
 .dg-scroll-fade--left {
   left: 0;
   justify-content: flex-start;
-  background: linear-gradient(to right, var(--scrollable-bg, var(--color-surface)) 30%, transparent);
+  background: linear-gradient(
+    to right,
+    var(--scrollable-bg, var(--color-surface)) 30%,
+    transparent
+  );
   padding-left: 2px;
 }
 
@@ -517,7 +578,9 @@ textarea {
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
-  transition: color 150ms ease, background 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
 }
 
 .dg-scroll-chevron:hover {
@@ -564,7 +627,10 @@ textarea {
   color: var(--color-text-muted);
   cursor: pointer;
   text-decoration: none;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
   font-family: inherit;
 }
 
@@ -598,7 +664,9 @@ textarea {
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color 150ms ease, border-color 150ms ease;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
   font-family: inherit;
   margin-bottom: -1px;
 }
@@ -668,13 +736,21 @@ textarea {
 
 /* ── Entrance Animations ──────────────────────────────── */
 @keyframes dg-enter {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes dg-enter-scale {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .dg-page-enter {
@@ -692,21 +768,25 @@ textarea {
 .dg-staff-directory-header,
 .dg-staff-directory-row {
   display: grid;
-  grid-template-columns: 60px minmax(0, 1fr) 40px;
+  grid-template-columns: 100px minmax(0, 1fr) 110px 110px 40px;
   align-items: stretch;
 }
 
 @media (min-width: 768px) {
   .dg-staff-directory-header,
   .dg-staff-directory-row {
-    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) 40px;
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      40px;
   }
 }
 
 @media (min-width: 1024px) {
   .dg-staff-directory-header,
   .dg-staff-directory-row {
-    grid-template-columns: 60px minmax(180px, 2fr) minmax(140px, 1fr) minmax(120px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.8fr) 40px;
+    grid-template-columns:
+      100px minmax(180px, 2fr) 110px 110px minmax(140px, 1fr) minmax(120px, 0.8fr)
+      minmax(140px, 1fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) 140px 40px;
   }
 }
 
@@ -766,10 +846,77 @@ textarea {
 .dg-staff-directory-cell {
   align-items: center;
   min-width: 0;
+  padding-inline: 16px;
+}
+
+/* Headers share the cell padding so column labels line up with cell content. */
+.dg-staff-directory-head-cell {
+  padding-inline: 16px;
+}
+
+/* Vertical dividers between visible columns. The rightmost data cell at
+   each breakpoint drops its right border so the row doesn't end with a
+   hanging line before the empty chevron / utility column. */
+.dg-staff-directory-head-cell:not(:last-child),
+.dg-staff-directory-cell:not(:last-child) {
+  border-right: 1px solid var(--color-border-light);
+}
+
+/* Base (<md): Status (col 4) is the rightmost visible data column. */
+.dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+.dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
+  border-right: none;
+}
+
+@media (min-width: 768px) {
+  /* md: Status regains its divider; Certification (col 6) is now rightmost. */
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(4),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(4) {
+    border-right: 1px solid var(--color-border-light);
+  }
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+    border-right: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* lg: Certification regains its divider; Date Joined (col 10) is the rightmost. */
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(6),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(6) {
+    border-right: 1px solid var(--color-border-light);
+  }
+  .dg-staff-directory-header > .dg-staff-directory-head-cell:nth-child(10),
+  .dg-staff-directory-row > .dg-staff-directory-cell:nth-child(10) {
+    border-right: none;
+  }
+}
+
+/* Outer column gutters (24px) match the table-mode `pl-6` / `pr-6` so reorder mode aligns with normal mode. */
+.dg-staff-directory-cell--rank,
+.dg-staff-directory-head-cell:first-child {
+  padding-left: 24px;
+}
+
+.dg-staff-directory-cell--chevron,
+.dg-staff-directory-head-cell:last-child {
+  padding-right: 24px;
 }
 
 .dg-staff-directory-cell--rank {
-  width: 60px;
+  width: 100px;
+}
+
+.dg-staff-directory-cell--employment {
+  width: 110px;
+}
+
+.dg-staff-directory-cell--status {
+  width: 110px;
+}
+
+.dg-staff-directory-cell--date-joined {
+  width: 140px;
 }
 
 .dg-staff-directory-cell--name {
@@ -786,7 +933,9 @@ textarea {
   position: relative;
   z-index: 1;
   transform: translate3d(0, var(--dg-settings-reorder-offset, 0px), 0);
-  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background 150ms ease;
+  transition:
+    transform 180ms cubic-bezier(0.2, 0, 0, 1),
+    background 150ms ease;
   will-change: transform;
 }
 
@@ -813,7 +962,9 @@ textarea {
 .dg-settings-reorder-item[data-dragging="true"][data-drag-phase="settling"],
 .dg-settings-reorder-group[data-dragging="true"][data-drag-phase="settling"],
 .dg-settings-reorder-subitem[data-dragging="true"][data-drag-phase="settling"] {
-  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1), background 150ms ease;
+  transition:
+    transform 180ms cubic-bezier(0.2, 0, 0, 1),
+    background 150ms ease;
 }
 
 .dg-settings-reorder-item[data-moving="true"],
@@ -849,6 +1000,14 @@ textarea {
 
 .dg-menu::-webkit-scrollbar {
   display: none;
+}
+
+.dg-profile-menu {
+  min-width: 224px;
+}
+
+.dg-profile-menu .dg-menu-item {
+  white-space: nowrap;
 }
 
 .dg-menu-item {
@@ -1037,6 +1196,11 @@ textarea {
   animation: fade-in var(--dg-duration-standard) ease;
 }
 
+/* Variant: keep the sticky app header visible above the overlay. */
+.dg-modal-overlay.is-header-safe {
+  top: var(--app-shell-header-h, 0);
+}
+
 .dg-modal {
   background: var(--color-surface);
   border-radius: var(--dg-radius-xl);
@@ -1078,7 +1242,9 @@ textarea {
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background var(--dg-duration-fast) ease, color var(--dg-duration-fast) ease;
+  transition:
+    background var(--dg-duration-fast) ease,
+    color var(--dg-duration-fast) ease;
 }
 
 .dg-modal-close:hover {
@@ -1116,12 +1282,20 @@ textarea {
   width: 18px;
   height: 18px;
   border-radius: 4px;
-  border: 1.5px solid var(--color-border-dark);
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--color-text-muted);
   background: var(--color-surface);
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
-  transition: background var(--dg-duration-fast) ease, border-color var(--dg-duration-fast) ease;
+  transition:
+    background var(--dg-duration-fast) ease,
+    border-color var(--dg-duration-fast) ease;
+}
+
+.dg-checkbox:hover:not(:checked):not(:disabled) {
+  border-color: var(--color-text-secondary);
 }
 
 .dg-checkbox:checked {
@@ -1204,7 +1378,10 @@ textarea {
 
 /* ── Sidebar collapse ────────────────────────────────────────── */
 .dg-sidebar {
-  transition: width 220ms ease, padding 220ms ease, opacity 180ms ease;
+  transition:
+    width 220ms ease,
+    padding 220ms ease,
+    opacity 180ms ease;
   overflow: hidden;
   position: relative;
 }
@@ -1228,7 +1405,9 @@ textarea {
   background: var(--color-surface);
   cursor: pointer;
   color: var(--color-text-muted);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
   flex-shrink: 0;
   padding: 0;
 }
@@ -1259,7 +1438,9 @@ textarea {
   cursor: pointer;
   color: var(--color-text-muted);
   box-shadow: var(--dg-shadow-sidebar-toggle);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
   padding: 0;
 }
 
@@ -1285,6 +1466,25 @@ textarea {
 }
 .dg-table-row.expanded:hover {
   background: var(--color-info-bg);
+}
+
+/* Strip the trailing divider from the last row of every <tbody>. :last-child
+   also covers single-row tables (the only row is the last row). !important
+   overrides inline `style={{ borderBottom: ... }}` used by bespoke tables
+   in gridmaster/reports/dashboard surfaces. The `<tr>` rule covers
+   shadcn-style row borders; the cell rules cover inline-styled td/th borders. */
+table tbody > tr:last-child,
+table tbody > tr:last-child > td,
+table tbody > tr:last-child > th {
+  border-bottom: 0 !important;
+}
+
+/* Div-based "table" lists (settings panels: AbsenceTypeRow, CoverageOptionRow,
+   IndicatorRow, JobRow, ActivityLog skeleton). Each row component renders its
+   own outer <div> with inline borderBottom; this strips the divider on the
+   last (or only) row. */
+.dg-list-row:last-child {
+  border-bottom: 0 !important;
 }
 
 .staff-detail-overlay {
@@ -1315,8 +1515,14 @@ textarea {
 }
 
 @keyframes staff-detail-in {
-  from { transform: translateX(24px) scale(0.98); opacity: 0; }
-  to   { transform: translateX(0) scale(1); opacity: 1; }
+  from {
+    transform: translateX(24px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
 }
 
 .staff-detail-pane.closing {
@@ -1326,7 +1532,10 @@ textarea {
   animation: fade-out var(--dg-duration-fast) ease forwards;
 }
 @keyframes staff-detail-out {
-  to { transform: translateX(24px) scale(0.98); opacity: 0; }
+  to {
+    transform: translateX(24px) scale(0.98);
+    opacity: 0;
+  }
 }
 
 .staff-detail-header {
@@ -1352,7 +1561,9 @@ textarea {
   background: transparent;
   cursor: pointer;
   color: var(--color-text-faint);
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
   flex-shrink: 0;
   align-self: flex-end;
 }
@@ -1445,7 +1656,9 @@ textarea {
 .dg-grid-slot,
 .dg-grid-cell {
   position: relative;
-  transition: background 100ms ease, box-shadow 100ms ease;
+  transition:
+    background 100ms ease,
+    box-shadow 100ms ease;
 }
 
 .dg-grid-slot[data-today="true"],
@@ -1521,22 +1734,14 @@ textarea {
 }
 
 .dg-grid-cell[data-top-divider="light"] .dg-grid-cell__chrome {
-  background-image: linear-gradient(
-    to right,
-    var(--color-border-light),
-    var(--color-border-light)
-  );
+  background-image: linear-gradient(to right, var(--color-border-light), var(--color-border-light));
   background-position: var(--dg-grid-divider-inset) 0;
   background-repeat: no-repeat;
   background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
 }
 
 .dg-grid-cell[data-top-divider="dark"] .dg-grid-cell__chrome {
-  background-image: linear-gradient(
-    to right,
-    var(--color-dark),
-    var(--color-dark)
-  );
+  background-image: linear-gradient(to right, var(--color-dark), var(--color-dark));
   background-position: var(--dg-grid-divider-inset) 0;
   background-repeat: no-repeat;
   background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
@@ -1554,11 +1759,7 @@ textarea {
 }
 
 .dg-grid-slot[data-bottom-divider="light"] .dg-grid-slot__chrome {
-  background-image: linear-gradient(
-    to right,
-    var(--color-border-light),
-    var(--color-border-light)
-  );
+  background-image: linear-gradient(to right, var(--color-border-light), var(--color-border-light));
   background-position: var(--dg-grid-divider-inset) 100%;
   background-repeat: no-repeat;
   background-size: calc(100% - var(--dg-grid-divider-inset)) 1px;
@@ -1709,7 +1910,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 /* ── Open Shift Button ────────────────────────────────── */
 .dg-open-shift-btn {
-  transition: filter 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+  transition:
+    filter 100ms ease,
+    border-color 100ms ease,
+    box-shadow 100ms ease;
 }
 .dg-open-shift-btn:hover {
   filter: brightness(0.93);
@@ -1721,20 +1925,37 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 /* ── Tooltip Animation ─────────────────────────────────── */
 @keyframes tooltipFadeIn {
-  from { opacity: 0; transform: translate(-50%, -90%) scale(0.95); }
-  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+  from {
+    opacity: 0;
+    transform: translate(-50%, -90%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+  }
 }
 
 /* ── Shift Cell Transition ─────────────────────────────── */
 .dg-shift-pill {
-  transition: transform 150ms ease, opacity 150ms ease;
+  transition:
+    transform 150ms ease,
+    opacity 150ms ease;
 }
 
 /* ── Snap-back Animation (when drag is cancelled) ─────── */
 @keyframes dg-snap-back {
-  0% { transform: scale(0.95); opacity: 0.5; }
-  50% { transform: scale(1.03); opacity: 0.85; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 .dg-draggable-shift.dg-snap-back {
   animation: dg-snap-back 200ms ease-out;
@@ -1791,10 +2012,22 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   padding: 2px 8px;
   border-radius: var(--dg-radius-md);
 }
-.dg-draft-chip--new { background: var(--color-success-bg); color: var(--color-success-text); }
-.dg-draft-chip--modified { background: var(--color-brand-bg); color: var(--color-brand); }
-.dg-draft-chip--deleted { background: var(--color-danger-bg); color: var(--color-danger); }
-.dg-draft-chip--notes { background: var(--color-brand-bg); color: var(--color-brand); }
+.dg-draft-chip--new {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+.dg-draft-chip--modified {
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+}
+.dg-draft-chip--deleted {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.dg-draft-chip--notes {
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+}
 
 /* ── Dashboard Card ─────────────────────────────────────── */
 .dg-card {
@@ -2007,22 +2240,32 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   inset: 0;
   pointer-events: none;
   transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.62),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
   animation: dg-shimmer 1.5s linear infinite;
 }
 
-.dg-skeleton--text    { height: 14px; width: 60%; }
-.dg-skeleton--heading { height: 22px; width: 40%; }
-.dg-skeleton--avatar  { width: 36px; height: 36px; border-radius: 50%; }
-.dg-skeleton--card    { height: 120px; border-radius: var(--dg-radius-md); }
+.dg-skeleton--text {
+  height: 14px;
+  width: 60%;
+}
+.dg-skeleton--heading {
+  height: 22px;
+  width: 40%;
+}
+.dg-skeleton--avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.dg-skeleton--card {
+  height: 120px;
+  border-radius: var(--dg-radius-md);
+}
 
 @keyframes dg-shimmer {
-  100% { transform: translateX(100%); }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* ── Modal / Panel Exit Animations ─────────────────────── */
@@ -2035,11 +2278,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 @keyframes fade-out {
-  to { opacity: 0; }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes modal-out {
-  to { transform: scale(0.96); opacity: 0; }
+  to {
+    transform: scale(0.96);
+    opacity: 0;
+  }
 }
 
 .dg-panel.closing {
@@ -2047,7 +2295,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 }
 
 @keyframes panel-out {
-  to { transform: translateX(100%); }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 /* ── Print Legend (hidden on screen, shown on last print page) ── */
@@ -2129,20 +2379,70 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 
 .dg-auth-input {
   width: 100%;
-  padding: 11px 13px;
+  padding: 14px 16px;
   border: 1.5px solid var(--color-border);
-  border-radius: var(--dg-radius-sm);
+  border-radius: var(--dg-radius-md);
   font-size: var(--dg-fs-body);
   outline: none;
   box-sizing: border-box;
   font-family: inherit;
   color: var(--color-text-primary);
   background: var(--color-surface);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.dg-auth-input::placeholder {
+  color: var(--color-text-faint);
 }
 
 .dg-auth-input:focus {
   border-color: var(--color-border-focus);
   box-shadow: 0 0 0 3px var(--dg-focus-ring);
+}
+
+.dg-auth-input:disabled {
+  background: var(--color-bg);
+  color: var(--color-text-subtle);
+  cursor: not-allowed;
+}
+
+.dg-auth-input--error,
+.dg-auth-input--error:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--dg-danger-ring);
+}
+
+/* Icon tile — the 56px circle behind Mail / CheckCircle on status cards */
+.dg-auth-icon-tile {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.dg-auth-icon-tile--success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+/* Workspace pill (slug.basedomain) shown on org login + MFA screens */
+.dg-auth-badge {
+  display: inline-block;
+  background: var(--color-brand-bg);
+  color: var(--color-brand);
+  border: 1px solid var(--color-brand-border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: var(--dg-fs-label);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .dg-auth-submit {
@@ -2165,6 +2465,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 .dg-auth-submit:disabled {
   opacity: 0.85;
   cursor: not-allowed;
+}
+
+/* Secondary auth button — same shape, low-emphasis fill */
+.dg-auth-submit--secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
+}
+
+.dg-auth-submit--secondary:disabled {
+  opacity: 0.6;
 }
 
 .dg-auth-link {
@@ -2227,7 +2537,8 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     padding: 32px 20px 28px;
   }
 
-  .dg-standalone-input {
+  .dg-standalone-input,
+  .dg-auth-input {
     font-size: 16px !important;
   }
 
@@ -2333,8 +2644,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   }
 
   @keyframes drawer-in {
-    from { transform: translateX(-100%); }
-    to   { transform: translateX(0); }
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
   }
 
   /* Mobile section selector (for sidebar replacement) */
@@ -2351,7 +2666,9 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     top: var(--header-height);
     z-index: 50;
   }
-  .dg-mobile-section-bar::-webkit-scrollbar { display: none; }
+  .dg-mobile-section-bar::-webkit-scrollbar {
+    display: none;
+  }
 
   .dg-mobile-section-chip {
     display: inline-flex;
@@ -2367,7 +2684,10 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     flex-shrink: 0;
     min-height: 44px;
     white-space: nowrap;
-    transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    transition:
+      background 150ms ease,
+      border-color 150ms ease,
+      color 150ms ease;
   }
 
   .dg-mobile-section-chip.active {
@@ -2645,8 +2965,12 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   }
 
   @keyframes sheet-up {
-    from { transform: translateY(100%); }
-    to   { transform: translateY(0); }
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
 }
 
@@ -2727,7 +3051,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -2739,7 +3062,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     @apply font-sans;
   }
 }
-
 
 /* ── Help Hint ────────────────────────────────────────────────────────────
  * Styles for <HelpHint /> trigger.
@@ -2760,7 +3082,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   vertical-align: middle;
   flex-shrink: 0;
 }
-
 
 /* ── Reduced motion ────────────────────────────────────────────────────────
  * Disables non-essential animations and transitions for users who have

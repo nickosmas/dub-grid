@@ -1,5 +1,25 @@
 import { readFileSync } from "fs";
+import { createInterface } from "node:readline/promises";
 import { Client } from "pg";
+
+/**
+ * Require the operator to type the project ref back before we DROP its schema
+ * (L-8). The only prior guard was `url.includes("supabase.co")`, which production
+ * also passes. Skipped when CONFIRM_RESET=yes (for intentional automation).
+ */
+async function confirmDestructiveReset(ref: string): Promise<void> {
+  if (process.env.CONFIRM_RESET === "yes") return;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  console.warn(
+    `\n⚠️  This will DROP SCHEMA public CASCADE on REMOTE project "${ref}" — ALL DATA IS LOST.`,
+  );
+  const answer = await rl.question(`Type the project ref "${ref}" to confirm: `);
+  rl.close();
+  if (answer.trim() !== ref) {
+    console.error("Confirmation did not match. Aborting.");
+    process.exit(1);
+  }
+}
 
 /**
  * Resets the remote Supabase database by dropping the public schema
@@ -10,8 +30,10 @@ import { Client } from "pg";
 async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl?.includes("supabase.co")) {
-    console.error("ERROR: .env.local is not pointing to a remote Supabase project.");
-    console.error("Run `npm run db:reset:remote` (auto-pulls from Vercel), or `npm run db:reset` for local.");
+    console.error("ERROR: .env.remote is not pointing to a remote Supabase project.");
+    console.error(
+      "Run `npm run db:reset:remote` (loads .env.remote), or `npm run db:reset` for local.",
+    );
     process.exit(1);
   }
 
@@ -23,11 +45,12 @@ async function main() {
     const ref = new URL(supabaseUrl).hostname.split(".")[0];
     connectionString = `postgresql://postgres.${ref}:${encodeURIComponent(process.env.SUPABASE_DB_PASSWORD)}@aws-0-us-west-2.pooler.supabase.com:6543/postgres`;
   } else {
-    console.error("ERROR: DATABASE_URL or SUPABASE_DB_PASSWORD not found in .env.local.");
+    console.error("ERROR: DATABASE_URL or SUPABASE_DB_PASSWORD not found in .env.remote.");
     process.exit(1);
   }
 
   const ref = new URL(supabaseUrl).hostname.split(".")[0];
+  await confirmDestructiveReset(ref);
   console.log(`Connecting to REMOTE Supabase (${ref})...\n`);
 
   const db = new Client({ connectionString, ssl: { rejectUnauthorized: false } });
@@ -88,7 +111,9 @@ async function main() {
   if (grantCount === 0) {
     await db.end();
     console.error("FATAL: No grants found for 'authenticated' role on public tables.");
-    console.error("004_grants.sql must include: GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;");
+    console.error(
+      "004_grants.sql must include: GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;",
+    );
     process.exit(1);
   }
   console.log(`  ${grantCount} table grants for 'authenticated' — OK`);
@@ -126,7 +151,9 @@ async function main() {
   const missingFns = expectedFns.filter((f) => !foundFns.includes(f));
   if (missingFns.length > 0) {
     console.error(`\nWARNING: Missing critical functions: ${missingFns.join(", ")}`);
-    console.error("002_functions_triggers.sql may have partially failed. Check the SQL for errors.");
+    console.error(
+      "002_functions_triggers.sql may have partially failed. Check the SQL for errors.",
+    );
   } else {
     console.log(`  ${foundFns.length} critical functions verified — OK`);
   }

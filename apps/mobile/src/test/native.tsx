@@ -45,6 +45,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "onResponderRelease" ||
       key === "pointerEvents" ||
       key === "numberOfLines" ||
+      key === "maxFontSizeMultiplier" ||
       key === "accessibilityIgnoresInvertColors" ||
       key === "android_ripple"
     ) {
@@ -62,6 +63,9 @@ function pickDomProps(input: Record<string, any>) {
     }
 
     if (key === "accessibilityState") {
+      if (value == null) {
+        continue;
+      }
       const state = value as {
         disabled?: boolean;
         expanded?: boolean;
@@ -92,11 +96,7 @@ function pickDomProps(input: Record<string, any>) {
 
 export function createReactNativeModule(React: ReactModule) {
   let layoutOffset = 0;
-  const View = ({
-    children,
-    onLayout,
-    ...props
-  }: Record<string, any>) => {
+  const View = ({ children, onLayout, ...props }: Record<string, any>) => {
     const layoutYRef = React.useRef<number | null>(null);
 
     if (layoutYRef.current == null) {
@@ -117,35 +117,30 @@ export function createReactNativeModule(React: ReactModule) {
       });
     }, [onLayout]);
 
-    return React.createElement(
-      "div",
-      pickDomProps(props),
-      children as ReactType.ReactNode,
-    );
+    return React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
   };
   const Text = ({ children, ...props }: Record<string, any>) =>
     React.createElement("span", pickDomProps(props), children as ReactType.ReactNode);
-  const ScrollView = React.forwardRef<
-    { scrollTo: typeof screenScrollToMock },
-    Record<string, any>
-  >(({ children, ...props }, ref) => {
-    React.useImperativeHandle(
-      ref,
-      () => ({
-        scrollTo: screenScrollToMock,
-      }),
-      [],
-    );
+  const ScrollView = React.forwardRef<{ scrollTo: typeof screenScrollToMock }, Record<string, any>>(
+    ({ children, ...props }, ref) => {
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          scrollTo: screenScrollToMock,
+        }),
+        [],
+      );
 
-    return React.createElement(
-      "div",
-      {
-        ...pickDomProps(props),
-        "data-keyboard-dismiss-mode": props.keyboardDismissMode,
-      },
-      children as ReactType.ReactNode,
-    );
-  });
+      return React.createElement(
+        "div",
+        {
+          ...pickDomProps(props),
+          "data-keyboard-dismiss-mode": props.keyboardDismissMode,
+        },
+        children as ReactType.ReactNode,
+      );
+    },
+  );
   const KeyboardAvoidingView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
   const Image = ({ source, ...props }: Record<string, any>) =>
@@ -155,12 +150,7 @@ export function createReactNativeModule(React: ReactModule) {
     });
   const SafeAreaView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
-  const Pressable = ({
-    children,
-    onPress,
-    disabled,
-    ...props
-  }: Record<string, any>) =>
+  const Pressable = ({ children, onPress, disabled, ...props }: Record<string, any>) =>
     React.createElement(
       "button",
       {
@@ -202,17 +192,9 @@ export function createReactNativeModule(React: ReactModule) {
       ...domProps,
     });
   });
-  const Modal = ({
-    children,
-    visible = true,
-    ...props
-  }: Record<string, any>) =>
+  const Modal = ({ children, visible = true, ...props }: Record<string, any>) =>
     visible
-      ? React.createElement(
-          "div",
-          pickDomProps(props),
-          children as ReactType.ReactNode,
-        )
+      ? React.createElement("div", pickDomProps(props), children as ReactType.ReactNode)
       : null;
   class AnimatedValue {
     value: number;
@@ -269,6 +251,18 @@ export function createReactNativeModule(React: ReactModule) {
         },
       }),
     },
+    Dimensions: {
+      get: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+      addEventListener: () => ({
+        remove() {
+          return undefined;
+        },
+      }),
+    },
+    TurboModuleRegistry: {
+      get: () => null,
+      getEnforcing: () => new Proxy({}, { get: () => () => undefined }),
+    },
     KeyboardAvoidingView,
     Image,
     LayoutAnimation: {
@@ -288,8 +282,7 @@ export function createReactNativeModule(React: ReactModule) {
     Modal,
     Platform: {
       OS: "ios",
-      select: (value: Record<string, any>) =>
-        value.ios ?? value.default ?? null,
+      select: (value: Record<string, any>) => value.ios ?? value.default ?? null,
     },
     Pressable,
     RefreshControl: () => null,

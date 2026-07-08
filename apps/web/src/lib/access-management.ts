@@ -18,6 +18,7 @@ const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
   canPublishSchedule: "Publish schedule",
   canApplyRecurringSchedule: "Apply recurring schedule",
   canEditNotes: "Edit notes",
+  canEditScheduleIndicators: "Edit schedule indicators",
   canViewRecurringShifts: "View recurring shifts",
   canManageRecurringShifts: "Manage recurring shifts",
   canManageShiftSeries: "Manage shift series",
@@ -120,9 +121,7 @@ export function buildMembershipAccessChanges(
   return changes;
 }
 
-export function buildMembershipRemovalChanges(
-  user: OrganizationUser,
-): AccessReviewChange[] {
+export function buildMembershipRemovalChanges(user: OrganizationUser): AccessReviewChange[] {
   return [
     {
       key: "organizationAccess",

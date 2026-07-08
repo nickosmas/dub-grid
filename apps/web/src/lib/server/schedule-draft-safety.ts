@@ -33,8 +33,7 @@ export async function fetchScheduleDraftBreakdown(input: {
   if (input.endDate) scheduleCellQuery = scheduleCellQuery.lte("date", input.endDate);
   if (input.updatedBy) scheduleCellQuery = scheduleCellQuery.eq("updated_by", input.updatedBy);
 
-  const { data: scheduleCellRows, error: scheduleCellError } =
-    await scheduleCellQuery;
+  const { data: scheduleCellRows, error: scheduleCellError } = await scheduleCellQuery;
   if (scheduleCellError) throw scheduleCellError;
 
   let noteQuery = serviceClient
@@ -54,14 +53,12 @@ export async function fetchScheduleDraftBreakdown(input: {
   let deletedShifts = 0;
 
   for (const row of (scheduleCellRows ?? []) as DbScheduleCell[]) {
-    const kind = mapNormalizedScheduleCellRowToScheduleEntry(
-      row,
-      {
+    const kind =
+      mapNormalizedScheduleCellRowToScheduleEntry(row, {
         isScheduler: true,
         assignmentLabelMap: new Map<number, string>(),
         absenceTypeMap: new Map<number, string>(),
-      },
-    )?.draftKind ?? null;
+      })?.draftKind ?? null;
     if (kind === "new") newShifts += 1;
     if (kind === "modified") modifiedShifts += 1;
     if (kind === "deleted") deletedShifts += 1;
@@ -129,10 +126,14 @@ export async function discardScheduleDraftsDirect(input: {
   const cellsToTouch: Array<{ id: string; version: number }> = [];
 
   for (const cell of cells) {
-    const draftSnapshot = (cell.snapshots ?? []).find((snapshot) => snapshot.snapshot_kind === "draft");
+    const draftSnapshot = (cell.snapshots ?? []).find(
+      (snapshot) => snapshot.snapshot_kind === "draft",
+    );
     if (!draftSnapshot) continue;
 
-    const hasPublished = (cell.snapshots ?? []).some((snapshot) => snapshot.snapshot_kind === "published");
+    const hasPublished = (cell.snapshots ?? []).some(
+      (snapshot) => snapshot.snapshot_kind === "published",
+    );
     if (hasPublished) {
       draftSnapshotIdsToDelete.push(draftSnapshot.id);
       cellsToTouch.push({ id: cell.id, version: cell.version });

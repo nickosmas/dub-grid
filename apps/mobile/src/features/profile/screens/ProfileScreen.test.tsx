@@ -1,24 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 const routerPush = vi.fn();
 const useQuery = vi.fn();
+const useMutation = vi.fn();
 const useAccessToken = vi.fn();
 const getSupabaseClient = vi.fn();
 const registerPushToken = vi.fn();
@@ -30,6 +24,7 @@ vi.mock("expo-router", () => ({
   router: {
     push: routerPush,
   },
+  Stack: Object.assign(() => null, { Screen: () => null }),
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -38,6 +33,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
   return {
     ...actual,
     useQuery,
+    useMutation,
   };
 });
 
@@ -52,6 +48,8 @@ vi.mock("../../../shared/lib/supabase", () => ({
 vi.mock("../../../shared/lib/api", () => ({
   getBootstrap: vi.fn(),
   getProfile: vi.fn(),
+  getProfileChangeRequests: vi.fn(),
+  updateProfileChangeRequest: vi.fn(),
   registerPushToken,
 }));
 
@@ -61,7 +59,7 @@ vi.mock("../../../shared/lib/auth-reset", () => ({
 
 vi.mock("../../../shared/lib/session", () => ({
   loadStoredPushDevice,
-  saveLastWorkspaceSlug: vi.fn(),
+  saveLastOrgSlug: vi.fn(),
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({
@@ -153,6 +151,7 @@ const bootstrapData = {
     canPublishSchedule: false,
     canApplyRecurringSchedule: false,
     canEditNotes: false,
+    canEditScheduleIndicators: false,
     canViewRecurringShifts: false,
     canManageRecurringShifts: false,
     canManageShiftSeries: false,
@@ -190,6 +189,7 @@ beforeAll(async () => {
 describe("ProfileScreen", () => {
   beforeEach(() => {
     useQuery.mockReset();
+    useMutation.mockReset();
     useAccessToken.mockReset();
     getSupabaseClient.mockReset();
     registerPushToken.mockReset();
@@ -200,8 +200,21 @@ describe("ProfileScreen", () => {
 
     useAccessToken.mockReturnValue("token-123");
     loadStoredPushDevice.mockResolvedValue(null);
+    useMutation.mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      variables: undefined,
+    });
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
+      if (key.includes("change-requests")) {
+        return {
+          data: { requests: [] },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
       if (key.includes("profile")) {
         return {
           data: profileData,
@@ -236,6 +249,14 @@ describe("ProfileScreen", () => {
   it("hides organization switching when the user belongs to one organization", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
+      if (key.includes("change-requests")) {
+        return {
+          data: { requests: [] },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
       if (key.includes("profile")) {
         return {
           data: profileData,
@@ -255,20 +276,32 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(
-      screen.queryByRole("button", { name: "Switch organization" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Switch organization" })).not.toBeInTheDocument();
   });
 
   it("shows pending profile change request review state", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
-      if (key.includes("profile")) {
+      if (key.includes("change-requests")) {
         return {
           data: {
-            ...profileData,
-            pendingProfileChangeRequest: true,
+            requests: [
+              {
+                id: "11111111-1111-1111-1111-111111111111",
+                type: "profile_update",
+                status: "pending",
+                createdAt: "2024-02-01T15:30:00.000Z",
+              },
+            ],
           },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+      if (key.includes("profile")) {
+        return {
+          data: profileData,
           error: null,
           isLoading: false,
           refetch: vi.fn(),
@@ -285,20 +318,33 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(
-      screen.getByText("A profile change request is pending admin review."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("1 pending request")).toBeInTheDocument();
+    expect(screen.getByText("Name change")).toBeInTheDocument();
   });
 
   it("shows pending account deletion request review state", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
-      if (key.includes("profile")) {
+      if (key.includes("change-requests")) {
         return {
           data: {
-            ...profileData,
-            pendingAccountDeletionRequest: true,
+            requests: [
+              {
+                id: "22222222-2222-2222-2222-222222222222",
+                type: "account_deletion",
+                status: "pending",
+                createdAt: "2024-02-01T15:30:00.000Z",
+              },
+            ],
           },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+      if (key.includes("profile")) {
+        return {
+          data: profileData,
           error: null,
           isLoading: false,
           refetch: vi.fn(),
@@ -315,22 +361,20 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(
-      screen.getByText("An account deletion request is pending admin review."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("1 pending request")).toBeInTheDocument();
+    expect(screen.getByText("Account deletion")).toBeInTheDocument();
   });
 
   it("opens detail screens from tappable rows", () => {
     render(<ProfileScreen />);
 
-    fireEvent.click(screen.getByText("Account details"));
-    fireEvent.click(screen.getByText("Work profile"));
+    fireEvent.click(screen.getByText("Profile details"));
     fireEvent.click(screen.getByText("Security & sessions"));
 
-    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/account");
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/work");
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/security");
-    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/me");
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/account");
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/home");
     expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/requests");
     expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/notifications");
   });
@@ -338,14 +382,10 @@ describe("ProfileScreen", () => {
   it("opens organization switching in a modal from the bottom button", () => {
     render(<ProfileScreen />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Switch organization" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Switch organization" }));
 
     expect(screen.getByText("Hidden Clinic")).toBeInTheDocument();
-    expect(routerPush).not.toHaveBeenCalledWith(
-      "/(tabs)/profile/switch-organization",
-    );
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/switch-organization");
   });
 
   it("resets the mobile session after a successful sign-out", async () => {

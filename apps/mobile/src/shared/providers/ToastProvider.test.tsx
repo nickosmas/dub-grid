@@ -1,23 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
-import {
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
-import {
-  createReactNativeModule,
-  createSafeAreaContextModule,
-} from "../../test/native";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createReactNativeModule, createSafeAreaContextModule } from "../../test/native";
 
 vi.useFakeTimers();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
@@ -177,9 +165,7 @@ describe("ToastProvider", () => {
     );
 
     expect(screen.getByText("Network connection issue")).toBeInTheDocument();
-    expect(
-      screen.getByText("Check your internet connection and try again."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Check your internet connection and try again.")).toBeInTheDocument();
   });
 
   it("suppresses queued network toasts while the offline toast is visible", () => {

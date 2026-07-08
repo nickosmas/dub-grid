@@ -9,10 +9,7 @@ import { requireMobileAuth } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
@@ -21,9 +18,7 @@ export async function PATCH(
     try {
       const payload = await markMobileNotificationRead(auth, id);
 
-      return NextResponse.json(
-        mobileNotificationReadResponseSchema.parse(payload),
-      );
+      return NextResponse.json(mobileNotificationReadResponseSchema.parse(payload));
     } catch (error) {
       if (error instanceof MobileApiRefreshError) {
         return NextResponse.json(
@@ -41,10 +36,7 @@ export async function PATCH(
       );
     }
   } catch {
-    return NextResponse.json(
-      { error: "We could not update that notification." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "We could not update that notification." }, { status: 500 });
   }
 }
 
@@ -56,9 +48,7 @@ export async function POST(req: NextRequest) {
     try {
       const payload = await markAllMobileNotificationsRead(auth);
 
-      return NextResponse.json(
-        mobileNotificationReadResponseSchema.parse(payload),
-      );
+      return NextResponse.json(mobileNotificationReadResponseSchema.parse(payload));
     } catch (error) {
       if (error instanceof MobileApiRefreshError) {
         return NextResponse.json(
@@ -76,9 +66,6 @@ export async function POST(req: NextRequest) {
       );
     }
   } catch {
-    return NextResponse.json(
-      { error: "We could not update your notifications." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "We could not update your notifications." }, { status: 500 });
   }
 }

@@ -17,9 +17,7 @@ import {
 
 describe("mobileBorderColorFromText", () => {
   it("derives a visible rgba border from a hex text color", () => {
-    expect(mobileBorderColorFromText("#1E293B")).toBe(
-      "rgba(30,41,59,0.35)",
-    );
+    expect(mobileBorderColorFromText("#1E293B")).toBe("rgba(30,41,59,0.35)");
   });
 
   it("falls back to the default mobile border color for invalid input", () => {
@@ -57,6 +55,7 @@ describe("shared design token derivation", () => {
           "brand": "#2563EB",
           "cardRadius": 16,
           "screenTitle": {
+            "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
             "fontWeight": "700",
             "lineHeight": 28,
@@ -68,6 +67,7 @@ describe("shared design token derivation", () => {
           "brand": "#2563EB",
           "cardRadius": 16,
           "screenTitle": {
+            "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
             "fontWeight": "700",
             "lineHeight": 28,

@@ -5,6 +5,9 @@ import type {
   MobileFocusArea,
   MobileNamedItem,
   MobileNotification,
+  MobileNotificationPriority,
+  MobileNotificationsCursor,
+  MobileNotificationsQuery,
   MobilePerson,
   MobileScheduleEntry,
   MobileScheduleRange,
@@ -71,27 +74,27 @@ export type MobileMeScheduleContext = MobileServiceContext & {
 export type MobileOrgScheduleContext = MobileServiceContext & {
   permissions: Pick<
     MobilePermissionsLike,
-    | "canViewSchedule"
-    | "canEditShifts"
-    | "canApproveShiftRequests"
-    | "canManageEmployees"
+    "canViewSchedule" | "canEditShifts" | "canApproveShiftRequests" | "canManageEmployees"
   >;
 };
 
 export type MobilePeopleContext = MobileServiceContext & {
   permissions: Pick<MobilePermissionsLike, "canManageEmployees" | "canViewStaff">;
+  user: Pick<MobileUserLike, "id">;
 };
 
 export type MobileNotificationsContext = MobileNotificationContext;
 
 type MobilePersonSource = {
   id: string;
+  employeeNumber: number;
   firstName: string;
   lastName: string;
   employmentType: MobilePerson["employmentType"];
   phone: string;
   email: string;
   status: MobilePerson["status"];
+  orgRole: MobilePerson["orgRole"];
   certificationId: number | null;
   roleIds: number[];
   seniority: number;
@@ -114,9 +117,7 @@ type FetchLinkedEmployeeForUser = (
   userId: string,
 ) => Promise<MobileLinkedEmployee | null>;
 
-type FetchMobileUnreadNotificationCount = (
-  userClient: SupabaseClient,
-) => Promise<number>;
+type FetchMobileUnreadNotificationCount = (userClient: SupabaseClient) => Promise<number>;
 
 type FetchMobileAbsenceTypes = (
   serviceClient: SupabaseClient,
@@ -153,17 +154,30 @@ type FetchMobilePeople = (
   orgId: string,
 ) => Promise<MobilePersonSource[]>;
 
-type FetchMobileNotifications = (
-  userClient: SupabaseClient,
-  input: { limit: number; offset: number },
-) => Promise<{
+export type FetchMobileNotificationsInput = {
+  limit: number;
+  cursor?: MobileNotificationsCursor | null;
+  category?: string;
+  type?: string;
+  priority?: MobileNotificationPriority;
+  read?: "read" | "unread";
+  search?: string;
+  archived?: "inbox" | "archived" | "any";
+  sort?: "asc" | "desc";
+};
+
+export type FetchMobileNotificationsResult = {
   unreadCount: number;
   notifications: MobileNotification[];
-}>;
+  nextCursor: MobileNotificationsCursor | null;
+};
 
-type MapOrganizationToMobileConfig = (
-  org: Organization,
-) => MobileBootstrapResponse["currentOrg"];
+type FetchMobileNotifications = (
+  userClient: SupabaseClient,
+  input: FetchMobileNotificationsInput,
+) => Promise<FetchMobileNotificationsResult>;
+
+type MapOrganizationToMobileConfig = (org: Organization) => MobileBootstrapResponse["currentOrg"];
 
 type MapEmployeeToMobilePerson = (person: MobilePersonSource) => MobilePerson;
 
@@ -182,10 +196,7 @@ type MobilePeopleResponse = {
   people: MobilePerson[];
 };
 
-type MobileNotificationsResponse = {
-  unreadCount: number;
-  notifications: MobileNotification[];
-};
+type MobileNotificationsResponse = FetchMobileNotificationsResult;
 
 export function getEffectiveMobileRole(role: string): "super_admin" | "admin" | "user" {
   return role === "super_admin" || role === "admin" ? role : "user";
@@ -226,29 +237,22 @@ export async function loadMobileBootstrapPayload(
     roles,
     certifications,
     departments,
-  ] =
-    await Promise.all([
-      deps.fetchLinkedEmployeeForUser(
-        auth.serviceClient,
-        auth.currentOrg.id,
-        auth.user.id,
-      ),
-      deps.fetchMobileUnreadNotificationCount(auth.userClient),
-      deps.fetchMobileAbsenceTypes(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
-    ]);
+  ] = await Promise.all([
+    deps.fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
+    deps.fetchMobileUnreadNotificationCount(auth.userClient),
+    deps.fetchMobileAbsenceTypes(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
+  ]);
 
   return {
     user: {
       id: auth.user.id,
       email: auth.user.email ?? null,
-      firstName:
-        (auth.user.user_metadata?.first_name as string | undefined) ?? null,
-      lastName:
-        (auth.user.user_metadata?.last_name as string | undefined) ?? null,
+      firstName: (auth.user.user_metadata?.first_name as string | undefined) ?? null,
+      lastName: (auth.user.user_metadata?.last_name as string | undefined) ?? null,
     },
     currentOrg: deps.mapOrganizationToMobileConfig(auth.currentOrg),
     memberships: auth.memberships.map((membership) => ({
@@ -360,10 +364,7 @@ export async function loadMobilePeoplePayload(
     throw new MobileApiAuthorizationError();
   }
 
-  const people = await deps.fetchMobilePeople(
-    auth.serviceClient,
-    auth.currentOrg.id,
-  );
+  const people = await deps.fetchMobilePeople(auth.serviceClient, auth.currentOrg.id);
   const visiblePeople = auth.permissions.canManageEmployees
     ? people
     : people.filter((person) => person.status === "active");
@@ -376,6 +377,12 @@ export async function loadMobilePeoplePayload(
         return mobilePerson;
       }
 
+      // Preserve userId on the caller's own row so the mobile app can find
+      // its own employee record (for /me/schedule lookup, "You" badge, etc.).
+      // The caller already knows their own auth id; nulling it here just
+      // breaks self-lookup. Other rows still get the link stripped so
+      // view-only callers can't map employee → auth account.
+      const isSelf = mobilePerson.userId === auth.user.id;
       return {
         ...mobilePerson,
         contactNotes: "",
@@ -386,7 +393,7 @@ export async function loadMobilePeoplePayload(
         pendingInvitation: null,
         roleIds: [],
         statusNote: "",
-        userId: null,
+        userId: isSelf ? mobilePerson.userId : null,
       };
     }),
   };
@@ -394,13 +401,25 @@ export async function loadMobilePeoplePayload(
 
 export async function loadMobileNotificationsPayload(
   auth: MobileNotificationsContext,
-  input: { limit?: number; offset?: number },
+  input: MobileNotificationsQuery,
   deps: {
     fetchMobileNotifications: FetchMobileNotifications;
   },
 ): Promise<MobileNotificationsResponse> {
+  const cursor =
+    input.cursorCreatedAt && input.cursorId
+      ? { createdAt: input.cursorCreatedAt, id: input.cursorId }
+      : null;
+
   return deps.fetchMobileNotifications(auth.userClient, {
-    limit: input.limit ?? 20,
-    offset: input.offset ?? 0,
+    limit: input.limit ?? 25,
+    cursor,
+    category: input.category,
+    type: input.type,
+    priority: input.priority,
+    read: input.read,
+    search: input.search,
+    archived: input.archived,
+    sort: input.sort,
   });
 }

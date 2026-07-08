@@ -1,11 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { renderHook, waitFor } from "@testing-library/react";
+import type { Session, User } from "@supabase/supabase-js";
 
-// ── Mock account client adapter ──────────────────────────────────────────────
-const mockGetSession = vi.fn();
-const mockGetUser = vi.fn();
-const mockOnAuthStateChange = vi.fn();
-const mockGetVerifiedBrowserAuth = vi.fn();
+// ── Controlled mock for useAuth ─────────────────────────────────────────────
+type MockAuth = {
+  user: User | null;
+  session: Session | null;
+  isLoading: boolean;
+};
+
+let currentAuth: MockAuth = { user: null, session: null, isLoading: false };
+
+function setAuth(next: Partial<MockAuth>): void {
+  currentAuth = { ...currentAuth, ...next };
+}
+
+vi.mock("@/lib/auth-context", () => ({
+  useAuth: () => currentAuth,
+}));
+
+// ── Mock account client adapter (only the pieces usePermissions still uses) ──
 const mockFetchAccountPermissions = vi.fn();
 const mockRemoveBrowserRealtimeChannel = vi.fn();
 
@@ -22,16 +36,9 @@ function createMockChannel() {
 const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => createMockChannel());
 
 vi.mock("@/features/account/client", () => ({
-  createBrowserRealtimeChannel: (name: string) =>
-    mockCreateBrowserRealtimeChannel(name),
+  createBrowserRealtimeChannel: (name: string) => mockCreateBrowserRealtimeChannel(name),
   fetchAccountPermissions: () => mockFetchAccountPermissions(),
-  getVerifiedBrowserAuth: () => mockGetVerifiedBrowserAuth(),
-  removeBrowserRealtimeChannel: (channel: unknown) =>
-    mockRemoveBrowserRealtimeChannel(channel),
-  subscribeToBrowserAuthChanges: (cb: unknown) => {
-    mockOnAuthStateChange(cb);
-    return { data: { subscription: { unsubscribe: vi.fn() } } };
-  },
+  removeBrowserRealtimeChannel: (channel: unknown) => mockRemoveBrowserRealtimeChannel(channel),
 }));
 
 // ── Import after mocks ──────────────────────────────────────────────────────
@@ -43,21 +50,8 @@ import {
   applyViewImplications,
   READ_ONLY_PERMS,
 } from "@/features/permissions";
-import {
-  clearPermsCache,
-  usePermissions,
-} from "@/features/permissions/client";
+import { clearPermsCache, usePermissions } from "@/features/permissions/client";
 import { ALL_FALSE_PERMS } from "./factories";
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 type TestJwtClaims = {
   platform_role?: string;
@@ -84,29 +78,26 @@ function createSession(
   } as Parameters<typeof getPermissionsFromSession>[0];
 }
 
+function signIn(claims: TestJwtClaims, userId = "u-1") {
+  const session = createSession(claims, userId) as unknown as Session;
+  setAuth({
+    user: { id: userId } as User,
+    session,
+    isLoading: false,
+  });
+  return session;
+}
+
+function signOut() {
+  setAuth({ user: null, session: null, isLoading: false });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   clearPermsCache();
-  let latestSession: ReturnType<typeof createSession> | null = null;
-  mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
-  mockGetVerifiedBrowserAuth.mockImplementation(async () => {
-    const [
-      {
-        data: { session },
-      },
-      {
-        data: { user },
-      },
-    ] = await Promise.all([mockGetSession(), mockGetUser()]);
-
-    latestSession = session;
-    if (!session?.access_token || !user) {
-      return { session: null, user: null };
-    }
-    return { session, user };
-  });
+  currentAuth = { user: null, session: null, isLoading: false };
   mockFetchAccountPermissions.mockImplementation(async () => ({
-    permissions: getPermissionsFromSession(latestSession),
+    permissions: getPermissionsFromSession(currentAuth.session),
   }));
 });
 
@@ -137,7 +128,9 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns NO_PERMS for session with no access_token", () => {
-    const perms = getPermissionsFromSession({ access_token: "" } as Parameters<typeof getPermissionsFromSession>[0]);
+    const perms = getPermissionsFromSession({ access_token: "" } as Parameters<
+      typeof getPermissionsFromSession
+    >[0]);
     expect(perms.role).toBe("user");
   });
 
@@ -179,7 +172,6 @@ describe("getPermissionsFromSession", () => {
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("admin");
     expect(perms.level).toBe(2);
-    // Without admin_permissions from DB, falls back to READ_ONLY
     expect(perms.canEditShifts).toBe(false);
     expect(perms.canViewSchedule).toBe(true);
     expect(perms.canViewStaff).toBe(true);
@@ -199,7 +191,9 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns user perms when JWT decode fails", () => {
-    const session = { access_token: "bad-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
+    const session = { access_token: "bad-jwt", user: { id: "u-1" } } as Parameters<
+      typeof getPermissionsFromSession
+    >[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("user");
     expect(perms.orgId).toBeNull();
@@ -268,19 +262,26 @@ describe("permission derivation", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Part D: usePermissions hook
+// Part D: usePermissions hook (consumes useAuth)
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("usePermissions hook", () => {
-  it("starts with loading state", async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
+  it("starts with loading state when auth is still resolving", () => {
+    setAuth({ user: null, session: null, isLoading: true });
     const { result } = renderHook(() => usePermissions());
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it("returns NO_PERMS when auth resolves with no session", async () => {
+    setAuth({ user: null, session: null, isLoading: false });
+    const { result } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("user");
+    expect(result.current.orgId).toBeNull();
   });
 
   it("resolves gridmaster perms from session", async () => {
-    const session = createSession(
+    signIn(
       {
         platform_role: "gridmaster",
         org_role: "user",
@@ -288,7 +289,6 @@ describe("usePermissions hook", () => {
       },
       "gm-1",
     );
-    mockGetSession.mockResolvedValue({ data: { session } });
 
     const { result } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -298,12 +298,11 @@ describe("usePermissions hook", () => {
   });
 
   it("resolves admin perms from the account permissions adapter", async () => {
-    const session = createSession({
+    signIn({
       platform_role: "none",
       org_role: "admin",
       org_id: "org-1",
     });
-    mockGetSession.mockResolvedValue({ data: { session } });
     mockFetchAccountPermissions.mockResolvedValue({
       permissions: buildPerms("admin", "org-1", false, {
         canViewSchedule: true,
@@ -311,6 +310,7 @@ describe("usePermissions hook", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: true,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,
@@ -341,69 +341,62 @@ describe("usePermissions hook", () => {
     expect(result.current.canPublishSchedule).toBe(false);
   });
 
-  it("clears perms on SIGNED_OUT event", async () => {
-    const session = createSession({
+  it("clears perms when auth transitions to signed-out", async () => {
+    signIn({
       platform_role: "none",
       org_role: "super_admin",
       org_id: "org-1",
     });
-    mockGetSession.mockResolvedValue({ data: { session } });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result, rerender } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
 
-    // Simulate SIGNED_OUT auth state change
-    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
-    act(() => {
-      authCallback("SIGNED_OUT", null);
-    });
+    signOut();
+    rerender();
 
     await waitFor(() => expect(result.current.role).toBe("user"));
   });
 
-  it("keeps resolved perms during same-user TOKEN_REFRESHED revalidation", async () => {
-    const session = createSession({
+  it("keeps resolved perms during same-user token refreshes", async () => {
+    signIn({
       platform_role: "none",
       org_role: "super_admin",
       org_id: "org-1",
     });
-    mockGetSession.mockResolvedValue({ data: { session } });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result, rerender } = renderHook(() => usePermissions());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
 
-    const sessionDeferred = deferred<{ data: { session: typeof session } }>();
-    const userDeferred = deferred<{ data: { user: { id: string } } }>();
-    mockGetSession.mockReturnValueOnce(sessionDeferred.promise);
-    mockGetUser.mockReturnValueOnce(userDeferred.promise);
-
-    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
-    act(() => {
-      authCallback("TOKEN_REFRESHED", session);
+    // Same user, refreshed session — cache hit within the 10s window means
+    // no re-fetch and the resolved perms survive.
+    signIn({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
     });
-
-    expect(result.current.isLoading).toBe(false);
-    expect(result.current.role).toBe("super_admin");
-
-    await act(async () => {
-      sessionDeferred.resolve({ data: { session } });
-      userDeferred.resolve({ data: { user: { id: "u-1" } } });
-      await Promise.resolve();
-    });
+    rerender();
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
   });
 
-  it("enters blocking loading when auth changes to a different user", async () => {
-    const firstSession = createSession({
-      platform_role: "none",
-      org_role: "super_admin",
-      org_id: "org-1",
-    });
-    const secondSession = createSession(
+  it("re-resolves when auth changes to a different user", async () => {
+    signIn(
+      {
+        platform_role: "none",
+        org_role: "super_admin",
+        org_id: "org-1",
+      },
+      "u-1",
+    );
+
+    const { result, rerender } = renderHook(() => usePermissions());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.role).toBe("super_admin");
+
+    signIn(
       {
         platform_role: "gridmaster",
         org_role: "user",
@@ -411,42 +404,20 @@ describe("usePermissions hook", () => {
       },
       "u-2",
     );
-    mockGetSession.mockResolvedValue({ data: { session: firstSession } });
+    rerender();
 
-    const { result } = renderHook(() => usePermissions());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.role).toBe("super_admin");
-
-    const sessionDeferred = deferred<{ data: { session: typeof secondSession } }>();
-    const userDeferred = deferred<{ data: { user: { id: string } } }>();
-    mockGetSession.mockReturnValueOnce(sessionDeferred.promise);
-    mockGetUser.mockReturnValueOnce(userDeferred.promise);
-
-    const authCallback = mockOnAuthStateChange.mock.calls[0][0];
-    act(() => {
-      authCallback("SIGNED_IN", secondSession);
+    await waitFor(() => {
+      expect(result.current.role).toBe("gridmaster");
     });
-
-    expect(result.current.isLoading).toBe(true);
-
-    await act(async () => {
-      sessionDeferred.resolve({ data: { session: secondSession } });
-      userDeferred.resolve({ data: { user: { id: "u-2" } } });
-      await Promise.resolve();
-    });
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.role).toBe("gridmaster");
     expect(result.current.isGridmaster).toBe(true);
   });
 
   it("resolves user role correctly", async () => {
-    const session = createSession({
+    signIn({
       platform_role: "none",
       org_role: "user",
       org_id: "org-1",
     });
-    mockGetSession.mockResolvedValue({ data: { session } });
     mockFetchAccountPermissions.mockResolvedValue({
       permissions: buildPerms("user", "org-1", false),
     });
@@ -595,13 +566,11 @@ describe("applyViewImplications", () => {
   });
 
   it("backward compat: admin with old-style permissions gets view implied", () => {
-    // Simulates an admin whose JSONB has manage perms but no view keys
     const oldStylePerms = {
       ...ALL_FALSE_PERMS,
       canManageEmployees: true,
       canManageFocusAreas: true,
       canManageScheduleDefinitions: true,
-      // canViewEmployeeDetails, canViewFocusAreas, canViewScheduleDefinitions are false (not in JSONB)
     };
     const result = applyViewImplications(oldStylePerms);
     expect(result.canViewEmployeeDetails).toBe(true);
@@ -611,21 +580,16 @@ describe("applyViewImplications", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Part G: canAccessSettings
+// Part G: canAccessSettings (via usePermissions hook)
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("canAccessSettings", () => {
   it("is true for super_admin", async () => {
-    mockGetSession.mockResolvedValue({
-      data: {
-        session: createSession({
-          platform_role: "none",
-          org_role: "super_admin",
-          org_id: "org-1",
-          org_slug: "acme",
-        }),
-      },
-      error: null,
+    signIn({
+      platform_role: "none",
+      org_role: "super_admin",
+      org_id: "org-1",
+      org_slug: "acme",
     });
 
     const { result } = renderHook(() => usePermissions());
@@ -634,20 +598,15 @@ describe("canAccessSettings", () => {
   });
 
   it("is true for admin with view-only permissions", async () => {
-    mockGetSession.mockResolvedValue({
-      data: {
-        session: createSession(
-          {
-            platform_role: "none",
-            org_role: "admin",
-            org_id: "org-1",
-            org_slug: "acme",
-          },
-          "user-1",
-        ),
+    signIn(
+      {
+        platform_role: "none",
+        org_role: "admin",
+        org_id: "org-1",
+        org_slug: "acme",
       },
-      error: null,
-    });
+      "user-1",
+    );
     mockFetchAccountPermissions.mockResolvedValue({
       permissions: buildPerms("admin", "org-1", false, {
         ...ALL_FALSE_PERMS,
@@ -662,21 +621,15 @@ describe("canAccessSettings", () => {
   });
 
   it("is false for user with no view or manage permissions", async () => {
-    mockGetSession.mockResolvedValue({
-      data: {
-        session: createSession(
-          {
-            platform_role: "none",
-            org_role: "user",
-            org_id: "org-1",
-            org_slug: "acme",
-          },
-          "user-1",
-        ),
+    signIn(
+      {
+        platform_role: "none",
+        org_role: "user",
+        org_id: "org-1",
+        org_slug: "acme",
       },
-      error: null,
-    });
-    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+      "user-1",
+    );
     mockFetchAccountPermissions.mockResolvedValue({
       permissions: buildPerms("user", "org-1", false),
     });
@@ -688,16 +641,16 @@ describe("canAccessSettings", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Part H: unionPermissions with view permissions
-// ══════════════════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════════════════
 // Part H: buildPerms — user role with direct + department permissions
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("buildPerms — user role per-user permissions", () => {
   it("user with admin_permissions set", () => {
-    const perms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
+    const perms = {
+      ...ALL_FALSE_PERMS,
+      canViewDashboardAnalytics: true,
+      canViewEmployeeDetails: true,
+    };
     const result = buildPerms("user", "org-1", false, perms);
     expect(result.canViewDashboardAnalytics).toBe(true);
     expect(result.canViewEmployeeDetails).toBe(true);

@@ -1,13 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,6 +9,7 @@ import {
   type MobileScheduleEntrySegment,
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
+import { indefiniteArticle } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -23,10 +17,7 @@ import { ModalHeader } from "../../../shared/components/ModalHeader";
 import { DetailSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import {
-  SplitShiftBadge,
-  SplitShiftSegmentList,
-} from "../components/SplitShift";
+import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   createShiftRequest,
@@ -37,10 +28,7 @@ import {
   getShiftSwapOptions,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import {
-  getMobileQueryContentState,
-  getQueryErrorMessage,
-} from "../../../shared/lib/query-state";
+import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
@@ -199,9 +187,7 @@ function formatWeekRangeLabel(startDate: string): string {
       timeZone: "UTC",
     }).format(new Date(`${value}T00:00:00.000Z`));
 
-  return `${formatRangeDate(startDate)} - ${formatRangeDate(
-    addDaysIso(startDate, 6),
-  )}`;
+  return `${formatRangeDate(startDate)} - ${formatRangeDate(addDaysIso(startDate, 6))}`;
 }
 
 function formatPublishedAt(value: string | null, timeZone?: string | null) {
@@ -275,12 +261,7 @@ function entriesHaveMatchingShiftAndFocusArea(
 
   return sourceSegments.some((sourceSegment) =>
     candidateSegments.some((candidateSegment) =>
-      doShiftmateSegmentsMatch(
-        sourceEntry,
-        sourceSegment,
-        candidateEntry,
-        candidateSegment,
-      ),
+      doShiftmateSegmentsMatch(sourceEntry, sourceSegment, candidateEntry, candidateSegment),
     ),
   );
 }
@@ -291,9 +272,7 @@ function isGeneralDetailEntry(entry: MobileScheduleEntry): boolean {
   return segments.length > 0 && segments.every(isGeneralDetailSegment);
 }
 
-function getSortedEntrySegments(
-  entry: MobileScheduleEntry,
-): MobileScheduleEntrySegment[] {
+function getSortedEntrySegments(entry: MobileScheduleEntry): MobileScheduleEntrySegment[] {
   return getScheduleEntrySegments(entry)
     .map((segment, originalIndex) => ({ segment, originalIndex }))
     .sort((left, right) => {
@@ -301,9 +280,7 @@ function getSortedEntrySegments(
         getSegmentSortTime(right.segment),
       );
 
-      return timeComparison === 0
-        ? left.originalIndex - right.originalIndex
-        : timeComparison;
+      return timeComparison === 0 ? left.originalIndex - right.originalIndex : timeComparison;
     })
     .map(({ segment }) => segment);
 }
@@ -331,14 +308,8 @@ function buildShiftmateSegmentGroups(
     const entries: ShiftmateSegmentMatch[] = [];
 
     for (const teammateEntry of teammateEntries) {
-      const matchingSegment = getSortedEntrySegments(teammateEntry).find(
-        (candidateSegment) =>
-          doShiftmateSegmentsMatch(
-            shiftEntry,
-            sourceSegment,
-            teammateEntry,
-            candidateSegment,
-          ),
+      const matchingSegment = getSortedEntrySegments(teammateEntry).find((candidateSegment) =>
+        doShiftmateSegmentsMatch(shiftEntry, sourceSegment, teammateEntry, candidateSegment),
       );
 
       if (matchingSegment) {
@@ -350,9 +321,7 @@ function buildShiftmateSegmentGroups(
     }
 
     return {
-      key: `${segmentIndex}-${getSegmentTitle(sourceSegment)}-${getSegmentTimeKey(
-        sourceSegment,
-      )}`,
+      key: `${segmentIndex}-${getSegmentTitle(sourceSegment)}-${getSegmentTimeKey(sourceSegment)}`,
       label: `Shift ${segmentIndex + 1}`,
       title: getSegmentTitle(sourceSegment),
       timeRange: getScheduleEntrySegmentTimeRange(sourceSegment),
@@ -374,14 +343,10 @@ function getScheduleEntryIdentityKey(entry: MobileScheduleEntry): string {
 }
 
 function getActionSegmentOptions(entry: MobileScheduleEntry) {
-  return getSortedEntrySegments(entry)
-    .map((segment, index) => ({ segment, segmentIndex: index }));
+  return getSortedEntrySegments(entry).map((segment, index) => ({ segment, segmentIndex: index }));
 }
 
-function getActionSegmentLabel(
-  entry: MobileScheduleEntry,
-  segmentIndex: number,
-): string {
+function getActionSegmentLabel(entry: MobileScheduleEntry, segmentIndex: number): string {
   const options = getActionSegmentOptions(entry);
   const option = options[segmentIndex] ?? options[0] ?? null;
 
@@ -467,10 +432,7 @@ function getRequestModalPresentationStyle(mode: RequestMode) {
   return "pageSheet" as const;
 }
 
-function getAbsenceTypeOptionLabel(absenceType: {
-  label: string;
-  name?: string | null;
-}) {
+function getAbsenceTypeOptionLabel(absenceType: { label: string; name?: string | null }) {
   const trimmedName = absenceType.name?.trim() ?? "";
 
   return trimmedName.length > 0 ? trimmedName : absenceType.label;
@@ -482,13 +444,9 @@ function getAbsenceTypeLabelForEntry(
 ) {
   const absenceTypeId = getScheduleEntryAbsenceTypeId(entry);
   const absenceType =
-    absenceTypeId == null
-      ? null
-      : (absenceTypes.find((item) => item.id === absenceTypeId) ?? null);
+    absenceTypeId == null ? null : (absenceTypes.find((item) => item.id === absenceTypeId) ?? null);
 
-  return absenceType
-    ? getAbsenceTypeOptionLabel(absenceType)
-    : getScheduleEntryTitle(entry);
+  return absenceType ? getAbsenceTypeOptionLabel(absenceType) : getScheduleEntryTitle(entry);
 }
 
 function getEntryTimeRanges(entry: MobileScheduleEntry): ShiftTimeRange[] {
@@ -536,8 +494,7 @@ function hasScheduledWorkedAssignment(entry: MobileScheduleEntry): boolean {
 
   return segments.every(
     (segment) =>
-      !Object.prototype.hasOwnProperty.call(segment, "shiftId") ||
-      segment.shiftId != null,
+      !Object.prototype.hasOwnProperty.call(segment, "shiftId") || segment.shiftId != null,
   );
 }
 
@@ -553,9 +510,7 @@ function getMinutesSinceMidnight(value: string): number | null {
   return hours * 60 + minutes;
 }
 
-function expandTimeRange(
-  range: ShiftTimeRange,
-): Array<{ start: number; end: number }> {
+function expandTimeRange(range: ShiftTimeRange): Array<{ start: number; end: number }> {
   const startMinutes = getMinutesSinceMidnight(range.start);
   const endMinutes = getMinutesSinceMidnight(range.end);
 
@@ -590,15 +545,12 @@ function entriesHaveOverlappingTimes(
 
   return leftRanges.some((leftRange) =>
     rightRanges.some(
-      (rightRange) =>
-        leftRange.start < rightRange.end && rightRange.start < leftRange.end,
+      (rightRange) => leftRange.start < rightRange.end && rightRange.start < leftRange.end,
     ),
   );
 }
 
-function getScheduleEntryRequiredFocusAreaIds(
-  entry: MobileScheduleEntry,
-): number[] {
+function getScheduleEntryRequiredFocusAreaIds(entry: MobileScheduleEntry): number[] {
   const focusAreaIds = new Set<number>();
   const presentationFocusAreaId = entry.presentation?.focusAreaId ?? null;
 
@@ -616,16 +568,11 @@ function getScheduleEntryRequiredFocusAreaIds(
   return [...focusAreaIds];
 }
 
-function getEarliestScheduleEntryStartTime(
-  entry: MobileScheduleEntry,
-): string | null {
+function getEarliestScheduleEntryStartTime(entry: MobileScheduleEntry): string | null {
   let earliestStartTime = entry.presentation?.startTime ?? null;
 
   for (const segment of getScheduleEntrySegments(entry)) {
-    if (
-      segment.startTime &&
-      (!earliestStartTime || segment.startTime < earliestStartTime)
-    ) {
+    if (segment.startTime && (!earliestStartTime || segment.startTime < earliestStartTime)) {
       earliestStartTime = segment.startTime;
     }
   }
@@ -641,8 +588,7 @@ function hasScheduleEntrySegmentStarted(
   const option = getActionSegmentOptions(entry)[segmentIndex];
   const startTime = option?.segment.startTime ?? option?.segment.shiftStartTime ?? null;
 
-  const { dateKey: todayDateKey, timeKey: currentTimeKey } =
-    getCurrentDateTimeParts(timeZone);
+  const { dateKey: todayDateKey, timeKey: currentTimeKey } = getCurrentDateTimeParts(timeZone);
 
   if (entry.date < todayDateKey) {
     return true;
@@ -666,12 +612,8 @@ function hasScheduleEntrySegmentStarted(
   return currentMinutes >= startMinutes;
 }
 
-function hasScheduleEntryStarted(
-  entry: MobileScheduleEntry,
-  timeZone?: string | null,
-): boolean {
-  const { dateKey: todayDateKey, timeKey: currentTimeKey } =
-    getCurrentDateTimeParts(timeZone);
+function hasScheduleEntryStarted(entry: MobileScheduleEntry, timeZone?: string | null): boolean {
+  const { dateKey: todayDateKey, timeKey: currentTimeKey } = getCurrentDateTimeParts(timeZone);
 
   if (entry.date < todayDateKey) {
     return true;
@@ -707,8 +649,7 @@ function hasAnyRequestableScheduleEntrySegment(
   }
 
   return options.some(
-    (option) =>
-      !hasScheduleEntrySegmentStarted(entry, timeZone, option.segmentIndex),
+    (option) => !hasScheduleEntrySegmentStarted(entry, timeZone, option.segmentIndex),
   );
 }
 
@@ -721,24 +662,18 @@ function canWorkRequiredFocusAreas(
   }
 
   const employeeFocusAreaIdSet = new Set(employeeFocusAreaIds ?? []);
-  return requiredFocusAreaIds.every((focusAreaId) =>
-    employeeFocusAreaIdSet.has(focusAreaId),
-  );
+  return requiredFocusAreaIds.every((focusAreaId) => employeeFocusAreaIdSet.has(focusAreaId));
 }
 
 function getInitials(name: string): string {
-  const parts =
-    name.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ?? [];
+  const parts = name.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ?? [];
 
   if (parts.length === 0) {
     return "?";
   }
 
   const first = parts[0]?.charAt(0).toUpperCase() ?? "";
-  const last =
-    parts.length > 1
-      ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "")
-      : "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "") : "";
 
   return `${first}${last}` || "?";
 }
@@ -816,9 +751,7 @@ function buildDetailAbsenceChip(
 ): DetailChip | null {
   const trimmedLabel = label?.trim() ?? "";
   const absenceColor = readOptionalStyleColor(colorSource?.shiftColor);
-  const absenceBorderColor = readOptionalStyleColor(
-    colorSource?.shiftBorderColor,
-  );
+  const absenceBorderColor = readOptionalStyleColor(colorSource?.shiftBorderColor);
   const absenceTextColor = readOptionalStyleColor(colorSource?.shiftTextColor);
 
   if (!trimmedLabel) {
@@ -835,9 +768,7 @@ function buildDetailAbsenceChip(
   };
 }
 
-function isGeneralDetailSegment(
-  segment: { shiftId?: number | null } | null | undefined,
-): boolean {
+function isGeneralDetailSegment(segment: { shiftId?: number | null } | null | undefined): boolean {
   return (
     segment != null &&
     Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
@@ -853,23 +784,16 @@ function hasMentoredSegments(
 
 function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return buildDetailAbsenceChip(
-      getScheduleEntryTitle(entry),
-      entry.presentation,
-    );
+    return buildDetailAbsenceChip(getScheduleEntryTitle(entry), entry.presentation);
   }
 
   const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
 
   if (isGeneralDetailSegment(primarySegment)) {
-    return buildDetailGeneralShiftChip(
-      getScheduleEntryTitle(entry),
-      primarySegment,
-    );
+    return buildDetailGeneralShiftChip(getScheduleEntryTitle(entry), primarySegment);
   }
 
-  const segment =
-    getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
+  const segment = getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
   const label = segment?.jobName?.trim() ?? "";
 
   if (!label) {
@@ -881,10 +805,7 @@ function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
 
 function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | null {
   if (isGeneralDetailSegment(segment)) {
-    return buildDetailGeneralShiftChip(
-      segment.shiftName ?? segment.label ?? null,
-      segment,
-    );
+    return buildDetailGeneralShiftChip(segment.shiftName ?? segment.label ?? null, segment);
   }
 
   const label = segment.jobName?.trim() ?? "";
@@ -898,10 +819,7 @@ function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | 
 
 function MentoredPill() {
   return (
-    <View
-      accessibilityLabel="Mentored assignment"
-      style={styles.mentoredPill}
-    >
+    <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
     </View>
   );
@@ -920,23 +838,22 @@ export default function ShiftDetailScreen() {
   const queryClient = useQueryClient();
   const { pushToast } = useToast();
   const [requestMode, setRequestMode] = useState<RequestMode>(null);
-  const [coverageRequestType, setCoverageRequestType] =
-    useState<CoverageRequestType>(null);
+  const [coverageRequestType, setCoverageRequestType] = useState<CoverageRequestType>(null);
   const [selectedTargetShift, setSelectedTargetShift] = useState<{
     employeeId: string;
     date: string;
     segmentIndex?: number;
   } | null>(null);
-  const [selectedRequesterSegmentIndex, setSelectedRequesterSegmentIndex] =
-    useState(0);
+  const [selectedRequesterSegmentIndex, setSelectedRequesterSegmentIndex] = useState(0);
   const [selectedSwapDate, setSelectedSwapDate] = useState<string | null>(null);
-  const [swapWeekStartDate, setSwapWeekStartDate] = useState<string | null>(
+  const [swapWeekStartDate, setSwapWeekStartDate] = useState<string | null>(null);
+  const [selectedTargetedPickupEmployeeId, setSelectedTargetedPickupEmployeeId] = useState<
+    string | null
+  >(null);
+  const [selectedCalloffAbsenceTypeId, setSelectedCalloffAbsenceTypeId] = useState<number | null>(
     null,
   );
-  const [selectedTargetedPickupEmployeeId, setSelectedTargetedPickupEmployeeId] =
-    useState<string | null>(null);
-  const [pendingConfirmation, setPendingConfirmation] =
-    useState<ShiftDetailConfirmation>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<ShiftDetailConfirmation>(null);
 
   const employeeId = readParam(params.employeeId);
   const shiftDate = readParam(params.date);
@@ -953,8 +870,7 @@ export default function ShiftDetailScreen() {
         : null);
   const source = readParam(params.source) === "team" ? "team" : "mine";
   const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
-  const linkedEmployeeFocusAreaIds =
-    bootstrapQuery.data?.linkedEmployee?.focusAreaIds ?? [];
+  const linkedEmployeeFocusAreaIds = bootstrapQuery.data?.linkedEmployee?.focusAreaIds ?? [];
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
   const todayDateKey = getCurrentDateTimeParts(timeZone).dateKey;
   const canViewTeamSchedule = bootstrapQuery.data
@@ -962,8 +878,7 @@ export default function ShiftDetailScreen() {
     : false;
   const absenceTypes = bootstrapQuery.data?.absenceTypes ?? [];
   const activeAbsenceTypes = absenceTypes;
-  const needsTeamScheduleForShift =
-    source === "team" || employeeId !== linkedEmployeeId;
+  const needsTeamScheduleForShift = source === "team" || employeeId !== linkedEmployeeId;
   const myScheduleRange = range;
   const teamScheduleRange = useMemo(() => {
     if (requestMode !== "swap") {
@@ -972,10 +887,7 @@ export default function ShiftDetailScreen() {
 
     return {
       startDate: range.startDate,
-      endDate: addDaysIso(
-        range.startDate,
-        SWAP_SCHEDULE_LOOKAHEAD_DAYS - 1,
-      ),
+      endDate: addDaysIso(range.startDate, SWAP_SCHEDULE_LOOKAHEAD_DAYS - 1),
     };
   }, [range, requestMode]);
 
@@ -1035,13 +947,7 @@ export default function ShiftDetailScreen() {
       requestMode === "swap",
   });
   const requestsQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "requests",
-      accessToken,
-      range.startDate,
-      range.endDate,
-    ],
+    queryKey: ["mobile", "requests", accessToken, range.startDate, range.endDate],
     queryFn: () => getShiftRequests(accessToken!, range),
     enabled:
       Boolean(accessToken) &&
@@ -1052,10 +958,7 @@ export default function ShiftDetailScreen() {
   const peopleQuery = useQuery({
     queryKey: ["mobile", "people", accessToken],
     queryFn: () => getPeople(accessToken!),
-    enabled:
-      Boolean(accessToken) &&
-      requestMode === "coverage" &&
-      coverageRequestType === "pickup",
+    enabled: Boolean(accessToken) && requestMode === "coverage" && coverageRequestType === "pickup",
   });
   const createRequestMutation = useMutation({
     mutationFn: (input: {
@@ -1093,6 +996,7 @@ export default function ShiftDetailScreen() {
       setSelectedSwapDate(null);
       setSwapWeekStartDate(null);
       setSelectedTargetedPickupEmployeeId(null);
+      setSelectedCalloffAbsenceTypeId(null);
       await queryClient.invalidateQueries({ queryKey: ["mobile", "requests"] });
     },
   });
@@ -1108,9 +1012,8 @@ export default function ShiftDetailScreen() {
       const entryKey = getScheduleEntryIdentityKey(entry);
 
       return (
-        collection.findIndex(
-          (candidate) => getScheduleEntryIdentityKey(candidate) === entryKey,
-        ) === index
+        collection.findIndex((candidate) => getScheduleEntryIdentityKey(candidate) === entryKey) ===
+        index
       );
     });
   }, [
@@ -1139,14 +1042,8 @@ export default function ShiftDetailScreen() {
           ACTIVE_SHIFT_REQUEST_STATUSES.has(request.status),
       ) ?? null
     );
-  }, [
-    linkedEmployeeId,
-    requestsQuery.data?.requests,
-    shiftEntry,
-    shouldCheckExistingRequests,
-  ]);
-  const isCheckingExistingRequests =
-    shouldCheckExistingRequests && requestsQuery.isLoading;
+  }, [linkedEmployeeId, requestsQuery.data?.requests, shiftEntry, shouldCheckExistingRequests]);
+  const isCheckingExistingRequests = shouldCheckExistingRequests && requestsQuery.isLoading;
   const shiftRequestCheckError =
     shouldCheckExistingRequests && requestsQuery.error
       ? getQueryErrorMessage(
@@ -1200,8 +1097,7 @@ export default function ShiftDetailScreen() {
     }
 
     const requesterCategoryKey = getScheduleEntryCategoryKey(shiftEntry);
-    const requesterRequiredFocusAreaIds =
-      getScheduleEntryRequiredFocusAreaIds(shiftEntry);
+    const requesterRequiredFocusAreaIds = getScheduleEntryRequiredFocusAreaIds(shiftEntry);
 
     return (swapOptionsQuery.data?.entries ?? []).filter((entry) => {
       if (
@@ -1222,12 +1118,7 @@ export default function ShiftDetailScreen() {
         return false;
       }
 
-      if (
-        !canWorkRequiredFocusAreas(
-          entry.employeeFocusAreaIds,
-          requesterRequiredFocusAreaIds,
-        )
-      ) {
+      if (!canWorkRequiredFocusAreas(entry.employeeFocusAreaIds, requesterRequiredFocusAreaIds)) {
         return false;
       }
 
@@ -1241,9 +1132,7 @@ export default function ShiftDetailScreen() {
 
       const requesterExistingShift =
         scheduleEntries.find(
-          (candidate) =>
-            candidate.employeeId === linkedEmployeeId &&
-            candidate.date === entry.date,
+          (candidate) => candidate.employeeId === linkedEmployeeId && candidate.date === entry.date,
         ) ?? null;
       if (entriesHaveOverlappingTimes(requesterExistingShift, entry)) {
         return false;
@@ -1252,8 +1141,7 @@ export default function ShiftDetailScreen() {
       const targetExistingShift =
         scheduleEntries.find(
           (candidate) =>
-            candidate.employeeId === entry.employeeId &&
-            candidate.date === shiftEntry.date,
+            candidate.employeeId === entry.employeeId && candidate.date === shiftEntry.date,
         ) ?? null;
 
       return !entriesHaveOverlappingTimes(targetExistingShift, shiftEntry);
@@ -1302,15 +1190,13 @@ export default function ShiftDetailScreen() {
   const previousEligibleSwapWeekStart =
     activeSwapWeekStart == null
       ? null
-      : ([...eligibleSwapWeekStarts].reverse().find(
-          (weekStart) => weekStart < activeSwapWeekStart,
-        ) ?? null);
+      : ([...eligibleSwapWeekStarts]
+          .reverse()
+          .find((weekStart) => weekStart < activeSwapWeekStart) ?? null);
   const nextEligibleSwapWeekStart =
     activeSwapWeekStart == null
       ? null
-      : (eligibleSwapWeekStarts.find(
-          (weekStart) => weekStart > activeSwapWeekStart,
-        ) ?? null);
+      : (eligibleSwapWeekStarts.find((weekStart) => weekStart > activeSwapWeekStart) ?? null);
   const swapWeekDates = useMemo(
     () => (activeSwapWeekStart ? getWeekDates(activeSwapWeekStart) : []),
     [activeSwapWeekStart],
@@ -1332,26 +1218,21 @@ export default function ShiftDetailScreen() {
     ? swapWeekDates.includes(selectedSwapDate)
     : false;
   const firstEligibleSwapDate =
-    swapWeekDates.find((date) => swapSectionsByDate.has(date)) ??
-    swapWeekDates[0] ??
-    null;
+    swapWeekDates.find((date) => swapSectionsByDate.has(date)) ?? swapWeekDates[0] ?? null;
   const activeSwapDate =
     selectedTargetEntry?.date ??
     (selectedSwapDateIsAvailable ? selectedSwapDate : null) ??
     firstEligibleSwapDate ??
     null;
   const activeSwapSection =
-    activeSwapDate == null
-      ? null
-      : (swapSectionsByDate.get(activeSwapDate) ?? null);
+    activeSwapDate == null ? null : (swapSectionsByDate.get(activeSwapDate) ?? null);
   const visibleSwapTargetOptions = activeSwapSection?.entries ?? [];
   const targetedPickupOptions = useMemo(() => {
     if (!shiftEntry || !linkedEmployeeId) {
       return [];
     }
 
-    const requesterRequiredFocusAreaIds =
-      getScheduleEntryRequiredFocusAreaIds(shiftEntry);
+    const requesterRequiredFocusAreaIds = getScheduleEntryRequiredFocusAreaIds(shiftEntry);
 
     return (teamScheduleQuery.data?.entries ?? [])
       .filter((entry) => {
@@ -1360,10 +1241,7 @@ export default function ShiftDetailScreen() {
           entry.employeeId !== linkedEmployeeId &&
           entry.publishedAt != null &&
           getScheduleEntryAbsenceTypeId(entry) != null &&
-          canWorkRequiredFocusAreas(
-            entry.employeeFocusAreaIds,
-            requesterRequiredFocusAreaIds,
-          )
+          canWorkRequiredFocusAreas(entry.employeeFocusAreaIds, requesterRequiredFocusAreaIds)
         );
       })
       .sort((left, right) => {
@@ -1381,12 +1259,18 @@ export default function ShiftDetailScreen() {
 
         return left.employeeName.localeCompare(right.employeeName);
       });
-  }, [
-    employeeSeniorityById,
-    linkedEmployeeId,
-    shiftEntry,
-    teamScheduleQuery.data?.entries,
-  ]);
+  }, [employeeSeniorityById, linkedEmployeeId, shiftEntry, teamScheduleQuery.data?.entries]);
+  const selectedTargetedPickupEntry = selectedTargetedPickupEmployeeId
+    ? (targetedPickupOptions.find(
+        (entry) => entry.employeeId === selectedTargetedPickupEmployeeId,
+      ) ?? null)
+    : null;
+  const selectedCalloffAbsenceType =
+    selectedCalloffAbsenceTypeId == null
+      ? null
+      : (activeAbsenceTypes.find(
+          (absenceType) => absenceType.id === selectedCalloffAbsenceTypeId,
+        ) ?? null);
   const canCreateRequestsForShift = Boolean(
     shiftEntry &&
     linkedEmployeeId &&
@@ -1402,10 +1286,7 @@ export default function ShiftDetailScreen() {
     canCreateRequestsForShift && shiftEntry && hasScheduledWorkedAssignment(shiftEntry),
   );
   const canSubmitRequest = Boolean(
-    linkedEmployeeId &&
-    shiftEntry &&
-    requestMode === "swap" &&
-    selectedTargetEntry,
+    linkedEmployeeId && shiftEntry && requestMode === "swap" && selectedTargetEntry,
   );
   const contentState = getMobileQueryContentState({
     hasData: Boolean(shiftEntry) && Boolean(bootstrapQuery.data),
@@ -1420,19 +1301,12 @@ export default function ShiftDetailScreen() {
   });
   const timeRange = shiftEntry ? getScheduleEntryTimeRange(shiftEntry) : null;
   const shiftSegments = shiftEntry ? getScheduleEntrySegments(shiftEntry) : [];
-  const actionSegmentOptions = shiftEntry
-    ? getActionSegmentOptions(shiftEntry)
-    : [];
+  const actionSegmentOptions = shiftEntry ? getActionSegmentOptions(shiftEntry) : [];
   const firstRequestableRequesterSegmentIndex =
     shiftEntry == null
       ? 0
       : (actionSegmentOptions.find(
-          (option) =>
-            !hasScheduleEntrySegmentStarted(
-              shiftEntry,
-              timeZone,
-              option.segmentIndex,
-            ),
+          (option) => !hasScheduleEntrySegmentStarted(shiftEntry, timeZone, option.segmentIndex),
         )?.segmentIndex ?? 0);
   const requesterSegmentIndexForRequest =
     actionSegmentOptions.length > 1 ? selectedRequesterSegmentIndex : undefined;
@@ -1442,32 +1316,20 @@ export default function ShiftDetailScreen() {
   const splitSegments = shiftEntry ? getSplitShiftSegmentsForEntry(shiftEntry) : [];
   const hasSplitShift = splitSegments.length > 1;
   const shiftmateSegmentGroups = useMemo(
-    () =>
-      hasSplitShift
-        ? buildShiftmateSegmentGroups(
-            shiftEntry,
-            scheduleEntries,
-          )
-        : [],
+    () => (hasSplitShift ? buildShiftmateSegmentGroups(shiftEntry, scheduleEntries) : []),
     [hasSplitShift, scheduleEntries, shiftEntry],
   );
-  const hasGroupedShiftmates = shiftmateSegmentGroups.some(
-    (group) => group.entries.length > 0,
-  );
+  const hasGroupedShiftmates = shiftmateSegmentGroups.some((group) => group.entries.length > 0);
   const hasMultipleSegments = shiftSegments.length > 1;
   const primarySegment = shiftSegments[0] ?? null;
   const primarySegmentTimeRange = primarySegment
     ? getScheduleEntrySegmentTimeRange(primarySegment)
     : null;
-  const publishedAtLabel = shiftEntry
-    ? formatPublishedAt(shiftEntry.publishedAt, timeZone)
-    : null;
+  const publishedAtLabel = shiftEntry ? formatPublishedAt(shiftEntry.publishedAt, timeZone) : null;
   const publishedSummary = shiftEntry
     ? formatPublishedSummary(shiftEntry.publishedByName, publishedAtLabel)
     : null;
-  const focusAreaName = shiftEntry
-    ? getScheduleEntryDisplayFocusAreaName(shiftEntry)
-    : null;
+  const focusAreaName = shiftEntry ? getScheduleEntryDisplayFocusAreaName(shiftEntry) : null;
   const jobChip = shiftEntry ? getEntryJobChip(shiftEntry) : null;
   let detailCardTitle = shiftEntry ? getScheduleEntryTitle(shiftEntry) : "";
 
@@ -1476,9 +1338,7 @@ export default function ShiftDetailScreen() {
   } else if (hasMultipleSegments) {
     detailCardTitle = "Shifts";
   }
-  const isViewingOtherEmployee = Boolean(
-    shiftEntry && shiftEntry.employeeId !== linkedEmployeeId,
-  );
+  const isViewingOtherEmployee = Boolean(shiftEntry && shiftEntry.employeeId !== linkedEmployeeId);
   const detailTitleChip = !hasMultipleSegments ? jobChip : null;
   const shouldRenderTitlePills = Boolean(
     hasSplitShift || detailTitleChip || primarySegment?.isMentored,
@@ -1523,6 +1383,7 @@ export default function ShiftDetailScreen() {
         : null,
     );
     setSelectedTargetedPickupEmployeeId(null);
+    setSelectedCalloffAbsenceTypeId(null);
   }
 
   function submitSwapRequest() {
@@ -1584,15 +1445,12 @@ export default function ShiftDetailScreen() {
     const shiftDateLabel = formatShiftDate(shiftEntry.date);
 
     setPendingConfirmation({
-      title:
-        type === "pickup"
-          ? "Offer shift for pickup?"
-          : "Submit call off request?",
+      title: type === "pickup" ? "Offer this shift for pickup?" : "Submit this call-off?",
       body:
         type === "pickup"
-          ? `Offer your ${shiftLabel} shift on ${shiftDateLabel} for pickup?`
-          : `Submit a ${options?.absenceTypeLabel ?? "selected"} absence request for your ${shiftLabel} shift on ${shiftDateLabel}?`,
-      confirmLabel: type === "pickup" ? "Offer for pickup" : "Submit call off",
+          ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
+          : `${indefiniteArticle(options?.absenceTypeLabel ?? "selected") === "an" ? "An" : "A"} ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
+      confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
       confirmTone: type === "calloff" ? "dangerFilled" : "primary",
       onConfirm: () =>
         submitCoverageRequest(type, {
@@ -1616,9 +1474,9 @@ export default function ShiftDetailScreen() {
     }
 
     setPendingConfirmation({
-      title: "Request pickup?",
-      body: `Ask ${entry.employeeName} to pick up your ${shiftLabel} shift on ${shiftDateLabel} while you use ${absenceTypeLabel}?`,
-      confirmLabel: "Request pickup",
+      title: "Send a pickup request?",
+      body: `${entry.employeeName} will be asked to pick up your ${shiftLabel} shift on ${shiftDateLabel} so you can use ${absenceTypeLabel}.`,
+      confirmLabel: "Send Request",
       onConfirm: () =>
         submitCoverageRequest("pickup", {
           targetEmpId: entry.employeeId,
@@ -1640,24 +1498,22 @@ export default function ShiftDetailScreen() {
     );
 
     setPendingConfirmation({
-      title: "Submit swap request?",
-      body: `Swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} with ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}?`,
-      confirmLabel: "Submit swap",
+      title: "Send this swap request?",
+      body: `You'll swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} for ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}.`,
+      confirmLabel: "Send Swap",
       onConfirm: submitSwapRequest,
     });
   }
 
   function handleSwapWeek(delta: 1 | -1) {
-    const nextWeekStart =
-      delta < 0 ? previousEligibleSwapWeekStart : nextEligibleSwapWeekStart;
+    const nextWeekStart = delta < 0 ? previousEligibleSwapWeekStart : nextEligibleSwapWeekStart;
 
     if (!nextWeekStart) {
       return;
     }
 
     const firstEligibleDate =
-      getWeekDates(nextWeekStart).find((date) => swapSectionsByDate.has(date)) ??
-      nextWeekStart;
+      getWeekDates(nextWeekStart).find((date) => swapSectionsByDate.has(date)) ?? nextWeekStart;
 
     setSwapWeekStartDate(nextWeekStart);
     setSelectedSwapDate(firstEligibleDate);
@@ -1675,16 +1531,16 @@ export default function ShiftDetailScreen() {
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
           <Text style={styles.loadingTitle}>Loading shift</Text>
-          <Text style={styles.loadingBody}>
-            Pulling the latest published shift details into the mobile app.
-          </Text>
+          <Text style={styles.loadingBody}>Getting the latest shift details.</Text>
           <DetailSkeleton sections={2} />
         </View>
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load shift"
+          variant="centered"
           onAction={() => {
             void Promise.all([
               bootstrapQuery.refetch(),
@@ -1695,18 +1551,17 @@ export default function ShiftDetailScreen() {
         />
       ) : !employeeId || !shiftDate || !shiftEntry ? (
         <EmptyStateCard
-          body="We could not find that published shift in the selected schedule range."
+          fillScreen
+          body="This shift isn't in the schedule range you're viewing."
           iconName="calendar-clear-outline"
-          title="Shift unavailable"
+          title="Shift not found"
         />
       ) : (
         <>
           <View style={styles.shiftDetailCard} testID="shift-detail-card">
             <View style={styles.detailHeroHeader}>
               <View style={styles.detailHeroCopy}>
-                <Text style={styles.detailHeroTitle}>
-                  {detailCardTitle}
-                </Text>
+                <Text style={styles.detailHeroTitle}>{detailCardTitle}</Text>
                 {shouldRenderTitlePills ? (
                   <View style={styles.detailHeroPillRow}>
                     {hasSplitShift ? (
@@ -1720,9 +1575,7 @@ export default function ShiftDetailScreen() {
                   </View>
                 ) : null}
                 {isViewingOtherEmployee && shiftEntry.employeeName ? (
-                  <Text style={styles.detailEmployeeName}>
-                    {shiftEntry.employeeName}
-                  </Text>
+                  <Text style={styles.detailEmployeeName}>{shiftEntry.employeeName}</Text>
                 ) : null}
               </View>
               <DetailDateTile date={shiftEntry.date} />
@@ -1752,8 +1605,8 @@ export default function ShiftDetailScreen() {
               ) : null}
               {!hasMultipleSegments && timeRange ? (
                 <DetailInfoRow
-                  iconBackgroundColor="#EEF2FF"
-                  iconColor="#4F46E5"
+                  iconBackgroundColor={mobileColors.brandSoft}
+                  iconColor={mobileColors.brand}
                   iconName="time-outline"
                   label="Shift time"
                   value={timeRange}
@@ -1765,6 +1618,7 @@ export default function ShiftDetailScreen() {
               <View style={styles.detailActionsRow}>
                 <DetailActionButton
                   disabled={createRequestMutation.isPending}
+                  iconName="exit-outline"
                   label="Drop shift"
                   onPress={() => resetRequestMode("coverage")}
                   tone="neutral"
@@ -1859,7 +1713,6 @@ export default function ShiftDetailScreen() {
               }}
             />
           ) : null}
-
         </>
       )}
       <Modal
@@ -1886,11 +1739,7 @@ export default function ShiftDetailScreen() {
                 disabled={createRequestMutation.isPending}
                 entry={shiftEntry}
                 isOptionDisabled={(segmentIndex) =>
-                  hasScheduleEntrySegmentStarted(
-                    shiftEntry,
-                    timeZone,
-                    segmentIndex,
-                  )
+                  hasScheduleEntrySegmentStarted(shiftEntry, timeZone, segmentIndex)
                 }
                 options={actionSegmentOptions}
                 selectedIndex={selectedRequesterSegmentIndex}
@@ -1899,76 +1748,78 @@ export default function ShiftDetailScreen() {
             ) : null}
             {requestMode === "coverage" ? (
               <View style={styles.subsection}>
-                <Text style={styles.subsectionBody}>
-                  Choose how you want to drop this shift.
-                </Text>
+                <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
                 <View style={styles.coverageOptionList}>
                   <CoverageOptionCard
                     active={coverageRequestType === "pickup"}
                     body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
                     disabled={createRequestMutation.isPending}
-                    onPress={() => setCoverageRequestType("pickup")}
+                    onPress={() => {
+                      setCoverageRequestType("pickup");
+                      setSelectedCalloffAbsenceTypeId(null);
+                    }}
                     title="Offer for pickup"
                     tone="neutral"
                   />
                   <CoverageOptionCard
                     active={coverageRequestType === "calloff"}
                     body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
-                    disabled={
-                      createRequestMutation.isPending ||
-                      activeAbsenceTypes.length === 0
-                    }
-                    onPress={() => setCoverageRequestType("calloff")}
+                    disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
+                    onPress={() => {
+                      setCoverageRequestType("calloff");
+                      setSelectedTargetedPickupEmployeeId(null);
+                    }}
                     title="Call off"
                     tone="danger"
                   />
                 </View>
                 {activeAbsenceTypes.length === 0 ? (
                   <Text style={styles.coverageNotice}>
-                    Call off is unavailable until at least one active absence
-                    type is set up.
+                    Call off is unavailable until at least one active absence type is set up.
                   </Text>
                 ) : null}
                 {coverageRequestType === "pickup" ? (
                   <View style={styles.modalInlinePanel}>
                     <Text style={styles.subsectionLabel}>Offer for pickup</Text>
-                    <Button
-                      disabled={createRequestMutation.isPending}
-                      label="Offer to everyone"
-                      onPress={() => confirmCoverageRequest("pickup")}
-                    />
-                    <Text style={styles.subsectionLabel}>
-                      Request specific person
-                    </Text>
+                    {selectedTargetedPickupEntry ? null : (
+                      <Button
+                        disabled={createRequestMutation.isPending}
+                        label="Offer to everyone"
+                        onPress={() => confirmCoverageRequest("pickup")}
+                      />
+                    )}
+                    <Text style={styles.subsectionLabel}>Request specific person</Text>
                     <Text style={styles.subsectionBody}>
-                      Only teammates with an absence on this date are shown.
+                      {selectedTargetedPickupEntry
+                        ? "Review your request below, then submit."
+                        : "Only teammates with an absence on this date are shown."}
                     </Text>
                     <View style={styles.swapDateFilteredList}>
                       {targetedPickupOptions.length === 0 ? (
-                        <Text style={styles.subsectionBody}>
-                          No absent teammates are available on this date.
-                        </Text>
+                        <EmptyStateCard
+                          compact
+                          iconName="person-remove-outline"
+                          title="No absent teammates on this date"
+                        />
                       ) : (
                         <View style={styles.swapOptions}>
-                          {targetedPickupOptions.map((entry) => (
+                          {(selectedTargetedPickupEntry
+                            ? [selectedTargetedPickupEntry]
+                            : targetedPickupOptions
+                          ).map((entry) => (
                             <SwapOptionCard
                               key={`${entry.employeeId}-${entry.date}`}
-                              active={
-                                selectedTargetedPickupEmployeeId ===
-                                entry.employeeId
-                              }
+                              active={selectedTargetedPickupEmployeeId === entry.employeeId}
                               disabled={createRequestMutation.isPending}
-                              detailLabel={getPickupTargetDetailLabel(
-                                activeAbsenceTypes,
-                                entry,
-                              )}
+                              detailLabel={getPickupTargetDetailLabel(activeAbsenceTypes, entry)}
                               entry={entry}
                               showSegments={false}
                               onPress={() => {
                                 setSelectedTargetedPickupEmployeeId(
-                                  entry.employeeId,
+                                  selectedTargetedPickupEmployeeId === entry.employeeId
+                                    ? null
+                                    : entry.employeeId,
                                 );
-                                confirmTargetedPickupRequest(entry);
                               }}
                             />
                           ))}
@@ -1980,21 +1831,29 @@ export default function ShiftDetailScreen() {
                 {coverageRequestType === "calloff" ? (
                   <View style={styles.modalInlinePanel}>
                     <Text style={styles.subsectionLabel}>
-                      Select absence reason
+                      {selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
                     </Text>
+                    {selectedCalloffAbsenceType ? (
+                      <Text style={styles.subsectionBody}>
+                        Review your call-off below, then submit.
+                      </Text>
+                    ) : null}
                     <View style={styles.selectorWrap}>
-                      {activeAbsenceTypes.map((absenceType) => (
+                      {(selectedCalloffAbsenceType
+                        ? [selectedCalloffAbsenceType]
+                        : activeAbsenceTypes
+                      ).map((absenceType) => (
                         <SelectorChip
                           key={absenceType.id}
-                          active={false}
+                          active={selectedCalloffAbsenceTypeId === absenceType.id}
                           disabled={createRequestMutation.isPending}
                           label={getAbsenceTypeOptionLabel(absenceType)}
                           onPress={() =>
-                            confirmCoverageRequest("calloff", {
-                              absenceTypeId: absenceType.id,
-                              absenceTypeLabel:
-                                getAbsenceTypeOptionLabel(absenceType),
-                            })
+                            setSelectedCalloffAbsenceTypeId(
+                              selectedCalloffAbsenceTypeId === absenceType.id
+                                ? null
+                                : absenceType.id,
+                            )
                           }
                         />
                       ))}
@@ -2006,146 +1865,141 @@ export default function ShiftDetailScreen() {
 
             {requestMode === "swap" ? (
               <View style={styles.subsection}>
-	                <Text style={styles.subsectionBody}>
-	                  {selectedTargetEntry
-	                    ? "Review the trade below, then submit your swap request."
-	                    : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
-	                </Text>
-	                {shiftEntry ? (
-	                  <>
-	                    <View style={styles.swapSummaryList}>
-	                      <SwapSummaryCard
-	                        entry={shiftEntry}
-	                        label={selectedTargetEntry ? "You give" : "Your shift"}
-                          segmentIndex={selectedRequesterSegmentIndex}
-	                      />
-	                      {selectedTargetEntry ? (
-	                        <SwapSummaryCard
-	                          entry={selectedTargetEntry}
-	                          label="You get"
-                            segmentIndex={selectedTargetShift?.segmentIndex ?? 0}
-	                          summaryNote={`From ${selectedTargetEntry.employeeName}`}
-	                        />
-	                      ) : null}
-	                    </View>
-	                    <View style={styles.modalInlinePanel}>
-	                      <Text style={styles.subsectionLabel}>
-	                        Eligible teammates
-	                      </Text>
-	                      {swapOptionsQuery.isLoading ? (
-	                        <Text style={styles.subsectionBody}>
-	                          Loading teammate shifts for this range.
-	                        </Text>
-	                      ) : swapOptionsQuery.error ? (
-	                        <Text style={styles.subsectionBody}>
-	                          {getQueryErrorMessage(
-	                            swapOptionsQuery.error,
-	                            "We couldn't load teammate shifts.",
-	                          )}
-	                        </Text>
-	                      ) : swapTargetOptions.length === 0 ? (
-	                        <Text style={styles.subsectionBody}>
-	                          No eligible teammate shifts are available in this
-	                          schedule range yet.
-	                        </Text>
-	                      ) : selectedTargetEntry ? (
-	                        <View style={styles.swapSelectedPanel}>
-	                          <Text style={styles.subsectionBody}>
-	                            {selectedTargetEntry.employeeName} is selected
-	                            for {formatShiftDate(selectedTargetEntry.date)}.
-	                          </Text>
-	                        </View>
-	                      ) : (
-	                        <View style={styles.swapDateFilteredList}>
-		                          <View style={styles.swapWeekNav}>
-		                            <Pressable
-		                              accessibilityLabel="Go to previous week"
-		                              accessibilityRole="button"
-		                              accessibilityState={{
-		                                disabled:
-		                                  previousEligibleSwapWeekStart == null,
-		                              }}
-		                              android_ripple={
-		                                previousEligibleSwapWeekStart == null
-		                                  ? undefined
-		                                  : { color: "rgba(15, 23, 42, 0.08)" }
-		                              }
-		                              disabled={previousEligibleSwapWeekStart == null}
-		                              onPress={() => handleSwapWeek(-1)}
-		                              style={({ pressed }) => [
-		                                styles.swapWeekNavButton,
-		                                pressed &&
-		                                  previousEligibleSwapWeekStart != null &&
-		                                  styles.swapWeekNavButtonPressed,
-		                                previousEligibleSwapWeekStart == null &&
-		                                  styles.swapWeekNavButtonDisabled,
-		                              ]}
-		                            >
-		                              <Ionicons
-		                                color={mobileColors.textSecondary}
-		                                name="chevron-back"
-		                                size={20}
-		                              />
-		                            </Pressable>
-		                            <Text style={styles.swapWeekRangeLabel}>
-		                              {activeSwapWeekStart
-		                                ? formatWeekRangeLabel(activeSwapWeekStart)
-		                                : ""}
-		                            </Text>
-		                            <Pressable
-		                              accessibilityLabel="Go to next week"
-		                              accessibilityRole="button"
-		                              accessibilityState={{
-		                                disabled: nextEligibleSwapWeekStart == null,
-		                              }}
-		                              android_ripple={
-		                                nextEligibleSwapWeekStart == null
-		                                  ? undefined
-		                                  : { color: "rgba(15, 23, 42, 0.08)" }
-		                              }
-		                              disabled={nextEligibleSwapWeekStart == null}
-		                              onPress={() => handleSwapWeek(1)}
-		                              style={({ pressed }) => [
-		                                styles.swapWeekNavButton,
-		                                pressed &&
-		                                  nextEligibleSwapWeekStart != null &&
-		                                  styles.swapWeekNavButtonPressed,
-		                                nextEligibleSwapWeekStart == null &&
-		                                  styles.swapWeekNavButtonDisabled,
-		                              ]}
-		                            >
-		                              <Ionicons
-		                                color={mobileColors.textSecondary}
-		                                name="chevron-forward"
-		                                size={20}
-		                              />
-		                            </Pressable>
-	                          </View>
-	                          <View
-	                            accessibilityLabel="Eligible swap dates"
-	                            style={styles.swapDateGrid}
-	                          >
-	                            {swapWeekDates.map((date) => (
-	                              <SwapDateChip
-	                                key={date}
-	                                active={date === activeSwapDate}
-	                                count={
-	                                  swapSectionsByDate.get(date)?.entries
-	                                    .length ?? 0
-	                                }
-	                                date={date}
-	                                onPress={() => {
-	                                  setSelectedSwapDate(date);
-	                                  setSelectedTargetShift(null);
-	                                }}
-	                              />
-	                            ))}
-	                          </View>
-	                          {activeSwapSection ? (
-	                            <View style={styles.swapOptions}>
+                <Text style={styles.subsectionBody}>
+                  {selectedTargetEntry
+                    ? "Review the trade below, then submit your swap request."
+                    : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
+                </Text>
+                {shiftEntry ? (
+                  <>
+                    <View style={styles.swapSummaryList}>
+                      <SwapSummaryCard
+                        entry={shiftEntry}
+                        label={selectedTargetEntry ? "You give" : "Your shift"}
+                        segmentIndex={selectedRequesterSegmentIndex}
+                      />
+                      {selectedTargetEntry ? (
+                        <SwapSummaryCard
+                          entry={selectedTargetEntry}
+                          label="You get"
+                          segmentIndex={selectedTargetShift?.segmentIndex ?? 0}
+                          summaryNote={`From ${selectedTargetEntry.employeeName}`}
+                        />
+                      ) : null}
+                    </View>
+                    <View style={styles.modalInlinePanel}>
+                      <Text style={styles.subsectionLabel}>Eligible teammates</Text>
+                      {swapOptionsQuery.isLoading ? (
+                        <Text style={styles.subsectionBody}>
+                          Loading teammate shifts for this range.
+                        </Text>
+                      ) : swapOptionsQuery.error ? (
+                        <Text style={styles.subsectionBody}>
+                          {getQueryErrorMessage(
+                            swapOptionsQuery.error,
+                            "We couldn't load teammate shifts.",
+                          )}
+                        </Text>
+                      ) : swapTargetOptions.length === 0 ? (
+                        <EmptyStateCard
+                          compact
+                          iconName="swap-horizontal-outline"
+                          title="No eligible shifts"
+                          body="Eligible teammate shifts will appear here once published."
+                        />
+                      ) : selectedTargetEntry ? (
+                        <View style={styles.swapSelectedPanel}>
+                          <Text style={styles.subsectionBody}>
+                            {selectedTargetEntry.employeeName} is selected for{" "}
+                            {formatShiftDate(selectedTargetEntry.date)}.
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={styles.swapDateFilteredList}>
+                          <View style={styles.swapWeekNav}>
+                            <Pressable
+                              accessibilityLabel="Go to previous week"
+                              accessibilityRole="button"
+                              accessibilityState={{
+                                disabled: previousEligibleSwapWeekStart == null,
+                              }}
+                              android_ripple={
+                                previousEligibleSwapWeekStart == null
+                                  ? undefined
+                                  : { color: "rgba(15, 23, 42, 0.08)" }
+                              }
+                              disabled={previousEligibleSwapWeekStart == null}
+                              onPress={() => handleSwapWeek(-1)}
+                              style={({ pressed }) => [
+                                styles.swapWeekNavButton,
+                                pressed &&
+                                  previousEligibleSwapWeekStart != null &&
+                                  styles.swapWeekNavButtonPressed,
+                                previousEligibleSwapWeekStart == null &&
+                                  styles.swapWeekNavButtonDisabled,
+                              ]}
+                            >
+                              <Ionicons
+                                color={mobileColors.textSecondary}
+                                name="chevron-back"
+                                size={20}
+                              />
+                            </Pressable>
+                            <Text style={styles.swapWeekRangeLabel}>
+                              {activeSwapWeekStart ? formatWeekRangeLabel(activeSwapWeekStart) : ""}
+                            </Text>
+                            <Pressable
+                              accessibilityLabel="Go to next week"
+                              accessibilityRole="button"
+                              accessibilityState={{
+                                disabled: nextEligibleSwapWeekStart == null,
+                              }}
+                              android_ripple={
+                                nextEligibleSwapWeekStart == null
+                                  ? undefined
+                                  : { color: "rgba(15, 23, 42, 0.08)" }
+                              }
+                              disabled={nextEligibleSwapWeekStart == null}
+                              onPress={() => handleSwapWeek(1)}
+                              style={({ pressed }) => [
+                                styles.swapWeekNavButton,
+                                pressed &&
+                                  nextEligibleSwapWeekStart != null &&
+                                  styles.swapWeekNavButtonPressed,
+                                nextEligibleSwapWeekStart == null &&
+                                  styles.swapWeekNavButtonDisabled,
+                              ]}
+                            >
+                              <Ionicons
+                                color={mobileColors.textSecondary}
+                                name="chevron-forward"
+                                size={20}
+                              />
+                            </Pressable>
+                          </View>
+                          <View
+                            accessibilityLabel="Eligible swap dates"
+                            style={styles.swapDateGrid}
+                          >
+                            {swapWeekDates.map((date) => (
+                              <SwapDateChip
+                                key={date}
+                                active={date === activeSwapDate}
+                                count={swapSectionsByDate.get(date)?.entries.length ?? 0}
+                                date={date}
+                                onPress={() => {
+                                  setSelectedSwapDate(date);
+                                  setSelectedTargetShift(null);
+                                }}
+                              />
+                            ))}
+                          </View>
+                          {activeSwapSection ? (
+                            <View style={styles.swapOptions}>
                               {visibleSwapTargetOptions.flatMap((entry) => {
-                                  const options = getActionSegmentOptions(entry);
-                                  const targetOptions = options.length > 1
+                                const options = getActionSegmentOptions(entry);
+                                const targetOptions =
+                                  options.length > 1
                                     ? options.filter(
                                         (option) =>
                                           !hasScheduleEntrySegmentStarted(
@@ -2164,47 +2018,43 @@ export default function ShiftDetailScreen() {
                                         : [options[0]]
                                       : [];
 
-                                  return targetOptions.map((option) => (
-	                                  <SwapOptionCard
-	                                    key={`${entry.employeeId}-${entry.date}-${option.segmentIndex}`}
-	                                    active={
-	                                      selectedTargetShift?.employeeId ===
-	                                        entry.employeeId &&
-	                                      selectedTargetShift?.date === entry.date &&
-                                        (selectedTargetShift.segmentIndex ?? 0) === option.segmentIndex
-	                                    }
-	                                    entry={entry}
-                                      segmentIndex={
-                                        options.length > 1 ? option.segmentIndex : undefined
-                                      }
-	                                    onPress={() =>
-	                                      setSelectedTargetShift({
-	                                        employeeId: entry.employeeId,
-	                                        date: entry.date,
-                                          segmentIndex:
-                                            options.length > 1
-                                              ? option.segmentIndex
-                                              : undefined,
-	                                      })
-	                                    }
-	                                  />
-                                  ));
-                                })}
-	                            </View>
-	                          ) : null}
-	                        </View>
-	                      )}
-	                    </View>
-	                  </>
-	                ) : (
-	                  <Text style={styles.subsectionBody}>
-	                    Refreshing shift details.
-	                  </Text>
-	                )}
-	              </View>
-	            ) : null}
+                                return targetOptions.map((option) => (
+                                  <SwapOptionCard
+                                    key={`${entry.employeeId}-${entry.date}-${option.segmentIndex}`}
+                                    active={
+                                      selectedTargetShift?.employeeId === entry.employeeId &&
+                                      selectedTargetShift?.date === entry.date &&
+                                      (selectedTargetShift.segmentIndex ?? 0) ===
+                                        option.segmentIndex
+                                    }
+                                    entry={entry}
+                                    segmentIndex={
+                                      options.length > 1 ? option.segmentIndex : undefined
+                                    }
+                                    onPress={() =>
+                                      setSelectedTargetShift({
+                                        employeeId: entry.employeeId,
+                                        date: entry.date,
+                                        segmentIndex:
+                                          options.length > 1 ? option.segmentIndex : undefined,
+                                      })
+                                    }
+                                  />
+                                ));
+                              })}
+                            </View>
+                          ) : null}
+                        </View>
+                      )}
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.subsectionBody}>Refreshing shift details.</Text>
+                )}
+              </View>
+            ) : null}
 
-	            {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
+            {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
               <View style={styles.modalActionButtons}>
                 <Button
                   disabled={createRequestMutation.isPending}
@@ -2217,10 +2067,51 @@ export default function ShiftDetailScreen() {
                 />
                 <Button
                   disabled={!canSubmitRequest || createRequestMutation.isPending}
-                  label={
-                    createRequestMutation.isPending ? "Submitting..." : "Submit"
-                  }
+                  label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
                   onPress={handleSubmitRequest}
+                />
+              </View>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "pickup" &&
+            selectedTargetedPickupEntry &&
+            shiftEntry ? (
+              <View style={styles.modalActionButtons}>
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedTargetedPickupEmployeeId(null)}
+                  tone="neutral"
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
+                  onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
+                />
+              </View>
+            ) : null}
+
+            {requestMode === "coverage" &&
+            coverageRequestType === "calloff" &&
+            selectedCalloffAbsenceType &&
+            shiftEntry ? (
+              <View style={styles.modalActionButtons}>
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label="Back"
+                  onPress={() => setSelectedCalloffAbsenceTypeId(null)}
+                  tone="neutral"
+                />
+                <Button
+                  disabled={createRequestMutation.isPending}
+                  label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
+                  onPress={() =>
+                    confirmCoverageRequest("calloff", {
+                      absenceTypeId: selectedCalloffAbsenceType.id,
+                      absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
+                    })
+                  }
                 />
               </View>
             ) : null}
@@ -2276,9 +2167,7 @@ function DetailHeaderJobPill({
   }
 
   const accessibilityLabel = chip.eyebrowLabel
-    ? `${chip.eyebrowLabel} ${chip.label}${
-        isMentored ? " mentored assignment" : ""
-      }`
+    ? `${chip.eyebrowLabel} ${chip.label}${isMentored ? " mentored assignment" : ""}`
     : `Job ${chip.label}${isMentored ? " mentored assignment" : ""}`;
   const label = chip.eyebrowLabel ?? chip.label;
 
@@ -2293,16 +2182,9 @@ function DetailHeaderJobPill({
         },
       ]}
     >
-      <Text style={[styles.detailHeaderJobPillText, { color: chip.textColor }]}>
-        {label}
-      </Text>
+      <Text style={[styles.detailHeaderJobPillText, { color: chip.textColor }]}>{label}</Text>
       {isMentored ? (
-        <Text
-          style={[
-            styles.detailHeaderJobPillMentoredText,
-            { color: chip.textColor },
-          ]}
-        >
+        <Text style={[styles.detailHeaderJobPillMentoredText, { color: chip.textColor }]}>
           (Mentored)
         </Text>
       ) : null}
@@ -2324,16 +2206,8 @@ function DetailInfoRow({
   value: string;
 }) {
   return (
-    <View
-      accessibilityLabel={`${label} ${value}`}
-      style={styles.detailInfoRow}
-    >
-      <View
-        style={[
-          styles.detailInfoIconBox,
-          { backgroundColor: iconBackgroundColor },
-        ]}
-      >
+    <View accessibilityLabel={`${label} ${value}`} style={styles.detailInfoRow}>
+      <View style={[styles.detailInfoIconBox, { backgroundColor: iconBackgroundColor }]}>
         <Ionicons color={iconColor} name={iconName} size={21} />
       </View>
       <View style={styles.detailInfoCopy}>
@@ -2358,17 +2232,13 @@ function DetailActionButton({
   tone: "neutral" | "secondary";
 }) {
   const isSecondary = tone === "secondary";
-  const contentColor = isSecondary
-    ? mobileColors.brand
-    : mobileColors.dangerText;
+  const contentColor = isSecondary ? mobileColors.brand : mobileColors.dangerText;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      android_ripple={
-        disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }
-      }
+      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -2379,12 +2249,8 @@ function DetailActionButton({
       ]}
     >
       <View style={styles.detailActionButtonContent}>
-        {iconName ? (
-          <Ionicons color={contentColor} name={iconName} size={21} />
-        ) : null}
-        <Text style={[styles.detailActionButtonText, { color: contentColor }]}>
-          {label}
-        </Text>
+        {iconName ? <Ionicons color={contentColor} name={iconName} size={21} /> : null}
+        <Text style={[styles.detailActionButtonText, { color: contentColor }]}>{label}</Text>
       </View>
     </Pressable>
   );
@@ -2401,11 +2267,7 @@ function DetailPublishedFooter({
 }) {
   return (
     <View style={styles.detailPublishedFooter}>
-      <Ionicons
-        color={mobileColors.textSubtle}
-        name="information-circle-outline"
-        size={18}
-      />
+      <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={18} />
       <Text accessibilityLabel={summary} style={styles.detailPublishedText}>
         {publishedAtLabel ? `Published ${publishedAtLabel}` : "Published"}
         {publishedByName ? (
@@ -2439,8 +2301,7 @@ function ActionSegmentSelector({
       <Text style={styles.subsectionLabel}>Choose shift</Text>
       <View style={styles.actionSegmentOptions}>
         {options.map((option) => {
-          const optionDisabled =
-            disabled || isOptionDisabled?.(option.segmentIndex) === true;
+          const optionDisabled = disabled || isOptionDisabled?.(option.segmentIndex) === true;
 
           return (
             <SelectorChip
@@ -2476,18 +2337,12 @@ function DetailJobPill({
   }
 
   const accessibilityLabel = chip.eyebrowLabel
-    ? `${chip.eyebrowLabel} ${chip.label}${
-        isMentored ? " mentored assignment" : ""
-      }`
+    ? `${chip.eyebrowLabel} ${chip.label}${isMentored ? " mentored assignment" : ""}`
     : `Job ${chip.label}${isMentored ? " mentored assignment" : ""}`;
-  const shouldRenderEyebrowInsidePill =
-    eyebrowDisplay === "inside" && chip.eyebrowLabel;
-  const shouldRenderSingleLinePill =
-    !chip.eyebrowLabel || eyebrowDisplay === "outside";
+  const shouldRenderEyebrowInsidePill = eyebrowDisplay === "inside" && chip.eyebrowLabel;
+  const shouldRenderSingleLinePill = !chip.eyebrowLabel || eyebrowDisplay === "outside";
   const chipBorderColor =
-    chip.kind === "general"
-      ? mobileBorderColorFromText(chip.textColor)
-      : chip.borderColor;
+    chip.kind === "general" ? mobileBorderColorFromText(chip.textColor) : chip.borderColor;
 
   return (
     <View
@@ -2502,16 +2357,9 @@ function DetailJobPill({
     >
       {shouldRenderSingleLinePill ? (
         <View style={styles.detailJobChipInlineTextRow}>
-          <Text style={[styles.detailJobChipText, { color: chip.textColor }]}>
-            {chip.label}
-          </Text>
+          <Text style={[styles.detailJobChipText, { color: chip.textColor }]}>{chip.label}</Text>
           {isMentored ? (
-            <Text
-              style={[
-                styles.detailJobChipMentoredText,
-                { color: chip.textColor },
-              ]}
-            >
+            <Text style={[styles.detailJobChipMentoredText, { color: chip.textColor }]}>
               (Mentored)
             </Text>
           ) : null}
@@ -2519,26 +2367,14 @@ function DetailJobPill({
       ) : (
         <View style={styles.detailJobChipTextStack}>
           {shouldRenderEyebrowInsidePill ? (
-            <Text
-              style={[
-                styles.detailJobChipEyebrowText,
-                { color: chip.textColor },
-              ]}
-            >
+            <Text style={[styles.detailJobChipEyebrowText, { color: chip.textColor }]}>
               {chip.eyebrowLabel}
             </Text>
           ) : null}
-          <Text
-            style={[styles.detailJobChipValueText, { color: chip.textColor }]}
-          >
+          <Text style={[styles.detailJobChipValueText, { color: chip.textColor }]}>
             {chip.label}
             {isMentored ? (
-              <Text
-                style={[
-                  styles.detailJobChipMentoredText,
-                  { color: chip.textColor },
-                ]}
-              >
+              <Text style={[styles.detailJobChipMentoredText, { color: chip.textColor }]}>
                 {" "}
                 (Mentored)
               </Text>
@@ -2566,16 +2402,10 @@ function ShiftmateSegmentGroups({
               <View style={styles.shiftmateSegmentTitleRow}>
                 <View style={styles.shiftmateSegmentTitleMeta}>
                   <Text style={styles.shiftmateSegmentTitle}>{group.title}</Text>
-                  <SplitShiftBadge
-                    compact
-                    count={groups.length}
-                    label={group.label}
-                  />
+                  <SplitShiftBadge compact count={groups.length} label={group.label} />
                 </View>
                 {group.timeRange ? (
-                  <Text style={styles.shiftmateSegmentTime}>
-                    {group.timeRange}
-                  </Text>
+                  <Text style={styles.shiftmateSegmentTime}>{group.timeRange}</Text>
                 ) : null}
               </View>
             </View>
@@ -2595,9 +2425,11 @@ function ShiftmateSegmentGroups({
               ))}
             </View>
           ) : (
-            <Text style={styles.shiftmateSegmentEmpty}>
-              No one listed for {group.label}.
-            </Text>
+            <EmptyStateCard
+              compact
+              iconName="people-outline"
+              title={`No one in ${group.label} yet`}
+            />
           )}
         </View>
       ))}
@@ -2621,17 +2453,13 @@ function ShiftmateRow({
   matchedSegment?: MobileScheduleEntrySegment | null;
 }) {
   const avatarTone = getAvatarTone(entry.employeeId);
-  const displayName =
-    entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
-  const jobChip = matchedSegment
-    ? buildSegmentJobChip(matchedSegment)
-    : getEntryJobChip(entry);
+  const displayName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
+  const jobChip = matchedSegment ? buildSegmentJobChip(matchedSegment) : getEntryJobChip(entry);
   const entryTimeRange = matchedSegment
     ? getScheduleEntrySegmentTimeRange(matchedSegment)
     : getScheduleEntryTimeRange(entry);
   const entryFocusAreaName = matchedSegment
-    ? (matchedSegment.displayFocusAreaName ??
-      getScheduleEntryDisplayFocusAreaName(entry))
+    ? (matchedSegment.displayFocusAreaName ?? getScheduleEntryDisplayFocusAreaName(entry))
     : getScheduleEntryDisplayFocusAreaName(entry);
   const segments = getScheduleEntrySegments(entry);
   const shouldShowSegments = !matchedSegment && segments.length > 1;
@@ -2640,9 +2468,7 @@ function ShiftmateRow({
     : hasMentoredSegments(segments);
   const metaItems = [
     entryTimeRange && entryTimeRange !== groupTimeRange ? entryTimeRange : null,
-    entryFocusAreaName && entryFocusAreaName !== groupFocusAreaName
-      ? entryFocusAreaName
-      : null,
+    entryFocusAreaName && entryFocusAreaName !== groupFocusAreaName ? entryFocusAreaName : null,
   ].filter(Boolean);
 
   return (
@@ -2656,9 +2482,7 @@ function ShiftmateRow({
           },
         ]}
       >
-        <Text
-          style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text style={[styles.shiftmateAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>
@@ -2667,11 +2491,7 @@ function ShiftmateRow({
           <Text style={styles.shiftmateName}>{displayName}</Text>
           {jobChip || isMentored ? (
             <View style={styles.shiftmateChipRow}>
-              <DetailJobPill
-                chip={jobChip}
-                eyebrowDisplay="outside"
-                isMentored={isMentored}
-              />
+              <DetailJobPill chip={jobChip} eyebrowDisplay="outside" isMentored={isMentored} />
             </View>
           ) : null}
         </View>
@@ -2706,9 +2526,7 @@ function SelectorChip({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
-      android_ripple={
-        disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }
-      }
+      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -2758,9 +2576,7 @@ function CoverageOptionCard({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
-      android_ripple={
-        disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }
-      }
+      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -2777,11 +2593,7 @@ function CoverageOptionCard({
             tone === "danger" && styles.coverageOptionCheckmarkDanger,
           ]}
         >
-          <Ionicons
-            color={mobileColors.textInverse}
-            name="checkmark"
-            size={14}
-          />
+          <Ionicons color={mobileColors.textInverse} name="checkmark" size={14} />
         </View>
       ) : null}
       <Text
@@ -2812,20 +2624,18 @@ function SwapSummaryCard({
   const segments = getScheduleEntrySegments(entry);
   const primarySegment =
     segmentIndex != null
-      ? getActionSegmentOptions(entry)[segmentIndex]?.segment ?? null
-      : segments[0] ?? null;
+      ? (getActionSegmentOptions(entry)[segmentIndex]?.segment ?? null)
+      : (segments[0] ?? null);
   const primarySegmentTimeRange = primarySegment
     ? getScheduleEntrySegmentTimeRange(primarySegment)
     : null;
   const timeRange = getScheduleEntryTimeRange(entry);
   const focusAreaName =
-    primarySegment?.displayFocusAreaName ??
-    getScheduleEntryDisplayFocusAreaName(entry);
+    primarySegment?.displayFocusAreaName ?? getScheduleEntryDisplayFocusAreaName(entry);
   const jobChip = getEntryJobChip(entry);
-  const summaryMeta =
-    [primarySegmentTimeRange ?? timeRange ?? "Time unavailable", focusAreaName]
-      .filter(Boolean)
-      .join(" · ");
+  const summaryMeta = [primarySegmentTimeRange ?? timeRange ?? "Time unavailable", focusAreaName]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <View style={styles.swapSummaryCard}>
@@ -2837,16 +2647,11 @@ function SwapSummaryCard({
       </Text>
       {jobChip || primarySegment?.isMentored ? (
         <View style={styles.detailJobPillRow}>
-          <DetailJobPill
-            chip={jobChip}
-            isMentored={primarySegment?.isMentored === true}
-          />
+          <DetailJobPill chip={jobChip} isMentored={primarySegment?.isMentored === true} />
         </View>
       ) : null}
       <Text style={styles.swapSummaryDate}>{formatShiftDate(entry.date)}</Text>
-      {summaryNote ? (
-        <Text style={styles.swapSummaryNote}>{summaryNote}</Text>
-      ) : null}
+      {summaryNote ? <Text style={styles.swapSummaryNote}>{summaryNote}</Text> : null}
       <Text style={styles.swapSummaryMeta}>{summaryMeta}</Text>
     </View>
   );
@@ -2873,9 +2678,7 @@ function SwapDateChip({
       accessibilityLabel={`Show eligible teammates for ${formatShiftDate(date)}`}
       accessibilityRole="button"
       accessibilityState={{ disabled, selected: active }}
-      android_ripple={
-        disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }
-      }
+      android_ripple={disabled ? undefined : { color: "rgba(15, 23, 42, 0.08)" }}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -2884,38 +2687,18 @@ function SwapDateChip({
         disabled && styles.swapDateChipDisabled,
       ]}
     >
-      <Text
-        style={[
-          styles.swapDateChipWeekday,
-          active && styles.swapDateChipTextActive,
-        ]}
-      >
+      <Text style={[styles.swapDateChipWeekday, active && styles.swapDateChipTextActive]}>
         {dateParts.weekdayLabel}
       </Text>
-      <Text
-        style={[
-          styles.swapDateChipDay,
-          active && styles.swapDateChipTextActive,
-        ]}
-      >
+      <Text style={[styles.swapDateChipDay, active && styles.swapDateChipTextActive]}>
         {dateParts.dayLabel}
       </Text>
       <View
-        accessibilityLabel={`${count} eligible teammate${
-          count === 1 ? "" : "s"
-        }`}
-        style={[
-          styles.swapDateChipCount,
-          active && styles.swapDateChipCountActive,
-        ]}
+        accessibilityLabel={`${count} eligible teammate${count === 1 ? "" : "s"}`}
+        style={[styles.swapDateChipCount, active && styles.swapDateChipCountActive]}
       >
         <Ionicons color={countColor} name="person-outline" size={11} />
-        <Text
-          style={[
-            styles.swapDateChipCountText,
-            active && styles.swapDateChipCountTextActive,
-          ]}
-        >
+        <Text style={[styles.swapDateChipCountText, active && styles.swapDateChipCountTextActive]}>
           {count}
         </Text>
       </View>
@@ -2940,8 +2723,7 @@ function SwapOptionCard({
   segmentIndex?: number;
   showSegments?: boolean;
 }) {
-  const optionLabel =
-    segmentIndex != null ? getActionSegmentLabel(entry, segmentIndex) : null;
+  const optionLabel = segmentIndex != null ? getActionSegmentLabel(entry, segmentIndex) : null;
 
   return (
     <Pressable
@@ -2962,15 +2744,9 @@ function SwapOptionCard({
           Shift {(segmentIndex ?? 0) + 1}: {optionLabel}
         </Text>
       ) : null}
-      {detailLabel ? (
-        <Text style={styles.swapOptionDetail}>{detailLabel}</Text>
-      ) : null}
+      {detailLabel ? <Text style={styles.swapOptionDetail}>{detailLabel}</Text> : null}
       {showSegments && segmentIndex == null ? (
-        <ShiftEntrySegmentList
-          entry={entry}
-          showSegmentLabels={false}
-          variant="supporting"
-        />
+        <ShiftEntrySegmentList entry={entry} showSegmentLabels={false} variant="supporting" />
       ) : null}
     </Pressable>
   );
@@ -3330,12 +3106,6 @@ const styles = StyleSheet.create({
     ...mobileText.meta,
     color: mobileColors.textMuted,
     fontWeight: "600",
-  },
-  shiftmateSegmentEmpty: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-    paddingVertical: 10,
   },
   shiftmateRow: {
     flexDirection: "row",

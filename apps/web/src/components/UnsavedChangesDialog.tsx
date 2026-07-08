@@ -7,10 +7,7 @@ interface UnsavedChangesDialogProps {
   onDiscard: () => void;
 }
 
-export function UnsavedChangesDialog({
-  onKeepEditing,
-  onDiscard,
-}: UnsavedChangesDialogProps) {
+export function UnsavedChangesDialog({ onKeepEditing, onDiscard }: UnsavedChangesDialogProps) {
   const descId = "unsaved-changes-dialog-description";
 
   return (
@@ -33,16 +30,10 @@ export function UnsavedChangesDialog({
         You have unsaved changes. Are you sure you want to discard them?
       </div>
       <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <button
-          className="dg-btn dg-btn-secondary"
-          onClick={onKeepEditing}
-        >
+        <button className="dg-btn dg-btn-secondary" onClick={onKeepEditing}>
           Keep editing
         </button>
-        <button
-          className="dg-btn dg-btn-danger"
-          onClick={onDiscard}
-        >
+        <button className="dg-btn dg-btn-danger" onClick={onDiscard}>
           Discard changes
         </button>
       </div>

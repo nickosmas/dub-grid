@@ -51,8 +51,7 @@ export function getMobileRequestActionFeedback({
       return {
         confirmLabel: "Volunteer",
         key,
-        message:
-          "Volunteer for this open shift? This will be sent to your admin for approval.",
+        message: "Volunteer for this open shift? This will be sent to your admin for approval.",
         pendingLabel: "Volunteering...",
         title: "Volunteer for open shift?",
       };
@@ -60,8 +59,7 @@ export function getMobileRequestActionFeedback({
       return {
         confirmLabel: "Claim shift",
         key,
-        message:
-          "Claim this open shift? This will be sent to your admin for approval.",
+        message: "Claim this open shift? This will be sent to your admin for approval.",
         pendingLabel: "Claiming...",
         title: "Claim this shift?",
       };
@@ -88,8 +86,7 @@ export function getMobileRequestActionFeedback({
       return {
         confirmLabel: "Approve",
         key,
-        message:
-          "Approve this request? This will finalize the staffing change.",
+        message: "Approve this request? This will finalize the staffing change.",
         pendingLabel: "Approving...",
         title: "Approve request?",
       };
@@ -98,8 +95,7 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Reject",
         confirmStyle: "destructive",
         key,
-        message:
-          "Reject this request? The original schedule will stay in place.",
+        message: "Reject this request? The original schedule will stay in place.",
         pendingLabel: "Rejecting...",
         title: "Reject request?",
       };

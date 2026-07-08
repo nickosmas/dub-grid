@@ -16,6 +16,7 @@ import type { ImpersonationData } from "@/lib/impersonation";
 export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
     id: "emp-1",
+    employeeNumber: 1001,
     firstName: "Test",
     lastName: "Employee",
     employmentType: "full_time",
@@ -33,11 +34,14 @@ export function makeEmployee(overrides: Partial<Employee> = {}): Employee {
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+    createdAt: null,
     ...overrides,
   };
 }
 
-export function makeAssignmentDefinition(overrides: Partial<AssignmentDefinition> = {}): AssignmentDefinition {
+export function makeAssignmentDefinition(
+  overrides: Partial<AssignmentDefinition> = {},
+): AssignmentDefinition {
   return {
     id: 1,
     orgId: "org1",
@@ -74,7 +78,9 @@ export function makeShiftCategory(overrides: Partial<ShiftCategory> = {}): Shift
   };
 }
 
-export function makeCoverageRequirement(overrides: Partial<CoverageRequirement> = {}): CoverageRequirement {
+export function makeCoverageRequirement(
+  overrides: Partial<CoverageRequirement> = {},
+): CoverageRequirement {
   return {
     id: 1,
     orgId: "org1",
@@ -88,7 +94,9 @@ export function makeCoverageRequirement(overrides: Partial<CoverageRequirement> 
   };
 }
 
-export function makeImpersonationData(overrides: Partial<ImpersonationData> = {}): ImpersonationData {
+export function makeImpersonationData(
+  overrides: Partial<ImpersonationData> = {},
+): ImpersonationData {
   return {
     sessionId: "session-1",
     targetUserId: "user-target-1",
@@ -123,6 +131,7 @@ export const ALL_FALSE_PERMS: AdminPermissions = {
   canPublishSchedule: false,
   canApplyRecurringSchedule: false,
   canEditNotes: false,
+  canEditScheduleIndicators: false,
   canViewRecurringShifts: false,
   canManageRecurringShifts: false,
   canManageShiftSeries: false,

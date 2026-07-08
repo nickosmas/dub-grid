@@ -5,10 +5,7 @@ import {
   resolveShiftJobSegments,
   type SegmentCompatibilityMaps,
 } from "@/lib/shift-job-segments";
-import type {
-  DbScheduleCell,
-  DbScheduleCellSnapshot,
-} from "@/lib/db/types";
+import type { DbScheduleCell, DbScheduleCellSnapshot } from "@/lib/db/types";
 import type {
   DraftKind,
   ScheduleCellInput,
@@ -44,16 +41,11 @@ function sortSegments<T extends { position: number }>(segments: T[]): T[] {
   return [...segments].sort((left, right) => left.position - right.position);
 }
 
-function cloneSegments(
-  segments: ScheduleCellSegmentSnapshot[],
-): ScheduleCellSegmentSnapshot[] {
+function cloneSegments(segments: ScheduleCellSegmentSnapshot[]): ScheduleCellSegmentSnapshot[] {
   return segments.map((segment) => ({ ...segment }));
 }
 
-function resolveCodeLabels(
-  ids: number[],
-  codeMap?: Map<number, string>,
-): string {
+function resolveCodeLabels(ids: number[], codeMap?: Map<number, string>): string {
   if (!codeMap || ids.length === 0) return "";
   return ids.map((id) => codeMap.get(id) ?? "?").join("/");
 }
@@ -117,17 +109,14 @@ export function buildScheduleCellSnapshot(
     return buildDeletedSnapshot(args);
   }
 
-  const orderedSegments =
-    args.kind === "worked" ? sortSegments(args.segments ?? []) : [];
+  const orderedSegments = args.kind === "worked" ? sortSegments(args.segments ?? []) : [];
 
   return {
     kind: args.kind,
     segments: cloneSegments(orderedSegments),
     absenceTypeId: args.kind === "absence" ? (args.absenceTypeId ?? null) : null,
-    customStartTime:
-      args.kind === "worked" ? (args.customStartTime ?? null) : null,
-    customEndTime:
-      args.kind === "worked" ? (args.customEndTime ?? null) : null,
+    customStartTime: args.kind === "worked" ? (args.customStartTime ?? null) : null,
+    customEndTime: args.kind === "worked" ? (args.customEndTime ?? null) : null,
     seriesId: args.seriesId ?? null,
     fromRecurring: args.fromRecurring ?? false,
     label: buildSnapshotLabel(args, orderedSegments),
@@ -152,14 +141,12 @@ export function scheduleCellSnapshotToInput(
   if (!snapshot) return null;
   return {
     kind: snapshot.kind,
-    segments: snapshot.segments.map(
-      (segment): ScheduleCellSegmentInput => ({
-        shiftId: segment.shiftId,
-        jobId: segment.jobId,
-        position: segment.position,
-        isMentored: segment.isMentored ?? false,
-      }),
-    ),
+    segments: snapshot.segments.map((segment): ScheduleCellSegmentInput => ({
+      shiftId: segment.shiftId,
+      jobId: segment.jobId,
+      position: segment.position,
+      isMentored: segment.isMentored ?? false,
+    })),
     absenceTypeId: snapshot.absenceTypeId ?? null,
     customStartTime: snapshot.customStartTime ?? null,
     customEndTime: snapshot.customEndTime ?? null,
@@ -189,9 +176,7 @@ export function resolveScheduleCellSnapshotFromInput(
     });
   }
 
-  const orderedSegments = [...input.segments].sort(
-    (left, right) => left.position - right.position,
-  );
+  const orderedSegments = [...input.segments].sort((left, right) => left.position - right.position);
 
   const resolvedSegments =
     options.segmentCompatibility != null
@@ -201,40 +186,33 @@ export function resolveScheduleCellSnapshotFromInput(
             jobIds: orderedSegments.map((segment) => segment.jobId),
           },
           options.segmentCompatibility,
-        ).map(
-          (segment, index): ScheduleCellSegmentSnapshot => ({
-            ...segment,
-            position: orderedSegments[index]?.position ?? index,
-            isMentored: orderedSegments[index]?.isMentored ?? false,
-          }),
-        )
-      : orderedSegments.map(
-          (segment): ScheduleCellSegmentSnapshot => ({
-            shiftId: segment.shiftId,
-            jobId: segment.jobId,
-            position: segment.position,
-            label: "",
-            assignmentId: null,
-            shiftName: null,
-            shiftAbbr: null,
-            jobName: null,
-            jobAbbr: null,
-            focusAreaId: null,
-            showJobOnGrid: false,
-            isShiftless: segment.shiftId == null,
-            isShiftOnly: false,
-            isMentored: segment.isMentored ?? false,
-            startTime: null,
-            endTime: null,
-          }),
-        );
+        ).map((segment, index): ScheduleCellSegmentSnapshot => ({
+          ...segment,
+          position: orderedSegments[index]?.position ?? index,
+          isMentored: orderedSegments[index]?.isMentored ?? false,
+        }))
+      : orderedSegments.map((segment): ScheduleCellSegmentSnapshot => ({
+          shiftId: segment.shiftId,
+          jobId: segment.jobId,
+          position: segment.position,
+          label: "",
+          assignmentId: null,
+          shiftName: null,
+          shiftAbbr: null,
+          jobName: null,
+          jobAbbr: null,
+          focusAreaId: null,
+          showJobOnGrid: false,
+          isShiftless: segment.shiftId == null,
+          isShiftOnly: false,
+          isMentored: segment.isMentored ?? false,
+          startTime: null,
+          endTime: null,
+        }));
 
   const assignmentIds =
     options.segmentCompatibility != null
-      ? deriveAssignmentDefinitionIdsFromSegments(
-          resolvedSegments,
-          options.segmentCompatibility,
-        )
+      ? deriveAssignmentDefinitionIdsFromSegments(resolvedSegments, options.segmentCompatibility)
       : [];
 
   return buildScheduleCellSnapshot({
@@ -292,10 +270,7 @@ export function buildScheduleCellEntryFromInput(args: {
   });
 }
 
-function normalizedSegmentsEqual(
-  left: ScheduleCellSnapshot,
-  right: ScheduleCellSnapshot,
-): boolean {
+function normalizedSegmentsEqual(left: ScheduleCellSnapshot, right: ScheduleCellSnapshot): boolean {
   if (left.kind !== "worked" || right.kind !== "worked") {
     return left.kind === right.kind;
   }
@@ -355,56 +330,39 @@ export function buildScheduleCellEntry(args: {
 }): ScheduleCellStateEntry | null {
   const draft = cloneScheduleCellSnapshot(args.draft);
   const published = cloneScheduleCellSnapshot(args.published);
-  const effective = cloneScheduleCellSnapshot(
-    args.isScheduler ? (draft ?? published) : published,
-  );
+  const effective = cloneScheduleCellSnapshot(args.isScheduler ? (draft ?? published) : published);
 
   if (!hasSnapshotContent(effective)) {
     return null;
   }
   const effectiveSnapshot = effective;
 
-  const effectiveLabel =
-    effective?.kind === "deleted" ? "OFF" : (effective?.label ?? "");
-  const publishedLabel =
-    published?.kind === "deleted" ? "OFF" : (published?.label ?? "");
+  const effectiveLabel = effective?.kind === "deleted" ? "OFF" : (effective?.label ?? "");
+  const publishedLabel = published?.kind === "deleted" ? "OFF" : (published?.label ?? "");
 
   return {
     draft,
     published,
     effective,
     label: effectiveLabel,
-    segments:
-      hasWorkedIdentity(effectiveSnapshot)
-        ? cloneSegments(effectiveSnapshot.segments)
-        : [],
-    assignmentIds:
-      effective?.kind === "worked" ? [...effective.assignmentIds] : [],
+    segments: hasWorkedIdentity(effectiveSnapshot) ? cloneSegments(effectiveSnapshot.segments) : [],
+    assignmentIds: effective?.kind === "worked" ? [...effective.assignmentIds] : [],
     isDraft: args.draftKind !== null,
     isDelete: args.isDelete ?? false,
     draftKind: args.draftKind,
     publishedAssignmentDefinitionIds:
       published?.kind === "worked" ? [...published.assignmentIds] : [],
-    publishedSegments:
-      hasWorkedIdentity(published) ? cloneSegments(published.segments) : [],
+    publishedSegments: hasWorkedIdentity(published) ? cloneSegments(published.segments) : [],
     publishedLabel,
-    seriesId:
-      effective?.seriesId ?? draft?.seriesId ?? published?.seriesId ?? null,
+    seriesId: effective?.seriesId ?? draft?.seriesId ?? published?.seriesId ?? null,
     fromRecurring:
-      effective?.fromRecurring ??
-      draft?.fromRecurring ??
-      published?.fromRecurring ??
-      false,
-    customStartTime:
-      effective?.kind === "worked" ? (effective.customStartTime ?? null) : null,
-    customEndTime:
-      effective?.kind === "worked" ? (effective.customEndTime ?? null) : null,
+      effective?.fromRecurring ?? draft?.fromRecurring ?? published?.fromRecurring ?? false,
+    customStartTime: effective?.kind === "worked" ? (effective.customStartTime ?? null) : null,
+    customEndTime: effective?.kind === "worked" ? (effective.customEndTime ?? null) : null,
     publishedCustomStartTime:
       published?.kind === "worked" ? (published.customStartTime ?? null) : null,
-    publishedCustomEndTime:
-      published?.kind === "worked" ? (published.customEndTime ?? null) : null,
-    absenceTypeId:
-      effective?.kind === "absence" ? (effective.absenceTypeId ?? null) : null,
+    publishedCustomEndTime: published?.kind === "worked" ? (published.customEndTime ?? null) : null,
+    absenceTypeId: effective?.kind === "absence" ? (effective.absenceTypeId ?? null) : null,
     publishedAbsenceTypeId:
       published?.kind === "absence" ? (published.absenceTypeId ?? null) : null,
     version: args.version,
@@ -457,10 +415,7 @@ function buildResolvedSegmentsFromNormalizedSnapshot(
 
       return {
         assignmentId,
-        label:
-          (assignmentId != null
-            ? (options.assignmentLabelMap.get(assignmentId) ?? "")
-            : ""),
+        label: assignmentId != null ? (options.assignmentLabelMap.get(assignmentId) ?? "") : "",
         shiftId: segment.shift_id ?? null,
         jobId: segment.job_id,
         position: segment.position,
@@ -520,14 +475,11 @@ function buildScheduleCellSnapshotFromRecord(args: {
     });
   }
 
-  const segments = buildResolvedSegmentsFromNormalizedSnapshot(
-    snapshot,
-    {
-      segmentCompatibility: args.segmentCompatibility,
-      assignmentLabelMap: args.assignmentLabelMap,
-      assignmentIdByPair: args.assignmentIdByPair,
-    },
-  );
+  const segments = buildResolvedSegmentsFromNormalizedSnapshot(snapshot, {
+    segmentCompatibility: args.segmentCompatibility,
+    assignmentLabelMap: args.assignmentLabelMap,
+    assignmentIdByPair: args.assignmentIdByPair,
+  });
   const assignmentIds =
     args.segmentCompatibility != null && segments.length > 0
       ? deriveAssignmentDefinitionIdsFromSegments(segments, args.segmentCompatibility)
@@ -554,9 +506,7 @@ export function mapNormalizedScheduleCellRowToScheduleEntry(
   const snapshots = row.snapshots ?? [];
   const draft = buildScheduleCellSnapshotFromRecord({
     cell: row,
-    snapshot: snapshots.find(
-      (snapshot) => snapshot.snapshot_kind === "draft",
-    ),
+    snapshot: snapshots.find((snapshot) => snapshot.snapshot_kind === "draft"),
     assignmentLabelMap: options.assignmentLabelMap,
     assignmentIdByPair: options.assignmentIdByPair,
     absenceTypeMap: options.absenceTypeMap,
@@ -564,9 +514,7 @@ export function mapNormalizedScheduleCellRowToScheduleEntry(
   });
   const published = buildScheduleCellSnapshotFromRecord({
     cell: row,
-    snapshot: snapshots.find(
-      (snapshot) => snapshot.snapshot_kind === "published",
-    ),
+    snapshot: snapshots.find((snapshot) => snapshot.snapshot_kind === "published"),
     assignmentLabelMap: options.assignmentLabelMap,
     assignmentIdByPair: options.assignmentIdByPair,
     absenceTypeMap: options.absenceTypeMap,

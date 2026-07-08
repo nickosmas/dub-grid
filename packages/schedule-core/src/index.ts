@@ -62,18 +62,12 @@ export type ShiftRequestLike = {
   type: string;
   requesterShiftDate: string | null | undefined;
   requesterPresentation?: ShiftTimeSourceLike | null;
-  requesterState?: Pick<
-    ShiftTimeSourceLike,
-    "customStartTime" | "customEndTime"
-  > | null;
+  requesterState?: Pick<ShiftTimeSourceLike, "customStartTime" | "customEndTime"> | null;
   requesterCustomStartTime?: string | null;
   requesterCustomEndTime?: string | null;
   targetShiftDate?: string | null;
   targetPresentation?: ShiftTimeSourceLike | null;
-  targetState?: Pick<
-    ShiftTimeSourceLike,
-    "customStartTime" | "customEndTime"
-  > | null;
+  targetState?: Pick<ShiftTimeSourceLike, "customStartTime" | "customEndTime"> | null;
   targetCustomStartTime?: string | null;
   targetCustomEndTime?: string | null;
 };
@@ -120,12 +114,7 @@ export type MobileScheduleShiftGroup = {
   entries: MobileScheduleEntry[];
 };
 
-export type MeScheduleSegmentStatus =
-  | "active"
-  | "upcoming"
-  | "scheduled"
-  | "away"
-  | "empty";
+export type MeScheduleSegmentStatus = "active" | "upcoming" | "scheduled" | "away" | "empty";
 
 export type MeScheduleSegmentItem = {
   key: string;
@@ -186,9 +175,7 @@ type LegacyMobileShiftRequest = MobileShiftRequest & {
   targetCustomEndTime?: string | null;
 };
 
-function getAvailableShiftFeedItemSlotCount(
-  item: AvailableShiftFeedItem,
-): number {
+function getAvailableShiftFeedItemSlotCount(item: AvailableShiftFeedItem): number {
   if (item.kind === "open_shift") {
     return Math.max(item.openShift.needed, 1);
   }
@@ -245,9 +232,7 @@ export function getCompactScheduleDateParts(value: string): {
   }).formatToParts(new Date(`${value}T00:00:00.000Z`));
 
   return {
-    weekdayLabel: (
-      parts.find((part) => part.type === "weekday")?.value ?? ""
-    ).toUpperCase(),
+    weekdayLabel: (parts.find((part) => part.type === "weekday")?.value ?? "").toUpperCase(),
     dayLabel: parts.find((part) => part.type === "day")?.value ?? "",
   };
 }
@@ -284,14 +269,10 @@ export function addMonthsToIsoDate(value: string, months: number): string {
   return formatIsoDateUtc(date);
 }
 
-export function getDaysBetweenIsoDates(
-  startDate: string,
-  endDate: string,
-): number {
+export function getDaysBetweenIsoDates(startDate: string, endDate: string): number {
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
   return Math.round(
-    (parseIsoDate(endDate).getTime() - parseIsoDate(startDate).getTime()) /
-      millisecondsPerDay,
+    (parseIsoDate(endDate).getTime() - parseIsoDate(startDate).getTime()) / millisecondsPerDay,
   );
 }
 
@@ -307,9 +288,7 @@ function getDatePartsInTimeZone(
   });
   const parts = formatter.formatToParts(value);
   const year = Number(parts.find((part) => part.type === "year")?.value ?? "0");
-  const month = Number(
-    parts.find((part) => part.type === "month")?.value ?? "0",
-  );
+  const month = Number(parts.find((part) => part.type === "month")?.value ?? "0");
   const day = Number(parts.find((part) => part.type === "day")?.value ?? "0");
 
   return {
@@ -319,18 +298,12 @@ function getDatePartsInTimeZone(
   };
 }
 
-export function getIsoDateInTimeZone(
-  value: Date,
-  timeZone?: string | null,
-): string {
+export function getIsoDateInTimeZone(value: Date, timeZone?: string | null): string {
   const parts = getDatePartsInTimeZone(value, timeZone);
   return `${parts.year}-${`${parts.month}`.padStart(2, "0")}-${`${parts.day}`.padStart(2, "0")}`;
 }
 
-export function getCurrentTimeValueInTimeZone(
-  value: Date,
-  timeZone?: string | null,
-): string {
+export function getCurrentTimeValueInTimeZone(value: Date, timeZone?: string | null): string {
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timeZone ?? "UTC",
     hour: "2-digit",
@@ -365,10 +338,7 @@ export function getScheduleRange(
   timeZone?: string | null,
   baseDate = new Date(),
 ): MobileScheduleRange {
-  const anchorDate = addDaysToIsoDate(
-    getIsoDateInTimeZone(baseDate, timeZone),
-    offsetWeeks * 7,
-  );
+  const anchorDate = addDaysToIsoDate(getIsoDateInTimeZone(baseDate, timeZone), offsetWeeks * 7);
   const startDate = getScheduleWeekStartDate(anchorDate);
 
   return {
@@ -386,20 +356,9 @@ export function getScheduleRangeForDate(date: string): MobileScheduleRange {
   };
 }
 
-export function formatScheduleRange(
-  range: MobileScheduleRange,
-  timeZone?: string | null,
-): string {
-  const start = formatDate(
-    range.startDate,
-    { month: "short", day: "numeric" },
-    timeZone,
-  );
-  const end = formatDate(
-    range.endDate,
-    { month: "short", day: "numeric" },
-    timeZone,
-  );
+export function formatScheduleRange(range: MobileScheduleRange, timeZone?: string | null): string {
+  const start = formatDate(range.startDate, { month: "short", day: "numeric" }, timeZone);
+  const end = formatDate(range.endDate, { month: "short", day: "numeric" }, timeZone);
   return `${start} - ${end}`;
 }
 
@@ -421,59 +380,39 @@ export function formatScheduleDayLabel(
     return `Tomorrow, ${formatDate(date, { month: "short", day: "numeric" }, timeZone)}`;
   }
 
-  return formatDate(
-    date,
-    { weekday: "short", month: "short", day: "numeric" },
-    timeZone,
-  );
+  return formatDate(date, { weekday: "short", month: "short", day: "numeric" }, timeZone);
 }
 
-export function formatScheduleSectionSubtitle(
-  entryCount: number,
-  scope: "mine" | "team",
-): string {
+export function formatScheduleSectionSubtitle(entryCount: number, scope: "mine" | "team"): string {
   if (scope === "team") {
     return `${entryCount} ${entryCount === 1 ? "assignment" : "assignments"}`;
   }
   return `${entryCount} ${entryCount === 1 ? "shift" : "shifts"}`;
 }
 
-export function formatScheduleTimeRange(
-  start: string | null,
-  end: string | null,
-): string | null {
+export function formatScheduleTimeRange(start: string | null, end: string | null): string | null {
   if (!start || !end) return null;
 
   return `${formatScheduleTimeValue(start)} - ${formatScheduleTimeValue(end)}`;
 }
 
-export function getScheduleEntryStartTime(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryStartTime(entry: ScheduleEntryLike): string | null {
   return entry.presentation?.startTime ?? entry.startTime ?? null;
 }
 
-export function getScheduleEntryEndTime(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryEndTime(entry: ScheduleEntryLike): string | null {
   return entry.presentation?.endTime ?? entry.endTime ?? null;
 }
 
-export function getScheduleEntryCustomStartTime(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryCustomStartTime(entry: ScheduleEntryLike): string | null {
   return entry.state?.customStartTime ?? entry.customStartTime ?? null;
 }
 
-export function getScheduleEntryCustomEndTime(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryCustomEndTime(entry: ScheduleEntryLike): string | null {
   return entry.state?.customEndTime ?? entry.customEndTime ?? null;
 }
 
-export function getScheduleEntryAbsenceTypeId(
-  entry: ScheduleEntryLike,
-): number | null {
+export function getScheduleEntryAbsenceTypeId(entry: ScheduleEntryLike): number | null {
   if (entry.state) {
     return entry.state.kind === "absence" ? entry.state.absenceTypeId : null;
   }
@@ -491,40 +430,23 @@ export function getScheduleEntryTitle(entry: ScheduleEntryLike): string {
   );
 }
 
-export function getScheduleEntryFocusAreaId(
-  entry: ScheduleEntryLike,
-): number | null {
+export function getScheduleEntryFocusAreaId(entry: ScheduleEntryLike): number | null {
   return entry.presentation?.focusAreaId ?? entry.focusAreaId ?? null;
 }
 
-export function getScheduleEntryFocusAreaName(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryFocusAreaName(entry: ScheduleEntryLike): string | null {
   return entry.presentation?.focusAreaName ?? entry.focusAreaName ?? null;
 }
 
-export function getScheduleEntryDisplayFocusAreaName(
-  entry: ScheduleEntryLike,
-): string | null {
-  return (
-    entry.presentation?.displayFocusAreaName ??
-    entry.displayFocusAreaName ??
-    null
-  );
+export function getScheduleEntryDisplayFocusAreaName(entry: ScheduleEntryLike): string | null {
+  return entry.presentation?.displayFocusAreaName ?? entry.displayFocusAreaName ?? null;
 }
 
-export function getScheduleEntryBaseTimeRange(
-  entry: ScheduleEntryLike,
-): string | null {
-  return formatScheduleTimeRange(
-    getScheduleEntryStartTime(entry),
-    getScheduleEntryEndTime(entry),
-  );
+export function getScheduleEntryBaseTimeRange(entry: ScheduleEntryLike): string | null {
+  return formatScheduleTimeRange(getScheduleEntryStartTime(entry), getScheduleEntryEndTime(entry));
 }
 
-export function getScheduleEntrySegments(
-  entry: ScheduleEntryLike,
-): MobileScheduleEntrySegment[] {
+export function getScheduleEntrySegments(entry: ScheduleEntryLike): MobileScheduleEntrySegment[] {
   const presentationSegments = entry.presentation?.segments ?? [];
   if (presentationSegments.length > 0) {
     return [...presentationSegments];
@@ -545,9 +467,7 @@ export function getScheduleEntrySegments(
   ];
 }
 
-function getExplicitScheduleEntrySegmentCount(
-  entry: ScheduleEntryLike,
-): number {
+function getExplicitScheduleEntrySegmentCount(entry: ScheduleEntryLike): number {
   const presentationSegments = entry.presentation?.segments ?? [];
   if (presentationSegments.length > 0) {
     return presentationSegments.length;
@@ -564,9 +484,7 @@ function getExplicitScheduleEntrySegmentCount(
   return 0;
 }
 
-export function getScheduleEntryCustomTimeRange(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryCustomTimeRange(entry: ScheduleEntryLike): string | null {
   const customStartTime = getScheduleEntryCustomStartTime(entry);
   const customEndTime = getScheduleEntryCustomEndTime(entry);
 
@@ -593,19 +511,13 @@ export function getScheduleEntrySegmentTimeRange(
 export function getScheduleEntrySegmentShiftTimeRange(
   segment: Pick<MobileScheduleEntrySegment, "shiftStartTime" | "shiftEndTime">,
 ): string | null {
-  return formatScheduleTimeRange(
-    segment.shiftStartTime ?? null,
-    segment.shiftEndTime ?? null,
-  );
+  return formatScheduleTimeRange(segment.shiftStartTime ?? null, segment.shiftEndTime ?? null);
 }
 
-export function getScheduleEntryTimeRange(
-  entry: ScheduleEntryLike,
-): string | null {
+export function getScheduleEntryTimeRange(entry: ScheduleEntryLike): string | null {
   const customStartTime = getScheduleEntryCustomStartTime(entry);
   const customEndTime = getScheduleEntryCustomEndTime(entry);
-  const hasPipeCustomTime =
-    hasPipeParts(customStartTime) || hasPipeParts(customEndTime);
+  const hasPipeCustomTime = hasPipeParts(customStartTime) || hasPipeParts(customEndTime);
   const shouldUseSinglePipeSegment =
     hasPipeCustomTime && getExplicitScheduleEntrySegmentCount(entry) === 1;
   const resolvedCustomStartTime = shouldUseSinglePipeSegment
@@ -617,10 +529,8 @@ export function getScheduleEntryTimeRange(
   const shouldUseCustomTime = !hasPipeCustomTime || shouldUseSinglePipeSegment;
 
   return formatScheduleTimeRange(
-    (shouldUseCustomTime ? resolvedCustomStartTime : null) ??
-      getScheduleEntryStartTime(entry),
-    (shouldUseCustomTime ? resolvedCustomEndTime : null) ??
-      getScheduleEntryEndTime(entry),
+    (shouldUseCustomTime ? resolvedCustomStartTime : null) ?? getScheduleEntryStartTime(entry),
+    (shouldUseCustomTime ? resolvedCustomEndTime : null) ?? getScheduleEntryEndTime(entry),
   );
 }
 
@@ -653,9 +563,7 @@ export function getScheduleShiftGroupTimeRange(
   return null;
 }
 
-function getEntryResolvedSegmentTimeRange(
-  entry: ScheduleEntryLike,
-): string | null {
+function getEntryResolvedSegmentTimeRange(entry: ScheduleEntryLike): string | null {
   const segmentsWithTime = getScheduleEntrySegments(entry).filter(
     (segment) => segment.startTime && segment.endTime,
   );
@@ -680,11 +588,7 @@ export function getScheduleEntryMemberTimeRange(
 
   const segmentTimeRange =
     getEntryResolvedSegmentTimeRange(entry) ?? getScheduleEntryTimeRange(entry);
-  if (
-    segmentTimeRange &&
-    groupTimeRange &&
-    segmentTimeRange !== groupTimeRange
-  ) {
+  if (segmentTimeRange && groupTimeRange && segmentTimeRange !== groupTimeRange) {
     return segmentTimeRange;
   }
 
@@ -707,8 +611,7 @@ export function sortScheduleEntries(
       getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left),
     );
     const rightTime = getSortableTime(
-      getScheduleEntryStartTime(right) ??
-        getScheduleEntryCustomStartTime(right),
+      getScheduleEntryStartTime(right) ?? getScheduleEntryCustomStartTime(right),
     );
 
     if (leftTime !== rightTime) {
@@ -779,11 +682,13 @@ export function buildScheduleMonthDays(
   );
 }
 
-export function formatScheduleMonthLabel(
-  date: string,
-  timeZone?: string | null,
-): string {
-  return formatDate(date, { month: "long", year: "numeric" }, timeZone);
+export function getScheduleMonthWeekIndexForDate(
+  monthAnchorDate: string,
+  targetDate: string,
+): number {
+  const gridStartDate = getScheduleWeekStartDate(getScheduleMonthStartDate(monthAnchorDate));
+
+  return Math.floor(getDaysBetweenIsoDates(gridStartDate, targetDate) / 7);
 }
 
 export function formatSchedulePillDateLabel(
@@ -801,20 +706,14 @@ export function formatSchedulePillDateLabel(
     return "Tomorrow";
   }
 
-  return formatDate(
-    date,
-    { weekday: "short", month: "short", day: "numeric" },
-    timeZone,
-  );
+  return formatDate(date, { weekday: "short", month: "short", day: "numeric" }, timeZone);
 }
 
 export function filterScheduleEntriesByDate(
   entries: ReadonlyArray<ScheduleEntryLike>,
   date: string,
 ): MobileScheduleEntry[] {
-  return entries.filter(
-    (entry) => entry.date === date,
-  ) as MobileScheduleEntry[];
+  return entries.filter((entry) => entry.date === date) as MobileScheduleEntry[];
 }
 
 function getMinutesSinceMidnight(value: string): number | null {
@@ -850,11 +749,7 @@ function expandTimeRange(
   return [{ start: startMinutes, end: endMinutes }];
 }
 
-function isTimeWithinRange(
-  start: string | null,
-  end: string | null,
-  currentTime: string,
-): boolean {
+function isTimeWithinRange(start: string | null, end: string | null, currentTime: string): boolean {
   const currentMinutes = getMinutesSinceMidnight(currentTime);
 
   if (currentMinutes == null) {
@@ -866,10 +761,7 @@ function isTimeWithinRange(
   );
 }
 
-function getRangeDurationMinutes(
-  start: string | null,
-  end: string | null,
-): number {
+function getRangeDurationMinutes(start: string | null, end: string | null): number {
   return expandTimeRange(start, end).reduce(
     (total, range) => total + Math.max(range.end - range.start, 0),
     0,
@@ -893,7 +785,14 @@ function hasPipeParts(value: string | null | undefined): boolean {
 
 function normalizeTimeValue(value: string | null | undefined): string | null {
   const normalized = value?.trim().slice(0, 5) ?? null;
-  return normalized ? normalized : null;
+  if (!normalized) return null;
+
+  // Zero-pad single-digit hours ("7:00" -> "07:00") so lexical comparisons
+  // and sorts against other HH:MM values (always zero-padded) are correct.
+  const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return normalized;
+  const [, hour, minute] = match;
+  return `${hour.padStart(2, "0")}:${minute}`;
 }
 
 function toShiftTimeRange(
@@ -947,10 +846,7 @@ export function getShiftLikeTimeRanges(
     index < Math.max(customStartParts.length, customEndParts.length);
     index += 1
   ) {
-    const range = toShiftTimeRange(
-      customStartParts[index] ?? null,
-      customEndParts[index] ?? null,
-    );
+    const range = toShiftTimeRange(customStartParts[index] ?? null, customEndParts[index] ?? null);
     if (range) {
       customRanges.push(range);
     }
@@ -986,9 +882,7 @@ export function hasShiftStartedAtTimeRanges(input: {
     return true;
   }
 
-  return (
-    getCurrentTimeValueInTimeZone(input.now, input.timeZone) >= earliestStart
-  );
+  return getCurrentTimeValueInTimeZone(input.now, input.timeZone) >= earliestStart;
 }
 
 export function hasShiftLikeStarted(input: {
@@ -1017,13 +911,9 @@ export function hasShiftRequestStarted(
       startTime: request.requesterPresentation?.startTime ?? null,
       endTime: request.requesterPresentation?.endTime ?? null,
       customStartTime:
-        request.requesterState?.customStartTime ??
-        request.requesterCustomStartTime ??
-        null,
+        request.requesterState?.customStartTime ?? request.requesterCustomStartTime ?? null,
       customEndTime:
-        request.requesterState?.customEndTime ??
-        request.requesterCustomEndTime ??
-        null,
+        request.requesterState?.customEndTime ?? request.requesterCustomEndTime ?? null,
     },
     now,
     timeZone,
@@ -1042,13 +932,8 @@ export function hasShiftRequestStarted(
         startTime: request.targetPresentation?.startTime ?? null,
         endTime: request.targetPresentation?.endTime ?? null,
         customStartTime:
-          request.targetState?.customStartTime ??
-          request.targetCustomStartTime ??
-          null,
-        customEndTime:
-          request.targetState?.customEndTime ??
-          request.targetCustomEndTime ??
-          null,
+          request.targetState?.customStartTime ?? request.targetCustomStartTime ?? null,
+        customEndTime: request.targetState?.customEndTime ?? request.targetCustomEndTime ?? null,
       },
       now,
       timeZone,
@@ -1057,29 +942,16 @@ export function hasShiftRequestStarted(
 }
 
 function getDurationFieldMinutes(
-  value: Pick<
-    MobileScheduleEntrySegment,
-    "defaultDurationHours" | "defaultDurationMinutes"
-  >,
+  value: Pick<MobileScheduleEntrySegment, "defaultDurationHours" | "defaultDurationMinutes">,
 ): number {
-  if (
-    value.defaultDurationHours == null &&
-    value.defaultDurationMinutes == null
-  ) {
+  if (value.defaultDurationHours == null && value.defaultDurationMinutes == null) {
     return 0;
   }
 
-  return Math.max(
-    (value.defaultDurationHours ?? 0) * 60 +
-      (value.defaultDurationMinutes ?? 0),
-    0,
-  );
+  return Math.max((value.defaultDurationHours ?? 0) * 60 + (value.defaultDurationMinutes ?? 0), 0);
 }
 
-function subtractBreakMinutes(
-  minutes: number,
-  breakMinutes: number | null | undefined,
-): number {
+function subtractBreakMinutes(minutes: number, breakMinutes: number | null | undefined): number {
   return Math.max(minutes - (breakMinutes ?? 0), 0);
 }
 
@@ -1093,8 +965,7 @@ function getSegmentScheduledMinutes(
     startOverride ?? segment.startTime ?? getScheduleEntryStartTime(entry),
     endOverride ?? segment.endTime ?? getScheduleEntryEndTime(entry),
   );
-  const minutes =
-    rangeMinutes > 0 ? rangeMinutes : getDurationFieldMinutes(segment);
+  const minutes = rangeMinutes > 0 ? rangeMinutes : getDurationFieldMinutes(segment);
 
   return subtractBreakMinutes(minutes, segment.breakMinutes);
 }
@@ -1123,10 +994,7 @@ export function getScheduleEntrySegmentFocusAreaName(
     return segment.displayFocusAreaName ?? null;
   }
 
-  return (
-    getScheduleEntryDisplayFocusAreaName(entry) ??
-    getScheduleEntryFocusAreaName(entry)
-  );
+  return getScheduleEntryDisplayFocusAreaName(entry) ?? getScheduleEntryFocusAreaName(entry);
 }
 
 export function buildMeScheduleSegmentItems(
@@ -1143,8 +1011,7 @@ export function buildMeScheduleSegmentItems(
       getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left),
     );
     const rightTime = getSortableTime(
-      getScheduleEntryStartTime(right) ??
-        getScheduleEntryCustomStartTime(right),
+      getScheduleEntryStartTime(right) ?? getScheduleEntryCustomStartTime(right),
     );
 
     if (leftTime !== rightTime) {
@@ -1200,17 +1067,11 @@ export function getFeaturedMeScheduleSegment(input: {
   todayDate: string;
 }): FeaturedMeScheduleSegment {
   const items = buildMeScheduleSegmentItems(input.entries);
-  const selectedDayItems = items.filter(
-    (item) => item.date === input.selectedDate,
-  );
+  const selectedDayItems = items.filter((item) => item.date === input.selectedDate);
 
-  if (
-    input.rangeStartDate &&
-    input.rangeStartDate.localeCompare(input.todayDate) > 0
-  ) {
+  if (input.rangeStartDate && input.rangeStartDate.localeCompare(input.todayDate) > 0) {
     const firstWeekItem =
-      items.find((item) => getScheduleEntryAbsenceTypeId(item.entry) == null) ??
-      null;
+      items.find((item) => getScheduleEntryAbsenceTypeId(item.entry) == null) ?? null;
 
     if (firstWeekItem) {
       return {
@@ -1251,9 +1112,7 @@ export function getFeaturedMeScheduleSegment(input: {
         }
 
         return (
-          getEntrySegmentSortTime(item.entry, item.segment).localeCompare(
-            input.currentTime,
-          ) > 0
+          getEntrySegmentSortTime(item.entry, item.segment).localeCompare(input.currentTime) > 0
         );
       }) ?? null;
 
@@ -1265,9 +1124,7 @@ export function getFeaturedMeScheduleSegment(input: {
     }
 
     const awayTodayItem =
-      selectedDayItems.find(
-        (item) => getScheduleEntryAbsenceTypeId(item.entry) != null,
-      ) ?? null;
+      selectedDayItems.find((item) => getScheduleEntryAbsenceTypeId(item.entry) != null) ?? null;
 
     if (awayTodayItem) {
       return {
@@ -1276,17 +1133,12 @@ export function getFeaturedMeScheduleSegment(input: {
       };
     }
 
-    const nextItem =
-      items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ??
-      null;
+    const nextItem = items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ?? null;
 
     if (nextItem) {
       return {
         item: nextItem,
-        status:
-          getScheduleEntryAbsenceTypeId(nextItem.entry) != null
-            ? "away"
-            : "upcoming",
+        status: getScheduleEntryAbsenceTypeId(nextItem.entry) != null ? "away" : "upcoming",
       };
     }
 
@@ -1301,24 +1153,16 @@ export function getFeaturedMeScheduleSegment(input: {
   if (selectedDayItem) {
     return {
       item: selectedDayItem,
-      status:
-        getScheduleEntryAbsenceTypeId(selectedDayItem.entry) != null
-          ? "away"
-          : "scheduled",
+      status: getScheduleEntryAbsenceTypeId(selectedDayItem.entry) != null ? "away" : "scheduled",
     };
   }
 
-  const nextItem =
-    items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ??
-    null;
+  const nextItem = items.find((item) => item.date.localeCompare(input.selectedDate) > 0) ?? null;
 
   if (nextItem) {
     return {
       item: nextItem,
-      status:
-        getScheduleEntryAbsenceTypeId(nextItem.entry) != null
-          ? "away"
-          : "upcoming",
+      status: getScheduleEntryAbsenceTypeId(nextItem.entry) != null ? "away" : "upcoming",
     };
   }
 
@@ -1342,36 +1186,25 @@ function getRequestPrimarySegment(
 ): MobileScheduleEntrySegment | null {
   const legacyRequest = request as MobileShiftRequest & {
     requesterSegments?: MobileShiftRequest["requesterPresentation"]["segments"];
-    targetSegments?:
-      | MobileShiftRequest["requesterPresentation"]["segments"]
-      | null;
+    targetSegments?: MobileShiftRequest["requesterPresentation"]["segments"] | null;
   };
   const segments =
     which === "requester"
-      ? (request.requesterPresentation?.segments ??
-        legacyRequest.requesterSegments ??
-        [])
-      : (request.targetPresentation?.segments ??
-        legacyRequest.targetSegments ??
-        []);
+      ? (request.requesterPresentation?.segments ?? legacyRequest.requesterSegments ?? [])
+      : (request.targetPresentation?.segments ?? legacyRequest.targetSegments ?? []);
 
   return segments[0] ?? null;
 }
 
-function getRequestSortTime(
-  request: MobileShiftRequest,
-  which: "requester" | "target",
-): string {
+function getRequestSortTime(request: MobileShiftRequest, which: "requester" | "target"): string {
   const legacyRequest = request as LegacyMobileShiftRequest;
   const primarySegment = getRequestPrimarySegment(request, which);
 
   return (
     primarySegment?.startTime ??
     (which === "requester"
-      ? (request.requesterState?.customStartTime ??
-        legacyRequest.requesterCustomStartTime)
-      : (request.targetState?.customStartTime ??
-        legacyRequest.targetCustomStartTime)) ??
+      ? (request.requesterState?.customStartTime ?? legacyRequest.requesterCustomStartTime)
+      : (request.targetState?.customStartTime ?? legacyRequest.targetCustomStartTime)) ??
     "99:99:99"
   );
 }
@@ -1457,9 +1290,7 @@ export function buildAvailableShiftDateGroups(input: {
   return groups;
 }
 
-function getScheduleEntryAvailabilityTimeRanges(
-  entry: MobileScheduleEntry,
-): TimeRange[] {
+function getScheduleEntryAvailabilityTimeRanges(entry: MobileScheduleEntry): TimeRange[] {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
     return [];
   }
@@ -1493,9 +1324,7 @@ function getScheduleEntryAvailabilityTimeRanges(
   return baseRange ? [baseRange] : [];
 }
 
-function getRequestAvailabilityTimeRanges(
-  request: MobileShiftRequest,
-): TimeRange[] {
+function getRequestAvailabilityTimeRanges(request: MobileShiftRequest): TimeRange[] {
   const legacyRequest = request as LegacyMobileShiftRequest;
   const segments = request.requesterPresentation?.segments ?? [];
   const segmentRanges = segments.flatMap((segment) => {
@@ -1520,18 +1349,14 @@ function getRequestAvailabilityTimeRanges(
   }
 
   const stateRange = toShiftTimeRange(
-    request.requesterState?.customStartTime ??
-      legacyRequest.requesterCustomStartTime,
-    request.requesterState?.customEndTime ??
-      legacyRequest.requesterCustomEndTime,
+    request.requesterState?.customStartTime ?? legacyRequest.requesterCustomStartTime,
+    request.requesterState?.customEndTime ?? legacyRequest.requesterCustomEndTime,
   );
 
   return stateRange ? [stateRange] : [];
 }
 
-function getOpenShiftAvailabilityTimeRanges(
-  openShift: MobileOpenShift,
-): TimeRange[] {
+function getOpenShiftAvailabilityTimeRanges(openShift: MobileOpenShift): TimeRange[] {
   const segmentRanges = openShift.presentation.segments.flatMap((segment) => {
     const range = toShiftTimeRange(
       segment.startTime ?? segment.shiftStartTime ?? null,
@@ -1570,8 +1395,7 @@ function availabilityRangesOverlap(
       expandTimeRange(leftRange.start, leftRange.end).some((leftExpanded) =>
         expandTimeRange(rightRange.start, rightRange.end).some(
           (rightExpanded) =>
-            leftExpanded.start < rightExpanded.end &&
-            rightExpanded.start < leftExpanded.end,
+            leftExpanded.start < rightExpanded.end && rightExpanded.start < leftExpanded.end,
         ),
       ),
     ),
@@ -1591,15 +1415,10 @@ function isPendingVolunteerRequest(
     return false;
   }
 
-  return (
-    linkedEmployeeId == null || request.requesterEmpId === linkedEmployeeId
-  );
+  return linkedEmployeeId == null || request.requesterEmpId === linkedEmployeeId;
 }
 
-function requestMatchesOpenShift(
-  request: MobileShiftRequest,
-  openShift: MobileOpenShift,
-): boolean {
+function requestMatchesOpenShift(request: MobileShiftRequest, openShift: MobileOpenShift): boolean {
   if (request.requesterShiftDate !== openShift.date) {
     return false;
   }
@@ -1643,6 +1462,14 @@ function buildScheduleAvailabilityRangesByDate(
   return rangesByDate;
 }
 
+/**
+ * How an open-shift source is surfaced to a regular user. Mirrors
+ * `OpenShiftVisibilityMode` from `@dubgrid/domain` (kept local so schedule-core
+ * stays dependency-light). `matched` only shows shifts that fit the user's
+ * availability; `always` shows them regardless; `hidden` shows none.
+ */
+export type OpenShiftFeedVisibilityMode = "hidden" | "matched" | "always";
+
 export function buildAvailableOpenShiftFeed(input: {
   linkedEmployeeId: string | null;
   scheduleEntries: ReadonlyArray<MobileScheduleEntry>;
@@ -1651,6 +1478,10 @@ export function buildAvailableOpenShiftFeed(input: {
   now?: Date;
   showAll?: boolean;
   timeZone?: string | null;
+  /** Visibility of coverage-shortage open shifts. Defaults to `matched`. */
+  coverageGapVisibility?: OpenShiftFeedVisibilityMode;
+  /** Visibility of call-off (open pickup) vacancies. Defaults to `matched`. */
+  calloffVisibility?: OpenShiftFeedVisibilityMode;
 }): AvailableOpenShiftFeed {
   if (!input.linkedEmployeeId && !input.showAll) {
     return {
@@ -1661,11 +1492,13 @@ export function buildAvailableOpenShiftFeed(input: {
     };
   }
 
-  const scheduleRangesByDate = buildScheduleAvailabilityRangesByDate(
-    input.scheduleEntries,
-  );
+  const scheduleRangesByDate = buildScheduleAvailabilityRangesByDate(input.scheduleEntries);
   const now = input.now ?? new Date();
   const showAll = input.showAll ?? false;
+  // The visibility policy governs the regular-user view only. When showAll is
+  // set (a scheduler/admin viewing every open shift), it always wins.
+  const coverageGapVisibility = input.coverageGapVisibility ?? "matched";
+  const calloffVisibility = input.calloffVisibility ?? "matched";
   const pendingVolunteerRequests = input.requests.filter(
     (request) =>
       isPendingVolunteerRequest(request, input.linkedEmployeeId) &&
@@ -1685,7 +1518,11 @@ export function buildAvailableOpenShiftFeed(input: {
         return false;
       }
 
-      if (showAll) {
+      if (!showAll && calloffVisibility === "hidden") {
+        return false;
+      }
+
+      if (showAll || calloffVisibility === "always") {
         return true;
       }
 
@@ -1698,15 +1535,17 @@ export function buildAvailableOpenShiftFeed(input: {
   const openShifts = input.openShifts.flatMap((openShift) => {
     const hasOwnPendingVolunteer =
       input.linkedEmployeeId != null &&
-      pendingVolunteerRequests.some((request) =>
-        requestMatchesOpenShift(request, openShift),
-      );
+      pendingVolunteerRequests.some((request) => requestMatchesOpenShift(request, openShift));
 
     if (hasOwnPendingVolunteer) {
       return [];
     }
 
     if (openShift.needed <= 0) {
+      return [];
+    }
+
+    if (!showAll && coverageGapVisibility === "hidden") {
       return [];
     }
 
@@ -1725,7 +1564,7 @@ export function buildAvailableOpenShiftFeed(input: {
       return [];
     }
 
-    if (showAll) {
+    if (showAll || coverageGapVisibility === "always") {
       return [openShift];
     }
 
@@ -1763,10 +1602,7 @@ export function buildMeShiftRequestSections(input: {
     };
   }
 
-  const sortRequests = (
-    left: MobileShiftRequest,
-    right: MobileShiftRequest,
-  ) => {
+  const sortRequests = (left: MobileShiftRequest, right: MobileShiftRequest) => {
     if (left.requesterShiftDate !== right.requesterShiftDate) {
       return left.requesterShiftDate.localeCompare(right.requesterShiftDate);
     }
@@ -1846,14 +1682,9 @@ export function buildWeeklyHoursSummary(
   }, 0);
 
   const scheduledHours = formatHoursValue(scheduledMinutes);
-  const progress =
-    targetHours > 0 ? Math.min(scheduledHours / targetHours, 1) : 0;
+  const progress = targetHours > 0 ? Math.min(scheduledHours / targetHours, 1) : 0;
   const statusLabel =
-    progress >= 0.8
-      ? "On track"
-      : progress >= 0.5
-        ? "In progress"
-        : "Needs attention";
+    progress >= 0.8 ? "On track" : progress >= 0.5 ? "In progress" : "Needs attention";
 
   return {
     scheduledHours,
@@ -1879,8 +1710,7 @@ export function buildScheduleTimeGroups(
 
   for (const entry of sortedEntries) {
     const sortTime = getSortableTime(
-      getScheduleEntryStartTime(entry) ??
-        getScheduleEntryCustomStartTime(entry),
+      getScheduleEntryStartTime(entry) ?? getScheduleEntryCustomStartTime(entry),
     );
     const key = sortTime ?? "unscheduled";
     const title = sortTime ? formatScheduleTimeValue(sortTime) : "Unscheduled";
@@ -1915,9 +1745,7 @@ export function getScheduleEntryCategoryKey(entry: ScheduleEntryLike): string {
       ? canonicalSegments.map((segment) =>
           segment.shiftId == null ? "null" : String(segment.shiftId),
         )
-      : (entry.shiftIds ?? []).map((shiftId) =>
-          shiftId == null ? "null" : String(shiftId),
-        );
+      : (entry.shiftIds ?? []).map((shiftId) => (shiftId == null ? "null" : String(shiftId)));
   if (shiftIds.some((shiftId) => shiftId !== "null")) {
     return `shift:${shiftIds.join(",")}`;
   }
@@ -1925,9 +1753,7 @@ export function getScheduleEntryCategoryKey(entry: ScheduleEntryLike): string {
   return `name:${title}`;
 }
 
-function getShiftOnlySegmentTitle(
-  segment: MobileScheduleEntrySegment,
-): string | null {
+function getShiftOnlySegmentTitle(segment: MobileScheduleEntrySegment): string | null {
   const title = segment.shiftName ?? segment.label ?? null;
   const jobName = segment.jobName?.trim();
 
@@ -1961,9 +1787,7 @@ function getScheduleEntrySeniority(entry: ScheduleEntryLike): number {
   return entry.employeeSeniority ?? Number.MAX_SAFE_INTEGER;
 }
 
-function sortTeamShiftGroupEntries(
-  entries: MobileScheduleEntry[],
-): MobileScheduleEntry[] {
+function sortTeamShiftGroupEntries(entries: MobileScheduleEntry[]): MobileScheduleEntry[] {
   return [...entries].sort((left, right) => {
     const leftJob = getScheduleEntryPrimaryJobSort(left);
     const rightJob = getScheduleEntryPrimaryJobSort(right);
@@ -1977,8 +1801,7 @@ function sortTeamShiftGroupEntries(
       return jobComparison;
     }
 
-    const seniorityComparison =
-      getScheduleEntrySeniority(left) - getScheduleEntrySeniority(right);
+    const seniorityComparison = getScheduleEntrySeniority(left) - getScheduleEntrySeniority(right);
     if (seniorityComparison !== 0) {
       return seniorityComparison;
     }
@@ -1987,9 +1810,7 @@ function sortTeamShiftGroupEntries(
   });
 }
 
-export function getScheduleEntryCategoryTitle(
-  entry: ScheduleEntryLike,
-): string {
+export function getScheduleEntryCategoryTitle(entry: ScheduleEntryLike): string {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
     return getScheduleEntryTitle(entry);
   }
@@ -1999,9 +1820,7 @@ export function getScheduleEntryCategoryTitle(
     .filter((title): title is string => Boolean(title))
     .filter((title, index, titles) => titles.indexOf(title) === index);
 
-  return shiftTitles.length > 0
-    ? shiftTitles.join(" / ")
-    : getScheduleEntryTitle(entry);
+  return shiftTitles.length > 0 ? shiftTitles.join(" / ") : getScheduleEntryTitle(entry);
 }
 
 export function buildScheduleShiftGroups(
@@ -2021,10 +1840,8 @@ export function buildScheduleShiftGroups(
   for (const entry of sortedEntries) {
     const key = getScheduleEntryCategoryKey(entry);
     const sortTime =
-      getSortableTime(
-        getScheduleEntryStartTime(entry) ??
-          getScheduleEntryCustomStartTime(entry),
-      ) ?? "99:99:99";
+      getSortableTime(getScheduleEntryStartTime(entry) ?? getScheduleEntryCustomStartTime(entry)) ??
+      "99:99:99";
     const existing = grouped.get(key) ?? {
       title: getScheduleEntryCategoryTitle(entry),
       sortKey: sortTime,
@@ -2072,11 +1889,7 @@ export function buildTeamScheduleFocusAreaTabs(
   for (const entry of entries) {
     const focusAreaId = getScheduleEntryFocusAreaId(entry);
     const focusAreaName = getScheduleEntryFocusAreaName(entry);
-    if (
-      focusAreaId != null &&
-      focusAreaName &&
-      !focusAreasById.has(focusAreaId)
-    ) {
+    if (focusAreaId != null && focusAreaName && !focusAreasById.has(focusAreaId)) {
       focusAreasById.set(focusAreaId, {
         id: focusAreaId,
         name: focusAreaName,
@@ -2087,9 +1900,7 @@ export function buildTeamScheduleFocusAreaTabs(
   const tabs = Array.from(focusAreasById.values()).map((focusArea) => ({
     key: `focus-area:${focusArea.id}`,
     label: focusArea.name,
-    count: entries.filter(
-      (entry) => getScheduleEntryFocusAreaId(entry) === focusArea.id,
-    ).length,
+    count: entries.filter((entry) => getScheduleEntryFocusAreaId(entry) === focusArea.id).length,
     focusAreaId: focusArea.id,
   }));
 
@@ -2136,8 +1947,7 @@ export function buildScheduleSections(
       getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left),
     );
     const rightTime = getSortableTime(
-      getScheduleEntryStartTime(right) ??
-        getScheduleEntryCustomStartTime(right),
+      getScheduleEntryStartTime(right) ?? getScheduleEntryCustomStartTime(right),
     );
     if (leftTime !== rightTime) {
       if (!leftTime) return 1;

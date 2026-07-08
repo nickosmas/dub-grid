@@ -7,9 +7,7 @@ type PublishDiffTone = {
   text: string;
 };
 
-export function getPublishDiffTone(
-  kind: PublishDiffPillKind,
-): PublishDiffTone {
+export function getPublishDiffTone(kind: PublishDiffPillKind): PublishDiffTone {
   switch (kind) {
     case "new":
       return {
@@ -57,12 +55,7 @@ type PublishDiffPillProps = ComponentPropsWithoutRef<"span"> & {
   kind: PublishDiffPillKind;
 };
 
-export function PublishDiffPill({
-  kind,
-  style,
-  children,
-  ...props
-}: PublishDiffPillProps) {
+export function PublishDiffPill({ kind, style, children, ...props }: PublishDiffPillProps) {
   const tone = getPublishDiffTone(kind);
 
   return (

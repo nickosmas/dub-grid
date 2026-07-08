@@ -50,9 +50,7 @@ function withCheckoutSessionPlaceholder(returnUrl: string) {
 }
 
 function defaultTrialEndFrom(date: Date): string {
-  return new Date(
-    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
-  ).toISOString();
+  return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
 }
 
 function resolveStripeTrialEnd(sub: Stripe.Subscription): string | null {
@@ -115,7 +113,9 @@ export async function createCheckoutSession(
     mode: "subscription",
     line_items: [{ price: priceId, quantity: seats }],
     subscription_data: {
-      trial_period_days: DEFAULT_TRIAL_DAYS,
+      // No trial_period_days: the in-app 14-day trial (started on the first
+      // super_admin sign-in) is the only trial. Subscribing goes straight to
+      // active so we don't grant a second free period on top of it.
       metadata: { org_id: orgId },
     },
     success_url: withCheckoutSessionPlaceholder(returnUrl),
@@ -202,7 +202,10 @@ export async function scheduleSubscriptionCancellation(
 /**
  * Extend a subscription's trial period.
  */
-export async function extendTrial(subscriptionId: string, newTrialEnd: Date): Promise<Stripe.Subscription> {
+export async function extendTrial(
+  subscriptionId: string,
+  newTrialEnd: Date,
+): Promise<Stripe.Subscription> {
   const s = getStripe();
   if (!s) throw new Error("Stripe not configured");
   return s.subscriptions.update(subscriptionId, {
@@ -229,13 +232,12 @@ export async function upsertStripeSubscriptionToDb(
     logger.warn({ subscriptionId: sub.id }, "Subscription missing customer ID");
     return;
   }
-  const orgId = sub.metadata?.org_id ?? await resolveStripeSubscriptionOrgId(
-    serviceClient,
-    {
+  const orgId =
+    sub.metadata?.org_id ??
+    (await resolveStripeSubscriptionOrgId(serviceClient, {
       subscriptionId: sub.id,
       customerId,
-    },
-  );
+    }));
   if (!orgId) {
     logger.warn(
       { subscriptionId: sub.id, customerId },
@@ -248,35 +250,29 @@ export async function upsertStripeSubscriptionToDb(
   const currentPeriodEnd = item?.current_period_end
     ? new Date(item.current_period_end * 1000).toISOString()
     : null;
-  const cancelAt = sub.cancel_at
-    ? new Date(sub.cancel_at * 1000).toISOString()
-    : null;
-  const canceledAt = sub.canceled_at
-    ? new Date(sub.canceled_at * 1000).toISOString()
-    : null;
+  const cancelAt = sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null;
+  const canceledAt = sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null;
   const previous = await loadPreviousSubscriptionForAudit(serviceClient, orgId);
 
-  const { error: subError } = await serviceClient
-    .from("subscriptions")
-    .upsert(
-      {
-        org_id: orgId,
-        stripe_subscription_id: sub.id,
-        stripe_customer_id: customerId,
-        status: sub.status,
-        price_id: item?.price?.id ?? null,
-        quantity: item?.quantity ?? 1,
-        current_period_start: item?.current_period_start
-          ? new Date(item.current_period_start * 1000).toISOString()
-          : null,
-        current_period_end: currentPeriodEnd,
-        cancel_at: cancelAt,
-        canceled_at: canceledAt,
-        trial_end: trialEnd,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "org_id" },
-    );
+  const { error: subError } = await serviceClient.from("subscriptions").upsert(
+    {
+      org_id: orgId,
+      stripe_subscription_id: sub.id,
+      stripe_customer_id: customerId,
+      status: sub.status,
+      price_id: item?.price?.id ?? null,
+      quantity: item?.quantity ?? 1,
+      current_period_start: item?.current_period_start
+        ? new Date(item.current_period_start * 1000).toISOString()
+        : null,
+      current_period_end: currentPeriodEnd,
+      cancel_at: cancelAt,
+      canceled_at: canceledAt,
+      trial_end: trialEnd,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "org_id" },
+  );
   if (subError) throw subError;
 
   const { error: orgError } = await serviceClient
@@ -409,12 +405,16 @@ export async function syncSubscriptionToDb(orgId: string): Promise<void> {
     return;
   }
 
-  await upsertStripeSubscriptionToDb(adminClient, {
-    ...sub,
-    metadata: { ...sub.metadata, org_id: orgId },
-  }, {
-    audit: { source: "gridmaster_sync" },
-  });
+  await upsertStripeSubscriptionToDb(
+    adminClient,
+    {
+      ...sub,
+      metadata: { ...sub.metadata, org_id: orgId },
+    },
+    {
+      audit: { source: "gridmaster_sync" },
+    },
+  );
 }
 
 async function loadPreviousSubscriptionForAudit(
@@ -481,10 +481,7 @@ async function resolveStripeCustomerOrgId(
       .eq("stripe_customer_id", customerId)
       .maybeSingle();
     if (error) {
-      logger.warn(
-        { error, customerId },
-        "Could not resolve Stripe customer to an organization",
-      );
+      logger.warn({ error, customerId }, "Could not resolve Stripe customer to an organization");
       return null;
     }
     return (org as { id?: string | null } | null)?.id ?? null;
@@ -547,9 +544,7 @@ async function writeStripeSubscriptionAuditLog(
     const { error } = await serviceClient.from("audit_log").insert({
       org_id: input.orgId,
       actor_id: input.actor?.id ?? null,
-      actor_email:
-        input.actor?.email ??
-        (input.source === "stripe_webhook" ? "Stripe" : null),
+      actor_email: input.actor?.email ?? (input.source === "stripe_webhook" ? "Stripe" : null),
       action,
       resource_type: "billing",
       resource_id: input.next.stripe_subscription_id,
@@ -580,10 +575,9 @@ export async function writeStripePaymentFailedAuditLog(
   serviceClient: BillingSyncClient,
   invoice: Stripe.Invoice,
   options: { stripeEventId?: string; stripeEventType?: string } = {},
-): Promise<void> {
-  const customerId =
-    stripeCustomerId(invoice.customer ?? null);
-  if (!customerId) return;
+): Promise<{ orgId: string } | null> {
+  const customerId = stripeCustomerId(invoice.customer ?? null);
+  if (!customerId) return null;
 
   try {
     const { data, error: orgError } = await serviceClient
@@ -596,7 +590,7 @@ export async function writeStripePaymentFailedAuditLog(
         { error: orgError, customerId, invoiceId: invoice.id },
         "Could not resolve Stripe invoice payment failure to an organization",
       );
-      return;
+      return null;
     }
 
     const { error } = await serviceClient.from("audit_log").insert({
@@ -617,10 +611,15 @@ export async function writeStripePaymentFailedAuditLog(
       },
     });
     if (error) {
-      logger.warn({ error, orgId: data.id, invoiceId: invoice.id }, "Billing audit log write failed");
+      logger.warn(
+        { error, orgId: data.id, invoiceId: invoice.id },
+        "Billing audit log write failed",
+      );
     }
+    return { orgId: data.id as string };
   } catch (error) {
     logger.warn({ error, customerId, invoiceId: invoice.id }, "Billing audit log write failed");
+    return null;
   }
 }
 
@@ -629,8 +628,7 @@ export async function writeStripePaymentSucceededAuditLog(
   invoice: Stripe.Invoice,
   options: { stripeEventId?: string; stripeEventType?: string } = {},
 ): Promise<void> {
-  const customerId =
-    stripeCustomerId(invoice.customer ?? null);
+  const customerId = stripeCustomerId(invoice.customer ?? null);
   if (!customerId) return;
 
   await writeStripeCustomerBillingActivityLog(serviceClient, {

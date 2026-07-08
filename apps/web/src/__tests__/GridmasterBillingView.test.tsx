@@ -12,8 +12,7 @@ const mockUpdateGridmasterSubscription = vi.fn();
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterBilling: () => mockFetchGridmasterBilling(),
   syncGridmasterBilling: (orgId: string) => mockSyncGridmasterBilling(orgId),
-  updateGridmasterSubscription: (input: unknown) =>
-    mockUpdateGridmasterSubscription(input),
+  updateGridmasterSubscription: (input: unknown) => mockUpdateGridmasterSubscription(input),
 }));
 
 vi.mock("sonner", () => ({
@@ -33,6 +32,7 @@ const billingSummary: GridmasterBillingSummary = {
       status: "trialing",
       stripeCustomerId: "cus_123",
       stripeSubscriptionId: "sub_123",
+      trialStartedAt: "2026-05-18T00:00:00.000Z",
       trialEndsAt: "2026-06-01T00:00:00.000Z",
       currentPeriodEnd: "2026-06-15T00:00:00.000Z",
       cancelAt: null,
@@ -45,6 +45,7 @@ const billingSummary: GridmasterBillingSummary = {
     },
   ],
   trialEndingSoon: [],
+  trialsNotStarted: [],
   riskOrganizations: [],
   missingStripeCustomer: [],
   seatMismatches: [],
@@ -89,16 +90,28 @@ describe("GridmasterBillingView", () => {
     });
   });
 
+  it("shows 'Trial pending' for a trialing org whose trial has not started", async () => {
+    mockFetchGridmasterBilling.mockResolvedValue({
+      ...billingSummary,
+      organizations: [{ ...billingSummary.organizations[0], trialEndsAt: null }],
+    });
+
+    renderView();
+
+    await screen.findByText("Acme Health");
+    // Status cell reads "Trial pending" (not the green "Trial active") when the
+    // clock has not started. "Trial active" still exists as a status-override
+    // dropdown option, so we assert on the pending label specifically.
+    expect(screen.getByText("Trial pending")).toBeInTheDocument();
+  });
+
   it("opens the selected organization's billing tab from the table row", async () => {
     const user = userEvent.setup();
     const { onSelectOrg } = renderView();
 
     await user.click(await screen.findByText("Acme Health"));
 
-    expect(onSelectOrg).toHaveBeenCalledWith(
-      "11111111-1111-4111-8111-111111111111",
-      "billing",
-    );
+    expect(onSelectOrg).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111", "billing");
   });
 
   it("extends a trial from the row action", async () => {
@@ -178,9 +191,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(
-      screen.getByRole("button", { name: "Billing status for Acme Health" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Billing status for Acme Health" }));
     await user.click(await screen.findByRole("option", { name: "Active" }));
     await user.click(screen.getByRole("button", { name: "Override" }));
     await user.click(screen.getByRole("button", { name: "Override Status" }));

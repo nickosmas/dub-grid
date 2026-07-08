@@ -19,9 +19,7 @@ describe("DraftReviewSummary", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("heading", { name: "Your edits" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your edits" })).toBeInTheDocument();
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("New shifts")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();

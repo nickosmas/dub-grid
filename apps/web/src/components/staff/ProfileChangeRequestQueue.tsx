@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Department, FocusArea, NamedItem } from "@/types";
 import {
@@ -9,7 +10,11 @@ import {
   type ProfileChangeRequest,
 } from "@/features/account/client";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
+import ProgressBar from "@/components/ProgressBar";
 import { extractErrorMessage } from "@/lib/error-handling";
+import { queryKeys } from "@/lib/query-keys";
+import { Inbox } from "lucide-react";
 
 interface ReferenceItem {
   id: number;
@@ -31,24 +36,25 @@ const FIELD_LABELS: Record<string, string> = {
   departmentIds: "Departments",
 };
 
-const STATUS_STYLES: Record<ProfileChangeRequest["status"], { label: string; className: string }> = {
-  pending: {
-    label: "Pending",
-    className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]",
-  },
-  approved: {
-    label: "Approved",
-    className: "bg-[var(--color-success-bg)] text-[var(--color-success-text)]",
-  },
-  rejected: {
-    label: "Rejected",
-    className: "bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "bg-[var(--color-bg)] text-[var(--color-text-muted)]",
-  },
-};
+const STATUS_STYLES: Record<ProfileChangeRequest["status"], { label: string; className: string }> =
+  {
+    pending: {
+      label: "Pending",
+      className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]",
+    },
+    approved: {
+      label: "Approved",
+      className: "bg-[var(--color-success-bg)] text-[var(--color-success-text)]",
+    },
+    rejected: {
+      label: "Rejected",
+      className: "bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]",
+    },
+    cancelled: {
+      label: "Cancelled",
+      className: "bg-[var(--color-bg)] text-[var(--color-text-muted)]",
+    },
+  };
 
 function formatDate(value: string | null): string {
   if (!value) return "Not recorded";
@@ -93,11 +99,7 @@ function formatReferenceValue(value: unknown, items: ReferenceItem[]): string {
   return match?.name ?? match?.abbr ?? String(value);
 }
 
-function formatFieldValue(
-  field: string,
-  value: unknown,
-  references: RequestReferenceData,
-): string {
+function formatFieldValue(field: string, value: unknown, references: RequestReferenceData): string {
   switch (field) {
     case "employmentType":
       return formatEmploymentType(value);
@@ -174,7 +176,11 @@ function ProfileUpdateDetails({
             {formatFieldValue(field, request.currentValues[field], references)}
           </div>
           <div className="px-3 py-2 font-semibold text-[var(--color-text-primary)]">
-            {formatFieldValue(field, request.requestedChanges[field as keyof typeof request.requestedChanges], references)}
+            {formatFieldValue(
+              field,
+              request.requestedChanges[field as keyof typeof request.requestedChanges],
+              references,
+            )}
           </div>
         </div>
       ))}
@@ -189,9 +195,46 @@ function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) 
         Account deletion request
       </div>
       <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--color-danger-text)]">
-        Approval will run the account deletion safeguards before removing the user&apos;s account.
+        Approving will permanently delete this user&apos;s account and remove them from your
+        organization. This can&apos;t be undone.
       </p>
     </div>
+  );
+}
+
+function RequestQueueSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 2 }).map((_, i) => (
+        <div key={i} className="dg-card" aria-hidden>
+          <div className="dg-card-header">
+            <div className="flex flex-col gap-2">
+              <div className="dg-skeleton" style={{ width: 140, height: 14, borderRadius: 4 }} />
+              <div className="dg-skeleton" style={{ width: 200, height: 12, borderRadius: 4 }} />
+            </div>
+            <div className="dg-skeleton" style={{ width: 64, height: 18, borderRadius: 999 }} />
+          </div>
+          <div className="dg-card-body flex flex-col gap-3">
+            <div className="grid gap-3 rounded-[var(--dg-radius-md)] bg-[var(--color-bg)] p-3 sm:grid-cols-3">
+              {Array.from({ length: 3 }).map((__, j) => (
+                <div key={j} className="flex flex-col gap-2">
+                  <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
+                  <div
+                    className="dg-skeleton"
+                    style={{ width: "80%", height: 12, borderRadius: 4 }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="dg-skeleton" style={{ width: "100%", height: 96, borderRadius: 8 }} />
+            <div className="flex gap-2">
+              <div className="dg-skeleton" style={{ width: 96, height: 32, borderRadius: 6 }} />
+              <div className="dg-skeleton" style={{ width: 96, height: 32, borderRadius: 6 }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -202,53 +245,58 @@ export function ProfileChangeRequestQueue({
   roles,
   departments,
 }: ProfileChangeRequestQueueProps) {
-  const [requests, setRequests] = useState<ProfileChangeRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [pendingResolution, setPendingResolution] = useState<{
     request: ProfileChangeRequest;
     action: "approve" | "reject";
   } | null>(null);
   const references = { focusAreas, certifications, roles, departments };
 
-  async function loadRequests() {
-    setLoading(true);
-    try {
+  const requestsQuery = useQuery({
+    queryKey: queryKeys.org.peopleChangeRequests(orgId, "pending"),
+    queryFn: async () => {
       const result = await fetchPeopleProfileChangeRequests(orgId, "pending");
-      setRequests(result.requests);
-    } catch (error) {
-      toast.error(extractErrorMessage(error, "Failed to load profile requests."));
-    } finally {
-      setLoading(false);
-    }
-  }
+      return result.requests;
+    },
+  });
 
   useEffect(() => {
-    void loadRequests();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId]);
-
-  async function resolveRequest(
-    requestId: string,
-    action: "approve" | "reject",
-  ) {
-    setResolvingId(requestId);
-    try {
-      await resolvePeopleProfileChangeRequest({ orgId, requestId, action });
-      setRequests((current) => current.filter((request) => request.id !== requestId));
-      setPendingResolution(null);
-      toast.success(action === "approve" ? "Request approved." : "Request rejected.");
-    } catch (error) {
-      toast.error(extractErrorMessage(error, "Failed to resolve request."));
-    } finally {
-      setResolvingId(null);
+    if (requestsQuery.isError) {
+      toast.error(extractErrorMessage(requestsQuery.error, "Failed to load profile requests."));
     }
-  }
+  }, [requestsQuery.isError, requestsQuery.error]);
+
+  const requests = requestsQuery.data ?? [];
+  const loading = requestsQuery.isPending;
+
+  const resolveMutation = useMutation({
+    mutationFn: (input: { requestId: string; action: "approve" | "reject" }) =>
+      resolvePeopleProfileChangeRequest({
+        orgId,
+        requestId: input.requestId,
+        action: input.action,
+      }),
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<ProfileChangeRequest[]>(
+        queryKeys.org.peopleChangeRequests(orgId, "pending"),
+        (current) => (current ?? []).filter((request) => request.id !== variables.requestId),
+      );
+      setPendingResolution(null);
+      toast.success(variables.action === "approve" ? "Request approved." : "Request rejected.");
+    },
+    onError: (error) => {
+      toast.error(extractErrorMessage(error, "Failed to resolve request."));
+    },
+  });
+
+  const resolvingId = resolveMutation.isPending
+    ? (resolveMutation.variables?.requestId ?? null)
+    : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-4">
+    <div className="flex w-full flex-col gap-4">
       <div>
-        <h1 className="m-0 text-[24px] font-bold tracking-tight text-[var(--color-text-primary)]">
+        <h1 className="m-0 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
           People requests
         </h1>
         <p className="mb-0 mt-1 text-[14px] text-[var(--color-text-muted)]">
@@ -256,18 +304,16 @@ export function ProfileChangeRequestQueue({
         </p>
       </div>
 
+      <ProgressBar loading={loading} />
+
       {loading ? (
-        <div className="dg-card">
-          <div className="dg-card-body text-[14px] text-[var(--color-text-muted)]">
-            Loading requests...
-          </div>
-        </div>
+        <RequestQueueSkeleton />
       ) : requests.length === 0 ? (
-        <div className="dg-card">
-          <div className="dg-card-body text-[14px] text-[var(--color-text-muted)]">
-            No pending people requests.
-          </div>
-        </div>
+        <EmptyState
+          icon={<Inbox size={28} />}
+          heading="No pending people requests"
+          description="Profile updates and account deletion requests from members will appear here for review."
+        />
       ) : (
         requests.map((request) => (
           <div key={request.id} className="dg-card">
@@ -278,7 +324,9 @@ export function ProfileChangeRequestQueue({
                   {request.requesterName || request.requesterEmail || "Unknown user"}
                 </div>
               </div>
-              <span className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${STATUS_STYLES[request.status].className}`}>
+              <span
+                className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${STATUS_STYLES[request.status].className}`}
+              >
                 {STATUS_STYLES[request.status].label}
               </span>
             </div>
@@ -352,7 +400,7 @@ export function ProfileChangeRequestQueue({
           message={
             pendingResolution.request.type === "account_deletion" &&
             pendingResolution.action === "approve"
-              ? "Approving this request will run account deletion safeguards and remove the user's account."
+              ? "Permanently delete this user's account and remove them from your organization? This can't be undone."
               : pendingResolution.action === "approve"
                 ? "Approve this profile change request and apply the requested updates?"
                 : "Reject this request? The requester will not receive the requested changes."
@@ -366,7 +414,10 @@ export function ProfileChangeRequestQueue({
           }
           isLoading={resolvingId === pendingResolution.request.id}
           onConfirm={() => {
-            void resolveRequest(pendingResolution.request.id, pendingResolution.action);
+            resolveMutation.mutate({
+              requestId: pendingResolution.request.id,
+              action: pendingResolution.action,
+            });
           }}
           onCancel={() => {
             if (!resolvingId) setPendingResolution(null);

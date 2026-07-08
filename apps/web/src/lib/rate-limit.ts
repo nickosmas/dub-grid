@@ -1,9 +1,17 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { createHash } from "node:crypto";
+import { serverEnv } from "@/lib/env";
 
-const hasRedisEnv =
-  !!process.env.UPSTASH_REDIS_REST_URL &&
-  !!process.env.UPSTASH_REDIS_REST_TOKEN;
+/**
+ * SHA-256 of a normalized email, for use as a rate-limit key without storing
+ * the raw address in Redis (matches the login route's hashing).
+ */
+export function hashEmail(email: string): string {
+  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+}
+
+const hasRedisEnv = !!serverEnv?.UPSTASH_REDIS_REST_URL && !!serverEnv?.UPSTASH_REDIS_REST_TOKEN;
 const isProduction = process.env.NODE_ENV === "production";
 
 function createRedis() {
@@ -13,13 +21,8 @@ function createRedis() {
 
 const redis = createRedis();
 
-function createSlidingWindowLimiter(
-  limit: number,
-  window: `${number} ${"s" | "m" | "h"}`,
-) {
-  return redis
-    ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) })
-    : null;
+function createSlidingWindowLimiter(limit: number, window: `${number} ${"s" | "m" | "h"}`) {
+  return redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) }) : null;
 }
 
 /**
@@ -58,6 +61,13 @@ export const passwordResetLimiter = createSlidingWindowLimiter(5, "15 m");
  * Provides brute-force protection at the application level.
  */
 export const loginLimiter = createSlidingWindowLimiter(15, "15 m");
+
+/**
+ * Per-TARGET-email limiter — 5 emails per hour to a single recipient, keyed by
+ * `hashEmail(targetEmail)`. Layers on top of the per-actor limiters so one
+ * actor can't flood a single inbox (invite/password-reset email bombing).
+ */
+export const emailTargetLimiter = createSlidingWindowLimiter(5, "1 h");
 
 export function getRateLimitConfigStatus(): {
   configured: boolean;
@@ -99,6 +109,16 @@ export async function checkRateLimit(
     }
     return { limited: false };
   }
-  const { success, reset } = await limiter.limit(key);
-  return { limited: !success, reset };
+  try {
+    const { success, reset } = await limiter.limit(key);
+    return { limited: !success, reset };
+  } catch {
+    // Redis/Upstash unreachable. Don't let it escape as a framework 500 from
+    // whatever callsite invoked us (some call before their try block). Fail
+    // closed in production (treat like misconfigured → 503), open in dev. (M-3)
+    if (isProduction) {
+      return { limited: true, misconfigured: true };
+    }
+    return { limited: false };
+  }
 }

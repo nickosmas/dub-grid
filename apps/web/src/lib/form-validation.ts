@@ -17,10 +17,7 @@ type CodeValidationOptions = {
   uppercase?: boolean;
 };
 
-export function getLineTextError(
-  value: string,
-  options: TextValidationOptions,
-): string | null {
+export function getLineTextError(value: string, options: TextValidationOptions): string | null {
   const { label, maxLength, required = false, disallowUrl = false } = options;
   const trimmed = value.trim();
 
@@ -39,10 +36,7 @@ export function getLineTextError(
   return null;
 }
 
-export function normalizeLineText(
-  value: string,
-  options: TextValidationOptions,
-): string {
+export function normalizeLineText(value: string, options: TextValidationOptions): string {
   const normalized = value.trim().replace(/\s+/g, " ");
   const error = getLineTextError(normalized, options);
   if (error) {
@@ -86,16 +80,8 @@ export function getOptionalUsPhoneFieldError(value: string): string | null {
   return getOptionalUsPhoneError(value);
 }
 
-export function getCodeError(
-  value: string,
-  options: CodeValidationOptions,
-): string | null {
-  const {
-    label,
-    maxLength,
-    required = false,
-    uppercase = false,
-  } = options;
+export function getCodeError(value: string, options: CodeValidationOptions): string | null {
+  const { label, maxLength, required = false, uppercase = false } = options;
   const normalized = uppercase
     ? value.trim().replace(/\s+/g, " ").toUpperCase()
     : value.trim().replace(/\s+/g, " ");
@@ -108,13 +94,8 @@ export function getCodeError(
   });
 }
 
-export function normalizeCode(
-  value: string,
-  options: CodeValidationOptions,
-): string {
-  const {
-    uppercase = false,
-  } = options;
+export function normalizeCode(value: string, options: CodeValidationOptions): string {
+  const { uppercase = false } = options;
   const normalized = uppercase
     ? value.trim().replace(/\s+/g, " ").toUpperCase()
     : value.trim().replace(/\s+/g, " ");

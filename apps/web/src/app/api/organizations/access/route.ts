@@ -7,12 +7,25 @@ import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
-import { buildMembershipAccessChanges, buildMembershipRemovalChanges } from "@/lib/access-management";
+import {
+  buildMembershipAccessChanges,
+  buildMembershipRemovalChanges,
+} from "@/lib/access-management";
 import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
+
+function selfActionForbiddenResponse() {
+  return NextResponse.json(
+    { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+    { status: 403 },
+  );
+}
 
 const adminPermissionsSchema = z.record(z.string(), z.boolean());
 
@@ -30,7 +43,10 @@ const deleteSchema = z.object({
   expectedUpdatedAt: z.string().datetime({ offset: true }),
 });
 
-function timestampsMatch(left: string | null | undefined, right: string | null | undefined): boolean {
+function timestampsMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
   if (!left || !right) return false;
   return new Date(left).getTime() === new Date(right).getTime();
 }
@@ -44,7 +60,7 @@ function getRequestIp(req: NextRequest): string | null {
 async function requirePrivilegedActor(
   req: NextRequest,
   orgId: string,
-): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+): Promise<{ ok: true; orgId: string } | { ok: false; response: NextResponse }> {
   const auth = await requireOrgPermissions(
     req,
     orgId,
@@ -54,7 +70,10 @@ async function requirePrivilegedActor(
     return { ok: false, response: auth.response };
   }
 
-  return { ok: true };
+  // Return the EFFECTIVE org (sandbox-redirected). Callers must mutate this org,
+  // not the raw client-supplied orgId — otherwise a sandbox user passes the gate
+  // against their sandbox but writes the real org. See SECURITY_AUDIT / H-1.
+  return { ok: true, orgId: auth.orgId };
 }
 
 async function fetchOrganizationUser(
@@ -64,7 +83,9 @@ async function fetchOrganizationUser(
   const serviceClient = getServiceClient();
   const { data: membership, error } = await serviceClient
     .from("organization_memberships")
-    .select("id, user_id, org_id, org_role, admin_permissions, joined_at, updated_at, archived_at, archived_by, department_ids, dept_admin_ids, phone, onboarding_completed_at, tooltip_tours_completed")
+    .select(
+      "id, user_id, org_id, org_role, admin_permissions, joined_at, updated_at, archived_at, archived_by, department_ids, dept_admin_ids, phone, onboarding_completed_at, tooltip_tours_completed",
+    )
     .eq("user_id", userId)
     .eq("org_id", orgId)
     .maybeSingle();
@@ -85,24 +106,20 @@ async function fetchOrganizationUser(
     return null;
   }
 
-  return membershipRowToOrganizationUser(
-    membership as DbOrganizationMembership,
-    {
-      email: authResult.data.user?.email ?? null,
-      firstName: (profile?.first_name as string | null) ?? null,
-      lastName: (profile?.last_name as string | null) ?? null,
-      platformRole: ((profile?.platform_role as PlatformRole | null) ?? "none"),
-      createdAt: (profile?.created_at as string | null) ?? null,
-      lastSignInAt: authResult.data.user?.last_sign_in_at ?? null,
-    },
-  );
+  return membershipRowToOrganizationUser(membership as DbOrganizationMembership, {
+    email: authResult.data.user?.email ?? null,
+    firstName: (profile?.first_name as string | null) ?? null,
+    lastName: (profile?.last_name as string | null) ?? null,
+    platformRole: (profile?.platform_role as PlatformRole | null) ?? "none",
+    createdAt: (profile?.created_at as string | null) ?? null,
+    lastSignInAt: authResult.data.user?.last_sign_in_at ?? null,
+  });
 }
 
 function buildConflictResponse(latestUser: OrganizationUser) {
   return NextResponse.json(
     {
-      error:
-        "Organization access changed elsewhere. Review the latest values before saving again.",
+      error: "Organization access changed elsewhere. Review the latest values before saving again.",
       code: "ORG_ACCESS_CONFLICT",
       user: latestUser,
     },
@@ -171,23 +188,51 @@ export async function PATCH(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { orgId, userId, expectedUpdatedAt, orgRole, adminPermissions } = parsed.data;
+  const {
+    orgId: requestedOrgId,
+    userId,
+    expectedUpdatedAt,
+    orgRole,
+    adminPermissions,
+  } = parsed.data;
+  // Effective (sandbox-redirected) org; reassigned after the gate. Declared
+  // here so the catch block can reference it for logging.
+  let orgId = requestedOrgId;
 
   try {
-    const allowed = await requirePrivilegedActor(req, orgId);
+    const allowed = await requirePrivilegedActor(req, requestedOrgId);
     if (!allowed.ok) return allowed.response;
+    // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
+    orgId = allowed.orgId;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {
       return NextResponse.json({ error: "User membership not found" }, { status: 404 });
+    }
+
+    // Self-action guard: you cannot change your own access record — neither
+    // role nor admin_permissions. Role self-changes are blocked at the RPC
+    // boundary anyway; permission-only self-edits used to be allowed on the
+    // theory that they were inert for super_admins, but that assumption
+    // depends on UI behavior. Block both at the API boundary so future UI
+    // changes can't accidentally expose this. (audit M1)
+    if (userId === user.id) {
+      const roleWouldChange = orgRole !== undefined && orgRole !== currentUser.orgRole;
+      const permissionsWouldChange =
+        adminPermissions !== undefined &&
+        JSON.stringify(adminPermissions ?? null) !==
+          JSON.stringify(currentUser.adminPermissions ?? null);
+      if (roleWouldChange || permissionsWouldChange) {
+        return selfActionForbiddenResponse();
+      }
     }
 
     if (!timestampsMatch(currentUser.updatedAt, expectedUpdatedAt)) {
@@ -197,9 +242,9 @@ export async function PATCH(req: NextRequest) {
     const nextRole = orgRole ?? currentUser.orgRole;
     const nextPermissions =
       nextRole === "admin"
-        ? (adminPermissions !== undefined
-            ? (adminPermissions as AdminPermissions | null)
-            : currentUser.adminPermissions)
+        ? adminPermissions !== undefined
+          ? (adminPermissions as AdminPermissions | null)
+          : currentUser.adminPermissions
         : null;
 
     const changes = buildMembershipAccessChanges(currentUser, {
@@ -213,7 +258,8 @@ export async function PATCH(req: NextRequest) {
 
     const serviceClient = getServiceClient();
 
-    if (currentUser.orgRole !== nextRole) {
+    const roleChanged = currentUser.orgRole !== nextRole;
+    if (roleChanged) {
       const { error } = await serviceClient.rpc("change_user_role", {
         p_target_user_id: userId,
         p_new_role: nextRole,
@@ -237,12 +283,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "User membership not found" }, { status: 404 });
     }
 
-    if (!timestampsMatch(latestAfterRole.updatedAt, expectedUpdatedAt) && currentUser.orgRole === nextRole) {
+    if (
+      !timestampsMatch(latestAfterRole.updatedAt, expectedUpdatedAt) &&
+      currentUser.orgRole === nextRole
+    ) {
       return buildConflictResponse(latestAfterRole);
     }
 
     const permissionsChanged =
-      JSON.stringify(currentUser.adminPermissions ?? null) !== JSON.stringify(nextPermissions ?? null);
+      JSON.stringify(currentUser.adminPermissions ?? null) !==
+      JSON.stringify(nextPermissions ?? null);
 
     if (permissionsChanged) {
       const { data: updatedMembership, error } = await serviceClient
@@ -277,6 +327,26 @@ export async function PATCH(req: NextRequest) {
       req,
     });
 
+    if (roleChanged) {
+      void dispatchNotificationEvent(user.id, {
+        action: "role_changed",
+        orgId,
+        targetUserId: userId,
+        fromRole: currentUser.orgRole ?? "user",
+        toRole: nextRole,
+      });
+    }
+
+    if (permissionsChanged) {
+      void dispatchNotificationEvent(user.id, {
+        action: "admin_permissions_changed",
+        orgId,
+        targetUserId: userId,
+        before: (currentUser.adminPermissions ?? null) as Record<string, boolean> | null,
+        after: (nextPermissions ?? null) as Record<string, boolean> | null,
+      });
+    }
+
     return NextResponse.json({ success: true, user: latestUser });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "organizations/access", orgId, userId } });
@@ -308,19 +378,29 @@ export async function DELETE(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = deleteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { orgId, userId, expectedUpdatedAt } = parsed.data;
+  const { orgId: requestedOrgId, userId, expectedUpdatedAt } = parsed.data;
+  // Effective (sandbox-redirected) org; reassigned after the gate. Declared here
+  // so the catch block can reference it for logging.
+  let orgId = requestedOrgId;
+
+  // Self-action guard: you cannot remove yourself from the organization.
+  if (userId === user.id) {
+    return selfActionForbiddenResponse();
+  }
 
   try {
-    const allowed = await requirePrivilegedActor(req, orgId);
+    const allowed = await requirePrivilegedActor(req, requestedOrgId);
     if (!allowed.ok) return allowed.response;
+    // Mutate the effective (sandbox-redirected) org, never the raw request orgId.
+    orgId = allowed.orgId;
 
     const currentUser = await fetchOrganizationUser(orgId, userId);
     if (!currentUser) {
@@ -378,6 +458,12 @@ export async function DELETE(req: NextRequest) {
       action: "user.removed_from_org",
       changes: buildMembershipRemovalChanges(currentUser),
       req,
+    });
+
+    void dispatchNotificationEvent(user.id, {
+      action: "membership_removed",
+      orgId,
+      removedUserId: userId,
     });
 
     return NextResponse.json({ success: true });

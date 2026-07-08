@@ -1,11 +1,7 @@
 "use client";
 
 import React, { useId, useRef, useState } from "react";
-import {
-  PREDEFINED_COLOR_GROUPS,
-  getPresetByBg,
-  PredefinedColor,
-} from "@/lib/colors";
+import { PREDEFINED_COLOR_GROUPS, getPresetByBg, PredefinedColor } from "@/lib/colors";
 import { sectionStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import { parseTo12h, to24h } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
@@ -19,7 +15,9 @@ export const inputStyle: React.CSSProperties = {
   boxSizing: "border-box" as const,
   height: 36,
   padding: "0 10px",
-  border: "1px solid var(--color-border)",
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "var(--color-border)",
   borderRadius: "var(--dg-btn-radius)",
   fontSize: 13,
   fontWeight: 500,
@@ -38,7 +36,7 @@ export function normalizeTimeCompare(t: string | null | undefined): string | nul
 // ── Section card (headerless container) ─────────────────────────────────────────
 export function SectionCard({
   children,
-  maxWidth = 860,
+  maxWidth = 1120,
   noPadding = false,
 }: {
   children: React.ReactNode;
@@ -61,7 +59,15 @@ export function SectionCard({
 }
 
 // ── Preset Color Picker ──────────────────────────────────────────────────────
-export function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: string; onChange: (c: PredefinedColor) => void; disabled?: boolean }) {
+export function PresetColorPicker({
+  valueBg,
+  onChange,
+  disabled,
+}: {
+  valueBg: string;
+  onChange: (c: PredefinedColor) => void;
+  disabled?: boolean;
+}) {
   const active = getPresetByBg(valueBg);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -221,16 +227,17 @@ export function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: st
                             height: 28,
                             borderRadius: "9999px",
                             background: color.bg,
-                            border: active.id === color.id ? `2px solid ${color.text}` : "1px solid var(--color-border)",
+                            border:
+                              active.id === color.id
+                                ? `2px solid ${color.text}`
+                                : "1px solid var(--color-border)",
                             cursor: disabled ? "not-allowed" : "pointer",
                             padding: 0,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             boxShadow:
-                              active.id === color.id
-                                ? `0 0 0 1px ${color.text}`
-                                : undefined,
+                              active.id === color.id ? `0 0 0 1px ${color.text}` : undefined,
                           }}
                         >
                           {active.id === color.id && (
@@ -258,15 +265,39 @@ export function PresetColorPicker({ valueBg, onChange, disabled }: { valueBg: st
 }
 
 // ── 12-hour time picker ───────────────────────────────────────────────────────
-export function TimeInput12h({ value, onChange, disabled }: { value: string | null | undefined; onChange: (v: string | null) => void; disabled?: boolean }) {
+export function TimeInput12h({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string | null | undefined;
+  onChange: (v: string | null) => void;
+  disabled?: boolean;
+}) {
   const { hour, minute, period } = parseTo12h(value);
 
   const hourOptions = [
     { value: "", label: "--" },
-    ...[1,2,3,4,5,6,7,8,9,10,11,12].map((h) => ({ value: String(h), label: String(h) })),
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((h) => ({ value: String(h), label: String(h) })),
   ];
-  const minuteOptions = ["00","05","10","15","20","25","30","35","40","45","50","55"].map((m) => ({ value: m, label: m }));
-  const periodOptions = [{ value: "AM" as const, label: "AM" }, { value: "PM" as const, label: "PM" }];
+  const minuteOptions = [
+    "00",
+    "05",
+    "10",
+    "15",
+    "20",
+    "25",
+    "30",
+    "35",
+    "40",
+    "45",
+    "50",
+    "55",
+  ].map((m) => ({ value: m, label: m }));
+  const periodOptions = [
+    { value: "AM" as const, label: "AM" },
+    { value: "PM" as const, label: "PM" },
+  ];
 
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -276,7 +307,7 @@ export function TimeInput12h({ value, onChange, disabled }: { value: string | nu
         onChange={(val) => onChange(to24h(val, minute, period))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 68 }}
+        style={{ width: 72 }}
       />
       <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
       <CustomSelect
@@ -285,7 +316,7 @@ export function TimeInput12h({ value, onChange, disabled }: { value: string | nu
         onChange={(val) => onChange(to24h(hour, val, period))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 68 }}
+        style={{ width: 72 }}
       />
       <CustomSelect
         value={period}
@@ -293,7 +324,7 @@ export function TimeInput12h({ value, onChange, disabled }: { value: string | nu
         onChange={(val) => onChange(to24h(hour, minute, val as "AM" | "PM"))}
         disabled={disabled}
         fontSize={13}
-        style={{ width: 72 }}
+        style={{ width: 78 }}
       />
     </div>
   );

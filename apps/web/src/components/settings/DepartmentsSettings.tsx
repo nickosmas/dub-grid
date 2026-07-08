@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { Department, FocusArea } from "@/types";
 import {
   checkDepartmentDependencies,
+  checkFocusAreaDependencies,
   deleteFocusArea,
   saveDepartments,
   upsertFocusArea,
@@ -24,6 +25,7 @@ import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
+import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -58,12 +60,7 @@ const DragHandle = ({
   label,
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { label: string }) => (
-  <div
-    {...props}
-    role="button"
-    aria-label={label}
-    className="dg-settings-reorder-handle"
-  >
+  <div {...props} role="button" aria-label={label} className="dg-settings-reorder-handle">
     <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
       <rect x="3" y="2" width="2" height="2" rx="1" />
       <rect x="9" y="2" width="2" height="2" rx="1" />
@@ -96,36 +93,36 @@ function FocusAreaRows({
   onFocusAreaDeleteClick: (fa: FocusArea) => void;
   focusAreaErrors: Record<number, string | null>;
 }) {
-  const handleReorder = useCallback((sourceIdx: number, dropIdx: number) => {
-    if (sourceIdx === dropIdx) return;
+  const handleReorder = useCallback(
+    (sourceIdx: number, dropIdx: number) => {
+      if (sourceIdx === dropIdx) return;
 
-    onFocusAreasChange((current) => {
-      const deptFAs = current
-        .filter((fa) => fa.departmentId === deptId && !fa.archivedAt)
-        .sort((a, b) => a.sortOrder - b.sortOrder);
+      onFocusAreasChange((current) => {
+        const deptFAs = current
+          .filter((fa) => fa.departmentId === deptId && !fa.archivedAt)
+          .sort((a, b) => a.sortOrder - b.sortOrder);
 
-      if (
-        sourceIdx < 0 ||
-        sourceIdx >= deptFAs.length ||
-        dropIdx < 0 ||
-        dropIdx > deptFAs.length
-      ) {
-        return current;
-      }
+        if (
+          sourceIdx < 0 ||
+          sourceIdx >= deptFAs.length ||
+          dropIdx < 0 ||
+          dropIdx > deptFAs.length
+        ) {
+          return current;
+        }
 
-      const list = [...deptFAs];
-      const [item] = list.splice(sourceIdx, 1);
-      if (!item) return current;
+        const list = [...deptFAs];
+        const [item] = list.splice(sourceIdx, 1);
+        if (!item) return current;
 
-      list.splice(Math.min(dropIdx, list.length), 0, item);
-      const reordered = list.map((fa, index) => ({ ...fa, sortOrder: index }));
+        list.splice(Math.min(dropIdx, list.length), 0, item);
+        const reordered = list.map((fa, index) => ({ ...fa, sortOrder: index }));
 
-      return [
-        ...current.filter((fa) => fa.departmentId !== deptId),
-        ...reordered,
-      ];
-    });
-  }, [deptId, onFocusAreasChange]);
+        return [...current.filter((fa) => fa.departmentId !== deptId), ...reordered];
+      });
+    },
+    [deptId, onFocusAreasChange],
+  );
 
   const reorder = useSmoothReorder({
     items: focusAreas,
@@ -149,14 +146,16 @@ function FocusAreaRows({
             data-dragging={motion.isDragging ? "true" : undefined}
             data-drag-phase={motion.dragPhase ?? undefined}
             data-moving={motion.isMoving ? "true" : undefined}
-            style={{
-              "--dg-settings-reorder-offset": `${motion.offsetY}px`,
-              display: "flex",
-              alignItems: "center",
-              gap: isEditing ? 8 : 10,
-              padding: isLastFA && !isEditing ? "8px 16px 16px 32px" : "8px 16px 8px 32px",
-              userSelect: isEditing ? "none" : undefined,
-            } as React.CSSProperties}
+            style={
+              {
+                "--dg-settings-reorder-offset": `${motion.offsetY}px`,
+                display: "flex",
+                alignItems: "center",
+                gap: isEditing ? 8 : 10,
+                padding: isLastFA && !isEditing ? "8px 16px 16px 32px" : "8px 16px 8px 32px",
+                userSelect: isEditing ? "none" : undefined,
+              } as React.CSSProperties
+            }
           >
             {isEditing ? (
               <DragHandle
@@ -181,9 +180,7 @@ function FocusAreaRows({
                   style={{
                     ...fieldStyle,
                     flex: 1,
-                    ...(focusAreaErrors[fa.id]
-                      ? { borderColor: "var(--color-danger)" }
-                      : {}),
+                    ...(focusAreaErrors[fa.id] ? { borderColor: "var(--color-danger)" } : {}),
                   }}
                 />
                 {focusAreaErrors[fa.id] ? (
@@ -200,14 +197,24 @@ function FocusAreaRows({
                 ) : null}
               </div>
             ) : (
-              <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-secondary)", flex: 1 }}>
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-label)",
+                  fontWeight: 500,
+                  color: "var(--color-text-secondary)",
+                  flex: 1,
+                }}
+              >
                 {fa.name || <span style={{ fontStyle: "italic", opacity: 0.6 }}>Unnamed</span>}
               </span>
             )}
             {isEditing && (
               <button
                 onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); onFocusAreaDeleteClick(fa); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFocusAreaDeleteClick(fa);
+                }}
                 style={{
                   background: "none",
                   border: "1px solid var(--color-danger-border, #FECACA)",
@@ -221,8 +228,12 @@ function FocusAreaRows({
                   flexShrink: 0,
                   transition: "background 150ms, color 150ms",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "none";
+                }}
               >
                 Delete
               </button>
@@ -264,22 +275,34 @@ function DepartmentSection({
   onFocusAreasChange: (focusAreas: FocusArea[]) => void;
 }) {
   const addLabel =
-    type === "scheduled"
-      ? departmentLabel.replace(/s$/i, "")
-      : "Management Department";
+    type === "scheduled" ? departmentLabel.replace(/s$/i, "") : "Management Department";
   const emptyTitle =
     type === "scheduled"
       ? `No ${departmentLabel.toLowerCase()} defined yet`
       : "No management departments defined yet";
 
+  const isWizardMode = useWizardMode();
+
   // ── Edit lifecycle state ────────────────────────────────────────────────────
-  const [isEditing, setIsEditing] = useState(false);
-  const [localDepts, setLocalDepts] = useState<Department[]>([]);
-  const [localFAs, setLocalFAs] = useState<FocusArea[]>([]);
+  const [isEditing, setIsEditing] = useState(isWizardMode);
+  const [localDepts, setLocalDepts] = useState<Department[]>(() =>
+    isWizardMode ? [...depts] : [],
+  );
+  const [localFAs, setLocalFAs] = useState<FocusArea[]>(() => []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; dept: Department; deps: DependencyInfo | null } | null>(null);
-  const [faDeleteConfirm, setFaDeleteConfirm] = useState<{ faId: number; fa: FocusArea } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    idx: number;
+    dept: Department;
+    deps: DependencyInfo | null;
+  } | null>(null);
+  const [faDeleteConfirm, setFaDeleteConfirm] = useState<{
+    faId: number;
+    fa: FocusArea;
+    deps: DependencyInfo | null;
+  } | null>(null);
+  const [pendingHardDeleteDeptIds, setPendingHardDeleteDeptIds] = useState<Set<number>>(new Set());
+  const [pendingHardDeleteFaIds, setPendingHardDeleteFaIds] = useState<Set<number>>(new Set());
 
   const nextTmpId = useRef(-1);
   const nextTmpFaId = useRef(-1000);
@@ -288,21 +311,19 @@ function DepartmentSection({
   // ── Focus area helpers ────────────────────────────────────────────────────
   const faByDept = useCallback(
     (deptId: number, source: FocusArea[]) =>
-      source.filter(fa => fa.departmentId === deptId && !fa.archivedAt).sort((a, b) => a.sortOrder - b.sortOrder),
+      source
+        .filter((fa) => fa.departmentId === deptId && !fa.archivedAt)
+        .sort((a, b) => a.sortOrder - b.sortOrder),
     [],
   );
 
   const propFAs = useMemo(
-    () =>
-      allFocusAreas.filter((fa) => depts.some((d) => d.id === fa.departmentId)),
+    () => allFocusAreas.filter((fa) => depts.some((d) => d.id === fa.departmentId)),
     [allFocusAreas, depts],
   );
 
   // ── Dirty check ─────────────────────────────────────────────────────────────
-  const nonEmpty = useCallback(
-    (list: Department[]) => list.filter(d => d.name.trim()),
-    [],
-  );
+  const nonEmpty = useCallback((list: Department[]) => list.filter((d) => d.name.trim()), []);
   const departmentErrors = useMemo(
     () =>
       localDepts.map((department) => ({
@@ -383,7 +404,8 @@ function DepartmentSection({
   const isDirty = useMemo(() => {
     const deptsDirty = JSON.stringify(nonEmpty(localDepts)) !== JSON.stringify(depts);
     if (type === "management") return deptsDirty;
-    const faDirty = JSON.stringify(localFAs.filter(fa => fa.name.trim())) !== JSON.stringify(propFAs);
+    const faDirty =
+      JSON.stringify(localFAs.filter((fa) => fa.name.trim())) !== JSON.stringify(propFAs);
     return deptsDirty || faDirty;
   }, [localDepts, depts, localFAs, propFAs, nonEmpty, type]);
 
@@ -393,12 +415,7 @@ function DepartmentSection({
     if (sourceIdx === dropIdx) return;
 
     setLocalDepts((current) => {
-      if (
-        sourceIdx < 0 ||
-        sourceIdx >= current.length ||
-        dropIdx < 0 ||
-        dropIdx > current.length
-      ) {
+      if (sourceIdx < 0 || sourceIdx >= current.length || dropIdx < 0 || dropIdx > current.length) {
         return current;
       }
 
@@ -425,7 +442,30 @@ function DepartmentSection({
     setError(null);
     setDeleteConfirm(null);
     setFaDeleteConfirm(null);
+    setPendingHardDeleteDeptIds(new Set());
+    setPendingHardDeleteFaIds(new Set());
   }, [depts, faByDept, propFAs, type]);
+
+  // Wizard mode: keep the editor open across saveAll iterations and resync the
+  // draft whenever the persisted prop changes (typically because we just saved
+  // this section). Without this, temp IDs in localDepts would still differ from
+  // the server-assigned real IDs and isDirty would stay true — so a retry after
+  // a later section's failure would re-run this save with a stale snapshot and
+  // hard-delete the rows we just persisted. Initialized to null so the first
+  // mount also hydrates localFAs (lazy useState only seeded localDepts).
+  const lastDeptsRef = useRef<Department[] | null>(null);
+  const lastPropFAsRef = useRef<FocusArea[] | null>(null);
+  useEffect(() => {
+    if (!isWizardMode) return;
+    if (lastDeptsRef.current !== depts) {
+      lastDeptsRef.current = depts;
+      setLocalDepts([...depts]);
+    }
+    if (lastPropFAsRef.current !== propFAs) {
+      lastPropFAsRef.current = propFAs;
+      setLocalFAs([...propFAs]);
+    }
+  }, [isWizardMode, depts, propFAs]);
 
   const handleEnterEdit = () => {
     syncDraftFromProps();
@@ -441,8 +481,12 @@ function DepartmentSection({
     setIsEditing(false);
   };
 
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = async () => {
+    lastSaveErrorRef.current = null;
     if (hasValidationErrors) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
       setError(
         departmentErrors.find((department) => department.name || department.abbr)?.name ??
           departmentErrors.find((department) => department.name || department.abbr)?.abbr ??
@@ -478,10 +522,21 @@ function DepartmentSection({
 
     setSaving(true);
     setError(null);
+    // Phase 1 (depts) and Phase 2 (focus areas, scheduled only) are not
+    // atomic: depts are one server action; FA upserts/deletes are individual
+    // HTTP calls. If phase 2 fails midway, the saved depts are still committed
+    // server-side, so we promote that state to local immediately so a retry
+    // doesn't re-send the dept save against now-stale `updatedAt` values.
+    let savedDepts: Department[] | null = null;
     try {
       // Phase 1: Save departments
-      const otherDepts = allDepartments.filter(d => d.type !== type || !!d.archivedAt);
-      const savedDepts = await saveDepartments(orgId, [...otherDepts, ...cleaned], allDepartments);
+      const otherDepts = allDepartments.filter((d) => d.type !== type || !!d.archivedAt);
+      savedDepts = await saveDepartments(
+        orgId,
+        [...otherDepts, ...cleaned],
+        allDepartments,
+        Array.from(pendingHardDeleteDeptIds),
+      );
 
       // Phase 2: Save focus areas (scheduled only)
       if (type === "scheduled") {
@@ -490,17 +545,27 @@ function DepartmentSection({
         for (const c of cleaned) {
           if (c.id < 0) {
             const real = savedDepts.find(
-              sd => sd.type === "scheduled" && sd.name === c.name && !otherDepts.some(od => od.id === sd.id),
+              (sd) =>
+                sd.type === "scheduled" &&
+                sd.name === c.name &&
+                !otherDepts.some((od) => od.id === sd.id),
             );
             if (real) tempToReal.set(c.id, real.id);
           }
         }
 
-        // Determine deleted FAs
-        const localFaIds = new Set(localFAs.filter(fa => fa.id > 0).map(fa => fa.id));
-        const deletedFAs = propFAs.filter(fa => fa.id > 0 && !localFaIds.has(fa.id));
+        // Determine deleted FAs. FAs whose parent dept is being hard-deleted are
+        // cascade-deleted server-side and must not be sent here (the dept row no
+        // longer exists at this point).
+        const localFaIds = new Set(localFAs.filter((fa) => fa.id > 0).map((fa) => fa.id));
+        const deletedFAs = propFAs.filter(
+          (fa) =>
+            fa.id > 0 &&
+            !localFaIds.has(fa.id) &&
+            !(fa.departmentId != null && pendingHardDeleteDeptIds.has(fa.departmentId)),
+        );
         for (const fa of deletedFAs) {
-          await deleteFocusArea(fa.id, orgId);
+          await deleteFocusArea(fa.id, orgId, pendingHardDeleteFaIds.has(fa.id));
         }
 
         // Upsert new and modified FAs
@@ -518,16 +583,18 @@ function DepartmentSection({
           }));
         for (let i = 0; i < cleanedFAs.length; i++) {
           const fa = cleanedFAs[i];
-          const realDeptId = fa.departmentId && fa.departmentId < 0
-            ? tempToReal.get(fa.departmentId) ?? fa.departmentId
-            : fa.departmentId;
+          const realDeptId =
+            fa.departmentId && fa.departmentId < 0
+              ? (tempToReal.get(fa.departmentId) ?? fa.departmentId)
+              : fa.departmentId;
           const isNew = fa.id < 0;
-          const orig = propFAs.find(p => p.id === fa.id);
-          const isModified = !isNew && orig && (
-            orig.name !== fa.name.trim()
-              || orig.sortOrder !== i
-              || orig.departmentId !== realDeptId
-          );
+          const orig = propFAs.find((p) => p.id === fa.id);
+          const isModified =
+            !isNew &&
+            orig &&
+            (orig.name !== fa.name.trim() ||
+              orig.sortOrder !== i ||
+              orig.departmentId !== realDeptId);
           if (isNew || isModified) {
             const saved = await upsertFocusArea({
               ...(isNew ? {} : { id: fa.id }),
@@ -547,17 +614,35 @@ function DepartmentSection({
         }
 
         // Merge saved FAs with unchanged FAs from other departments
-        const otherFAs = allFocusAreas.filter(fa => !depts.some(d => d.id === fa.departmentId) && !tempToReal.has(fa.departmentId ?? -999));
+        const otherFAs = allFocusAreas.filter(
+          (fa) =>
+            !depts.some((d) => d.id === fa.departmentId) &&
+            !tempToReal.has(fa.departmentId ?? -999),
+        );
         onFocusAreasChange([...otherFAs, ...savedFAsList]);
       }
 
       onDepartmentsChange(savedDepts);
-      setIsEditing(false);
-      setLocalDepts([]);
-      setLocalFAs([]);
+      // Wizard mode keeps the editor open so saveAll can retry after a later
+      // section fails, and so the user can keep adding/editing rows. The local
+      // draft is resynced from props via a useEffect below.
+      if (!isWizardMode) {
+        setIsEditing(false);
+        setLocalDepts([]);
+        setLocalFAs([]);
+      }
       toast.success(`${title} saved`);
     } catch (err) {
-      setError(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
+      lastSaveErrorRef.current = err;
+      // Partial-failure case: depts saved but focus-area phase failed. Promote
+      // the saved dept state to the parent so a retry doesn't re-issue Phase 1
+      // and trigger a stale-updatedAt conflict.
+      if (savedDepts) {
+        onDepartmentsChange(savedDepts);
+        toast.error(`${title} saved, but some focus areas didn't update. Review and try again.`);
+      } else {
+        toast.error(formatClientErrorMessage(err, `We couldn't save ${title.toLowerCase()}.`));
+      }
       Sentry.captureException(err);
     } finally {
       setSaving(false);
@@ -566,16 +651,16 @@ function DepartmentSection({
 
   // ── Row handlers ──────────────────────────────────────────────────────────
   const handleItemChange = (i: number, value: string) => {
-    setLocalDepts(prev => {
+    setLocalDepts((prev) => {
       const updated = prev.map((d, idx) => (idx === i ? { ...d, name: value, abbr: value } : d));
       // Single-FA departments: sync FA name to dept name
       if (type === "scheduled") {
         const dept = updated[i];
         const fas = faByDept(dept.id, localFAs);
         if (fas.length === 1) {
-          setLocalFAs(prevFAs => prevFAs.map(fa =>
-            fa.id === fas[0].id ? { ...fa, name: value } : fa,
-          ));
+          setLocalFAs((prevFAs) =>
+            prevFAs.map((fa) => (fa.id === fas[0].id ? { ...fa, name: value } : fa)),
+          );
         }
       }
       return updated;
@@ -592,18 +677,21 @@ function DepartmentSection({
       type,
       sortOrder: localDepts.length,
     };
-    setLocalDepts(prev => [...prev, newDept]);
+    setLocalDepts((prev) => [...prev, newDept]);
 
     // Auto-create a default focus area for new scheduled departments
     if (type === "scheduled") {
       const faId = nextTmpFaId.current--;
-      setLocalFAs(prev => [...prev, {
-        id: faId,
-        orgId,
-        departmentId: id,
-        name: "",
-        sortOrder: 0,
-      }]);
+      setLocalFAs((prev) => [
+        ...prev,
+        {
+          id: faId,
+          orgId,
+          departmentId: id,
+          name: "",
+          sortOrder: 0,
+        },
+      ]);
     }
 
     requestAnimationFrame(() => {
@@ -615,9 +703,9 @@ function DepartmentSection({
     const dept = (isEditing ? localDepts : depts)[i];
     if (dept.id <= 0) {
       // New unsaved — remove immediately
-      setLocalDepts(prev => prev.filter((_, idx) => idx !== i));
+      setLocalDepts((prev) => prev.filter((_, idx) => idx !== i));
       if (type === "scheduled") {
-        setLocalFAs(prev => prev.filter(fa => fa.departmentId !== dept.id));
+        setLocalFAs((prev) => prev.filter((fa) => fa.departmentId !== dept.id));
       }
       return;
     }
@@ -625,45 +713,67 @@ function DepartmentSection({
     setDeleteConfirm({ idx: i, dept, deps });
   };
 
-  const handleRemove = (i: number) => {
+  const handleRemove = (i: number, hard: boolean) => {
     const dept = localDepts[i];
-    setLocalDepts(prev => prev.filter((_, idx) => idx !== i));
+    setLocalDepts((prev) => prev.filter((_, idx) => idx !== i));
     if (type === "scheduled") {
-      setLocalFAs(prev => prev.filter(fa => fa.departmentId !== dept.id));
+      setLocalFAs((prev) => prev.filter((fa) => fa.departmentId !== dept.id));
+    }
+    if (hard) {
+      setPendingHardDeleteDeptIds((prev) => {
+        const next = new Set(prev);
+        next.add(dept.id);
+        return next;
+      });
     }
   };
 
   // ── FA handlers (scheduled only) ──────────────────────────────────────────
   const handleFAChange = (faId: number, value: string) => {
-    setLocalFAs(prev => prev.map(fa => fa.id === faId ? { ...fa, name: value } : fa));
+    setLocalFAs((prev) => prev.map((fa) => (fa.id === faId ? { ...fa, name: value } : fa)));
   };
 
   const addFocusArea = (deptId: number) => {
     const id = nextTmpFaId.current--;
     const existing = faByDept(deptId, localFAs);
-    setLocalFAs(prev => [...prev, {
-      id,
-      orgId,
-      departmentId: deptId,
-      name: "",
-      sortOrder: existing.length,
-    }]);
+    setLocalFAs((prev) => [
+      ...prev,
+      {
+        id,
+        orgId,
+        departmentId: deptId,
+        name: "",
+        sortOrder: existing.length,
+      },
+    ]);
   };
 
-  const handleFADeleteClick = (fa: FocusArea) => {
+  const handleFADeleteClick = async (fa: FocusArea) => {
     if (fa.id < 0) {
-      setLocalFAs(prev => prev.filter(f => f.id !== fa.id));
+      setLocalFAs((prev) => prev.filter((f) => f.id !== fa.id));
       return;
     }
-    setFaDeleteConfirm({ faId: fa.id, fa });
+    const deps = await checkFocusAreaDependencies(fa.id, orgId);
+    setFaDeleteConfirm({ faId: fa.id, fa, deps });
   };
 
-  const handleFARemove = (faId: number) => {
-    setLocalFAs(prev => prev.filter(f => f.id !== faId));
+  const handleFARemove = (faId: number, hard: boolean) => {
+    setLocalFAs((prev) => prev.filter((f) => f.id !== faId));
+    if (hard) {
+      setPendingHardDeleteFaIds((prev) => {
+        const next = new Set(prev);
+        next.add(faId);
+        return next;
+      });
+    }
   };
 
   // ── Keyboard navigation ─────────────────────────────────────────────────────
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, dept: Department, idx: number) => {
+  const handleNameKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    dept: Department,
+    idx: number,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (!dept.name.trim()) return;
@@ -675,7 +785,7 @@ function DepartmentSection({
     }
     if (e.key === "Backspace" && !dept.name && dept.id < 0) {
       e.preventDefault();
-      handleRemove(idx);
+      handleRemove(idx, false);
       if (idx > 0) {
         const prevId = localDepts[idx - 1].id;
         requestAnimationFrame(() => {
@@ -685,24 +795,49 @@ function DepartmentSection({
     }
   };
 
+  // Register with wizard so Continue can save this section.
+  useRegisterWizardEditor(
+    `departments:${type}`,
+    {
+      isDirty: () => isDirty,
+      hasErrors: () => hasValidationErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode && canEdit,
+  );
+
   // ── Action buttons ────────────────────────────────────────────────────────
-  const footerActions = isEditing ? (
+  const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
-      secondaryAction={(
-        <button onClick={isDirty ? handleDiscard : handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-          {getEditorDismissLabel(isDirty)}
+      secondaryAction={
+        <button
+          onClick={isDirty ? handleDiscard : handleClose}
+          className="dg-btn dg-btn-secondary dg-btn-sm"
+        >
+          {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
         </button>
-      )}
-      primaryAction={(
-        <button onClick={handleSave} disabled={saving || !isDirty || hasValidationErrors} className="dg-btn dg-btn-primary dg-btn-sm">
+      }
+      primaryAction={
+        <button
+          onClick={handleSave}
+          disabled={saving || !isDirty || hasValidationErrors}
+          className="dg-btn dg-btn-primary dg-btn-sm"
+        >
           {getEditorSaveLabel(saving)}
         </button>
-      )}
+      }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
     />
   ) : canEdit && displayList.length > 0 ? (
     <EditorActionRow
-      primaryAction={<button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">Edit</button>}
+      primaryAction={
+        <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
+          Edit
+        </button>
+      }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
     />
   ) : null;
@@ -710,12 +845,34 @@ function DepartmentSection({
   return (
     <SectionCard noPadding>
       {/* Header: title, description, actions */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, padding: "16px 16px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "16px 16px 14px",
+          borderBottom: "1px solid var(--color-border-light)",
+        }}
+      >
         <div>
-          <h3 style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+          <h3
+            style={{
+              fontSize: "var(--dg-fs-body)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+              margin: 0,
+            }}
+          >
             {title}
           </h3>
-          <p style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+          <p
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-muted)",
+              margin: "4px 0 0",
+            }}
+          >
             {description}
           </p>
         </div>
@@ -724,21 +881,24 @@ function DepartmentSection({
       {/* Content */}
       {displayList.length === 0 && !isEditing ? (
         <EmptyState
-          compact
+          size="compact"
           title={emptyTitle}
           style={{ border: "none", borderRadius: 0 }}
-          action={canEdit ? (
-            <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
-              + Add {addLabel}
-            </button>
-          ) : undefined}
+          action={
+            canEdit ? (
+              <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
+                + Add {addLabel}
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <div>
           {/* Department rows */}
           {displayList.map((dept, i) => {
             const motion = departmentReorder.getItemMotion(dept);
-            const childFAs = type === "scheduled" ? faByDept(dept.id, isEditing ? localFAs : propFAs) : [];
+            const childFAs =
+              type === "scheduled" ? faByDept(dept.id, isEditing ? localFAs : propFAs) : [];
             const hasMultipleFAs = childFAs.length > 1;
             const isSingleFA = type === "scheduled" && childFAs.length === 1;
 
@@ -750,9 +910,11 @@ function DepartmentSection({
                 data-dragging={motion.isDragging ? "true" : undefined}
                 data-drag-phase={motion.dragPhase ?? undefined}
                 data-moving={motion.isMoving ? "true" : undefined}
-                style={{
-                  "--dg-settings-reorder-offset": `${motion.offsetY}px`,
-                } as React.CSSProperties}
+                style={
+                  {
+                    "--dg-settings-reorder-offset": `${motion.offsetY}px`,
+                  } as React.CSSProperties
+                }
               >
                 {/* Divider between scheduled department groups */}
                 {type === "scheduled" && i > 0 && (
@@ -767,7 +929,10 @@ function DepartmentSection({
                     alignItems: "center",
                     gap: 10,
                     padding: isEditing ? "10px 16px" : "11px 16px",
-                    borderBottom: type === "management" && i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                    borderBottom:
+                      type === "management" && i < displayList.length - 1
+                        ? "1px solid var(--color-border-light)"
+                        : "none",
                     cursor: isEditing ? "grab" : "default",
                     userSelect: isEditing ? "none" : undefined,
                   }}
@@ -783,7 +948,10 @@ function DepartmentSection({
                   {isEditing ? (
                     <div style={{ flex: 1 }}>
                       <input
-                        ref={(el) => { if (el) nameRefs.current.set(dept.id, el); else nameRefs.current.delete(dept.id); }}
+                        ref={(el) => {
+                          if (el) nameRefs.current.set(dept.id, el);
+                          else nameRefs.current.delete(dept.id);
+                        }}
                         value={dept.name}
                         onChange={(e) => handleItemChange(i, e.target.value)}
                         onKeyDown={(e) => handleNameKeyDown(e, dept, i)}
@@ -814,13 +982,34 @@ function DepartmentSection({
                     </div>
                   ) : (
                     <>
-                      <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                        {dept.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Unnamed</span>}
+                      <span
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                        }}
+                      >
+                        {dept.name || (
+                          <span
+                            style={{
+                              color: "var(--color-text-muted)",
+                              fontStyle: "italic",
+                              fontWeight: 400,
+                            }}
+                          >
+                            Unnamed
+                          </span>
+                        )}
                       </span>
 
                       {/* Multi-FA count (next to name) */}
                       {hasMultipleFAs && (
-                        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
                           {childFAs.length} {focusAreaLabel.toLowerCase()}
                         </span>
                       )}
@@ -834,7 +1023,10 @@ function DepartmentSection({
                   {isEditing && (
                     <button
                       onMouseDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); handleDeleteClick(i); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClick(i);
+                      }}
                       style={{
                         background: "none",
                         border: "1px solid var(--color-danger-border, #FECACA)",
@@ -848,8 +1040,12 @@ function DepartmentSection({
                         flexShrink: 0,
                         transition: "background 150ms, color 150ms",
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "none";
+                      }}
                     >
                       Delete
                     </button>
@@ -874,7 +1070,10 @@ function DepartmentSection({
                     {isEditing && (
                       <div style={{ padding: "8px 16px 8px 60px" }}>
                         <button
-                          onClick={(e) => { e.stopPropagation(); addFocusArea(dept.id); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addFocusArea(dept.id);
+                          }}
                           className={addBtnClass}
                           style={{ width: "100%" }}
                         >
@@ -889,7 +1088,10 @@ function DepartmentSection({
                 {type === "scheduled" && isEditing && isSingleFA && (
                   <div style={{ padding: "6px 16px 10px 60px" }}>
                     <button
-                      onClick={(e) => { e.stopPropagation(); addFocusArea(dept.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addFocusArea(dept.id);
+                      }}
                       className="dg-btn dg-btn-secondary dg-btn-sm"
                       style={{ fontSize: "var(--dg-fs-caption)" }}
                     >
@@ -897,7 +1099,6 @@ function DepartmentSection({
                     </button>
                   </div>
                 )}
-
               </div>
             );
           })}
@@ -915,8 +1116,25 @@ function DepartmentSection({
 
       {/* Error banner */}
       {(duplicateDepartmentName || duplicateFocusAreaName || error) && (
-        <div style={{ margin: "0 16px 12px", padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--dg-radius-md)", color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-          <strong>{duplicateDepartmentName || duplicateFocusAreaName ? "Validation Error:" : "Save Error:"}</strong>{" "}
+        <div
+          style={{
+            margin: "0 16px 12px",
+            padding: 12,
+            background: "var(--color-danger-bg)",
+            border: "1px solid var(--color-danger-border)",
+            borderRadius: "var(--dg-radius-md)",
+            color: "var(--color-danger-text)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 500,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          <strong>
+            {duplicateDepartmentName || duplicateFocusAreaName
+              ? "Validation Error:"
+              : "Save Error:"}
+          </strong>{" "}
           {duplicateDepartmentName ?? duplicateFocusAreaName ?? error}
         </div>
       )}
@@ -924,50 +1142,154 @@ function DepartmentSection({
       {footerActions}
 
       {/* Delete confirmation dialogs */}
-      {deleteConfirm && (
-        deleteConfirm.deps?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${deleteConfirm.dept.name}"?`}
-            message={<>
-              <strong>{deleteConfirm.dept.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
-              <br /><br />
-              Archiving will preserve historical records but remove it from active use. Consider renaming instead if this department is still needed.
-            </>}
-            confirmLabel="Archive"
-            variant="warning"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
-            onCancel={() => setDeleteConfirm(null)}
-            secondaryConfirmLabel="Rename Instead"
-            onSecondaryConfirm={() => {
-              setDeleteConfirm(null);
-              requestAnimationFrame(() => {
-                nameRefs.current.get(deleteConfirm.dept.id)?.focus();
-                nameRefs.current.get(deleteConfirm.dept.id)?.select();
-              });
-            }}
-          />
-        ) : (
-          <ConfirmDialog
-            title={`Delete "${deleteConfirm.dept.name}"?`}
-            message={<>This will archive <strong>{deleteConfirm.dept.name || "this department"}</strong>. Historical records will be preserved.</>}
-            confirmLabel="Delete"
-            variant="danger"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
-            onCancel={() => setDeleteConfirm(null)}
-          />
-        )
-      )}
+      {deleteConfirm &&
+        (() => {
+          const deps = deleteConfirm.deps;
+          const hasActive = deps?.hasDependencies ?? false;
+          const hasAny = deps?.hasAnyReferences ?? true;
+          if (hasActive) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${deleteConfirm.dept.name}"?`}
+                message={
+                  <>
+                    <strong>{deleteConfirm.dept.name}</strong> is currently{" "}
+                    {deps!.summary.toLowerCase()}.
+                    <br />
+                    <br />
+                    Archiving will preserve historical records but remove it from active use.
+                    Consider renaming instead if this department is still needed.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                onConfirm={() => {
+                  handleRemove(deleteConfirm.idx, false);
+                  setDeleteConfirm(null);
+                }}
+                onCancel={() => setDeleteConfirm(null)}
+                secondaryConfirmLabel="Rename Instead"
+                onSecondaryConfirm={() => {
+                  setDeleteConfirm(null);
+                  requestAnimationFrame(() => {
+                    nameRefs.current.get(deleteConfirm.dept.id)?.focus();
+                    nameRefs.current.get(deleteConfirm.dept.id)?.select();
+                  });
+                }}
+              />
+            );
+          }
+          if (hasAny) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${deleteConfirm.dept.name}"?`}
+                message={
+                  <>
+                    This will archive{" "}
+                    <strong>{deleteConfirm.dept.name || "this department"}</strong>. Historical
+                    records will be preserved.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                onConfirm={() => {
+                  handleRemove(deleteConfirm.idx, false);
+                  setDeleteConfirm(null);
+                }}
+                onCancel={() => setDeleteConfirm(null)}
+              />
+            );
+          }
+          return (
+            <ConfirmDialog
+              title={`Delete "${deleteConfirm.dept.name}"?`}
+              message={
+                <>
+                  This will permanently delete{" "}
+                  <strong>{deleteConfirm.dept.name || "this department"}</strong>. Nothing
+                  references it, so no history will be lost.
+                </>
+              }
+              confirmLabel="Delete"
+              variant="danger"
+              onConfirm={() => {
+                handleRemove(deleteConfirm.idx, true);
+                setDeleteConfirm(null);
+              }}
+              onCancel={() => setDeleteConfirm(null)}
+            />
+          );
+        })()}
 
-      {faDeleteConfirm && (
-        <ConfirmDialog
-          title={`Delete "${faDeleteConfirm.fa.name}"?`}
-          message={<>This will archive <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Employees assigned to it will need reassignment.</>}
-          confirmLabel="Delete"
-          variant="danger"
-          onConfirm={() => { handleFARemove(faDeleteConfirm.faId); setFaDeleteConfirm(null); }}
-          onCancel={() => setFaDeleteConfirm(null)}
-        />
-      )}
+      {faDeleteConfirm &&
+        (() => {
+          const deps = faDeleteConfirm.deps;
+          const hasActive = deps?.hasDependencies ?? false;
+          const hasAny = deps?.hasAnyReferences ?? true;
+          if (hasActive) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${faDeleteConfirm.fa.name}"?`}
+                message={
+                  <>
+                    <strong>{faDeleteConfirm.fa.name}</strong> is currently{" "}
+                    {deps!.summary.toLowerCase()}.
+                    <br />
+                    <br />
+                    Archiving will preserve historical records but remove it from active use.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                onConfirm={() => {
+                  handleFARemove(faDeleteConfirm.faId, false);
+                  setFaDeleteConfirm(null);
+                }}
+                onCancel={() => setFaDeleteConfirm(null)}
+              />
+            );
+          }
+          if (hasAny) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${faDeleteConfirm.fa.name}"?`}
+                message={
+                  <>
+                    This will archive{" "}
+                    <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Historical
+                    records will be preserved.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                onConfirm={() => {
+                  handleFARemove(faDeleteConfirm.faId, false);
+                  setFaDeleteConfirm(null);
+                }}
+                onCancel={() => setFaDeleteConfirm(null)}
+              />
+            );
+          }
+          return (
+            <ConfirmDialog
+              title={`Delete "${faDeleteConfirm.fa.name}"?`}
+              message={
+                <>
+                  This will permanently delete{" "}
+                  <strong>{faDeleteConfirm.fa.name || "this focus area"}</strong>. Nothing
+                  references it.
+                </>
+              }
+              confirmLabel="Delete"
+              variant="danger"
+              onConfirm={() => {
+                handleFARemove(faDeleteConfirm.faId, true);
+                setFaDeleteConfirm(null);
+              }}
+              onCancel={() => setFaDeleteConfirm(null)}
+            />
+          );
+        })()}
     </SectionCard>
   );
 }
@@ -990,10 +1312,10 @@ export default function DepartmentsSettings({
   const managementDepartmentLabel = "Management Departments";
 
   const scheduledDepts = departments
-    .filter(d => d.type === "scheduled" && !d.archivedAt)
+    .filter((d) => d.type === "scheduled" && !d.archivedAt)
     .sort((a, b) => a.sortOrder - b.sortOrder);
   const managementDepts = departments
-    .filter(d => d.type === "management" && !d.archivedAt)
+    .filter((d) => d.type === "management" && !d.archivedAt)
     .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (

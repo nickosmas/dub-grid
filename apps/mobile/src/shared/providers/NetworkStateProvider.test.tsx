@@ -1,15 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { act } from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-} from "../../test/native";
+import { createReactNativeModule } from "../../test/native";
 
 vi.useFakeTimers();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 const setOnline = vi.fn();
 const setFocused = vi.fn();
@@ -17,8 +13,7 @@ const getNetworkStateAsync = vi.fn();
 const addNetworkStateListener = vi.fn();
 const removeNetworkListener = vi.fn();
 let networkListener:
-  | ((state: { isConnected?: boolean; isInternetReachable?: boolean }) => void)
-  | null = null;
+  ((state: { isConnected?: boolean; isInternetReachable?: boolean }) => void) | null = null;
 
 vi.mock("@tanstack/react-query", () => ({
   onlineManager: {

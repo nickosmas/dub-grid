@@ -34,11 +34,7 @@ export default function ChangeReviewModal({
   const hasSensitiveChanges = changes.some((change) => change.sensitive);
 
   return (
-    <Modal
-      title={title}
-      onClose={onCancel}
-      style={{ maxWidth: 720, width: "100%" }}
-    >
+    <Modal title={title} onClose={onCancel} style={{ maxWidth: 720, width: "100%" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <p
           style={{
@@ -82,11 +78,8 @@ export default function ChangeReviewModal({
                 gridTemplateColumns: "minmax(140px, 180px) 1fr 1fr",
                 gap: 12,
                 padding: "12px 14px",
-                borderTop:
-                  index === 0 ? "none" : "1px solid var(--color-border-light)",
-                background: change.sensitive
-                  ? "var(--color-bg-secondary)"
-                  : "var(--color-surface)",
+                borderTop: index === 0 ? "none" : "1px solid var(--color-border-light)",
+                background: change.sensitive ? "var(--color-bg-secondary)" : "var(--color-surface)",
               }}
             >
               <div

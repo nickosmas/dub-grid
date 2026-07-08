@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -41,18 +38,13 @@ export async function GET(req: NextRequest) {
     }
     void auth;
 
-    const result = await createRequestSupabaseClient(req).rpc(
-      "get_all_users_with_profiles",
-    );
+    const result = await createRequestSupabaseClient(req).rpc("get_all_users_with_profiles");
     if (result.error) {
       throw result.error;
     }
 
     const users: PlatformUser[] = (result.data ?? [])
-      .filter(
-        (row: Record<string, unknown>) =>
-          row.platform_role !== "gridmaster",
-      )
+      .filter((row: Record<string, unknown>) => row.platform_role !== "gridmaster")
       .map((row: Record<string, unknown>) => mapPlatformUser(row));
     const userIds = users.map((user) => user.id);
     const serviceClient = getServiceClient();
@@ -84,14 +76,18 @@ export async function GET(req: NextRequest) {
             { data: [], error: null },
             { data: [], error: null },
           ];
-    for (const extraResult of [sessionsResult, mobileTokensResult, membershipsResult, forceLogoutResult]) {
+    for (const extraResult of [
+      sessionsResult,
+      mobileTokensResult,
+      membershipsResult,
+      forceLogoutResult,
+    ]) {
       if (extraResult.error) throw extraResult.error;
     }
     const dayAgo = Date.now() - 86_400_000;
     const activeSessionsByUser = countBy(
       (sessionsResult.data ?? []).filter(
-        (row: Record<string, unknown>) =>
-          Date.parse(String(row.last_active_at ?? "")) >= dayAgo,
+        (row: Record<string, unknown>) => Date.parse(String(row.last_active_at ?? "")) >= dayAgo,
       ) as Record<string, unknown>[],
       "user_id",
     );
@@ -126,10 +122,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("gridmaster users GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load users" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load users" }, { status: 500 });
   }
 }
 
@@ -194,9 +187,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("gridmaster users PATCH failed", error);
-    return NextResponse.json(
-      { error: "Failed to update user status" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update user status" }, { status: 500 });
   }
 }

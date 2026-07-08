@@ -16,10 +16,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import {
-  useSetMobileSubNav,
-  type SubNavItem,
-} from "@/components/MobileSubNavContext";
+import { useSetMobileSubNav, type SubNavItem } from "@/components/MobileSubNavContext";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import type {
   AbsenceType,
@@ -32,8 +29,6 @@ import type {
   AssignmentDefinition,
   ShiftDisplayMode,
 } from "@/types";
-import OrgActivityLog from "@/components/settings/ActivityLog";
-import UserManagementSettings from "@/components/settings/UserManagement";
 import { MembersSection } from "@/components/staff/MembersSection";
 import { ProfileChangeRequestQueue } from "@/components/staff/ProfileChangeRequestQueue";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
@@ -55,38 +50,6 @@ const MEMBERS_ICON = (
     <circle cx="9" cy="7" r="4" />
     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const USER_MANAGEMENT_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
-const ACTIVITY_ICON = (
-  <svg
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 8v4l3 3" />
-    <circle cx="12" cy="12" r="10" />
   </svg>
 );
 
@@ -126,18 +89,18 @@ const CALENDAR_ICON = (
   </svg>
 );
 
-type StaffSection = "directory" | "requests" | "access" | "activity" | "recurring-schedule";
+type StaffSection = "directory" | "requests" | "access" | "recurring-schedule";
 
 interface StaffViewProps {
   employees: Employee[];
-  benchedEmployees?: Employee[];
-  terminatedEmployees?: Employee[];
+  inactiveEmployees?: Employee[];
+  removedEmployees?: Employee[];
   focusAreas: FocusArea[];
   certifications: NamedItem[];
   roles: NamedItem[];
   onSave: (emp: Employee) => void;
-  onDelete: (empId: string) => void;
-  onBench: (empId: string, note?: string) => void;
+  onRemove: (empId: string, note?: string) => void;
+  onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onAdd: () => void;
   orgId?: string;
@@ -165,14 +128,14 @@ interface StaffViewProps {
 
 export default function StaffView({
   employees,
-  benchedEmployees = [],
-  terminatedEmployees = [],
+  inactiveEmployees = [],
+  removedEmployees = [],
   focusAreas,
   certifications,
   roles,
   onSave,
-  onDelete,
-  onBench,
+  onRemove,
+  onDeactivate,
   onActivate,
   onAdd,
   orgId,
@@ -201,35 +164,30 @@ export default function StaffView({
   const scheduledDepartmentLabel = departmentLabelProp || "Scheduled Departments";
   const managementDepartmentLabel = "Management Departments";
   const canAccessPeopleAdminSurfaces = Boolean(canManageEmployees || isSuperAdmin || isGridmaster);
-  const canAccessPeopleRecurring = Boolean(orgId && canViewRecurringShifts && canAccessPeopleAdminSurfaces);
+  const canAccessPeopleRecurring = Boolean(
+    orgId && canViewRecurringShifts && canAccessPeopleAdminSurfaces,
+  );
 
   const allowedSections: StaffSection[] = [
     "directory",
     ...(canAccessPeopleAdminSurfaces ? ["requests" as const] : []),
-    ...((isSuperAdmin || isGridmaster) ? ["access" as const] : []),
     ...(canAccessPeopleRecurring ? ["recurring-schedule" as const] : []),
-    ...(isSuperAdmin ? ["activity" as const] : []),
   ];
   const sectionParam = searchParams.get("section") as StaffSection | null;
   const resolvedSection =
     sectionParam === ("members" as string)
       ? ("directory" as StaffSection)
-      : sectionParam === ("users" as string)
-        ? ("access" as StaffSection)
+      : sectionParam === ("users" as string) || sectionParam === ("access" as string)
+        ? ("directory" as StaffSection)
         : sectionParam;
   const activeSection: StaffSection =
-    resolvedSection && allowedSections.includes(resolvedSection)
-      ? resolvedSection
-      : "directory";
+    resolvedSection && allowedSections.includes(resolvedSection) ? resolvedSection : "directory";
 
   const links: { id: StaffSection; label: string; icon: ReactNode }[] = useMemo(
     () => [
       { id: "directory", label: "Directory", icon: MEMBERS_ICON },
       ...(canAccessPeopleAdminSurfaces
         ? [{ id: "requests" as StaffSection, label: "Requests", icon: REQUESTS_ICON }]
-        : []),
-      ...((isSuperAdmin || isGridmaster)
-        ? [{ id: "access" as StaffSection, label: "User Access", icon: USER_MANAGEMENT_ICON }]
         : []),
       ...(canAccessPeopleRecurring
         ? [
@@ -240,11 +198,8 @@ export default function StaffView({
             },
           ]
         : []),
-      ...(isSuperAdmin
-        ? [{ id: "activity" as StaffSection, label: "Activity Log", icon: ACTIVITY_ICON }]
-        : []),
     ],
-    [canAccessPeopleAdminSurfaces, canAccessPeopleRecurring, isGridmaster, isSuperAdmin],
+    [canAccessPeopleAdminSurfaces, canAccessPeopleRecurring],
   );
 
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -296,9 +251,7 @@ export default function StaffView({
                         render={
                           <Link
                             href={
-                              link.id === "directory"
-                                ? "/people"
-                                : `/people?section=${link.id}`
+                              link.id === "directory" ? "/people" : `/people?section=${link.id}`
                             }
                             replace
                           />
@@ -363,14 +316,14 @@ export default function StaffView({
         {activeSection === "directory" && (
           <MembersSection
             employees={employees}
-            benchedEmployees={benchedEmployees}
-            terminatedEmployees={terminatedEmployees}
+            inactiveEmployees={inactiveEmployees}
+            removedEmployees={removedEmployees}
             focusAreas={focusAreas}
             certifications={certifications}
             roles={roles}
             onSave={onSave}
-            onDelete={onDelete}
-            onBench={onBench}
+            onRemove={onRemove}
+            onDeactivate={onDeactivate}
             onActivate={onActivate}
             onAdd={onAdd}
             canViewEmployeeDetails={canViewEmployeeDetails ?? false}
@@ -390,24 +343,6 @@ export default function StaffView({
 
         {activeSection !== "directory" && (
           <div className="p-4 md:p-6 lg:px-12 lg:py-10">
-            {activeSection === "access" &&
-              (isSuperAdmin || isGridmaster) &&
-              orgId && (
-                <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
-                  <UserManagementSettings
-                    orgId={orgId}
-                    isSuperAdmin={isSuperAdmin}
-                    departments={departmentsProp as unknown as Department[]}
-                  />
-                </div>
-              )}
-
-            {activeSection === "activity" && isSuperAdmin && orgId && (
-              <div className="mx-auto" style={{ width: "100%", maxWidth: 1100 }}>
-                <OrgActivityLog orgId={orgId} />
-              </div>
-            )}
-
             {activeSection === "requests" && canAccessPeopleAdminSurfaces && orgId && (
               <ProfileChangeRequestQueue
                 orgId={orgId}
@@ -418,25 +353,23 @@ export default function StaffView({
               />
             )}
 
-            {activeSection === "recurring-schedule" &&
-              orgId &&
-              canAccessPeopleRecurring && (
-                <RecurringScheduleSection
-                  employees={employees}
-                  orgId={orgId}
-                  currentUserId={user?.id ?? null}
-                  assignments={assignments ?? []}
-                  shiftCategories={shiftCategories ?? []}
-                  jobs={jobs ?? []}
-                  orgRoles={roles}
-                  assignmentMap={assignmentLabelMap ?? EMPTY_CODE_MAP}
-                  canManage={canManageRecurringShifts ?? false}
-                  focusAreas={focusAreas}
-                  certifications={certifications}
-                  absenceTypes={absenceTypes}
-                  shiftDisplayMode={shiftDisplayMode}
-                />
-              )}
+            {activeSection === "recurring-schedule" && orgId && canAccessPeopleRecurring && (
+              <RecurringScheduleSection
+                employees={employees}
+                orgId={orgId}
+                currentUserId={user?.id ?? null}
+                assignments={assignments ?? []}
+                shiftCategories={shiftCategories ?? []}
+                jobs={jobs ?? []}
+                orgRoles={roles}
+                assignmentMap={assignmentLabelMap ?? EMPTY_CODE_MAP}
+                canManage={canManageRecurringShifts ?? false}
+                focusAreas={focusAreas}
+                certifications={certifications}
+                absenceTypes={absenceTypes}
+                shiftDisplayMode={shiftDisplayMode}
+              />
+            )}
           </div>
         )}
       </SidebarInset>

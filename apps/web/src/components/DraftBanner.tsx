@@ -15,7 +15,21 @@ interface DraftBannerProps {
   breakdown?: DraftBreakdown;
   showDiff?: boolean;
   onToggleDiff?: () => void;
+  /**
+   * Controls the diff-toggle label. "changes" promises before/after info
+   * (used when modified/deleted drafts exist); "highlight" honestly describes
+   * what the overlay does when only "new" drafts exist (no baseline to
+   * compare against — the overlay just outlines the cells you drew).
+   * Defaults to "changes" for backward compatibility.
+   */
+  diffMode?: "highlight" | "changes";
   canPublish?: boolean;
+  /**
+   * Optional dismiss handler. When provided, an "×" button hides the banner
+   * until the underlying draft data changes again. Hiding is a UI affordance
+   * only — drafts are not discarded.
+   */
+  onDismiss?: () => void;
 }
 
 function plural(n: number, word: string) {
@@ -31,15 +45,16 @@ function BreakdownChips({ breakdown }: { breakdown: DraftBreakdown }) {
   if (breakdown.deletedShifts > 0)
     chips.push({ label: `${breakdown.deletedShifts} deleted`, cls: "dg-draft-chip--deleted" });
   const noteCount = breakdown.newNotes + breakdown.deletedNotes;
-  if (noteCount > 0)
-    chips.push({ label: plural(noteCount, "note"), cls: "dg-draft-chip--notes" });
+  if (noteCount > 0) chips.push({ label: plural(noteCount, "note"), cls: "dg-draft-chip--notes" });
 
   if (chips.length === 0) return null;
 
   return (
     <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
       {chips.map((c) => (
-        <span key={c.cls} className={`dg-draft-chip ${c.cls}`}>{c.label}</span>
+        <span key={c.cls} className={`dg-draft-chip ${c.cls}`}>
+          {c.label}
+        </span>
       ))}
     </span>
   );
@@ -53,25 +68,29 @@ export default function DraftBanner({
   breakdown,
   showDiff = false,
   onToggleDiff,
+  diffMode = "changes",
   canPublish = true,
+  onDismiss,
 }: DraftBannerProps) {
   const isDisabled = isPublishing || isCanceling;
   const publishHint = canPublish
     ? "Save all draft changes to the live schedule"
     : "You don't have permission to publish schedules.";
+  const diffOnLabel = diffMode === "highlight" ? "Hide Highlights" : "Hide Changes";
+  const diffOffLabel = diffMode === "highlight" ? "Highlight New" : "Show Changes";
+  const diffHint =
+    diffMode === "highlight"
+      ? "Outline the brand-new shifts you've drafted"
+      : "Highlight differences from the published schedule";
 
   return (
     <div className="dg-draft-banner no-print" data-tour="draft-banner">
       <div className="dg-draft-banner-dot" />
-      {breakdown ? (
-        <BreakdownChips breakdown={breakdown} />
-      ) : (
-        <span>Unpublished changes</span>
-      )}
+      {breakdown ? <BreakdownChips breakdown={breakdown} /> : <span>Unpublished changes</span>}
       {showDiff && <ChangeLegend />}
       <div className="dg-draft-banner-actions">
         {onToggleDiff && (
-          <Hint content={hint("Highlight differences from the published schedule")} side="bottom">
+          <Hint content={hint(diffHint)} side="bottom">
             <button
               data-tour="draft-banner-diff"
               onClick={onToggleDiff}
@@ -84,12 +103,12 @@ export default function DraftBanner({
               {showDiff ? (
                 <>
                   <EyeOff size={12} style={{ marginRight: 4 }} />
-                  Hide Changes
+                  {diffOnLabel}
                 </>
               ) : (
                 <>
                   <Eye size={12} style={{ marginRight: 4 }} />
-                  Show Changes
+                  {diffOffLabel}
                 </>
               )}
             </button>
@@ -108,7 +127,9 @@ export default function DraftBanner({
                 <ButtonSpinner size={12} />
                 Discarding…
               </>
-            ) : "Discard"}
+            ) : (
+              "Discard"
+            )}
           </button>
         </Hint>
         <Hint content={hint(publishHint)} side="bottom">
@@ -123,9 +144,18 @@ export default function DraftBanner({
                 <ButtonSpinner size={12} />
                 Publishing…
               </>
-            ) : "Publish"}
+            ) : (
+              "Publish"
+            )}
           </button>
         </Hint>
+        {onDismiss && (
+          <Hint content={hint("Hide this banner for the rest of this session")} side="bottom">
+            <button type="button" onClick={onDismiss} className="dg-btn dg-btn-secondary dg-btn-sm">
+              Close
+            </button>
+          </Hint>
+        )}
       </div>
     </div>
   );

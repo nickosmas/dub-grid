@@ -2,9 +2,47 @@
 
 Quarterly rotation schedule. Each secret has a specific rotation procedure.
 
+## Environment Variables Reference
+
+All required and optional env vars are validated at startup by
+`apps/web/src/lib/env.ts` (Zod schema). The schema enforces the following at
+runtime:
+
+**Always required (all environments):**
+
+- `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase public anon key (baked into client bundle)
+- `SUPABASE_SERVICE_ROLE_KEY` — Server-only service role key (never `NEXT_PUBLIC_`)
+
+**Required in production (`NODE_ENV=production` + `VERCEL_ENV=production` or `STRICT_PROD_ENV_VALIDATION=1`):**
+
+- `UPSTASH_REDIS_REST_URL` — Rate limiter; fail-closed if absent (503)
+- `UPSTASH_REDIS_REST_TOKEN` — Rate limiter token
+
+**Optional (warn in dev, degrade gracefully):**
+
+- `RESEND_API_KEY` — Transactional email (invites, password resets)
+- `EXPO_ACCESS_TOKEN` — Expo push notifications
+- `STRIPE_SECRET_KEY` — Stripe billing
+- `STRIPE_WEBHOOK_SECRET` — Stripe webhook signature verification
+- `STRIPE_PRICE_ID_MONTHLY` — Monthly subscription price ID
+- `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` — Error monitoring
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` — Stripe client-side
+- `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST` — Analytics
+- `NEXT_PUBLIC_SITE_URL` — Used by CSRF origin validation and absolute URL generation
+- `NEXT_PUBLIC_BASE_DOMAIN` — Multi-tenant subdomain routing
+- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Maps
+- `NEXT_PUBLIC_VERCEL_URL` — Fallback for CSRF origin in Vercel Preview deployments
+
+> Note: `SUPABASE_JWT_SECRET` is **not** used. JWT verification uses the JWKS
+> endpoint (ES256 asymmetric keys from `{SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
+
+---
+
 ## Rotation Procedures
 
 ### SUPABASE_SERVICE_ROLE_KEY
+
 1. Go to Supabase Dashboard > Settings > API
 2. Regenerate the service_role key
 3. Update in Vercel env vars (Production + Preview)
@@ -13,13 +51,15 @@ Quarterly rotation schedule. Each secret has a specific rotation procedure.
 6. Verify: hit `/api/health` and confirm DB check passes
 
 ### NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 1. Same location as above — regenerate the anon key
 2. Update in Vercel env vars (all environments)
 3. Run `vercel env pull` to update `.env.local` locally
-4. Rebuild and deploy (anon key is baked into client bundle)
+4. Rebuild and deploy (the anon key is baked into the client bundle)
 5. Verify: log in as a normal user, confirm schedule loads
 
 ### RESEND_API_KEY
+
 1. Go to Resend Dashboard > API Keys
 2. Create a new key with the same permissions
 3. Update in Vercel env vars
@@ -27,55 +67,99 @@ Quarterly rotation schedule. Each secret has a specific rotation procedure.
 5. Verify: trigger a test invitation email
 
 ### UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN
+
 1. Go to Upstash Console > your database
-2. If rotating token: create a new token, update env vars, delete old token
-3. If rotating URL: create a new database, migrate, update URL
-4. Verify: trigger rate limiting (5+ rapid login attempts)
+2. If rotating the token: create a new token, update env vars, delete the old token
+3. If rotating the URL: create a new database, migrate data, update URL
+4. Verify: trigger rate limiting (5+ rapid login attempts to the same endpoint)
+
+> Important: `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are
+> **required** in production. The rate limiters fail closed (503) when Redis is
+> unconfigured — the app will return 503 on all rate-limited routes until these
+> vars are set. See `apps/web/src/lib/rate-limit.ts`.
 
 ### STRIPE_SECRET_KEY
+
 1. Go to Stripe Dashboard > Developers > API Keys
-2. Roll the secret key (Stripe supports rolling — new key active immediately, old key valid for 24h)
+2. Roll the secret key (Stripe supports rolling — new key active immediately, old key valid for 24 hours)
 3. Update in Vercel env vars
 4. Verify: check billing portal loads, webhook deliveries succeed
 
 ### STRIPE_WEBHOOK_SECRET
+
 1. Go to Stripe Dashboard > Developers > Webhooks
 2. Roll the webhook signing secret
 3. Update in Vercel env vars
-4. Verify: trigger a test webhook event
+4. Verify: trigger a test webhook event from the Stripe dashboard
 
 ### SENTRY_AUTH_TOKEN
+
+Used only at build time to upload source maps. Not needed at runtime.
+
 1. Go to Sentry > Settings > Auth Tokens
 2. Create a new token with the same scopes
-3. Update in Vercel env vars
+3. Update in Vercel env vars and GitHub Actions secrets
 4. Delete the old token
-5. Verify: run a build and confirm source maps upload
+5. Verify: run a build and confirm source maps upload in the Sentry dashboard
 
 ### TURBO_TOKEN / TURBO_TEAM
+
+Used for Turborepo remote cache.
+
 1. In Vercel, create or rotate the Turbo access token for the team that owns the remote cache
 2. Update GitHub Actions secrets: `TURBO_TOKEN` and `TURBO_TEAM`
 3. Update local shell or secret manager values used for Turbo commands
 4. Verify: run `npm run type-check` twice and confirm the second run reports cache hits
 
 ### NEXT_PUBLIC_POSTHOG_KEY / POSTHOG_PERSONAL_API_KEY
+
 1. Go to PostHog > Project Settings > API Keys
 2. Regenerate the key
 3. Update in Vercel env vars
 4. Verify: check PostHog dashboard shows events after deploy
 
+---
+
 ## Rotation Schedule
 
-| Quarter | Secrets to Rotate |
-|---------|------------------|
-| Q1 (Jan) | Supabase keys, Resend API key |
-| Q2 (Apr) | Stripe keys, Upstash tokens |
-| Q3 (Jul) | Sentry token, PostHog keys |
+| Quarter  | Secrets to Rotate               |
+| -------- | ------------------------------- |
+| Q1 (Jan) | Supabase keys, Resend API key   |
+| Q2 (Apr) | Stripe keys, Upstash tokens     |
+| Q3 (Jul) | Sentry token, PostHog keys      |
 | Q4 (Oct) | All keys (annual full rotation) |
+
+---
 
 ## Emergency Rotation
 
 If a secret is compromised:
+
 1. Rotate immediately using the procedure above
-2. Check audit logs for unauthorized access
+2. Check audit logs for unauthorized access (Supabase logs, Vercel function logs, Sentry events)
 3. Notify the team
 4. Document the incident
+
+### What to check per secret
+
+| Secret                      | Check                                                   |
+| --------------------------- | ------------------------------------------------------- |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase audit logs for unexpected service-role queries |
+| `STRIPE_SECRET_KEY`         | Stripe Dashboard > Logs for unexpected API calls        |
+| `STRIPE_WEBHOOK_SECRET`     | Stripe webhook delivery logs for signature failures     |
+| `RESEND_API_KEY`            | Resend logs for unexpected email sends                  |
+| `UPSTASH_REDIS_REST_TOKEN`  | Upstash logs for unexpected key reads/writes            |
+
+---
+
+## Security Notes
+
+- Server-only secrets must never have the `NEXT_PUBLIC_` prefix. The env schema
+  (`apps/web/src/lib/env.ts`) enforces this by keeping them in the `serverSchema`.
+- In strict production mode the schema throws at startup for missing required vars,
+  preventing a misconfigured deployment from silently failing open.
+- Rotate secrets immediately if they are ever committed to version control. Use
+  `git filter-repo` to purge history and rotate all secrets simultaneously (assume
+  the commit was pushed before it was caught).
+- Keep separate secret values per environment (dev / staging / production). Never
+  copy a production secret to a development environment.

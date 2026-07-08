@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  CalendarDays,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { addDays, cn } from "@/lib/utils";
 
@@ -77,14 +72,8 @@ export default function CalendarDatePicker({
   allowClear = false,
   style,
 }: CalendarDatePickerProps) {
-  const selectedDate = useMemo(
-    () => (value ? parseLocalDate(value) : null),
-    [value],
-  );
-  const minSelectableDate = useMemo(
-    () => (minDate ? parseLocalDate(minDate) : null),
-    [minDate],
-  );
+  const selectedDate = useMemo(() => (value ? parseLocalDate(value) : null), [value]);
+  const minSelectableDate = useMemo(() => (minDate ? parseLocalDate(minDate) : null), [minDate]);
   const todayKey = formatLocalDate(new Date());
 
   const [open, setOpen] = useState(false);
@@ -99,21 +88,13 @@ export default function CalendarDatePicker({
     setVisibleMonth(startOfMonth(selectedDate ?? minSelectableDate ?? new Date()));
   }, [minSelectableDate, open, selectedDate]);
 
-  const calendarDays = useMemo(
-    () => buildCalendarDays(visibleMonth),
-    [visibleMonth],
-  );
+  const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
 
-  const triggerLabel = selectedDate
-    ? FIELD_DATE_FORMATTER.format(selectedDate)
-    : placeholder;
+  const triggerLabel = selectedDate ? FIELD_DATE_FORMATTER.format(selectedDate) : placeholder;
 
   return (
     <>
-      <div
-        ref={triggerRef}
-        style={{ display: "inline-block", width: "100%", ...style }}
-      >
+      <div ref={triggerRef} style={{ display: "inline-block", width: "100%", ...style }}>
         <button
           id={id}
           type="button"
@@ -131,34 +112,26 @@ export default function CalendarDatePicker({
             gap: 10,
             width: "100%",
             minHeight: "var(--dg-toolbar-h)",
-            background: disabled
-              ? "var(--color-bg)"
-              : "var(--color-surface)",
+            background: disabled ? "var(--color-bg)" : "var(--color-surface)",
             border: "1px solid var(--color-border)",
             borderRadius: "var(--dg-btn-radius)",
             padding: "10px 12px",
             fontSize: 13,
             fontWeight: 500,
-            color: selectedDate
-              ? "var(--color-text-secondary)"
-              : "var(--color-text-subtle)",
+            color: selectedDate ? "var(--color-text-secondary)" : "var(--color-text-subtle)",
             cursor: disabled ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             textAlign: "left",
             transition: "box-shadow 150ms ease",
             boxShadow: open ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
-            borderColor: open
-              ? "var(--color-border-focus)"
-              : "var(--color-border)",
+            borderColor: open ? "var(--color-border-focus)" : "var(--color-border)",
             opacity: disabled ? 0.5 : 1,
           }}
         >
           <CalendarDays
             size={15}
             style={{
-              color: selectedDate
-                ? "var(--color-text-muted)"
-                : "var(--color-text-faint)",
+              color: selectedDate ? "var(--color-text-muted)" : "var(--color-text-faint)",
               flexShrink: 0,
             }}
           />
@@ -229,9 +202,7 @@ export default function CalendarDatePicker({
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <button
                   type="button"
-                  onClick={() =>
-                    setVisibleMonth((current) => shiftMonth(current, -1))
-                  }
+                  onClick={() => setVisibleMonth((current) => shiftMonth(current, -1))}
                   className="dg-menu-item"
                   aria-label={`Show ${MONTH_FORMATTER.format(shiftMonth(visibleMonth, -1))}`}
                   style={{
@@ -245,9 +216,7 @@ export default function CalendarDatePicker({
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    setVisibleMonth((current) => shiftMonth(current, 1))
-                  }
+                  onClick={() => setVisibleMonth((current) => shiftMonth(current, 1))}
                   className="dg-menu-item"
                   aria-label={`Show ${MONTH_FORMATTER.format(shiftMonth(visibleMonth, 1))}`}
                   style={{
@@ -288,8 +257,7 @@ export default function CalendarDatePicker({
                 const dateKey = formatLocalDate(day);
                 const isSelected = value === dateKey;
                 const isToday = dateKey === todayKey;
-                const isCurrentMonth =
-                  day.getMonth() === visibleMonth.getMonth();
+                const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
                 const isDisabled = !!minDate && dateKey < minDate && !isSelected;
 
                 return (

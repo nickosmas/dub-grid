@@ -1,13 +1,5 @@
 import { type ReactNode, useMemo, useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -16,10 +8,11 @@ import type {
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
+import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ModalHeader } from "../../../shared/components/ModalHeader";
+import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -29,19 +22,18 @@ import {
   getPeople,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 type StatusFilter = "active" | "inactive";
 type SortMode = "seniority" | "alphabetical";
+type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 type ProfileRequestConfirmation = {
   request: MobileProfileChangeRequest;
   action: "approve" | "reject";
@@ -55,23 +47,6 @@ function formatStatusLabel(status: MobilePerson["status"]): string {
   return status === "active" ? "Active" : "Inactive";
 }
 
-function hashCode(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string) {
-  const hue = hashCode(seed) % 360;
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 94%)`,
-    borderColor: `hsl(${hue}, 70%, 86%)`,
-    color: `hsl(${hue}, 70%, 34%)`,
-  };
-}
-
 export default function PeopleScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
@@ -80,14 +55,13 @@ export default function PeopleScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [sortMode, setSortMode] = useState<SortMode>("seniority");
   const [focusFilterId, setFocusFilterId] = useState<number | "all">("all");
-  const [managementDepartmentFilterId, setManagementDepartmentFilterId] =
-    useState<number | "all">("all");
-  const [isRefineModalVisible, setIsRefineModalVisible] = useState(false);
+  const [managementDepartmentFilterId, setManagementDepartmentFilterId] = useState<number | "all">(
+    "all",
+  );
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
-  const canManageEmployees = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const peopleQuery = useQuery({
     queryKey: ["mobile", "people", accessToken],
     queryFn: () => getPeople(accessToken!),
@@ -99,19 +73,13 @@ export default function PeopleScreen() {
     enabled: Boolean(accessToken) && canManageEmployees,
   });
   const resolveRequestMutation = useMutation({
-    mutationFn: ({
-      requestId,
-      action,
-    }: {
-      requestId: string;
-      action: "approve" | "reject";
-    }) => updateProfileChangeRequest(accessToken!, requestId, { action }),
+    mutationFn: ({ requestId, action }: { requestId: string; action: "approve" | "reject" }) =>
+      updateProfileChangeRequest(accessToken!, requestId, { action }),
     onSuccess: async (_, variables) => {
       await Promise.all([profileRequestsQuery.refetch(), peopleQuery.refetch()]);
       pushToast({
         tone: "success",
-        title:
-          variables.action === "approve" ? "Request approved" : "Request rejected",
+        title: variables.action === "approve" ? "Request approved" : "Request rejected",
         message: "The profile request was updated.",
       });
     },
@@ -124,12 +92,15 @@ export default function PeopleScreen() {
     },
   });
   const manualRefresh = useManualRefresh(() =>
-    Promise.all([
-      peopleQuery.refetch(),
-      bootstrapQuery.refetch(),
-      profileRequestsQuery.refetch(),
-    ]),
+    Promise.all([peopleQuery.refetch(), bootstrapQuery.refetch(), profileRequestsQuery.refetch()]),
   );
+  function clearFilters() {
+    setFocusFilterId("all");
+    setManagementDepartmentFilterId("all");
+    setStatusFilter("active");
+    setSortMode("seniority");
+  }
+
   function confirmProfileRequestAction() {
     if (!profileRequestConfirmation) return;
 
@@ -143,10 +114,7 @@ export default function PeopleScreen() {
   const focusAreaMap = useMemo(
     () =>
       new Map(
-        (bootstrapQuery.data?.focusAreas ?? []).map((focusArea) => [
-          focusArea.id,
-          focusArea.name,
-        ]),
+        (bootstrapQuery.data?.focusAreas ?? []).map((focusArea) => [focusArea.id, focusArea.name]),
       ),
     [bootstrapQuery.data?.focusAreas],
   );
@@ -176,28 +144,20 @@ export default function PeopleScreen() {
           person.email.toLowerCase().includes(normalizedSearch) ||
           person.phone.toLowerCase().includes(normalizedSearch);
 
-        const matchesStatus =
-          !canManageEmployees
-            ? true
-            : statusFilter === "active"
-              ? person.status === "active"
-              : person.status !== "active";
+        const matchesStatus = !canManageEmployees
+          ? true
+          : statusFilter === "active"
+            ? person.status === "active"
+            : person.status !== "active";
 
         const matchesFocus =
           focusFilterId === "all" ? true : person.focusAreaIds.includes(focusFilterId);
         const matchesManagementDepartment =
           managementDepartmentFilterId === "all"
             ? true
-            : getPersonManagementDepartmentIds(person).includes(
-                managementDepartmentFilterId,
-              );
+            : getPersonManagementDepartmentIds(person).includes(managementDepartmentFilterId);
 
-        return (
-          matchesSearch &&
-          matchesStatus &&
-          matchesFocus &&
-          matchesManagementDepartment
-        );
+        return matchesSearch && matchesStatus && matchesFocus && matchesManagementDepartment;
       })
       .sort((left, right) => {
         if (sortMode === "alphabetical") {
@@ -221,20 +181,19 @@ export default function PeopleScreen() {
     statusFilter,
   ]);
   const visiblePeople = useMemo(
-    () =>
-      canManageEmployees
-        ? people
-        : people.filter((person) => person.status === "active"),
+    () => (canManageEmployees ? people : people.filter((person) => person.status === "active")),
     [canManageEmployees, people],
   );
   const activeCount = visiblePeople.filter((person) => person.status === "active").length;
   const inactiveCount = visiblePeople.length - activeCount;
-  const activeRefinementCount =
+  const activeFilterCount =
     (focusFilterId === "all" ? 0 : 1) +
     (managementDepartmentFilterId === "all" ? 0 : 1) +
     (canManageEmployees && statusFilter === "inactive" ? 1 : 0) +
     (sortMode === "alphabetical" ? 1 : 0);
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
+  const currentUserId = bootstrapQuery.data?.user?.id ?? null;
+  const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const contentState = getMobileQueryContentState({
     hasData: peopleQuery.data !== undefined,
     isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
@@ -249,137 +208,126 @@ export default function PeopleScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      <Modal
-        animationType="slide"
-        allowSwipeDismissal
-        onRequestClose={() => setIsRefineModalVisible(false)}
-        presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
-        visible={isRefineModalVisible}
-      >
-        <Screen
-          bottomPaddingMode="modal"
-          stickyHeader={
-            <ModalHeader
-              title="Refine directory"
-              onClose={() => setIsRefineModalVisible(false)}
+      <BottomSheetModal
+        footer={
+          <>
+            <Button
+              compact
+              disabled={activeFilterCount === 0}
+              label="Clear all"
+              tone="neutral"
+              onPress={clearFilters}
             />
-          }
-          stickyHeaderTopPadding={15}
-        >
-          <View style={styles.modalContent}>
-            <SelectionSection label="Focus area">
-              <SelectionRow
-                label="All focus areas"
-                onPress={() => setFocusFilterId("all")}
-                selected={focusFilterId === "all"}
-              />
-              {focusAreas.map((focusArea) => (
-                <SelectionRow
-                  key={focusArea.id}
-                  label={focusArea.name}
-                  onPress={() => setFocusFilterId(focusArea.id)}
-                  selected={focusFilterId === focusArea.id}
-                />
-              ))}
-            </SelectionSection>
+            <View style={styles.filterFooterSpacer} />
+            <Button
+              compact
+              label="Done"
+              tone="primary"
+              onPress={() => setIsFilterModalVisible(false)}
+            />
+          </>
+        }
+        onDismiss={() => setIsFilterModalVisible(false)}
+        scrollable
+        visible={isFilterModalVisible}
+      >
+        <Text style={styles.sheetTitle}>Filter directory</Text>
 
-            {canManageEmployees && managementDepartments.length > 0 ? (
-              <SelectionSection label="Management departments">
-                <SelectionRow
-                  label="All management departments"
-                  onPress={() => setManagementDepartmentFilterId("all")}
-                  selected={managementDepartmentFilterId === "all"}
-                />
-                {managementDepartments.map((department) => (
-                  <SelectionRow
-                    key={department.id}
-                    detail={`${countPeopleInManagementDepartment(
-                      visiblePeople,
-                      department.id,
-                    )} people`}
-                    label={department.name}
-                    onPress={() => setManagementDepartmentFilterId(department.id)}
-                    selected={managementDepartmentFilterId === department.id}
-                  />
-                ))}
-              </SelectionSection>
-            ) : null}
+        <SelectionSection label="Focus area">
+          <SelectionRow
+            label="All focus areas"
+            onPress={() => setFocusFilterId("all")}
+            selected={focusFilterId === "all"}
+          />
+          {focusAreas.map((focusArea) => (
+            <SelectionRow
+              key={focusArea.id}
+              label={focusArea.name}
+              onPress={() => setFocusFilterId(focusArea.id)}
+              selected={focusFilterId === focusArea.id}
+            />
+          ))}
+        </SelectionSection>
 
-            {canManageEmployees ? (
-              <SelectionSection label="Status">
-                <SelectionRow
-                  detail={`${activeCount} people`}
-                  label="Active staff"
-                  onPress={() => setStatusFilter("active")}
-                  selected={statusFilter === "active"}
-                />
-                <SelectionRow
-                  detail={`${inactiveCount} people`}
-                  label="Inactive staff"
-                  onPress={() => setStatusFilter("inactive")}
-                  selected={statusFilter === "inactive"}
-                />
-              </SelectionSection>
-            ) : null}
+        {canManageEmployees && managementDepartments.length > 0 ? (
+          <SelectionSection label="Management departments">
+            <SelectionRow
+              label="All management departments"
+              onPress={() => setManagementDepartmentFilterId("all")}
+              selected={managementDepartmentFilterId === "all"}
+            />
+            {managementDepartments.map((department) => (
+              <SelectionRow
+                key={department.id}
+                detail={`${countPeopleInManagementDepartment(visiblePeople, department.id)} people`}
+                label={department.name}
+                onPress={() => setManagementDepartmentFilterId(department.id)}
+                selected={managementDepartmentFilterId === department.id}
+              />
+            ))}
+          </SelectionSection>
+        ) : null}
 
-            <SelectionSection label="Sort by">
-              <SelectionRow
-                label="Seniority"
-                onPress={() => setSortMode("seniority")}
-                selected={sortMode === "seniority"}
-              />
-              <SelectionRow
-                label="Alphabetical"
-                onPress={() => setSortMode("alphabetical")}
-                selected={sortMode === "alphabetical"}
-              />
-            </SelectionSection>
-          </View>
-        </Screen>
-      </Modal>
+        {canManageEmployees ? (
+          <SelectionSection label="Status">
+            <SelectionRow
+              detail={`${activeCount} people`}
+              label="Active staff"
+              onPress={() => setStatusFilter("active")}
+              selected={statusFilter === "active"}
+            />
+            <SelectionRow
+              detail={`${inactiveCount} people`}
+              label="Inactive staff"
+              onPress={() => setStatusFilter("inactive")}
+              selected={statusFilter === "inactive"}
+            />
+          </SelectionSection>
+        ) : null}
+
+        <SelectionSection label="Sort by">
+          <SelectionRow
+            label="Seniority"
+            onPress={() => setSortMode("seniority")}
+            selected={sortMode === "seniority"}
+          />
+          <SelectionRow
+            label="Alphabetical"
+            onPress={() => setSortMode("alphabetical")}
+            selected={sortMode === "alphabetical"}
+          />
+        </SelectionSection>
+      </BottomSheetModal>
 
       <View style={styles.section}>
         <View style={styles.searchBarRow}>
-          <View style={styles.searchField}>
-            <Ionicons color={mobileColors.textSubtle} name="search" size={18} />
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setSearchValue}
-              placeholder="Search people"
-              placeholderTextColor={mobileColors.textSubtle}
-              style={styles.searchInput}
-              value={searchValue}
-            />
-          </View>
+          <SearchBar
+            accessibilityLabel="Search people"
+            onChangeText={setSearchValue}
+            placeholder="Search people"
+            value={searchValue}
+          />
           <Pressable
             accessibilityLabel="Open people filters and sort"
             accessibilityRole="button"
-            accessibilityState={{ expanded: isRefineModalVisible }}
+            accessibilityState={{ expanded: isFilterModalVisible }}
             android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-            onPress={() => setIsRefineModalVisible(true)}
-            style={[
-              styles.refineButton,
-              activeRefinementCount > 0 && styles.refineButtonActive,
-            ]}
+            onPress={() => setIsFilterModalVisible(true)}
+            style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}
           >
             <Ionicons
-              color={
-                activeRefinementCount > 0
-                  ? mobileColors.textInverse
-                  : mobileColors.textSecondary
-              }
+              color={activeFilterCount > 0 ? mobileColors.textInverse : mobileColors.textSecondary}
               name="options-outline"
               size={16}
             />
             <Text
               numberOfLines={1}
               style={[
-                styles.refineButtonText,
-                activeRefinementCount > 0 && styles.refineButtonTextActive,
+                styles.filterButtonText,
+                activeFilterCount > 0 && styles.filterButtonTextActive,
               ]}
             >
-              Refine
+              Filter
             </Text>
           </Pressable>
         </View>
@@ -392,17 +340,12 @@ export default function PeopleScreen() {
             {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
               <View
                 key={request.id}
-                style={[
-                  styles.requestRow,
-                  index < profileRequests.length - 1 && styles.rowDivider,
-                ]}
+                style={[styles.requestRow, index < profileRequests.length - 1 && styles.rowDivider]}
               >
                 <View style={styles.requestCopy}>
                   <Text style={styles.personName}>{request.requesterName}</Text>
                   <Text style={styles.personSubtitle}>
-                    {request.type === "account_deletion"
-                      ? "Account deletion"
-                      : "Profile update"}
+                    {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
                   </Text>
                 </View>
                 <View style={styles.requestActions}>
@@ -441,31 +384,36 @@ export default function PeopleScreen() {
           <Text style={styles.loadingTitle}>Loading directory</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
-      ) : contentState.kind === "error" &&
-        contentState.reason === "unauthorized" ? (
+      ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
-          body="Your current role does not include mobile staff visibility for this workspace."
+          body="Your current role does not include mobile staff visibility for this organization."
+          fillScreen
           tone="warning"
           title="Directory unavailable"
+          variant="centered"
         />
       ) : contentState.kind === "error" ? (
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load people"
+          variant="centered"
           onAction={() => {
             void peopleQuery.refetch();
           }}
         />
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
-          body="No teammates are available in this workspace yet."
+          fillScreen
+          body="Teammates will appear here once they're added to your organization."
           iconName="people-outline"
           title="No teammates yet"
         />
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
-          body="Try a different name, email, phone number, focus area, or management department."
+          fillScreen
+          body="Try a different name, email, phone, or focus area."
           iconName="search-outline"
           title="No matches"
         />
@@ -494,7 +442,17 @@ export default function PeopleScreen() {
                   employmentType={person.employmentType}
                   isLast={index === filteredPeople.length - 1}
                   name={getFullName(person)}
+                  orgRole={person.orgRole}
                   onPress={() => {
+                    const isSelf =
+                      (currentEmployeeId !== null && person.id === currentEmployeeId) ||
+                      (currentUserId !== null &&
+                        person.userId !== null &&
+                        person.userId === currentUserId);
+                    if (isSelf) {
+                      router.push("/(tabs)/profile");
+                      return;
+                    }
                     router.push({
                       pathname: "/(tabs)/people/[id]",
                       params: { id: person.id },
@@ -513,14 +471,12 @@ export default function PeopleScreen() {
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "Approve this account deletion request? The account deletion safeguards will run before access is removed."
+            ? "Safeguards will run before this account loses access."
             : profileRequestConfirmation?.action === "approve"
-              ? "Approve this profile change request?"
-              : "Reject this profile change request?"
+              ? "The change will be applied to this teammate's profile."
+              : "The teammate's profile will stay as it is."
         }
-        confirmLabel={
-          profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"
-        }
+        confirmLabel={profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"}
         confirmTone={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
@@ -533,9 +489,7 @@ export default function PeopleScreen() {
         onCancel={() => setProfileRequestConfirmation(null)}
         onConfirm={confirmProfileRequestAction}
         title={
-          profileRequestConfirmation?.action === "approve"
-            ? "Approve request?"
-            : "Reject request?"
+          profileRequestConfirmation?.action === "approve" ? "Approve request?" : "Reject request?"
         }
         visible={profileRequestConfirmation != null}
       />
@@ -551,18 +505,11 @@ function countPeopleInManagementDepartment(
   people: MobilePerson[],
   departmentId: MobileDepartment["id"],
 ): number {
-  return people.filter((person) =>
-    getPersonManagementDepartmentIds(person).includes(departmentId),
-  ).length;
+  return people.filter((person) => getPersonManagementDepartmentIds(person).includes(departmentId))
+    .length;
 }
 
-function SelectionSection({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function SelectionSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{label}</Text>
@@ -588,18 +535,13 @@ function SelectionRow({
       accessibilityState={{ selected }}
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.selectionRow,
-        pressed && styles.selectionRowPressed,
-      ]}
+      style={({ pressed }) => [styles.selectionRow, pressed && styles.selectionRowPressed]}
     >
       <View style={styles.selectionRowCopy}>
         <Text style={styles.selectionRowTitle}>{label}</Text>
         {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
       </View>
-      {selected ? (
-        <Ionicons color={mobileColors.brand} name="checkmark" size={20} />
-      ) : null}
+      {selected ? <Ionicons color={mobileColors.brand} name="checkmark" size={20} /> : null}
     </Pressable>
   );
 }
@@ -608,6 +550,7 @@ function PersonRow({
   id,
   employmentType,
   name,
+  orgRole,
   subtitle,
   status,
   accessHint,
@@ -618,6 +561,7 @@ function PersonRow({
   id: string;
   employmentType: MobilePerson["employmentType"];
   name: string;
+  orgRole: MobileOrgRole;
   subtitle: string;
   status: MobilePerson["status"];
   accessHint: string | null;
@@ -633,6 +577,7 @@ function PersonRow({
     .filter(Boolean)
     .join(" - ");
   const avatarTone = getAvatarTone(id);
+  const orgRoleBadge = getMobileOrgRoleBadge(orgRole);
   const initials =
     name
       .split(" ")
@@ -662,14 +607,19 @@ function PersonRow({
           },
         ]}
       >
-        <Text style={[styles.personAvatarText, { color: avatarTone.color }]}>
-          {initials}
-        </Text>
+        <Text style={[styles.personAvatarText, { color: avatarTone.color }]}>{initials}</Text>
       </View>
       <View style={styles.personCopy}>
-        <Text numberOfLines={1} style={styles.personName}>
-          {name}
-        </Text>
+        <View style={styles.personNameRow}>
+          <Text numberOfLines={1} style={styles.personName}>
+            {name}
+          </Text>
+          {orgRoleBadge ? (
+            <View style={orgRoleBadge.containerStyle}>
+              <Text style={orgRoleBadge.textStyle}>{orgRoleBadge.label}</Text>
+            </View>
+          ) : null}
+        </View>
         <Text numberOfLines={1} style={styles.personSubtitle}>
           {subtitle}
         </Text>
@@ -700,35 +650,19 @@ const styles = StyleSheet.create({
     color: mobileColors.textSubtle,
     textTransform: "uppercase",
   },
-  modalContent: {
-    gap: 16,
-    paddingBottom: 12,
+  sheetTitle: {
+    ...mobileText.heroMetric,
+    color: mobileColors.textPrimary,
+  },
+  filterFooterSpacer: {
+    flex: 1,
   },
   searchBarRow: {
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
   },
-  searchField: {
-    minHeight: 46,
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    flex: 1,
-    gap: 9,
-    paddingHorizontal: 14,
-  },
-  searchInput: {
-    ...mobileText.sectionTitle,
-    fontWeight: "400",
-    color: mobileColors.textPrimary,
-    flex: 1,
-    paddingVertical: 12,
-  },
-  refineButton: {
+  filterButton: {
     minHeight: 46,
     alignItems: "center",
     backgroundColor: mobileColors.surface,
@@ -740,16 +674,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 14,
   },
-  refineButtonActive: {
+  filterButtonActive: {
     backgroundColor: mobileColors.brand,
     borderColor: mobileColors.brand,
   },
-  refineButtonText: {
+  filterButtonText: {
     color: mobileColors.textSecondary,
     fontSize: 14,
     fontWeight: "700",
   },
-  refineButtonTextActive: {
+  filterButtonTextActive: {
     color: mobileColors.textInverse,
   },
   selectionList: {
@@ -839,9 +773,16 @@ const styles = StyleSheet.create({
     gap: 3,
     minWidth: 0,
   },
+  personNameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    minWidth: 0,
+  },
   personName: {
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
+    flexShrink: 1,
   },
   personSubtitle: {
     ...mobileText.body,

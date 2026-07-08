@@ -3,13 +3,12 @@ import { z } from "zod";
 import { createStripeCustomer, createCheckoutSession } from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
-import {
-  countBillableAppUsers,
-  resolveBillingReturnUrl,
-} from "@/features/billing/server";
+import { countBillableAppUsers, resolveBillingReturnUrl } from "@/features/billing/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
@@ -20,6 +19,8 @@ export async function POST(req: NextRequest) {
   // ── CSRF: validate Origin header ──────────────────────────────────
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   try {
     let body: unknown;
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     }
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
     const { orgId } = parsed.data;
     const returnUrl = resolveBillingReturnUrl(parsed.data.returnUrl, [
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
       req,
       orgId,
       (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true },
     );
     if ("response" in auth) return auth.response;
     const supabase = auth.serviceClient;
@@ -55,10 +56,7 @@ export async function POST(req: NextRequest) {
       `billing-checkout:${auth.actor.id}:${orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -101,10 +99,7 @@ export async function POST(req: NextRequest) {
         if (authUser?.user?.email) email = authUser.user.email;
       }
       if (!email) {
-        return NextResponse.json(
-          { error: "Billing contact email required" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Billing contact email required" }, { status: 400 });
       }
 
       const customer = await createStripeCustomer(orgId, org.name, email);

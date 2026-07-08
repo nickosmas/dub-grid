@@ -12,13 +12,17 @@ import type {
 } from "@/types";
 import { saveCoverageRequirements } from "@/features/settings/client";
 import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
-import { getJobPlacementShiftPool, resolveJobColorsForShift, resolveJobTimesForShift } from "@/lib/job-placement";
+import {
+  getJobPlacementShiftPool,
+  resolveJobColorsForShift,
+  resolveJobTimesForShift,
+} from "@/lib/job-placement";
 import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -35,7 +39,10 @@ type CoverageOptionSection = {
   isShiftless: boolean;
 };
 
-function requirementKey(focusAreaId: number, option: Pick<AssignableShiftOption, "jobId" | "shiftId">): string {
+function requirementKey(
+  focusAreaId: number,
+  option: Pick<AssignableShiftOption, "jobId" | "shiftId">,
+): string {
   return `${focusAreaId}:${option.jobId}:${option.shiftId ?? "null"}`;
 }
 
@@ -56,8 +63,7 @@ function buildDraft(
 ): CoverageDraft {
   const matching = requirements.filter(
     (requirement) =>
-      requirement.focusAreaId === focusAreaId &&
-      requirementMatchesOption(requirement, option),
+      requirement.focusAreaId === focusAreaId && requirementMatchesOption(requirement, option),
   );
 
   if (matching.length === 0) {
@@ -77,9 +83,10 @@ function buildDraft(
 
   return {
     everyDay: false,
-    values: Array.from({ length: 7 }, (_, index) => (
-      matching.find((requirement) => requirement.dayOfWeek === index)?.minStaff ?? 0
-    )),
+    values: Array.from(
+      { length: 7 },
+      (_, index) => matching.find((requirement) => requirement.dayOfWeek === index)?.minStaff ?? 0,
+    ),
   };
 }
 
@@ -90,17 +97,63 @@ function serializeDraft(draft: CoverageDraft): string {
   });
 }
 
-function summarizeDraft(draft: CoverageDraft): string {
+function serializeDrafts(drafts: Record<string, CoverageDraft>): string {
+  return Object.keys(drafts)
+    .sort()
+    .map((key) => `${key}=${serializeDraft(drafts[key])}`)
+    .join("|");
+}
+
+function CoveragePreview({ draft }: { draft: CoverageDraft }) {
+  const numberStyle: React.CSSProperties = {
+    color: "var(--color-text-primary)",
+    fontWeight: 700,
+    fontSize: "var(--dg-fs-body-sm)",
+    fontVariantNumeric: "tabular-nums",
+    lineHeight: 1,
+  };
+  const labelStyle: React.CSSProperties = {
+    color: "var(--color-text-muted)",
+    fontSize: "var(--dg-fs-caption)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    fontWeight: 600,
+  };
+  const emptyStyle: React.CSSProperties = {
+    color: "var(--color-text-faint)",
+    fontStyle: "italic",
+    fontSize: "var(--dg-fs-caption)",
+  };
+
   if (draft.everyDay) {
-    return draft.values[0] > 0 ? `Every day: ${draft.values[0]}` : "No requirement";
+    const value = draft.values[0] ?? 0;
+    if (value <= 0) return <span style={emptyStyle}>No requirement</span>;
+    return (
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+        <span style={labelStyle}>Every day</span>
+        <span style={numberStyle}>{value}</span>
+      </span>
+    );
   }
 
   const activeDays = draft.values
     .map((value, index) => ({ value, index }))
-    .filter((entry) => entry.value > 0)
-    .map((entry) => `${DAY_NAMES[entry.index]} ${entry.value}`);
+    .filter((entry) => entry.value > 0);
 
-  return activeDays.length > 0 ? activeDays.join(", ") : "No requirement";
+  if (activeDays.length === 0) return <span style={emptyStyle}>No requirement</span>;
+
+  return (
+    <span
+      style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px 12px", alignItems: "baseline" }}
+    >
+      {activeDays.map((entry) => (
+        <span key={entry.index} style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}>
+          <span style={labelStyle}>{DAY_NAMES[entry.index]}</span>
+          <span style={numberStyle}>{entry.value}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function getCoverageSectionKey(option: AssignableShiftOption): string {
@@ -139,7 +192,9 @@ function buildCoverageOptions(args: {
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
   const activeJobs = jobs.filter((job) => !job.archivedAt && !isRegularStaffSystemJob(job));
-  const focusAreaNameById = new Map(activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]));
+  const focusAreaNameById = new Map(
+    activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]),
+  );
   const options: AssignableShiftOption[] = [];
 
   for (const job of activeJobs) {
@@ -161,7 +216,8 @@ function buildCoverageOptions(args: {
           shiftId: shift.id,
           jobId: job.id,
           focusAreaId: shift.focusAreaId ?? null,
-          focusAreaName: shift.focusAreaId != null ? (focusAreaNameById.get(shift.focusAreaId) ?? null) : null,
+          focusAreaName:
+            shift.focusAreaId != null ? (focusAreaNameById.get(shift.focusAreaId) ?? null) : null,
           shiftName: shift.name,
           shiftAbbr: shift.abbr ?? null,
           jobName: job.name,
@@ -265,70 +321,26 @@ function compareCoverageOptionsByQualificationSeniority(
 }
 
 function CoverageOptionRow({
-  orgId,
-  focusAreaId,
   option,
-  requirements,
-  onSaved,
+  draft,
+  onDraftChange,
   canEdit,
+  isLast,
 }: {
-  orgId: string;
-  focusAreaId: number;
   option: AssignableShiftOption;
-  requirements: CoverageRequirement[];
-  onSaved: (saved: CoverageRequirement[], option: AssignableShiftOption) => void;
+  draft: CoverageDraft;
+  onDraftChange: (draft: CoverageDraft) => void;
   canEdit: boolean;
+  isLast?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [saving, setSaving] = useState(false);
   const panelId = React.useId();
-  const initialDraft = useMemo(
-    () => buildDraft(requirements, focusAreaId, option),
-    [focusAreaId, option, requirements],
-  );
-  const [draft, setDraft] = useState<CoverageDraft>(initialDraft);
-
-  React.useEffect(() => {
-    if (!expanded) {
-      setDraft(buildDraft(requirements, focusAreaId, option));
-    }
-  }, [expanded, focusAreaId, option, requirements]);
-
-  const isDirty = serializeDraft(draft) !== serializeDraft(initialDraft);
-  const handleClose = () => {
-    if (isDirty) {
-      setDraft(initialDraft);
-      return;
-    }
-    setExpanded(false);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const rows = draft.everyDay
-        ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0 }]
-        : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value }));
-      const saved = await saveCoverageRequirements(
-        orgId,
-        focusAreaId,
-        option.jobId,
-        option.shiftId ?? null,
-        rows,
-      );
-      onSaved(saved, option);
-      setExpanded(false);
-      toast.success("Coverage requirement saved");
-    } catch (error) {
-      Sentry.captureException(error);
-      toast.error("Failed to save coverage requirement");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
-    <div style={{ borderBottom: expanded ? "none" : "1px solid var(--color-border-light)" }}>
+    <div
+      className="dg-list-row"
+      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+    >
       <button
         type="button"
         className="dg-hover-row"
@@ -350,14 +362,27 @@ function CoverageOptionRow({
         onClick={() => setExpanded((previous) => !previous)}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             {getCoverageRowTitle(option)}
           </div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 3 }}>
-            {summarizeDraft(initialDraft)}
+          <div style={{ marginTop: 4 }}>
+            <CoveragePreview draft={draft} />
           </div>
         </div>
-        <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+        <span
+          style={{
+            fontSize: "var(--dg-fs-body-sm)",
+            color: "var(--color-text-faint)",
+            transform: expanded ? "rotate(180deg)" : "none",
+            transition: "transform 150ms ease",
+          }}
+        >
           ▾
         </span>
       </button>
@@ -378,22 +403,34 @@ function CoverageOptionRow({
           onClick={(event) => event.stopPropagation()}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={draft.everyDay}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    setDraft((previous) => ({
+                    onDraftChange({
                       everyDay: true,
-                      values: [previous.everyDay ? previous.values[0] ?? 0 : previous.values[1] ?? previous.values[0] ?? 0],
-                    }));
+                      values: [
+                        draft.everyDay
+                          ? (draft.values[0] ?? 0)
+                          : (draft.values[1] ?? draft.values[0] ?? 0),
+                      ],
+                    });
                     return;
                   }
-                  setDraft((previous) => ({
+                  onDraftChange({
                     everyDay: false,
-                    values: Array.from({ length: 7 }, () => previous.values[0] ?? 0),
-                  }));
+                    values: Array.from({ length: 7 }, () => draft.values[0] ?? 0),
+                  });
                 }}
                 disabled={!canEdit}
               />
@@ -403,7 +440,15 @@ function CoverageOptionRow({
 
           {draft.everyDay ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <label style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              <label
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 700,
+                  color: "var(--color-text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Minimum Staff
               </label>
               <input
@@ -411,16 +456,40 @@ function CoverageOptionRow({
                 min={0}
                 max={999}
                 value={draft.values[0] ?? 0}
-                onChange={(event) => setDraft({ everyDay: true, values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))] })}
-                style={{ width: 72, padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
+                onChange={(event) =>
+                  onDraftChange({
+                    everyDay: true,
+                    values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))],
+                  })
+                }
+                style={{
+                  width: 72,
+                  padding: "6px 8px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                  textAlign: "center",
+                }}
                 disabled={!canEdit}
               />
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+            <div
+              style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}
+            >
               {DAY_NAMES.map((day, index) => (
-                <label key={`${option.id}-${day}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <label
+                  key={`${option.id}-${day}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 700,
+                      color: "var(--color-text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
                     {day}
                   </span>
                   <input
@@ -430,30 +499,222 @@ function CoverageOptionRow({
                     value={draft.values[index] ?? 0}
                     onChange={(event) => {
                       const nextValues = [...draft.values];
-                      nextValues[index] = Math.max(0, Math.min(999, Number(event.target.value) || 0));
-                      setDraft({ everyDay: false, values: nextValues });
+                      nextValues[index] = Math.max(
+                        0,
+                        Math.min(999, Number(event.target.value) || 0),
+                      );
+                      onDraftChange({ everyDay: false, values: nextValues });
                     }}
-                    style={{ width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
+                    style={{
+                      width: "100%",
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      textAlign: "center",
+                    }}
                     disabled={!canEdit}
                   />
                 </label>
               ))}
             </div>
           )}
-
-          <EditorActionRow
-            secondaryAction={(
-              <button onClick={handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-                {getEditorDismissLabel(isDirty)}
-              </button>
-            )}
-            primaryAction={(
-              <button onClick={handleSave} disabled={saving || !canEdit || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
-                {getEditorSaveLabel(saving)}
-              </button>
-            )}
-          />
         </div>
+      )}
+    </div>
+  );
+}
+
+function FocusAreaCoverageCard({
+  orgId,
+  focusArea,
+  sections,
+  requirements,
+  canEdit,
+  onBatchSaved,
+}: {
+  orgId: string;
+  focusArea: FocusArea;
+  sections: CoverageOptionSection[];
+  requirements: CoverageRequirement[];
+  canEdit: boolean;
+  onBatchSaved: (
+    focusAreaId: number,
+    results: Array<{ option: AssignableShiftOption; saved: CoverageRequirement[] }>,
+  ) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  const initialDrafts = useMemo(() => {
+    const map: Record<string, CoverageDraft> = {};
+    for (const section of sections) {
+      for (const option of section.options) {
+        map[requirementKey(focusArea.id, option)] = buildDraft(requirements, focusArea.id, option);
+      }
+    }
+    return map;
+  }, [sections, requirements, focusArea.id]);
+  const initialKey = useMemo(() => serializeDrafts(initialDrafts), [initialDrafts]);
+
+  const [drafts, setDrafts] = useState<Record<string, CoverageDraft>>(initialDrafts);
+  const [baselineKey, setBaselineKey] = useState(initialKey);
+
+  // Sync drafts to the saved baseline when it changes (after a save, or an
+  // external update). Render-time adjustment per React guidance, not an effect.
+  if (initialKey !== baselineKey) {
+    setDrafts(initialDrafts);
+    setBaselineKey(initialKey);
+  }
+
+  const isDirty = serializeDrafts(drafts) !== initialKey;
+
+  const draftFor = (option: AssignableShiftOption): CoverageDraft =>
+    drafts[requirementKey(focusArea.id, option)] ??
+    initialDrafts[requirementKey(focusArea.id, option)];
+
+  const handleDiscard = () => setDrafts(initialDrafts);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const allOptions = sections.flatMap((section) => section.options);
+      const dirtyOptions = allOptions.filter((option) => {
+        const key = requirementKey(focusArea.id, option);
+        return serializeDraft(draftFor(option)) !== serializeDraft(initialDrafts[key]);
+      });
+
+      const results = await Promise.all(
+        dirtyOptions.map(async (option) => {
+          const draft = draftFor(option);
+          const rows = draft.everyDay
+            ? [{ dayOfWeek: null, minStaff: draft.values[0] ?? 0 }]
+            : draft.values.map((value, index) => ({ dayOfWeek: index, minStaff: value }));
+          const saved = await saveCoverageRequirements(
+            orgId,
+            focusArea.id,
+            option.jobId,
+            option.shiftId ?? null,
+            rows,
+          );
+          return { option, saved };
+        }),
+      );
+
+      onBatchSaved(focusArea.id, results);
+      toast.success(
+        results.length > 1 ? "Coverage requirements saved" : "Coverage requirement saved",
+      );
+    } catch (error) {
+      Sentry.captureException(error);
+      toast.error("Failed to save coverage requirements");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        background: "var(--color-surface)",
+        borderRadius: "var(--dg-radius-md)",
+        border: "1px solid var(--color-border)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid var(--color-border-light)",
+          fontWeight: 700,
+          fontSize: "var(--dg-fs-label)",
+          color: "var(--color-text-secondary)",
+        }}
+      >
+        {focusArea.name}
+      </div>
+
+      {sections.length === 0 ? (
+        <EmptyState
+          size="compact"
+          title="No coverage targets yet"
+          description="Create shifts or scheduled jobs that apply to this focus area before adding coverage."
+          style={{ margin: "12px 16px" }}
+        />
+      ) : (
+        <>
+          <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {sections.map((section) => (
+              <div
+                key={`${focusArea.id}-${section.key}`}
+                style={{
+                  border: "1px solid var(--color-border-light)",
+                  borderRadius: "var(--dg-radius-lg)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderBottom: "1px solid var(--color-border-light)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 700,
+                      color: "var(--color-text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {section.title}
+                  </div>
+                </div>
+                <div style={{ padding: "0 12px" }}>
+                  {section.options.map((option, optionIndex) => (
+                    <CoverageOptionRow
+                      key={`${focusArea.id}-${requirementKey(focusArea.id, option)}`}
+                      option={option}
+                      draft={draftFor(option)}
+                      onDraftChange={(next) =>
+                        setDrafts((previous) => ({
+                          ...previous,
+                          [requirementKey(focusArea.id, option)]: next,
+                        }))
+                      }
+                      canEdit={canEdit}
+                      isLast={optionIndex === section.options.length - 1}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}>
+            <EditorActionRow
+              secondaryAction={
+                isDirty ? (
+                  <button
+                    onClick={handleDiscard}
+                    disabled={saving}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                  >
+                    {EDITOR_ACTION_LABELS.discard}
+                  </button>
+                ) : null
+              }
+              primaryAction={
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !canEdit || !isDirty}
+                  className="dg-btn dg-btn-primary dg-btn-sm"
+                >
+                  {getEditorSaveLabel(saving)}
+                </button>
+              }
+            />
+          </div>
+        </>
       )}
     </div>
   );
@@ -484,14 +745,15 @@ export default function CoverageRequirementsSettings({
 }) {
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const assignableOptions = useMemo(
-    () => buildCoverageOptions({
-      shiftCategories,
-      jobs,
-      focusAreas,
-      orgRoles,
-      certifications,
-      shiftDisplayMode,
-    }),
+    () =>
+      buildCoverageOptions({
+        shiftCategories,
+        jobs,
+        focusAreas,
+        orgRoles,
+        certifications,
+        shiftDisplayMode,
+      }),
     [certifications, focusAreas, jobs, orgRoles, shiftCategories, shiftDisplayMode],
   );
   const coverageOptions = useMemo(
@@ -499,52 +761,32 @@ export default function CoverageRequirementsSettings({
     [assignableOptions],
   );
 
-  const optionsByFocusArea = useMemo(() => {
-    return new Map(
-      activeFocusAreas.map((focusArea) => {
-        const localOptions = coverageOptions.filter(
-          (option) => option.focusAreaId === focusArea.id,
-        );
-        return [focusArea.id, localOptions];
-      }),
-    );
-  }, [activeFocusAreas, coverageOptions]);
-
-  if (activeFocusAreas.length === 0 || coverageOptions.length === 0) {
-    return (
-      <EmptyState
-        compact
-        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
-        description={activeFocusAreas.length === 0
-          ? "Create focus areas first to configure coverage."
-          : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."}
-      />
-    );
-  }
-
   const sectionsByFocusArea = useMemo(() => {
     return new Map(
       activeFocusAreas.map((focusArea) => {
         const localOptions = coverageOptions.filter(
           (option) => option.focusAreaId === focusArea.id,
         );
-        const sections = localOptions.reduce<Map<string, CoverageOptionSection>>((accumulator, option) => {
-          const key = getCoverageSectionKey(option);
-          const existing = accumulator.get(key);
-          if (existing) {
-            existing.options.push(option);
-            return accumulator;
-          }
+        const sections = localOptions.reduce<Map<string, CoverageOptionSection>>(
+          (accumulator, option) => {
+            const key = getCoverageSectionKey(option);
+            const existing = accumulator.get(key);
+            if (existing) {
+              existing.options.push(option);
+              return accumulator;
+            }
 
-          accumulator.set(key, {
-            key,
-            title: getCoverageSectionTitle(option),
-            options: [option],
-            sortOrder: option.groupSortOrder,
-            isShiftless: option.isShiftless,
-          });
-          return accumulator;
-        }, new Map());
+            accumulator.set(key, {
+              key,
+              title: getCoverageSectionTitle(option),
+              options: [option],
+              sortOrder: option.groupSortOrder,
+              isShiftless: option.isShiftless,
+            });
+            return accumulator;
+          },
+          new Map(),
+        );
 
         return [
           focusArea.id,
@@ -564,65 +806,51 @@ export default function CoverageRequirementsSettings({
     );
   }, [activeFocusAreas, coverageOptions]);
 
-  const handleSaved = (saved: CoverageRequirement[], option: AssignableShiftOption, focusAreaId: number) => {
-    const updated = coverageRequirements.filter(
-      (requirement) =>
-        !(
-          requirement.focusAreaId === focusAreaId &&
-          requirementMatchesOption(requirement, option)
-        ),
-    );
-    onCoverageRequirementsChange([...updated, ...saved]);
+  const handleBatchSaved = (
+    focusAreaId: number,
+    results: Array<{ option: AssignableShiftOption; saved: CoverageRequirement[] }>,
+  ) => {
+    if (results.length === 0) return;
+    let updated = coverageRequirements;
+    for (const { option } of results) {
+      updated = updated.filter(
+        (requirement) =>
+          !(
+            requirement.focusAreaId === focusAreaId && requirementMatchesOption(requirement, option)
+          ),
+      );
+    }
+    const added = results.flatMap((result) => result.saved);
+    onCoverageRequirementsChange([...updated, ...added]);
   };
+
+  if (activeFocusAreas.length === 0 || coverageOptions.length === 0) {
+    return (
+      <EmptyState
+        size="compact"
+        title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
+        description={
+          activeFocusAreas.length === 0
+            ? "Create focus areas first to configure coverage."
+            : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."
+        }
+      />
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {activeFocusAreas.map((focusArea) => {
-        const localOptions = optionsByFocusArea.get(focusArea.id) ?? [];
-        const sections = sectionsByFocusArea.get(focusArea.id) ?? [];
-
-        return (
-          <div key={focusArea.id} style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
-            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
-              {focusArea.name}
-            </div>
-
-            {localOptions.length === 0 ? (
-              <EmptyState
-                compact
-                title="No coverage targets yet"
-                description="Create shifts or scheduled jobs that apply to this focus area before adding coverage."
-                style={{ margin: "12px 16px" }}
-              />
-            ) : (
-              <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-                {sections.map((section) => (
-                  <div key={`${focusArea.id}-${section.key}`} style={{ border: "1px solid var(--color-border-light)", borderRadius: "var(--dg-radius-lg)", overflow: "hidden" }}>
-                    <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-border-light)" }}>
-                      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        {section.title}
-                      </div>
-                    </div>
-                    <div style={{ padding: "0 12px" }}>
-                      {section.options.map((option) => (
-                        <CoverageOptionRow
-                          key={`${focusArea.id}-${requirementKey(focusArea.id, option)}`}
-                          orgId={orgId}
-                          focusAreaId={focusArea.id}
-                          option={option}
-                          requirements={coverageRequirements}
-                          onSaved={(saved, savedOption) => handleSaved(saved, savedOption, focusArea.id)}
-                          canEdit={canEdit}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {activeFocusAreas.map((focusArea) => (
+        <FocusAreaCoverageCard
+          key={focusArea.id}
+          orgId={orgId}
+          focusArea={focusArea}
+          sections={sectionsByFocusArea.get(focusArea.id) ?? []}
+          requirements={coverageRequirements}
+          canEdit={canEdit}
+          onBatchSaved={handleBatchSaved}
+        />
+      ))}
     </div>
   );
 }

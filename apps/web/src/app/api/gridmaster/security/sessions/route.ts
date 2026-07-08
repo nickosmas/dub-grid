@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { OrganizationRole, PlatformRole } from "@dubgrid/domain";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { USER_SESSION_ACTIVE_WINDOW_MS } from "@/features/account/server";
-import type {
-  GridmasterUserSession,
-  GridmasterUserSessionOrg,
-} from "@/types";
+import type { GridmasterUserSession, GridmasterUserSessionOrg } from "@/types";
 
 type Row = Record<string, unknown>;
 
@@ -48,21 +42,24 @@ export async function GET(req: NextRequest) {
       membershipsResult,
       orgsResult,
       profilesResult,
-    ] =
-      await Promise.all([
-        requestClient.rpc("get_all_users_with_profiles"),
-        requestClient.rpc("get_gridmaster_accounts"),
-        serviceClient
-          .from("user_sessions")
-          .select(SESSION_SELECT)
-          .order("last_active_at", { ascending: false }),
-        serviceClient
-          .from("organization_memberships")
-          .select(MEMBERSHIP_SELECT)
-          .is("archived_at", null),
-        serviceClient.from("organizations").select(ORG_SELECT),
-        serviceClient.from("profiles").select(PROFILE_SELECT),
-      ]);
+    ] = await Promise.all([
+      requestClient.rpc("get_all_users_with_profiles"),
+      requestClient.rpc("get_gridmaster_accounts"),
+      serviceClient
+        .from("user_sessions")
+        .select(SESSION_SELECT)
+        // Skip transient rows inserted by the JWT hook / switch_org before
+        // track-session fills in device + org. Matches the filter used by
+        // fetchUserSessions and fetchUserSessionsForUser.
+        .not("refresh_token_hash", "is", null)
+        .order("last_active_at", { ascending: false }),
+      serviceClient
+        .from("organization_memberships")
+        .select(MEMBERSHIP_SELECT)
+        .is("archived_at", null),
+      serviceClient.from("organizations").select(ORG_SELECT),
+      serviceClient.from("profiles").select(PROFILE_SELECT),
+    ]);
 
     for (const result of [
       usersResult,
@@ -88,19 +85,12 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({
-      sessions: sessions.filter(
-        (session) => session.userPlatformRole !== "gridmaster",
-      ),
-      gridmasterSessions: sessions.filter(
-        (session) => session.userPlatformRole === "gridmaster",
-      ),
+      sessions: sessions.filter((session) => session.userPlatformRole !== "gridmaster"),
+      gridmasterSessions: sessions.filter((session) => session.userPlatformRole === "gridmaster"),
     });
   } catch (error) {
     console.error("gridmaster security sessions GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load sessions" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });
   }
 }
 
@@ -209,10 +199,7 @@ function getSessionOrg(
   };
 }
 
-function getSessionStatus(
-  lastActiveAt: string,
-  nowMs: number,
-): GridmasterUserSession["status"] {
+function getSessionStatus(lastActiveAt: string, nowMs: number): GridmasterUserSession["status"] {
   const lastActiveMs = Date.parse(lastActiveAt);
   if (!Number.isFinite(lastActiveMs)) {
     return "stale";
@@ -232,29 +219,18 @@ function stringOrNull(value: unknown): string | null {
 }
 
 function fullName(firstName: unknown, lastName: unknown): string | null {
-  const name = [stringOrNull(firstName), stringOrNull(lastName)]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const name = [stringOrNull(firstName), stringOrNull(lastName)].filter(Boolean).join(" ").trim();
   return name || null;
 }
 
-function userSessionPlatformOrNull(
-  value: unknown,
-): GridmasterUserSession["platform"] {
-  return value === "web" || value === "ios" || value === "android"
-    ? value
-    : null;
+function userSessionPlatformOrNull(value: unknown): GridmasterUserSession["platform"] {
+  return value === "web" || value === "ios" || value === "android" ? value : null;
 }
 
 function organizationRoleOrNull(value: unknown): OrganizationRole | null {
-  return typeof value === "string" && value.trim()
-    ? (value as OrganizationRole)
-    : null;
+  return typeof value === "string" && value.trim() ? (value as OrganizationRole) : null;
 }
 
 function platformRoleOrNull(value: unknown): PlatformRole | null {
-  return typeof value === "string" && value.trim()
-    ? (value as PlatformRole)
-    : null;
+  return typeof value === "string" && value.trim() ? (value as PlatformRole) : null;
 }

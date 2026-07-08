@@ -1,8 +1,9 @@
 import React from "react";
+import Link from "next/link";
 import type { SectionCoverage } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 const STATUS_COLORS = {
   green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
@@ -22,6 +23,7 @@ interface CoverageBySectionCardProps {
   focusAreaLabel: string;
   isMobile: boolean;
   hasRequirements: boolean;
+  canManageCoverageRequirements?: boolean;
   publishedWindowState?: PublishedWindowState;
   periodLabel?: string;
   onExpand?: () => void;
@@ -32,6 +34,7 @@ export default function CoverageBySectionCard({
   focusAreaLabel,
   isMobile,
   hasRequirements,
+  canManageCoverageRequirements = false,
   publishedWindowState = "published",
   periodLabel = "this week",
   onExpand,
@@ -56,8 +59,8 @@ export default function CoverageBySectionCard({
           </div>
         </div>
         <div className="dg-card-body">
-          <DashboardEmptyState
-            variant="inline"
+          <EmptyState
+            size="inline"
             title={
               !hasRequirements
                 ? undefined
@@ -75,6 +78,16 @@ export default function CoverageBySectionCard({
                   : isPartial
                     ? "Coverage is only shown for dates that have been published."
                     : undefined
+            }
+            action={
+              !hasRequirements && canManageCoverageRequirements ? (
+                <Link
+                  href="/settings?section=schedule-coverage"
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                >
+                  Configure coverage
+                </Link>
+              ) : undefined
             }
           />
         </div>
@@ -111,8 +124,16 @@ export default function CoverageBySectionCard({
                   border: "1px solid var(--color-border)",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <span
+                    style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)" }}
+                  >
                     {sec.focusAreaName}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -124,7 +145,14 @@ export default function CoverageBySectionCard({
                     </span>
                   </div>
                 </div>
-                <div style={{ height: 6, background: "var(--color-border)", borderRadius: 3, overflow: "hidden" }}>
+                <div
+                  style={{
+                    height: 6,
+                    background: "var(--color-border)",
+                    borderRadius: 3,
+                    overflow: "hidden",
+                  }}
+                >
                   <div
                     style={{
                       height: 6,
@@ -218,10 +246,10 @@ export default function CoverageBySectionCard({
                           justifyContent: "center",
                           fontSize: 10,
                           fontWeight: 600,
-                        background: colors.bg,
-                        color: colors.text,
-                        cursor: "default",
-                      }}
+                          background: colors.bg,
+                          color: colors.text,
+                          cursor: "default",
+                        }}
                         aria-label={ariaLabel}
                       >
                         {cellLabel}

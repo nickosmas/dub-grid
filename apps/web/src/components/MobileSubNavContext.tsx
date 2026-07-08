@@ -26,9 +26,7 @@ export function MobileSubNavProvider({ children }: { children: React.ReactNode }
   const [items, setItems] = useState<SubNavItem[]>([]);
   const contextValue = useMemo(() => ({ items, setItems }), [items]);
   return (
-    <MobileSubNavContext.Provider value={contextValue}>
-      {children}
-    </MobileSubNavContext.Provider>
+    <MobileSubNavContext.Provider value={contextValue}>{children}</MobileSubNavContext.Provider>
   );
 }
 

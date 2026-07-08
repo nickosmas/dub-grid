@@ -9,6 +9,7 @@ vi.mock("@/features/mobile/server", () => ({
 function createEmployeeRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "00000000-0000-0000-0000-000000000001",
+    employee_number: 1042,
     first_name: "Mina",
     last_name: "Diaz",
     status: "active",
@@ -46,7 +47,7 @@ describe("mobile people status route", () => {
     const response = await PATCH(
       {
         json: async () => ({
-          action: "bench",
+          action: "deactivate",
           expectedVersion: 7,
         }),
       } as never,
@@ -64,12 +65,10 @@ describe("mobile people status route", () => {
   });
 
   it("updates employee status for authorized mobile managers", async () => {
-    const selectSingle = vi
-      .fn()
-      .mockResolvedValueOnce({ data: createEmployeeRow(), error: null });
+    const selectSingle = vi.fn().mockResolvedValueOnce({ data: createEmployeeRow(), error: null });
     const updateMaybeSingle = vi.fn().mockResolvedValue({
       data: createEmployeeRow({
-        status: "benched",
+        status: "inactive",
         status_note: "Coverage hold",
         status_changed_at: "2026-04-24T12:00:00.000Z",
         version: 8,
@@ -132,7 +131,7 @@ describe("mobile people status route", () => {
       {
         headers: new Headers(),
         json: async () => ({
-          action: "bench",
+          action: "deactivate",
           expectedVersion: 7,
           note: "Coverage hold",
         }),
@@ -150,12 +149,14 @@ describe("mobile people status route", () => {
       success: true,
       person: {
         id: "00000000-0000-0000-0000-000000000001",
+        employeeNumber: 1042,
         firstName: "Mina",
         lastName: "Diaz",
         employmentType: "full_time",
         phone: "555-0100",
         email: "mina@dubgrid.com",
-        status: "benched",
+        status: "inactive",
+        orgRole: null,
         certificationId: null,
         roleIds: [3],
         seniority: 1,

@@ -6,8 +6,7 @@ const createRequestSupabaseClient = vi.fn();
 const getServiceClient = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  createRequestSupabaseClient: (req: NextRequest) =>
-    createRequestSupabaseClient(req),
+  createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
 
@@ -129,12 +128,8 @@ function createServiceClientMock(rows: MockAccessRow) {
               error: null,
             }),
             then<TResult1 = unknown, TResult2 = never>(
-              onfulfilled?:
-                | ((value: unknown) => TResult1 | PromiseLike<TResult1>)
-                | null,
-              onrejected?:
-                | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-                | null,
+              onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+              onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
             ) {
               return Promise.resolve({
                 data: getListData(table),
@@ -191,7 +186,7 @@ describe("requireOrgPermissions", () => {
       expect(result.response.status).toBe(403);
       await expect(result.response.json()).resolves.toEqual({
         error:
-          "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+          "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
       });
     }
   });
@@ -303,7 +298,7 @@ describe("requireOrgPermissions", () => {
       expect(result.response.status).toBe(403);
       await expect(result.response.json()).resolves.toEqual({
         error:
-          "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.",
+          "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
       });
     }
   });
@@ -354,7 +349,7 @@ describe("requireOrgPermissions", () => {
       makeRequest(),
       "11111111-1111-4111-8111-111111111111",
       () => true,
-      { allowDuringSetup: true, allowLockedWorkspace: true },
+      { allowDuringSetup: true, allowLockedOrganization: true },
     );
 
     expect("response" in result).toBe(false);

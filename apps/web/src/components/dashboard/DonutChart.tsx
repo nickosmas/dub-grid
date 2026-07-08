@@ -27,7 +27,10 @@ export default function DonutChart({
 
   const arcs = segments
     .filter((s) => s.value > 0)
-    .reduce<{ items: { key: string; color: string; dashArray: string; dashOffset: number }[]; offset: number }>(
+    .reduce<{
+      items: { key: string; color: string; dashArray: string; dashOffset: number }[];
+      offset: number;
+    }>(
       (acc, seg, i) => {
         const pct = total > 0 ? seg.value / total : 0;
         const dash = pct * circumference;
@@ -92,13 +95,7 @@ export default function DonutChart({
         </text>
       )}
       {centerSubLabel && (
-        <text
-          x={cx}
-          y={cy + 12}
-          textAnchor="middle"
-          fontSize={9}
-          fill="var(--color-text-subtle)"
-        >
+        <text x={cx} y={cy + 12} textAnchor="middle" fontSize={9} fill="var(--color-text-subtle)">
           {centerSubLabel}
         </text>
       )}

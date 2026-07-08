@@ -53,9 +53,7 @@ const bodySchema = z.discriminatedUnion("action", [
 ]);
 
 function defaultTrialEndFrom(date: Date): string {
-  return new Date(
-    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
-  ).toISOString();
+  return new Date(date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000).toISOString();
 }
 
 export async function POST(req: NextRequest) {
@@ -68,7 +66,11 @@ export async function POST(req: NextRequest) {
 
   // Input
   let body: unknown;
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
@@ -80,10 +82,7 @@ export async function POST(req: NextRequest) {
     `gridmaster-subscription:${user.id}:${orgId}`,
   );
   if (misconfigured) {
-    return NextResponse.json(
-      { error: "Service temporarily unavailable" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -109,14 +108,37 @@ export async function POST(req: NextRequest) {
 
     if (action === "extend_trial") {
       const days = parsed.data.trialDays ?? 14;
+      // If extending starts a pending trial (no start recorded yet), stamp the
+      // start now; otherwise preserve the existing start so the column stays
+      // consistent with trial_ends_at. See trial activation in 002 migrations.
+      const { data: orgRow } = await admin
+        .from("organizations")
+        .select("trial_started_at")
+        .eq("id", orgId)
+        .single();
+      const startedAt = orgRow?.trial_started_at ?? new Date().toISOString();
       if (!sub?.stripe_subscription_id) {
         // No Stripe subscription — just update trial_ends_at on the org
         const newEnd = new Date(Date.now() + days * 86400000).toISOString();
-        await admin.from("organizations").update({ trial_ends_at: newEnd, subscription_status: "trialing" }).eq("id", orgId);
+        await admin
+          .from("organizations")
+          .update({
+            trial_started_at: startedAt,
+            trial_ends_at: newEnd,
+            subscription_status: "trialing",
+          })
+          .eq("id", orgId);
       } else {
         const newEnd = new Date(Date.now() + days * 86400000);
         await extendTrial(sub.stripe_subscription_id, newEnd);
-        await admin.from("organizations").update({ trial_ends_at: newEnd.toISOString(), subscription_status: "trialing" }).eq("id", orgId);
+        await admin
+          .from("organizations")
+          .update({
+            trial_started_at: startedAt,
+            trial_ends_at: newEnd.toISOString(),
+            subscription_status: "trialing",
+          })
+          .eq("id", orgId);
       }
       await writeGridmasterAuditLog({
         serviceClient: admin,
@@ -150,10 +172,7 @@ export async function POST(req: NextRequest) {
 
     if (action === "cancel_at_period_end") {
       if (!sub?.stripe_subscription_id) {
-        return NextResponse.json(
-          { error: "Stripe subscription required" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Stripe subscription required" }, { status: 400 });
       }
       const scheduledSubscription = await scheduleSubscriptionCancellation(
         sub.stripe_subscription_id,
@@ -200,10 +219,7 @@ export async function POST(req: NextRequest) {
 
     if (action === "sync_seats") {
       if (!sub?.stripe_subscription_id) {
-        return NextResponse.json(
-          { error: "Stripe subscription required" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Stripe subscription required" }, { status: 400 });
       }
       const seats = Math.max(await countBillableAppUsers(admin, orgId), 1);
       await syncSubscriptionSeats(sub.stripe_subscription_id, seats);
@@ -211,10 +227,7 @@ export async function POST(req: NextRequest) {
         .from("subscriptions")
         .update({ quantity: seats, updated_at: new Date().toISOString() })
         .eq("org_id", orgId);
-      await admin
-        .from("organizations")
-        .update({ subscription_seats: seats })
-        .eq("id", orgId);
+      await admin.from("organizations").update({ subscription_seats: seats }).eq("id", orgId);
       await writeGridmasterAuditLog({
         serviceClient: admin,
         actor: user,
@@ -234,9 +247,7 @@ export async function POST(req: NextRequest) {
         .from("organizations")
         .update({
           subscription_status: status,
-          ...(status === "trialing"
-            ? { trial_ends_at: defaultTrialEndFrom(new Date()) }
-            : {}),
+          ...(status === "trialing" ? { trial_ends_at: defaultTrialEndFrom(new Date()) } : {}),
         })
         .eq("id", orgId);
       await writeGridmasterAuditLog({

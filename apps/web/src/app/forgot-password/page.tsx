@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { PublicRoute } from "@/components/RouteGuards";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import Link from "next/link";
-import { Mail } from "lucide-react";
 import { resetBrowserPasswordForEmail } from "@/features/account/client";
 
 function ForgotPasswordContent() {
@@ -30,7 +30,7 @@ function ForgotPasswordContent() {
       if (msg.includes("rate") || msg.includes("limit")) {
         toast.error("Too many requests. Please wait a few minutes and try again.");
       } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network error — please check your connection.");
+        toast.error("Network error. Check your connection and try again.");
       } else {
         // Always show success to prevent email enumeration
         setSent(true);
@@ -50,64 +50,20 @@ function ForgotPasswordContent() {
         </div>
 
         {sent ? (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "var(--color-brand-bg)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Mail size={28} color="var(--color-brand)" />
-              </div>
-            </div>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "12px" }}
-            >
-              Check Your Email
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body)",
-                color: "var(--color-text-muted)",
-                lineHeight: 1.6,
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
-              If an account exists for <strong>{email}</strong>, we&apos;ve sent
-              a password reset link. Check your inbox and spam folder.
-            </p>
-            <Link
-              href="/login"
-              className="dg-auth-link"
-              style={{
-                display: "block",
-                textAlign: "center",
-                color: "var(--color-text-subtle)",
-              }}
-            >
-              Back to login
-            </Link>
-          </>
+          <AuthStateCard
+            icon="mail"
+            heading="Check your email"
+            message={
+              <>
+                If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset
+                link. Check your inbox and spam folder.
+              </>
+            }
+            secondaryCta={{ label: "Back to login", href: "/login" }}
+          />
         ) : (
           <>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "8px" }}
-            >
+            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
               Forgot Password
             </h1>
             <p
@@ -119,8 +75,7 @@ function ForgotPasswordContent() {
                 marginBottom: "24px",
               }}
             >
-              Enter your email address and we&apos;ll send you a link to reset
-              your password.
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
 
             <form
@@ -132,16 +87,17 @@ function ForgotPasswordContent() {
               }}
             >
               <div>
-                <label className="dg-auth-field-label">
+                <label htmlFor="forgot-email" className="dg-auth-field-label">
                   Email
                 </label>
                 <input
+                  id="forgot-email"
                   type="email"
                   required
                   autoComplete="email"
                   autoFocus
                   disabled={loading}
-                  className="dg-auth-input dg-standalone-input"
+                  className="dg-auth-input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"

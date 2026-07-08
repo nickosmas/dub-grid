@@ -4,13 +4,13 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
-import { draftBreakdownsEqual } from "@/lib/draft-utils";
 import {
   fetchScheduleDraftBreakdown,
   publishScheduleDirect,
 } from "@/lib/server/schedule-draft-safety";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +18,6 @@ const bodySchema = z.object({
   orgId: z.string().uuid(),
   startDate: z.string(),
   endDate: z.string(),
-  expectedSummary: z.object({
-    newShifts: z.number().int().nonnegative(),
-    modifiedShifts: z.number().int().nonnegative(),
-    deletedShifts: z.number().int().nonnegative(),
-    newNotes: z.number().int().nonnegative(),
-    deletedNotes: z.number().int().nonnegative(),
-    totalChanges: z.number().int().nonnegative(),
-  }).optional(),
 });
 
 /**
@@ -59,15 +51,15 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { orgId, startDate, endDate, expectedSummary } = parsed.data;
+  const { orgId, startDate, endDate } = parsed.data;
 
   try {
     // ── Permission check ──────────────────────────────────────────────
@@ -75,32 +67,22 @@ export async function POST(req: NextRequest) {
       req,
       orgId,
       (permissions) =>
-        permissions.isGridmaster ||
-        permissions.isSuperAdmin ||
-        permissions.canPublishSchedule,
+        permissions.isGridmaster || permissions.isSuperAdmin || permissions.canPublishSchedule,
     );
     if ("response" in orgAuth) {
       return orgAuth.response;
     }
     const serviceClient = orgAuth.serviceClient;
 
-    const latestSummary = await fetchScheduleDraftBreakdown({
+    // Snapshot the breakdown about to be published, for the audit log + client
+    // response. Must read BEFORE publishScheduleDirect: that RPC consumes the
+    // draft snapshots, so a post-publish read would show ~zero changes.
+    const publishedSummary = await fetchScheduleDraftBreakdown({
       orgId,
       startDate,
       endDate,
       serviceClient,
     });
-
-    if (expectedSummary && !draftBreakdownsEqual(expectedSummary, latestSummary)) {
-      return NextResponse.json(
-        {
-          error: "Schedule drafts changed elsewhere. Review the latest summary and try again.",
-          code: "SCHEDULE_DRAFT_CONFLICT",
-          summary: latestSummary,
-        },
-        { status: 409 },
-      );
-    }
 
     // ── Execute publish ─────────────────────────────────────────────
     await publishScheduleDirect({
@@ -121,11 +103,11 @@ export async function POST(req: NextRequest) {
       details: {
         startDate,
         endDate,
-        summary: latestSummary,
+        summary: publishedSummary,
       },
     });
 
-    return NextResponse.json({ success: true, summary: latestSummary });
+    return NextResponse.json({ success: true, summary: publishedSummary });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "shifts/publish", orgId } });
     logger.error({ error: err, orgId }, "Schedule publish failed");

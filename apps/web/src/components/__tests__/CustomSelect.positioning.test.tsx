@@ -13,11 +13,7 @@ vi.mock("@/components/ui/popover", () => ({
     return (
       <div
         role={typeof props.role === "string" ? props.role : undefined}
-        aria-label={
-          typeof props["aria-label"] === "string"
-            ? props["aria-label"]
-            : undefined
-        }
+        aria-label={typeof props["aria-label"] === "string" ? props["aria-label"] : undefined}
       >
         {props.children}
       </div>
@@ -55,8 +51,7 @@ describe("CustomSelect positioning", () => {
         align: "start",
         positionMethod: "fixed",
         style: expect.objectContaining({
-          maxHeight:
-            "min(420px, var(--available-height, calc(100vh - 24px)))",
+          maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
           overscrollBehavior: "contain",
         }),
       }),

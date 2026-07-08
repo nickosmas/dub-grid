@@ -19,8 +19,7 @@ export function StaffDetailHeader({
   onToggleEditDetails,
 }: StaffDetailHeaderProps) {
   const displayName = getEmployeeDisplayName(employee);
-  const employmentLabel =
-    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
 
   const statusConfig = {
     active: {
@@ -31,16 +30,16 @@ export function StaffDetailHeader({
         borderColor: "var(--color-success-border)",
       },
     },
-    benched: {
-      label: "Benched",
+    inactive: {
+      label: "Inactive",
       style: {
         background: "var(--color-warning-bg)",
         color: "var(--color-warning-text)",
         borderColor: "var(--color-warning-border)",
       },
     },
-    terminated: {
-      label: "Terminated",
+    removed: {
+      label: "Removed",
       style: {
         background: "var(--color-danger-bg)",
         color: "var(--color-danger-text)",
@@ -62,15 +61,23 @@ export function StaffDetailHeader({
               </Avatar>
 
               <div className="min-w-0">
-                <Badge
-                  variant="outline"
-                  className="px-2 font-semibold"
-                  style={statusConfig.style}
-                >
-                  {statusConfig.label}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="px-2 font-semibold"
+                    style={statusConfig.style}
+                  >
+                    {statusConfig.label}
+                  </Badge>
+                  <span
+                    className="font-mono text-[13px] font-medium text-[var(--color-text-faint)]"
+                    aria-label="Employee ID"
+                  >
+                    #{employee.employeeNumber}
+                  </span>
+                </div>
 
-                <h1 className="mt-3 text-[28px] font-bold tracking-tight text-[var(--color-text-primary)]">
+                <h1 className="mt-3 text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
                   {displayName}
                 </h1>
               </div>
@@ -91,7 +98,7 @@ export function StaffDetailHeader({
             <BioField label="Email" value={employee.email || "—"} />
             <BioField label="Phone" value={employee.phone || "—"} />
             <BioField label="Employment" value={employmentLabel} />
-            <BioField label="Seniority" value={`#${employee.seniority}`} />
+            <BioField label="Employee ID" value={`#${employee.employeeNumber}`} />
           </div>
         </div>
       </div>

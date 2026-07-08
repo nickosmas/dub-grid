@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const actorNamesSchema = z.object({
   orgId: z.string().uuid(),
@@ -31,6 +33,9 @@ async function ensureViewerCanAccessOrg(orgId: string, userId: string): Promise<
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) {
@@ -41,18 +46,18 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = actorNamesSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     if (auth.claims.platform_role !== "gridmaster") {
       const hasAccess = await ensureViewerCanAccessOrg(parsed.data.orgId, auth.user.id);
       if (!hasAccess) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+        return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
       }
     }
 
@@ -106,9 +111,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ names });
   } catch (error) {
     console.error("schedule actor names POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to load schedule actor names" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load schedule actor names" }, { status: 500 });
   }
 }

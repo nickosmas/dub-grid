@@ -22,6 +22,9 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +32,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - run: npx turbo run lint
+      - run: npx prettier --check .
 
   type-check:
     name: Type Check
@@ -60,6 +64,58 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test
+
+  mobile-verify:
+    name: Mobile Verify
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx turbo run type-check --filter=@dubgrid/mobile
+      - run: npx turbo run test --filter=@dubgrid/mobile --filter=@dubgrid/schedule-core --filter=@dubgrid/contracts
+
+  integration-test:
+    name: Integration Tests (live DB)
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      # Well-known Supabase CLI local dev keys (deterministic, not secrets).
+      # See: https://supabase.com/docs/guides/local-development
+      LOCAL_SUPABASE_URL: http://127.0.0.1:54321
+      LOCAL_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      LOCAL_SUPABASE_DB_URL: postgres://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Seed database
+        run: npx tsx seed.ts
+        env:
+          FORCE_LOCAL_DB: "1"
+
+      - name: Run integration tests
+        working-directory: apps/web
+        run: npx vitest run --config vitest.config.mts integration.test.ts
 
   build:
     name: Build

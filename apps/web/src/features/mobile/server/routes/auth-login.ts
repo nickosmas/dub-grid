@@ -1,14 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  mobileAuthLoginBodySchema,
-  mobileAuthLoginResponseSchema,
-} from "@dubgrid/contracts";
+import { mobileAuthLoginBodySchema, mobileAuthLoginResponseSchema } from "@dubgrid/contracts";
 import {
   createMobileEphemeralAuthClient,
-  isValidMobileWorkspaceSlug,
+  isValidMobileOrgSlug,
   loginMobileUser,
   MobileApiRequestError,
-  normalizeMobileWorkspaceSlug,
+  normalizeMobileOrgSlug,
 } from "@dubgrid/mobile-api-core";
 import { checkRateLimit, loginLimiter } from "@/lib/rate-limit";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -18,10 +15,7 @@ import { createMobileOptionsHandler, withMobileCors } from "./cors";
 
 async function hashEmail(email: string): Promise<string> {
   const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode(email.toLowerCase()),
-  );
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(email.toLowerCase()));
 
   return Array.from(new Uint8Array(hashBuffer))
     .map((value) => value.toString(16).padStart(2, "0"))
@@ -41,23 +35,15 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return json(
-      { error: "We couldn't read that sign-in request. Try again." },
-      { status: 400 },
-    );
+    return json({ error: "We couldn't read that sign-in request. Try again." }, { status: 400 });
   }
 
   const parsed = mobileAuthLoginBodySchema.safeParse(body);
-  const normalizedWorkspaceSlug = parsed.success
-    ? normalizeMobileWorkspaceSlug(parsed.data.workspaceSlug)
-    : "";
+  const normalizedOrgSlug = parsed.success ? normalizeMobileOrgSlug(parsed.data.orgSlug) : "";
 
-  if (
-    !parsed.success ||
-    !isValidMobileWorkspaceSlug(normalizedWorkspaceSlug, RESERVED_SUBDOMAINS)
-  ) {
+  if (!parsed.success || !isValidMobileOrgSlug(normalizedOrgSlug, RESERVED_SUBDOMAINS)) {
     return json(
-      { error: "Enter a valid workspace slug, email, and password." },
+      { error: "Enter a valid organization slug, email, and password." },
       { status: 400 },
     );
   }
@@ -69,10 +55,7 @@ export async function POST(req: NextRequest) {
   );
 
   if (misconfigured) {
-    return json(
-      { error: "Service temporarily unavailable" },
-      { status: 503 },
-    );
+    return json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
 
   if (limited) {
@@ -90,10 +73,7 @@ export async function POST(req: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) {
-    return json(
-      { error: "Server misconfigured" },
-      { status: 500 },
-    );
+    return json({ error: "Server misconfigured" }, { status: 500 });
   }
 
   const sessionClient = createMobileEphemeralAuthClient(supabaseUrl, anonKey);
@@ -101,21 +81,21 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await loginMobileUser(serviceClient, sessionClient, {
       ...parsed.data,
-      workspaceSlug: normalizedWorkspaceSlug,
+      orgSlug: normalizedOrgSlug,
     });
 
     return json(mobileAuthLoginResponseSchema.parse(payload));
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
       return json(
-        { error: formatClientErrorMessage(error, "We could not finish signing you in right now.") },
+        {
+          error: formatClientErrorMessage(error, "We could not finish signing you in right now."),
+          ...(error.code ? { code: error.code } : {}),
+        },
         { status: error.status },
       );
     }
 
-    return json(
-      { error: "We could not finish signing you in right now." },
-      { status: 503 },
-    );
+    return json({ error: "We could not finish signing you in right now." }, { status: 503 });
   }
 }

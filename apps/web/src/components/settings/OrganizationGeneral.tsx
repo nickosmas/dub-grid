@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Organization } from "@/types";
 import {
   OrganizationSettingsConflictError,
@@ -9,7 +9,8 @@ import {
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE, useEmployeeCount } from "@/hooks";
-import { labelStyle } from "./shared";
+import { SectionCard, labelStyle } from "./shared";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
 import {
@@ -26,6 +27,7 @@ import {
   getOptionalUsPhoneFieldError,
   normalizeLineText,
 } from "@/lib/form-validation";
+import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationGeneral({
   organization,
@@ -34,6 +36,7 @@ export default function OrganizationGeneral({
   organization: Organization;
   onSave: (o: Organization) => void;
 }) {
+  const isWizardMode = useWizardMode();
   const isMobile = useMediaQuery(MOBILE);
   const { employeeCount, loading: employeeCountLoading } = useEmployeeCount(organization.id);
   const buildForm = useCallback(
@@ -92,14 +95,25 @@ export default function OrganizationGeneral({
   // Warn before navigating away with unsaved changes
   useEffect(() => {
     if (!isModified) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isModified]);
 
+  // Tracks whether the most recent handleSave call completed successfully.
+  // Wizard mode reads this after `save()` returns to decide whether to advance.
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = useCallback(async () => {
-    if (nameError || phoneError) return;
+    lastSaveErrorRef.current = null;
+    if (nameError || phoneError) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
+      return;
+    }
     if (!organization.updatedAt) {
+      lastSaveErrorRef.current = new Error("Organization data is out of date.");
       toast.error("Organization data is out of date. Refresh and try again.");
       return;
     }
@@ -127,6 +141,7 @@ export default function OrganizationGeneral({
       setReviewOpen(false);
       toast.success("Settings saved");
     } catch (err) {
+      lastSaveErrorRef.current = err;
       if (err instanceof OrganizationSettingsConflictError) {
         onSave(err.latestOrganization);
         setForm(buildForm(err.latestOrganization));
@@ -157,76 +172,102 @@ export default function OrganizationGeneral({
     setReviewOpen(true);
   }, [hasValidationErrors, isModified, saving]);
 
+  // Wizard mode: expose save() so the wizard's Continue button can save this
+  // section without the user clicking Review & Save first. The review modal
+  // is bypassed during onboarding — there's no production data to protect yet.
+  useRegisterWizardEditor(
+    "organization-general",
+    {
+      isDirty: () => isModified,
+      hasErrors: () => hasValidationErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode,
+  );
+
   const handleCancel = useCallback(() => {
     setReviewOpen(false);
     setForm(buildForm());
   }, [buildForm]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
-        <div>
-          <label style={labelStyle}>ORGANIZATION NAME</label>
-          <input
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            maxLength={60}
-            className="dg-input"
-          />
-          {nameError ? (
-            <p
-              role="alert"
-              style={{
-                margin: "6px 0 0",
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-danger)",
-              }}
-            >
-              {nameError}
-            </p>
-          ) : null}
-        </div>
-      </div>
-      <OrganizationLocationFields
-        value={form}
-        onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-        phoneError={phoneError}
-        employeeCount={employeeCount}
-        employeeCountLoading={employeeCountLoading}
-        gridTemplateColumns={isMobile ? "1fr" : "1fr 1fr"}
-      />
-
-      <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
-        {isModified ? (
-          <button
-            onClick={handleCancel}
-            disabled={saving}
-            className="dg-btn dg-btn-secondary"
-          >
-            {EDITOR_ACTION_LABELS.discard}
-          </button>
-        ) : null}
-        <button
-          onClick={handleReview}
-          disabled={!isModified || saving || hasValidationErrors}
-          className="dg-btn dg-btn-primary"
+    <SectionCard>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
         >
-          Review & Save
-        </button>
-      </div>
-
-      {reviewOpen ? (
-        <OrganizationChangeReviewModal
-          changes={changes}
-          saving={saving}
-          onCancel={() => {
-            if (!saving) setReviewOpen(false);
-          }}
-          onConfirm={() => {
-            void handleSave();
-          }}
+          <div>
+            <label style={labelStyle}>ORGANIZATION NAME</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              maxLength={60}
+              className="dg-input"
+            />
+            {nameError ? (
+              <p
+                role="alert"
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                }}
+              >
+                {nameError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <OrganizationLocationFields
+          value={form}
+          onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
+          phoneError={phoneError}
+          employeeCount={employeeCount}
+          employeeCountLoading={employeeCountLoading}
+          gridTemplateColumns={isMobile ? "1fr" : "1fr 1fr"}
         />
-      ) : null}
-    </div>
+
+        {!isWizardMode && (
+          <EditorActionRow
+            secondaryAction={
+              isModified ? (
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="dg-btn dg-btn-secondary"
+                >
+                  {EDITOR_ACTION_LABELS.discard}
+                </button>
+              ) : null
+            }
+            primaryAction={
+              <button
+                onClick={handleReview}
+                disabled={!isModified || saving || hasValidationErrors}
+                className="dg-btn dg-btn-primary"
+              >
+                Review & Save
+              </button>
+            }
+          />
+        )}
+
+        {reviewOpen ? (
+          <OrganizationChangeReviewModal
+            changes={changes}
+            saving={saving}
+            onCancel={() => {
+              if (!saving) setReviewOpen(false);
+            }}
+            onConfirm={() => {
+              void handleSave();
+            }}
+          />
+        ) : null}
+      </div>
+    </SectionCard>
   );
 }

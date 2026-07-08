@@ -1,13 +1,8 @@
 "use client";
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
-import { useOrganizationData } from "@/hooks";
-import {
-  CalendarDays,
-  Users,
-  LayoutDashboard,
-  Shield,
-} from "lucide-react";
+import { useOrganizationData, useOrgClaims } from "@/hooks";
+import { CalendarDays, Users, LayoutDashboard, Shield } from "lucide-react";
 
 interface WelcomeStepProps {
   role: string;
@@ -15,10 +10,7 @@ interface WelcomeStepProps {
   isOrgSetup?: boolean;
 }
 
-const featureCards: Record<
-  string,
-  { icon: React.ReactNode; title: string; desc: string }[]
-> = {
+const featureCards: Record<string, { icon: React.ReactNode; title: string; desc: string }[]> = {
   super_admin: [
     {
       icon: <LayoutDashboard size={20} />,
@@ -38,7 +30,7 @@ const featureCards: Record<
     {
       icon: <Shield size={20} />,
       title: "Full Control",
-      desc: "Configure every aspect of your workspace and delegate permissions",
+      desc: "Configure every aspect of your organization and delegate permissions",
     },
   ],
   admin: [
@@ -74,22 +66,25 @@ const featureCards: Record<
 
 export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepProps) {
   const { org } = useOrganizationData();
-  const orgName = org?.name;
+  const { orgName: claimOrgName } = useOrgClaims();
+  // Prefer the JWT claim so the org name paints on first render (no bootstrap
+  // fetch). Falls back to the fetched org for tokens minted before the claim.
+  const orgName = claimOrgName ?? org?.name;
 
   const isSuperAdmin = role === "super_admin";
   const isSaOrientation = isSuperAdmin && (isOrgSetup ?? false);
   const features = featureCards[role] ?? featureCards.user;
 
   const heading = isSaOrientation
-    ? `Welcome to ${orgName ?? "DubGrid"}`
+    ? `Welcome to ${orgName ?? "DubGrid"}!`
     : isSuperAdmin
-      ? "Welcome to DubGrid"
-      : `Welcome to ${orgName ?? "DubGrid"}`;
+      ? "Welcome to DubGrid!"
+      : `Welcome to ${orgName ?? "DubGrid"}!`;
 
   const subtext = isSaOrientation
     ? "You\u2019ve been added as a super admin. Let\u2019s take a quick look at what you can do."
     : isSuperAdmin
-      ? "Smart staff scheduling built for care facilities. Let\u2019s set up your workspace \u2014 it only takes a few minutes."
+      ? "Smart staff scheduling built for care facilities. Let\u2019s set up your organization \u2014 it only takes a few minutes."
       : role === "admin"
         ? "You\u2019ve been added as an administrator. Here\u2019s what you\u2019ll have access to."
         : "You\u2019re all set up and ready to go. Here\u2019s what you\u2019ll find here.";

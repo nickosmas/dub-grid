@@ -101,9 +101,7 @@ describe("AuthSessionProvider", () => {
   });
 
   it("clears local auth state when the stored refresh token is invalid", async () => {
-    getSession.mockRejectedValueOnce(
-      new Error("Invalid Refresh Token: Refresh Token Not Found"),
-    );
+    getSession.mockRejectedValueOnce(new Error("Invalid Refresh Token: Refresh Token Not Found"));
     signOut.mockResolvedValueOnce({ error: null });
 
     render(

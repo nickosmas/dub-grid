@@ -45,9 +45,7 @@ type StaffReferenceValidationInput = {
   requireFocusArea?: boolean;
 };
 
-export function getStaffFieldErrors(
-  input: StaffTextValidationInput,
-): StaffFieldErrors {
+export function getStaffFieldErrors(input: StaffTextValidationInput): StaffFieldErrors {
   const fieldErrors: StaffFieldErrors = {};
 
   if (input.firstName !== undefined) {
@@ -112,21 +110,13 @@ export function normalizeStaffTextFields(input: StaffTextValidationInput): {
   }
 
   return {
-    ...(input.firstName !== undefined
-      ? { firstName: normalizeStaffName(input.firstName) }
-      : {}),
-    ...(input.lastName !== undefined
-      ? { lastName: normalizeStaffName(input.lastName) }
-      : {}),
-    ...(input.email !== undefined
-      ? { email: normalizeRequiredStaffEmail(input.email) }
-      : {}),
+    ...(input.firstName !== undefined ? { firstName: normalizeStaffName(input.firstName) } : {}),
+    ...(input.lastName !== undefined ? { lastName: normalizeStaffName(input.lastName) } : {}),
+    ...(input.email !== undefined ? { email: normalizeRequiredStaffEmail(input.email) } : {}),
     ...(input.optionalEmail !== undefined
       ? { optionalEmail: normalizeOptionalStaffEmail(input.optionalEmail) }
       : {}),
-    ...(input.phone !== undefined
-      ? { phone: normalizeOptionalUsPhone(input.phone) }
-      : {}),
+    ...(input.phone !== undefined ? { phone: normalizeOptionalUsPhone(input.phone) } : {}),
     ...(input.contactNotes !== undefined
       ? { contactNotes: normalizeStaffNotes(input.contactNotes) }
       : {}),
@@ -160,11 +150,7 @@ export function buildStaffValidationErrorResponse(
 
 async function fetchActiveIds(
   serviceClient: SupabaseClient,
-  table:
-    | "focus_areas"
-    | "organization_roles"
-    | "departments"
-    | "certifications",
+  table: "focus_areas" | "organization_roles" | "departments" | "certifications",
   orgId: string,
   ids: number[],
 ): Promise<Set<number>> {
@@ -172,11 +158,7 @@ async function fetchActiveIds(
     return new Set();
   }
 
-  let query = serviceClient
-    .from(table)
-    .select("id")
-    .eq("org_id", orgId)
-    .in("id", ids);
+  let query = serviceClient.from(table).select("id").eq("org_id", orgId).in("id", ids);
   if (table !== "certifications") {
     query = query.is("archived_at", null);
   } else {
@@ -197,16 +179,10 @@ export async function validateStaffOrgReferences(
   input: StaffReferenceValidationInput,
 ): Promise<StaffFieldErrors> {
   const fieldErrors: StaffFieldErrors = {};
-  const focusAreaIds = input.focusAreaIds
-    ? [...new Set(input.focusAreaIds)]
-    : undefined;
+  const focusAreaIds = input.focusAreaIds ? [...new Set(input.focusAreaIds)] : undefined;
   const roleIds = input.roleIds ? [...new Set(input.roleIds)] : undefined;
-  const departmentIds = input.departmentIds
-    ? [...new Set(input.departmentIds)]
-    : undefined;
-  const deptAdminIds = input.deptAdminIds
-    ? [...new Set(input.deptAdminIds)]
-    : undefined;
+  const departmentIds = input.departmentIds ? [...new Set(input.departmentIds)] : undefined;
+  const deptAdminIds = input.deptAdminIds ? [...new Set(input.deptAdminIds)] : undefined;
 
   if (input.requireFocusArea && focusAreaIds && focusAreaIds.length === 0) {
     fieldErrors.focusAreaIds = "Select at least one focus area";
@@ -216,72 +192,57 @@ export async function validateStaffOrgReferences(
 
   if (focusAreaIds) {
     checks.push(
-      fetchActiveIds(serviceClient, "focus_areas", orgId, focusAreaIds).then(
-        (validIds) => {
-          if (validIds.size !== focusAreaIds.length) {
-            fieldErrors.focusAreaIds =
-              "Select valid focus areas from this organization";
-          }
-        },
-      ),
-    );
-  }
-
-  if (roleIds) {
-    checks.push(
-      fetchActiveIds(serviceClient, "organization_roles", orgId, roleIds).then(
-        (validIds) => {
-          if (validIds.size !== roleIds.length) {
-            fieldErrors.roleIds = "Select valid roles from this organization";
-          }
-        },
-      ),
-    );
-  }
-
-  if (departmentIds) {
-    checks.push(
-      fetchActiveIds(serviceClient, "departments", orgId, departmentIds).then(
-        (validIds) => {
-          if (validIds.size !== departmentIds.length) {
-            fieldErrors.departmentIds =
-              "Select valid departments from this organization";
-          }
-        },
-      ),
-    );
-  }
-
-  if (input.certificationId != null) {
-    checks.push(
-      fetchActiveIds(serviceClient, "certifications", orgId, [
-        input.certificationId,
-      ]).then((validIds) => {
-        if (!validIds.has(input.certificationId!)) {
-          fieldErrors.certificationId =
-            "Select a valid certification from this organization";
+      fetchActiveIds(serviceClient, "focus_areas", orgId, focusAreaIds).then((validIds) => {
+        if (validIds.size !== focusAreaIds.length) {
+          fieldErrors.focusAreaIds = "Select valid focus areas from this organization";
         }
       }),
     );
   }
 
+  if (roleIds) {
+    checks.push(
+      fetchActiveIds(serviceClient, "organization_roles", orgId, roleIds).then((validIds) => {
+        if (validIds.size !== roleIds.length) {
+          fieldErrors.roleIds = "Select valid roles from this organization";
+        }
+      }),
+    );
+  }
+
+  if (departmentIds) {
+    checks.push(
+      fetchActiveIds(serviceClient, "departments", orgId, departmentIds).then((validIds) => {
+        if (validIds.size !== departmentIds.length) {
+          fieldErrors.departmentIds = "Select valid departments from this organization";
+        }
+      }),
+    );
+  }
+
+  if (input.certificationId != null) {
+    checks.push(
+      fetchActiveIds(serviceClient, "certifications", orgId, [input.certificationId]).then(
+        (validIds) => {
+          if (!validIds.has(input.certificationId!)) {
+            fieldErrors.certificationId = "Select a valid certification from this organization";
+          }
+        },
+      ),
+    );
+  }
+
   if (deptAdminIds) {
-    if (
-      departmentIds &&
-      deptAdminIds.some((id) => !departmentIds.includes(id))
-    ) {
-      fieldErrors.deptAdminIds =
-        "Department admins must belong to the selected departments";
+    if (departmentIds && deptAdminIds.some((id) => !departmentIds.includes(id))) {
+      fieldErrors.deptAdminIds = "Department admins must belong to the selected departments";
     } else {
       checks.push(
-        fetchActiveIds(serviceClient, "departments", orgId, deptAdminIds).then(
-          (validIds) => {
-            if (validIds.size !== deptAdminIds.length) {
-              fieldErrors.deptAdminIds =
-                "Select valid department admin departments from this organization";
-            }
-          },
-        ),
+        fetchActiveIds(serviceClient, "departments", orgId, deptAdminIds).then((validIds) => {
+          if (validIds.size !== deptAdminIds.length) {
+            fieldErrors.deptAdminIds =
+              "Select valid department admin departments from this organization";
+          }
+        }),
       );
     }
   }

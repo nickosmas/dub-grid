@@ -25,9 +25,7 @@ import { GET } from "./route";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 function makeRequest() {
-  return new NextRequest(
-    `http://localhost/api/gridmaster/users/${USER_ID}/memberships`,
-  );
+  return new NextRequest(`http://localhost/api/gridmaster/users/${USER_ID}/memberships`);
 }
 
 describe("GET /api/gridmaster/users/[userId]/memberships", () => {

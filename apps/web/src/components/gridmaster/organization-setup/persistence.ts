@@ -1,9 +1,5 @@
-import {
-  insertEmployee,
-} from "@/features/employees/client";
-import {
-  createGridmasterOrganizationSetup,
-} from "@/features/gridmaster/client";
+import { insertEmployee } from "@/features/employees/client";
+import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
 import {
   createOrganizationInvitation,
   updateOrganizationSettings,
@@ -19,10 +15,7 @@ import {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { DEFAULT_PREDEFINED_COLOR_BG } from "@/lib/colors";
 import { normalizeCode, normalizeLineText } from "@/lib/form-validation";
-import type {
-  AssignableOrganizationRole,
-  Organization,
-} from "@/types";
+import type { AssignableOrganizationRole, Organization } from "@/types";
 import type {
   CreatedEmployee,
   DeptRow,
@@ -39,9 +32,7 @@ export async function validateOrganizationSlug(slug: string): Promise<boolean> {
   if (!slug) return false;
 
   try {
-    const response = await fetch(
-      `/api/validate-domain?slug=${encodeURIComponent(slug)}`,
-    );
+    const response = await fetch(`/api/validate-domain?slug=${encodeURIComponent(slug)}`);
     const json = await response.json();
     return json.valid === false;
   } catch {
@@ -76,9 +67,7 @@ export type SuperAdminSetupResult =
   | { kind: "pending-invite"; displayName: string; pendingInvite: PendingInvite }
   | { kind: "invite-error"; displayName: string; message: string };
 
-export async function createOrganizationSetup(
-  input: CreateOrganizationSetupInput,
-): Promise<{
+export async function createOrganizationSetup(input: CreateOrganizationSetupInput): Promise<{
   org: Organization;
   superAdmin: SuperAdminSetupResult;
 }> {
@@ -110,16 +99,12 @@ export async function saveOrganizationSetupConfig({
   const departmentIdMap = new Map<string, number>();
   const focusAreaIdMap = new Map<string, number>();
   const shiftCategoryIdMap = new Map<string, number>();
-  const validDepartments = departments.filter((department) =>
-    department.name.trim(),
-  );
+  const validDepartments = departments.filter((department) => department.name.trim());
   const validFocusAreas = focusAreas.filter((focusArea) => focusArea.name.trim());
   const validCertifications = certifications.filter((item) => item.name.trim());
   const validRoles = orgRoles.filter((item) => item.name.trim());
   const validCategories = shiftCategories.filter((category) => category.name.trim());
-  const validJobs = jobs.filter(
-    (job) => job.label.trim() || job.name.trim(),
-  );
+  const validJobs = jobs.filter((job) => job.label.trim() || job.name.trim());
   const scheduledDepartmentRowIds = new Set(
     validDepartments
       .filter((department) => department.type === "scheduled")
@@ -131,18 +116,17 @@ export async function saveOrganizationSetupConfig({
   if (
     validFocusAreas.some(
       (focusArea) =>
-        focusArea.departmentId == null ||
-        !scheduledDepartmentRowIds.has(focusArea.departmentId),
+        focusArea.departmentId == null || !scheduledDepartmentRowIds.has(focusArea.departmentId),
     )
   ) {
-    throw new Error("Assign each focus area to a scheduled department before saving configuration.");
+    throw new Error(
+      "Assign each focus area to a scheduled department before saving configuration.",
+    );
   }
 
   if (
     validCategories.some(
-      (category) =>
-        category.focusAreaId == null ||
-        !focusAreaRowIds.has(category.focusAreaId),
+      (category) => category.focusAreaId == null || !focusAreaRowIds.has(category.focusAreaId),
     )
   ) {
     throw new Error("Assign each shift to a focus area before saving configuration.");
@@ -150,15 +134,15 @@ export async function saveOrganizationSetupConfig({
 
   if (
     validJobs.some((job) => {
-      const hasDepartment = job.departmentIds.some((id) =>
-        scheduledDepartmentRowIds.has(id),
-      );
+      const hasDepartment = job.departmentIds.some((id) => scheduledDepartmentRowIds.has(id));
       const hasFocusArea = job.focusAreaIds.some((id) => focusAreaRowIds.has(id));
       const hasShift = job.shiftCategoryIds.some((id) => shiftCategoryRowIds.has(id));
       return !hasDepartment || !hasFocusArea || !hasShift;
     })
   ) {
-    throw new Error("Assign each job to a scheduled department, focus area, and shift before saving configuration.");
+    throw new Error(
+      "Assign each job to a scheduled department, focus area, and shift before saving configuration.",
+    );
   }
 
   if (shiftDisplayMode !== "code") {
@@ -203,8 +187,7 @@ export async function saveOrganizationSetupConfig({
   for (let index = 0; index < validFocusAreas.length; index += 1) {
     const focusArea = validFocusAreas[index];
     const departmentId =
-      (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ??
-      null;
+      (focusArea.departmentId ? departmentIdMap.get(focusArea.departmentId) : undefined) ?? null;
     const saved = await upsertFocusArea({
       orgId: createdOrg.id,
       departmentId,
@@ -276,8 +259,7 @@ export async function saveOrganizationSetupConfig({
   for (let index = 0; index < validCategories.length; index += 1) {
     const category = validCategories[index];
     const focusAreaId =
-      (category.focusAreaId ? focusAreaIdMap.get(category.focusAreaId) : undefined) ??
-      null;
+      (category.focusAreaId ? focusAreaIdMap.get(category.focusAreaId) : undefined) ?? null;
     const saved = await upsertShiftCategory({
       orgId: createdOrg.id,
       name: normalizeLineText(category.name, {

@@ -23,8 +23,7 @@ export async function GET(req: NextRequest) {
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
   const auth = await requireMobileAuth(req);
-  if ("response" in auth)
-    return withMobileCors(req, auth.response, CORS_METHODS);
+  if ("response" in auth) return withMobileCors(req, auth.response, CORS_METHODS);
 
   const payload = await loadMobileBootstrapPayload(auth, {
     fetchLinkedEmployeeForUser,

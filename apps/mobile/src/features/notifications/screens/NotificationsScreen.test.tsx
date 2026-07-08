@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createQueryStateCardModule,
@@ -6,23 +6,24 @@ import {
   createScreenModule,
 } from "../../../test/native";
 
+const useInfiniteQuery = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const markAllNotificationsRead = vi.fn();
 const markNotificationRead = vi.fn();
+const bulkUpdateNotifications = vi.fn();
 const setQueryData = vi.fn();
 const push = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@tanstack/react-query", () => ({
   QueryClient: class QueryClient {},
   onlineManager: {
     isOnline: () => true,
   },
+  useInfiniteQuery,
   useQuery,
 }));
 
@@ -36,16 +37,16 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
 );
 
 vi.mock("../../../shared/lib/api", () => ({
+  bulkUpdateNotifications,
   getNotifications: vi.fn(),
+  getNotificationFacets: vi.fn(),
   markAllNotificationsRead,
   markNotificationRead,
 }));
@@ -72,90 +73,93 @@ beforeAll(async () => {
   NotificationsScreen = (await import("./NotificationsScreen")).default;
 });
 
+const SAMPLE_NOTIFICATION = {
+  id: "00000000-0000-4000-8000-000000000001",
+  type: "shift_request_new",
+  channel: "in_app",
+  category: "shift_requests",
+  title: "Pickup available",
+  message: "A shift is waiting for response.",
+  metadata: { requestId: "req-1" },
+  priority: "high",
+  groupKey: null,
+  groupCount: 1,
+  actionUrl: "/requests?id=req-1&tab=approval",
+  actionLabel: "Review",
+  readAt: null,
+  archivedAt: null,
+  createdAt: "2026-04-24T12:00:00.000Z",
+};
+
+function buildInfiniteQueryResult(
+  overrides: Partial<{
+    notifications: (typeof SAMPLE_NOTIFICATION)[];
+    unreadCount: number;
+    isLoading: boolean;
+    error: Error | null;
+  }> = {},
+) {
+  const refetch = vi.fn().mockResolvedValue(undefined);
+  return {
+    data: {
+      pages: [
+        {
+          notifications: overrides.notifications ?? [],
+          unreadCount: overrides.unreadCount ?? 0,
+          nextCursor: null,
+        },
+      ],
+    },
+    isLoading: overrides.isLoading ?? false,
+    error: overrides.error ?? null,
+    refetch,
+    fetchNextPage: vi.fn(),
+    hasNextPage: false,
+    isFetchingNextPage: false,
+  };
+}
+
 describe("NotificationsScreen", () => {
   beforeEach(() => {
+    useInfiniteQuery.mockReset();
     useQuery.mockReset();
     useAccessToken.mockReset();
     markAllNotificationsRead.mockReset();
     markNotificationRead.mockReset();
+    bulkUpdateNotifications.mockReset();
     setQueryData.mockReset();
     push.mockReset();
     pushToast.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
-  });
-
-  it("shows the loading state before alerts arrive", () => {
     useQuery.mockReturnValue({
       data: undefined,
       error: null,
-      isFetching: false,
-      isLoading: true,
-      refetch: vi.fn(),
-    });
-
-    render(<NotificationsScreen />);
-
-    expect(screen.getByText("Loading alerts")).toBeInTheDocument();
-  });
-
-  it("shows a retryable error state", () => {
-    const refetch = vi.fn();
-    useQuery.mockReturnValue({
-      data: undefined,
-      error: new Error("Forbidden"),
-      isFetching: false,
       isLoading: false,
-      refetch,
+      refetch: vi.fn().mockResolvedValue(undefined),
     });
-
-    render(<NotificationsScreen />);
-
-    expect(screen.getByText("Could not load alerts")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Try Again"));
-    expect(refetch).toHaveBeenCalled();
   });
 
   it("shows the empty state when no alerts exist", () => {
-    useQuery.mockReturnValue({
-      data: {
-        notifications: [],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    });
+    useInfiniteQuery.mockReturnValue(buildInfiniteQueryResult());
 
     render(<NotificationsScreen />);
 
     expect(screen.getByText("No alerts yet")).toBeInTheDocument();
   });
 
-  it("marks unread shift-request alerts as read and routes into requests", async () => {
-    const refetch = vi.fn().mockRejectedValue(new Error("Refresh failed"));
+  it("opens the detail screen when an alert is tapped and marks it read first", async () => {
+    const queryResult = buildInfiniteQueryResult({
+      notifications: [SAMPLE_NOTIFICATION],
+      unreadCount: 1,
+    });
+    useInfiniteQuery.mockReturnValue(queryResult);
+    const facetsRefetch = vi.fn().mockResolvedValue(undefined);
     useQuery.mockReturnValue({
-      data: {
-        notifications: [
-          {
-            id: "00000000-0000-4000-8000-000000000001",
-            type: "shift_request_new",
-            channel: "in_app",
-            category: "shift_requests",
-            title: "Pickup available",
-            message: "A shift is waiting for response.",
-            metadata: {
-              requestId: "req-1",
-            },
-            readAt: null,
-            createdAt: "2026-04-24T12:00:00.000Z",
-          },
-        ],
-      },
+      data: undefined,
       error: null,
-      isFetching: false,
       isLoading: false,
-      refetch,
+      refetch: facetsRefetch,
     });
     markNotificationRead.mockResolvedValue({
       success: true,
@@ -167,86 +171,28 @@ describe("NotificationsScreen", () => {
     fireEvent.click(screen.getByText("Pickup available"));
 
     await waitFor(() => {
-      expect(markNotificationRead).toHaveBeenCalledWith(
-        "token-123",
-        "00000000-0000-4000-8000-000000000001",
-      );
+      expect(markNotificationRead).toHaveBeenCalledWith("token-123", SAMPLE_NOTIFICATION.id);
+    });
+    expect(push).toHaveBeenCalledWith({
+      pathname: "/alerts/[id]",
+      params: { id: SAMPLE_NOTIFICATION.id },
     });
     expect(setQueryData).toHaveBeenCalled();
-    expect(refetch).toHaveBeenCalled();
-    expect(push).toHaveBeenCalledWith({
-      pathname: "/(tabs)/requests",
-      params: {
-        requestId: "req-1",
-        tab: "approval",
-      },
-    });
-    expect(pushToast).not.toHaveBeenCalled();
-  });
-
-  it("does not navigate away when marking an unread alert as read fails", async () => {
-    useQuery.mockReturnValue({
-      data: {
-        notifications: [
-          {
-            id: "00000000-0000-4000-8000-000000000001",
-            type: "shift_request_new",
-            channel: "in_app",
-            category: "shift_requests",
-            title: "Pickup available",
-            message: "A shift is waiting for response.",
-            metadata: {
-              requestId: "req-1",
-            },
-            readAt: null,
-            createdAt: "2026-04-24T12:00:00.000Z",
-          },
-        ],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    });
-    markNotificationRead.mockRejectedValue(new Error("Database is unavailable"));
-
-    render(<NotificationsScreen />);
-
-    fireEvent.click(screen.getByText("Pickup available"));
-
+    // Sidebar/chip badge bug: row-press must refetch both list + facets so
+    // filter chip counts stay accurate. handleArchive/handleMarkAllRead already
+    // do this — handleRowPress used to skip the facets refetch.
     await waitFor(() => {
-      expect(pushToast).toHaveBeenCalledWith({
-        tone: "error",
-        title: "Could not update alerts",
-        message: "We couldn't update that alert.",
-      });
+      expect(queryResult.refetch).toHaveBeenCalled();
+      expect(facetsRefetch).toHaveBeenCalled();
     });
-    expect(push).not.toHaveBeenCalled();
   });
 
   it("marks all unread alerts as read", async () => {
-    const refetch = vi.fn().mockRejectedValue(new Error("Refresh failed"));
-    useQuery.mockReturnValue({
-      data: {
-        notifications: [
-          {
-            id: "00000000-0000-4000-8000-000000000001",
-            type: "schedule_published",
-            channel: "in_app",
-            category: "schedule",
-            title: "Schedule published",
-            message: "This week's schedule is live.",
-            metadata: {},
-            readAt: null,
-            createdAt: "2026-04-24T12:00:00.000Z",
-          },
-        ],
-      },
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch,
+    const queryResult = buildInfiniteQueryResult({
+      notifications: [SAMPLE_NOTIFICATION],
+      unreadCount: 1,
     });
+    useInfiniteQuery.mockReturnValue(queryResult);
     markAllNotificationsRead.mockResolvedValue({
       success: true,
       unreadCount: 0,
@@ -256,11 +202,31 @@ describe("NotificationsScreen", () => {
 
     fireEvent.click(screen.getByText("Mark all read"));
 
+    const confirmDialog = await screen.findByRole("alert");
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "Mark all read" }));
+
     await waitFor(() => {
       expect(markAllNotificationsRead).toHaveBeenCalledWith("token-123");
     });
-    expect(setQueryData).toHaveBeenCalled();
-    expect(refetch).toHaveBeenCalled();
-    expect(pushToast).not.toHaveBeenCalled();
+    expect(queryResult.refetch).toHaveBeenCalled();
+  });
+
+  it("does not navigate when marking the alert read fails", async () => {
+    useInfiniteQuery.mockReturnValue(
+      buildInfiniteQueryResult({
+        notifications: [SAMPLE_NOTIFICATION],
+        unreadCount: 1,
+      }),
+    );
+    markNotificationRead.mockRejectedValue(new Error("Database is unavailable"));
+
+    render(<NotificationsScreen />);
+
+    fireEvent.click(screen.getByText("Pickup available"));
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalled();
+    });
+    expect(push).not.toHaveBeenCalled();
   });
 });

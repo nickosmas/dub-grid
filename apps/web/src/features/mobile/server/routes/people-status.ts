@@ -3,10 +3,7 @@ import {
   mobilePersonStatusUpdateBodySchema,
   mobilePersonStatusUpdateResponseSchema,
 } from "@dubgrid/contracts";
-import {
-  MobileApiAuthorizationError,
-  updateMobilePersonStatus,
-} from "@dubgrid/mobile-api-core";
+import { MobileApiAuthorizationError, updateMobilePersonStatus } from "@dubgrid/mobile-api-core";
 import {
   fetchMobileEmployeeRowById,
   insertMobileAuditLogEntry,
@@ -27,10 +24,7 @@ function getRequestIp(req: NextRequest): string | null {
   return forwarded.split(",")[0]?.trim() || null;
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) {
     return auth.response;
@@ -48,10 +42,7 @@ export async function PATCH(
 
   const parsed = mobilePersonStatusUpdateBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Check the status details and try again." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Check the status details and try again." }, { status: 400 });
   }
 
   const { id } = await context.params;
@@ -67,11 +58,7 @@ export async function PATCH(
       },
       {
         fetchEmployeeById: async (serviceClient, orgId, employeeId) => {
-          const row = await fetchMobileEmployeeRowById(
-            serviceClient,
-            orgId,
-            employeeId,
-          );
+          const row = await fetchMobileEmployeeRowById(serviceClient, orgId, employeeId);
           return row ? rowToEmployee(row) : null;
         },
         updateEmployeeStatus: async (serviceClient, input) => {
@@ -103,10 +90,14 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(
-      { error: result.error },
-      { status: result.status },
-    );
+    if (result.kind === "self_action_forbidden") {
+      return NextResponse.json(
+        { error: result.error, code: result.code },
+        { status: result.status },
+      );
+    }
+
+    return NextResponse.json({ error: result.error }, { status: result.status });
   } catch (error) {
     if (error instanceof MobileApiAuthorizationError) {
       return NextResponse.json(

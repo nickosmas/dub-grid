@@ -80,9 +80,7 @@ describe("GET /api/gridmaster/impersonation", () => {
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/gridmaster/impersonation"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/gridmaster/impersonation"));
 
     expect(response.status).toBe(403);
     expect(requestRpc).not.toHaveBeenCalled();
