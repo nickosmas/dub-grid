@@ -350,7 +350,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
   return (
     <PublicRoute>
-      <PageShell>
+      <PageShell signInDisclaimer={!orgNotFound}>
         <Card>
           {/* Logo — links to apex landing page */}
           <a
